@@ -1,0 +1,270 @@
+.security-settings-page {
+  padding: 2rem;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.security-header {
+  margin-bottom: 2rem;
+}
+
+.security-header h2 {
+  font-size: 2rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+  color: #fff;
+}
+
+.security-header p {
+  color: #9ca3af;
+  font-size: 1rem;
+}
+
+.security-content {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.security-card {
+  background: #1f2937;
+  border-radius: 12px;
+  padding: 2rem;
+  border: 1px solid #374151;
+}
+
+.security-card h3 {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin-bottom: 1.5rem;
+  color: #fff;
+}
+
+.security-card h3 svg {
+  color: #3b82f6;
+}
+
+.security-group {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.security-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.5rem;
+  background: #111827;
+  border-radius: 8px;
+  border: 1px solid #374151;
+}
+
+.security-info h4 {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+  color: #fff;
+}
+
+.security-info p {
+  color: #9ca3af;
+  font-size: 0.9rem;
+  margin-bottom: 0.75rem;
+}
+
+.status-badge {
+  display: inline-block;
+  padding: 0.25rem 0.75rem;
+  border-radius: 12px;
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+.status-badge.enabled {
+  background: rgba(34, 197, 94, 0.1);
+  color: #22c55e;
+  border: 1px solid rgba(34, 197, 94, 0.3);
+}
+
+.status-badge.disabled {
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+/* Password Form */
+.password-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  max-width: 500px;
+}
+
+.password-form .form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.password-form label {
+  font-weight: 500;
+  color: #e5e7eb;
+  font-size: 0.9rem;
+}
+
+.password-form .form-input {
+  padding: 0.75rem 1rem;
+  background: #111827;
+  border: 1px solid #374151;
+  border-radius: 8px;
+  color: #fff;
+  font-size: 1rem;
+}
+
+.password-form .form-input:focus {
+  outline: none;
+  border-color: #3b82f6;
+}
+
+.password-form .hint-text {
+  color: #9ca3af;
+  font-size: 0.85rem;
+}
+
+/* Sessions */
+.session-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.5rem;
+  background: #111827;
+  border-radius: 8px;
+  border: 1px solid #374151;
+}
+
+.session-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.session-header h4 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #fff;
+}
+
+.current-badge {
+  padding: 0.25rem 0.75rem;
+  background: rgba(59, 130, 246, 0.1);
+  color: #3b82f6;
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.session-details {
+  color: #9ca3af;
+  font-size: 0.9rem;
+  margin-bottom: 0.25rem;
+}
+
+.session-time {
+  color: #6b7280;
+  font-size: 0.85rem;
+}
+
+/* Activity */
+.activity-item {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem;
+  background: #111827;
+  border-radius: 8px;
+  border: 1px solid #374151;
+}
+
+.activity-icon {
+  font-size: 1.5rem;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #1f2937;
+  border-radius: 50%;
+}
+
+.activity-details h4 {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #fff;
+  margin-bottom: 0.25rem;
+}
+
+.activity-details p {
+  color: #9ca3af;
+  font-size: 0.85rem;
+}
+
+/* Buttons */
+.btn-primary, .btn-danger-outline {
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: none;
+  font-size: 0.95rem;
+}
+
+.btn-primary {
+  background: #3b82f6;
+  color: #fff;
+}
+
+.btn-primary:hover {
+  background: #2563eb;
+}
+
+.btn-danger-outline {
+  background: transparent;
+  border: 1px solid #ef4444;
+  color: #ef4444;
+}
+
+.btn-danger-outline:hover {
+  background: rgba(239, 68, 68, 0.1);
+}
+
+.info-text {
+  color: #9ca3af;
+  font-size: 0.9rem;
+  margin-bottom: 1rem;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .security-settings-page {
+    padding: 1rem;
+  }
+
+  .security-item,
+  .session-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+
+  .security-item button,
+  .session-item button {
+    width: 100%;
+  }
+}

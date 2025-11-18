@@ -1,19 +1,63 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { toast } from 'react-toastify';
+import { apiClient } from '../api';
+import LoadingSpinner from '../components/LoadingSpinner';
 import '../styles/profile.css';
 
 const ProfilePage = () => {
-  const { user } = useAuth();
+  const { user, token, logout } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
-  const [formData, setFormData] = useState({
-    username: user?.username || '',
-    email: user?.email || 'user@example.com',
-    fullName: user?.fullName || '',
-    phone: user?.phone || '',
-    company: user?.company || '',
-    role: user?.role || 'Admin',
+  const [isLoading, setIsLoading] = useState(true);
+  const [stats, setStats] = useState({
+    total_vms_created: 0,
+    storage_used_tb: 0,
+    total_spend: 0,
+    member_since: 'Recent'
   });
+  const [formData, setFormData] = useState({
+    username: '',
+    email: '',
+    full_name: '',
+    phone: '',
+    company: '',
+    role: 'Admin',
+    profile_picture: null,
+  });
+
+  useEffect(() => {
+    fetchProfileData();
+  }, [token]);
+
+  const fetchProfileData = async () => {
+    try {
+      setIsLoading(true);
+      
+      // Fetch profile
+      const profileResponse = await apiClient.get('/profile/me');
+      const profileData = profileResponse.data;
+      
+      setFormData({
+        username: profileData.username || '',
+        email: profileData.email || '',
+        full_name: profileData.full_name || '',
+        phone: profileData.phone || '',
+        company: profileData.company || '',
+        role: profileData.role || 'Admin',
+        profile_picture: profileData.profile_picture || null,
+      });
+
+      // Fetch stats
+      const statsResponse = await apiClient.get('/profile/stats');
+      setStats(statsResponse.data);
+      
+    } catch (error) {
+      console.error('Failed to fetch profile:', error);
+      toast.error('Failed to load profile data');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleChange = (e) => {
     setFormData({
@@ -22,24 +66,109 @@ const ProfilePage = () => {
     });
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    // TODO: API call to update profile
-    toast.success('Profile updated successfully!');
-    setIsEditing(false);
+    try {
+      await apiClient.put('/profile/me', {
+        username: formData.username,
+        email: formData.email,
+        full_name: formData.full_name,
+        phone: formData.phone,
+        company: formData.company
+      });
+      
+      toast.success('Profile updated successfully!');
+      setIsEditing(false);
+      fetchProfileData();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to update profile');
+    }
   };
 
   const handleCancel = () => {
-    setFormData({
-      username: user?.username || '',
-      email: user?.email || 'user@example.com',
-      fullName: user?.fullName || '',
-      phone: user?.phone || '',
-      company: user?.company || '',
-      role: user?.role || 'Admin',
-    });
+    fetchProfileData();
     setIsEditing(false);
   };
+
+  const handleUploadPicture = async (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    // Validate file size (2MB max)
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error('File size must be less than 2MB');
+      return;
+    }
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please upload an image file');
+      return;
+    }
+
+    const formDataObj = new FormData();
+    formDataObj.append('file', file);
+
+    try {
+      const response = await apiClient.post('/profile/picture', formDataObj, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      toast.success('Profile picture uploaded successfully!');
+      fetchProfileData();
+    } catch (error) {
+      toast.error('Failed to upload profile picture');
+    }
+  };
+
+  const handleRemovePicture = async () => {
+    try {
+      await apiClient.delete('/profile/picture');
+      toast.success('Profile picture removed successfully!');
+      fetchProfileData();
+    } catch (error) {
+      toast.error('Failed to remove profile picture');
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    const confirmed = window.confirm(
+      '⚠️ WARNING: This will permanently delete your account and all associated data including VMs, files, and settings. This action cannot be undone. Are you absolutely sure?'
+    );
+    
+    if (!confirmed) return;
+
+    const doubleConfirm = window.confirm(
+      'This is your last chance. Type "DELETE" in the next prompt to confirm account deletion.'
+    );
+    
+    if (!doubleConfirm) return;
+
+    const finalConfirmation = prompt('Type "DELETE" (in capital letters) to permanently delete your account:');
+    
+    if (finalConfirmation !== 'DELETE') {
+      toast.error('Account deletion cancelled - confirmation text did not match');
+      return;
+    }
+
+    try {
+      await apiClient.delete('/profile/account');
+      toast.success('Account deleted successfully. Redirecting...');
+      
+      // Log out after 2 seconds
+      setTimeout(() => {
+        logout();
+        window.location.href = '/';
+      }, 2000);
+    } catch (error) {
+      toast.error('Failed to delete account');
+    }
+  };
+
+  if (isLoading) {
+    return <LoadingSpinner size="large" text="Loading profile..." />;
+  }
 
   return (
     <div className="profile-page">
@@ -53,12 +182,25 @@ const ProfilePage = () => {
         <div className="profile-card">
           <h3>Profile Picture</h3>
           <div className="profile-picture-section">
-            <div className="profile-picture-large">
-              {formData.username?.substring(0, 2).toUpperCase() || 'U'}
+            <div className="picture-container">
+              {formData.profile_picture ? (
+                <img src={formData.profile_picture} alt="Profile" className="profile-picture" />
+              ) : (
+                <div className="profile-picture-placeholder">
+                  {formData.username?.charAt(0).toUpperCase() || 'U'}
+                </div>
+              )}
             </div>
             <div className="profile-picture-actions">
-              <button className="btn-upload">Upload Photo</button>
-              <button className="btn-remove">Remove</button>
+              <label htmlFor="picture-upload" className="btn-upload">Upload Photo</label>
+              <input 
+                id="picture-upload" 
+                type="file" 
+                accept="image/*" 
+                onChange={handleUploadPicture}
+                style={{ display: 'none' }}
+              />
+              <button className="btn-remove" onClick={handleRemovePicture} type="button">Remove</button>
               <p className="hint-text">JPG, GIF or PNG. Max size of 2MB</p>
             </div>
           </div>
@@ -108,8 +250,8 @@ const ProfilePage = () => {
                 <label>Full Name</label>
                 <input
                   type="text"
-                  name="fullName"
-                  value={formData.fullName}
+                  name="full_name"
+                  value={formData.full_name}
                   onChange={handleChange}
                   disabled={!isEditing}
                   className="form-input"
@@ -175,28 +317,28 @@ const ProfilePage = () => {
             <div className="stat-item">
               <div className="stat-icon">🖥️</div>
               <div className="stat-details">
-                <div className="stat-value">12</div>
+                <div className="stat-value">{stats.total_vms_created}</div>
                 <div className="stat-label">Total VMs Created</div>
               </div>
             </div>
             <div className="stat-item">
               <div className="stat-icon">💾</div>
               <div className="stat-details">
-                <div className="stat-value">2.4 TB</div>
+                <div className="stat-value">{stats.storage_used_tb.toFixed(2)} TB</div>
                 <div className="stat-label">Storage Used</div>
               </div>
             </div>
             <div className="stat-item">
               <div className="stat-icon">💰</div>
               <div className="stat-details">
-                <div className="stat-value">$847</div>
+                <div className="stat-value">${stats.total_spend.toFixed(2)}</div>
                 <div className="stat-label">Total Spend</div>
               </div>
             </div>
             <div className="stat-item">
               <div className="stat-icon">📅</div>
               <div className="stat-details">
-                <div className="stat-value">6 months</div>
+                <div className="stat-value">{stats.member_since}</div>
                 <div className="stat-label">Member Since</div>
               </div>
             </div>
@@ -212,7 +354,7 @@ const ProfilePage = () => {
                 <h4>Delete Account</h4>
                 <p>Permanently delete your account and all associated data</p>
               </div>
-              <button className="btn-danger">Delete Account</button>
+              <button className="btn-danger" onClick={handleDeleteAccount}>Delete Account</button>
             </div>
           </div>
         </div>

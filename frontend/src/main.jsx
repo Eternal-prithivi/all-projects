@@ -16,6 +16,7 @@ import ProtectedRoute from "./components/ProtectedRoute.jsx";
 import { AuthProvider } from "./context/AuthContext.jsx";
 import "./index.css";
 import SecurityPage from "./pages/SecurityPage.jsx";
+import SecuritySettingsPage from "./pages/SecuritySettingsPage.jsx";
 import ProfilePage from "./pages/ProfilePage.jsx";
 import SettingsPage from "./pages/SettingsPage.jsx";
 
@@ -44,6 +45,7 @@ const router = createBrowserRouter([
               { path: "storage", element: <StoragePage /> },
               { path: "vmcluster", element: <VMClusterPage /> },
               { path: "security", element: <SecurityPage /> },
+              { path: "security-settings", element: <SecuritySettingsPage /> },
               { path: "profile", element: <ProfilePage /> },
               { path: "settings", element: <SettingsPage /> },
             ],

@@ -1,8 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { toast } from 'react-toastify';
+import { apiClient } from '../api';
+import LoadingSpinner from '../components/LoadingSpinner';
 import '../styles/settings.css';
 
 const SettingsPage = () => {
+  const [isLoading, setIsLoading] = useState(true);
+  const [apiKeys, setApiKeys] = useState([]);
   const [notifications, setNotifications] = useState({
     emailNotifications: true,
     budgetAlerts: true,
@@ -24,12 +28,67 @@ const SettingsPage = () => {
     paymentMethod: 'Credit Card ****1234',
   });
 
-  const handleNotificationChange = (key) => {
-    setNotifications({
+  useEffect(() => {
+    fetchSettings();
+    fetchApiKeys();
+  }, []);
+
+  const fetchSettings = async () => {
+    try {
+      setIsLoading(true);
+      const response = await apiClient.get('/settings/');
+      const data = response.data;
+      
+      setNotifications({
+        emailNotifications: data.notifications.email_notifications,
+        budgetAlerts: data.notifications.budget_alerts,
+        securityAlerts: data.notifications.security_alerts,
+        weeklyReports: data.notifications.weekly_reports,
+        maintenanceUpdates: data.notifications.maintenance_updates,
+      });
+      
+      setPreferences(data.preferences);
+      setBilling({
+        autoRenew: data.billing.auto_renew,
+        paymentMethod: data.billing.payment_method || 'Credit Card ****1234'
+      });
+    } catch (error) {
+      console.error('Failed to fetch settings:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const fetchApiKeys = async () => {
+    try {
+      const response = await apiClient.get('/settings/api-keys');
+      setApiKeys(response.data.keys || []);
+    } catch (error) {
+      console.error('Failed to fetch API keys:', error);
+    }
+  };
+
+  const handleNotificationChange = async (key) => {
+    const newNotifications = {
       ...notifications,
       [key]: !notifications[key]
-    });
-    toast.success('Notification settings updated');
+    };
+    setNotifications(newNotifications);
+    
+    try {
+      await apiClient.put('/settings/notifications', {
+        email_notifications: newNotifications.emailNotifications,
+        budget_alerts: newNotifications.budgetAlerts,
+        security_alerts: newNotifications.securityAlerts,
+        weekly_reports: newNotifications.weeklyReports,
+        maintenance_updates: newNotifications.maintenanceUpdates,
+      });
+      toast.success('Notification settings updated');
+    } catch (error) {
+      toast.error('Failed to update notifications');
+      // Revert change
+      setNotifications(notifications);
+    }
   };
 
   const handlePreferenceChange = (e) => {
@@ -39,9 +98,71 @@ const SettingsPage = () => {
     });
   };
 
-  const handleSavePreferences = () => {
-    toast.success('Preferences saved successfully!');
+  const handleSavePreferences = async () => {
+    try {
+      await apiClient.put('/settings/preferences', preferences);
+      toast.success('Preferences saved successfully!');
+    } catch (error) {
+      toast.error('Failed to save preferences');
+    }
   };
+
+  const handleGenerateApiKey = async () => {
+    try {
+      const response = await apiClient.post('/settings/api-keys');
+      toast.success(
+        <div>
+          <strong>API Key Generated!</strong><br/>
+          <code style={{fontSize: '0.85rem'}}>{response.data.key}</code><br/>
+          <small>{response.data.note}</small>
+        </div>,
+        { autoClose: false }
+      );
+      fetchApiKeys();
+    } catch (error) {
+      toast.error('Failed to generate API key');
+    }
+  };
+
+  const handleRevokeApiKey = async (keyId) => {
+    try {
+      await apiClient.delete(`/settings/api-keys/${keyId}`);
+      toast.success('API key revoked');
+      fetchApiKeys();
+    } catch (error) {
+      toast.error('Failed to revoke API key');
+    }
+  };
+
+  const handleUpdatePaymentMethod = async () => {
+    const cardNumber = prompt('Enter the last 4 digits of your new card:');
+    
+    if (!cardNumber) {
+      toast.info('Payment method update cancelled');
+      return;
+    }
+    
+    if (cardNumber.length !== 4 || isNaN(cardNumber)) {
+      toast.error('Please enter exactly 4 digits');
+      return;
+    }
+
+    try {
+      await apiClient.put('/settings/payment-method', {
+        last_four: cardNumber
+      });
+      
+      const newPaymentMethod = `Credit Card ****${cardNumber}`;
+      setBilling({ ...billing, paymentMethod: newPaymentMethod });
+      toast.success('Payment method updated successfully!');
+    } catch (error) {
+      toast.error('Failed to update payment method');
+    }
+  };
+
+  if (isLoading) {
+    return <LoadingSpinner size="large" text="Loading settings..." />;
+  }
 
   return (
     <div className="settings-page">
@@ -186,9 +307,19 @@ const SettingsPage = () => {
                 <input
                   type="checkbox"
                   checked={billing.autoRenew}
-                  onChange={() => {
-                    setBilling({ ...billing, autoRenew: !billing.autoRenew });
-                    toast.success('Billing settings updated');
+                  onChange={async () => {
+                    const newValue = !billing.autoRenew;
+                    setBilling({ ...billing, autoRenew: newValue });
+                    try {
+                      await apiClient.put('/settings/billing', {
+                        auto_renew: newValue,
+                        payment_method: billing.paymentMethod
+                      });
+                      toast.success('Billing settings updated');
+                    } catch (error) {
+                      toast.error('Failed to update billing settings');
+                      setBilling({ ...billing, autoRenew: !newValue });
+                    }
                   }}
                 />
                 <span className="toggle-slider"></span>
@@ -200,7 +331,7 @@ const SettingsPage = () => {
                 <h4>Payment Method</h4>
                 <p>{billing.paymentMethod}</p>
               </div>
-              <button className="btn-secondary">Update Payment Method</button>
+              <button className="btn-secondary" onClick={handleUpdatePaymentMethod}>Update Payment Method</button>
             </div>
           </div>
         </div>
@@ -216,15 +347,20 @@ const SettingsPage = () => {
           </h3>
           <div className="settings-group">
             <p className="info-text">Generate and manage API keys for programmatic access to your resources</p>
-            <div className="api-key-item">
-              <div className="api-key-info">
-                <h4>Production API Key</h4>
-                <code>sk-prod-****************************xyz123</code>
-                <p className="key-created">Created: Nov 15, 2025</p>
+            {apiKeys.map((key) => (
+              <div key={key.key_id} className="api-key-item">
+                <div className="api-key-info">
+                  <h4>Production API Key</h4>
+                  <code>{key.key_preview}</code>
+                  <p className="key-created">Created: {new Date(key.created_at).toLocaleDateString()}</p>
+                </div>
+                <button className="btn-danger-outline" onClick={() => handleRevokeApiKey(key.key_id)}>Revoke</button>
               </div>
-              <button className="btn-danger-outline">Revoke</button>
-            </div>
-            <button className="btn-secondary">Generate New API Key</button>
+            ))}
+            {apiKeys.length === 0 && (
+              <p className="info-text">No API keys generated yet</p>
+            )}
+            <button className="btn-secondary" onClick={handleGenerateApiKey}>Generate New API Key</button>
           </div>
         </div>
       </div>

@@ -36,7 +36,12 @@ def register_user_route(user: UserCreate, db: Collection = Depends(get_users_col
     return {"message": f"User {user.username} registered successfully"}
 
 @router.post("/token", response_model=Token)
-def login_for_access_token_route(form_data: OAuth2PasswordRequestForm = Depends(), db: Collection = Depends(get_users_collection)):
+def login_for_access_token_route(
+    form_data: OAuth2PasswordRequestForm = Depends(), 
+    db: Collection = Depends(get_users_collection)
+):
+    from app.database.mongo_client import get_database
+    
     user_dict = db.find_one({"username": form_data.username})
     if not user_dict or not verify_password(form_data.password, user_dict["hashed_password"]):
         raise HTTPException(status_code=401, detail="Incorrect username or password")
@@ -48,6 +53,33 @@ def login_for_access_token_route(form_data: OAuth2PasswordRequestForm = Depends(
     # This ensures the user must provide a new 2FA code to access protected
     # resources during this new session.
     mark_2fa_unverified(user_in_db.username)
+    
+    # Create session entry
+    DB = get_database()
+    sessions_collection = DB["sessions"]
+    from uuid import uuid4
+    
+    session_id = str(uuid4())
+    sessions_collection.insert_one({
+        "_id": session_id,
+        "username": user_in_db.username,
+        "device": "Unknown Device",  # TODO: Parse User-Agent header
+        "location": "Unknown Location",  # TODO: GeoIP lookup
+        "ip_address": "0.0.0.0",  # TODO: Extract from request
+        "created_at": datetime.utcnow(),
+        "last_active": datetime.utcnow(),
+        "is_current": True
+    })
+    
+    # Log activity
+    activity_collection = DB["activity_log"]
+    activity_collection.insert_one({
+        "username": user_in_db.username,
+        "action": "Successful Login",
+        "description": "User logged in successfully",
+        "timestamp": datetime.utcnow(),
+        "ip": "0.0.0.0"  # TODO: Extract from request
+    })
     
     access_token = create_access_token(data={"sub": user_in_db.username})
     return Token(access_token=access_token, token_type="bearer")

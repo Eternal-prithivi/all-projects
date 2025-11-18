@@ -3,6 +3,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.auth import routes_auth
 from app.dashboard import routes_dashboard
 from app.users import routes_users
+from app.users import routes_profile
+from app.users import routes_settings
 from app.storage import routes_storage
 from app.security import routes_security
 from app.websockets import routes_ws
@@ -35,6 +37,8 @@ app.add_middleware(
 
 app.include_router(routes_auth.router, prefix="/api/auth")
 app.include_router(routes_users.router, prefix="/api/users")
+app.include_router(routes_profile.router, prefix="/api")
+app.include_router(routes_settings.router, prefix="/api")
 app.include_router(routes_dashboard.router, prefix="/api/dashboard")
 app.include_router(routes_storage.router, prefix="/api/storage")
 app.include_router(routes_security.router, prefix="/api/security")

@@ -108,6 +108,18 @@ async def finalize_2fa(
         {"$set": {"two_fa_enabled": True, "two_fa_verified": True}}
     )
 
+    # Log activity
+    from app.database.mongo_client import get_database
+    from datetime import datetime
+    DB = get_database()
+    activity_collection = DB["activity_log"]
+    activity_collection.insert_one({
+        "username": current_user.username,
+        "action": "2FA Enabled",
+        "description": "User enabled two-factor authentication",
+        "timestamp": datetime.utcnow()
+    })
+
     return {"verified": True, "message": "2FA successfully enabled."}
 
 # Verify 2FA token for a given session
@@ -145,4 +157,17 @@ async def disable_2fa(current_user: UserInDB = Depends(get_current_user)):
         {"username": current_user.username},
         {"$unset": {"two_fa_secret": "", "two_fa_enabled": "", "two_fa_verified": ""}}
     )
+    
+    # Log activity
+    from app.database.mongo_client import get_database
+    from datetime import datetime
+    DB = get_database()
+    activity_collection = DB["activity_log"]
+    activity_collection.insert_one({
+        "username": current_user.username,
+        "action": "2FA Disabled",
+        "description": "User disabled two-factor authentication",
+        "timestamp": datetime.utcnow()
+    })
+    
     return {"message": "2FA has been disabled."}

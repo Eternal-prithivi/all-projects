@@ -87,7 +87,7 @@ const ProfileDropdown = () => {
 
           <button className="profile-menu-item" onClick={() => {
             setIsOpen(false);
-            navigate('/dashboard/security');
+            navigate('/dashboard/security-settings');
           }}>
             <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
               <path d="M8 1L2 4v5c0 3.5 2.5 6.5 6 7 3.5-.5 6-3.5 6-7V4l-6-3zm0 2.2L12 5v4c0 2.5-1.8 4.8-4 5.2-2.2-.4-4-2.7-4-5.2V5l4-1.8z"/>
