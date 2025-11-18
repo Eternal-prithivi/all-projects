@@ -65,21 +65,30 @@ const ProfileDropdown = () => {
 
           <div className="profile-menu-divider"></div>
 
-          <button className="profile-menu-item" onClick={() => navigate('/dashboard')}>
+          <button className="profile-menu-item" onClick={() => {
+            setIsOpen(false);
+            navigate('/dashboard/profile');
+          }}>
             <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
               <path d="M8 8a3 3 0 100-6 3 3 0 000 6zm2 2H6c-2.2 0-4 1.8-4 4v1h12v-1c0-2.2-1.8-4-4-4z"/>
             </svg>
             Profile
           </button>
 
-          <button className="profile-menu-item" onClick={() => setIsOpen(false)}>
+          <button className="profile-menu-item" onClick={() => {
+            setIsOpen(false);
+            navigate('/dashboard/settings');
+          }}>
             <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
               <path d="M8 1a7 7 0 100 14A7 7 0 008 1zm0 12.5A5.5 5.5 0 1113.5 8 5.51 5.51 0 018 13.5zM8 4a4 4 0 100 8 4 4 0 000-8z"/>
             </svg>
             Settings
           </button>
 
-          <button className="profile-menu-item" onClick={() => setIsOpen(false)}>
+          <button className="profile-menu-item" onClick={() => {
+            setIsOpen(false);
+            navigate('/dashboard/security');
+          }}>
             <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
               <path d="M8 1L2 4v5c0 3.5 2.5 6.5 6 7 3.5-.5 6-3.5 6-7V4l-6-3zm0 2.2L12 5v4c0 2.5-1.8 4.8-4 5.2-2.2-.4-4-2.7-4-5.2V5l4-1.8z"/>
             </svg>
