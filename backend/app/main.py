@@ -12,6 +12,7 @@ from app.cost import routes_export
 from app.cost import routes_forecast
 from app.cost import routes_anomaly
 from app.vm import routes_vm
+from app.vm import routes_admin_cleanup  # Temporary admin cleanup endpoint
 from app.pricing import routes_pricing
 from app.budgets import routes_budgets
 from app.database.mongo_client import mongodb_client
@@ -49,6 +50,7 @@ app.include_router(routes_anomaly.router, prefix="/api/cost", tags=["Cost Anomal
 app.include_router(routes_pricing.router, prefix="/api", tags=["Pricing"])
 app.include_router(routes_budgets.router, prefix="/api/budgets", tags=["Budgets"])
 app.include_router(routes_vm.router, prefix="/api/vm", tags=["Virtual Machines"])
+app.include_router(routes_admin_cleanup.router, prefix="/api", tags=["Admin"])  # Cleanup endpoint
 
 @app.get("/", tags=["Root"])
 def read_root():

@@ -228,7 +228,7 @@ function VMClusterPage() {
 
     try {
       const url = assignmentId 
-        ? `${API_BASE_URL}/release?assignment_id=${assignmentId}`
+        ? `${API_BASE_URL}/release/${assignmentId}`
         : `${API_BASE_URL}/release`;
       
       await fetch(url, {

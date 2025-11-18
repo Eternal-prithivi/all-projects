@@ -835,6 +835,12 @@ async def get_ssh_instructions(
                     "title": "Connect to your VM",
                     "command": f"ssh -i ~/.ssh/vm_{assignment_id}.pem {ssh_username}@{vm_ip}",
                     "description": "Use this command to connect to your VM"
+                },
+                {
+                    "step": 4,
+                    "title": "Disconnect from VM",
+                    "command": "exit",
+                    "description": "Type 'exit' or press Ctrl+D to safely disconnect when you're done"
                 }
             ],
             "troubleshooting": [
