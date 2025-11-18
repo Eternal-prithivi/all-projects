@@ -45,3 +45,4 @@
 [2025-11-19 00:58:58,010: INFO/MainProcess] Scheduler: Sending due task collect-vm-metrics-every-5-minutes (collect_vm_metrics)
 [2025-11-19 01:03:58,018: INFO/MainProcess] Scheduler: Sending due task collect-vm-metrics-every-5-minutes (collect_vm_metrics)
 [2025-11-19 01:03:59,438: INFO/MainProcess] Scheduler: Sending due task auto-release-inactive-vms-every-10-minutes (auto_release_inactive_vms)
+[2025-11-19 01:08:58,022: INFO/MainProcess] Scheduler: Sending due task collect-vm-metrics-every-5-minutes (collect_vm_metrics)

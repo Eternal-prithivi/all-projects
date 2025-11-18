@@ -297,10 +297,8 @@ async def get_all_my_vm_assignments(
     """
     Retrieve all active VM assignments for the authenticated user.
     """
-    print(f"🔍 /my-assignments called by user: {current_user.username}")
     from app.vm.manager import get_all_user_assignments
     assignments = get_all_user_assignments(current_user.username)
-    print(f"✅ Found {len(assignments)} assignments for {current_user.username}")
     return assignments
 
 
@@ -390,7 +388,7 @@ async def get_vm_metrics(vm_name: str, use_real: bool = False) -> VMMetricsRespo
             "active_users": metrics_db.active_users,
             "uptime_hours": metrics_db.uptime_hours,
             "estimated_cost_usd": metrics_db.estimated_cost_usd,
-            "status": vm_details.get("status", VMStatus.UNKNOWN),
+            "status": vm_details.get("status", "TERMINATED"),
             "recorded_at": metrics_db.recorded_at,
             "recommendation_score": 50,  # Default score, can be enhanced with ML
             "recommendation_reason": ""  # Can be populated based on metrics thresholds
@@ -541,10 +539,10 @@ async def get_migration_recommendations(
             for vm_name in cluster_vms:
                 try:
                     # Get active user count
-                    "active_users": DB["vm_assignments"].count_documents({
+                    active_users = DB["vm_assignments"].count_documents({
                         "vm_name": vm_name,
                         "status": "active"
-                    }),
+                    })
                     
                     # Get VM details
                     vm_details = get_vm_details(vm_name, settings.GCP_ZONE)
@@ -701,9 +699,6 @@ async def download_ssh_key(
     from app.utils.config import settings as app_settings
     
     try:
-        # Find the assignment
-        print(f"🔍 Looking for assignment: {assignment_id}, user: {current_user.username}")
-        
         assignment = DB["vm_assignments"].find_one({
             "assignment_id": assignment_id,
             "user_id": current_user.username,
@@ -711,15 +706,6 @@ async def download_ssh_key(
         })
         
         if not assignment:
-            # Try without user_id filter to see if it exists
-            any_assignment = DB["vm_assignments"].find_one({"assignment_id": assignment_id})
-            if any_assignment:
-                print(f"❌ Assignment exists but belongs to user: {any_assignment.get('user_id')}")
-                print(f"❌ Requested by user: {current_user.username}")
-                print(f"❌ Status: {any_assignment.get('status')}")
-            else:
-                print(f"❌ Assignment {assignment_id} does not exist at all")
-            
             raise HTTPException(
                 status_code=404,
                 detail="Assignment not found or you don't have permission to access it"

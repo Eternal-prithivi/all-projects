@@ -554,12 +554,6 @@ def get_all_user_assignments(user_id: str) -> List[Dict[str, Any]]:
     """
     Get all active VM assignments for a user.
     """
-    print(f"🔍 Searching for assignments with user_id='{user_id}', status='active'")
-    
-    # Debug: Check what's actually in the database
-    all_assignments = list(vm_assignments_collection.find({}).limit(5))
-    print(f"📊 Sample assignments in DB: {[(a.get('user_id'), a.get('status'), a.get('vm_name')) for a in all_assignments]}")
-    
     assignments = vm_assignments_collection.find({
         "user_id": user_id,
         "status": AssignmentStatus.ACTIVE.value
@@ -570,7 +564,6 @@ def get_all_user_assignments(user_id: str) -> List[Dict[str, Any]]:
         assignment.pop("_id", None)
         result.append(assignment)
     
-    print(f"✅ Found {len(result)} assignments for user '{user_id}'")
     return result
 
 
