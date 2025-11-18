@@ -292,13 +292,15 @@ async def get_my_vm_assignment(
 
 @router.get("/my-assignments", summary="Get All My VM Assignments")
 async def get_all_my_vm_assignments(
-    user_id: str = Depends(get_current_user)
+    current_user: User = Depends(get_current_user)
 ) -> List[Dict[str, Any]]:
     """
     Retrieve all active VM assignments for the authenticated user.
     """
+    print(f"🔍 /my-assignments called by user: {current_user.username}")
     from app.vm.manager import get_all_user_assignments
-    assignments = get_all_user_assignments(user_id)
+    assignments = get_all_user_assignments(current_user.username)
+    print(f"✅ Found {len(assignments)} assignments for {current_user.username}")
     return assignments
 
 
@@ -308,9 +310,9 @@ async def release_vm(
     current_user: User = Depends(get_current_user)
 ):
     if assignment_id:
-        result = release_vm_assignment(user_id, assignment_id)
+        result = release_vm_assignment(current_user.username, assignment_id)
     else:
-        result = release_vm_assignment(user_id)
+        result = release_vm_assignment(current_user.username)
     
     if not result["success"]:
         raise HTTPException(status_code=404, detail=result["message"])
@@ -335,7 +337,7 @@ async def get_vm_metrics(vm_name: str, use_real: bool = False) -> VMMetricsRespo
         # Always get fresh user count from MongoDB (no cost, always up-to-date)
         active_users = DB["vm_assignments"].count_documents({
             "vm_name": vm_name,
-            "status": "ACTIVE"
+            "status": "active"
         })
         
         # Check cache for expensive GCP metrics - include use_real in cache key
@@ -469,7 +471,7 @@ async def get_vm_configuration(vm_name: str) -> Dict[str, Any]:
         # Get current metrics
         active_users = DB["vm_assignments"].count_documents({
             "vm_name": vm_name,
-            "status": "ACTIVE"
+            "status": "active"
         })
         
         latest_metrics = DB["vm_metrics"].find_one(
@@ -539,10 +541,10 @@ async def get_migration_recommendations(
             for vm_name in cluster_vms:
                 try:
                     # Get active user count
-                    active_users = DB["vm_assignments"].count_documents({
+                    "active_users": DB["vm_assignments"].count_documents({
                         "vm_name": vm_name,
-                        "status": "ACTIVE"
-                    })
+                        "status": "active"
+                    }),
                     
                     # Get VM details
                     vm_details = get_vm_details(vm_name, settings.GCP_ZONE)
@@ -562,7 +564,8 @@ async def get_migration_recommendations(
                     continue
             
             # Get user assignments
-            user_assignments = list(DB["vm_assignments"].find({"status": "ACTIVE"}))
+            # Get all active assignments
+            user_assignments = list(DB["vm_assignments"].find({"status": "active"}))
             
             # Generate recommendations
             recommendations = MigrationRecommender.generate_recommendations(
@@ -645,9 +648,9 @@ async def predict_cluster_load(cluster_type: ClusterType) -> Dict[str, Any]:
         for vm_name in cluster_vms:
             try:
                 # Get active user count
-                active_users = DB["vm_assignments"].count_documents({
+                stats["active_users"] = DB["vm_assignments"].count_documents({
                     "vm_name": vm_name,
-                    "status": "ACTIVE"
+                    "status": "active"
                 })
                 
                 # Determine cluster type from VM name
@@ -687,7 +690,7 @@ async def predict_cluster_load(cluster_type: ClusterType) -> Dict[str, Any]:
 @router.get("/ssh-key/{assignment_id}", summary="Download SSH Private Key")
 async def download_ssh_key(
     assignment_id: str,
-    user_id: str = Depends(get_current_user)
+    current_user: User = Depends(get_current_user)
 ):
     """
     Download the SSH private key for a specific VM assignment.
@@ -704,7 +707,7 @@ async def download_ssh_key(
         assignment = DB["vm_assignments"].find_one({
             "assignment_id": assignment_id,
             "user_id": current_user.username,
-            "status": "ACTIVE"
+            "status": "active"
         })
         
         if not assignment:
@@ -815,7 +818,7 @@ async def get_ssh_instructions(
         assignment = DB["vm_assignments"].find_one({
             "assignment_id": assignment_id,
             "user_id": current_user.username,
-            "status": "ACTIVE"
+            "status": "active"
         })
         
         if not assignment:

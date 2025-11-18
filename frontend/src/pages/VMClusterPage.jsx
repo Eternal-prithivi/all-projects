@@ -99,12 +99,15 @@ function VMClusterPage() {
   const fetchAssignment = useCallback(async () => {
     if (!token) return;
     try {
+      console.log("🔍 Fetching all assignments for user...");
       const assignments = await getAllMyAssignments(token);
+      console.log("✅ Assignments fetched:", assignments);
       setAllAssignments(assignments);
       setCurrentAssignment(assignments[0] || null);
     } catch (error) {
+      console.error("❌ Error fetching assignments:", error);
       if (!error.message.includes("404")) {
-        console.error("Error fetching assignments:", error);
+        console.error("Error details:", error);
       }
       setAllAssignments([]);
       setCurrentAssignment(null);
