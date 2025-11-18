@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { toast, ToastContainer } from "react-toastify";
 import { useAuth } from "../context/AuthContext.jsx";
+import LoadingSpinner from "../components/LoadingSpinner.jsx";
+import EmptyState from "../components/EmptyState.jsx";
 import "../styles/vmcluster.css";
 
 // API Functions
@@ -362,11 +364,7 @@ ${instructions.troubleshooting.map((item) => `
   };
 
   if (isLoading) {
-    return (
-      <div className="vm-container">
-        <div className="loading-spinner">Loading VM Cluster Data...</div>
-      </div>
-    );
+    return <LoadingSpinner size="large" text="Loading VM Cluster Data..." />;
   }
 
   return (
@@ -375,10 +373,16 @@ ${instructions.troubleshooting.map((item) => `
 
       {/* Header */}
       <div className="vm-header">
-        <h2>VM Cluster Management</h2>
-        <p className="vm-subtitle">
-          Intelligent workload assignment with auto-scaling and migration
-        </p>
+        <div>
+          <h2>VM Cluster Management</h2>
+          <p className="vm-subtitle">
+            Intelligent workload assignment with auto-scaling and migration
+          </p>
+        </div>
+        <div className="live-indicator">
+          <span className="live-dot"></span>
+          <span className="live-text">Live</span>
+        </div>
       </div>
 
       {/* Cluster Topology - First Section */}
@@ -598,16 +602,13 @@ ${instructions.troubleshooting.map((item) => `
           </div>
         </div>
       ) : (
-        <div className="no-assignment-card">
-          <h3>No Active VM Assignment</h3>
-          <p>Request a VM to get started with your workload</p>
-          <button
-            className="btn-request-primary"
-            onClick={() => setShowRequestModal(true)}
-          >
-            Request VM
-          </button>
-        </div>
+        <EmptyState
+          icon="🖥️"
+          title="No Active VM Assignment"
+          message="Request a VM to get started with your workload. Choose from General or Storage clusters based on your needs."
+          actionLabel="Request VM"
+          onAction={() => setShowRequestModal(true)}
+        />
       )}
 
       {/* Cluster Health Dashboard */}

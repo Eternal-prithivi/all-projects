@@ -1,23 +1,23 @@
 import React from 'react';
-import { useAuth } from '../../context/AuthContext.jsx';
-import { useNavigate } from 'react-router-dom';
+import ProfileDropdown from '../ProfileDropdown.jsx';
 
-function Header({ user }) { // Accept user as a prop
-  const { logout } = useAuth();
-  const navigate = useNavigate();
-
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
-  };
-
+function Header({ user, onShowShortcuts }) {
   return (
     <header className="dashboard-header">
-      {/* Add a check here: only show the welcome message if the user exists */}
       <h1 className="header-title">Welcome, {user ? user.username : 'User'}!</h1>
-      <button onClick={handleLogout} className="logout-button">
-        Logout
-      </button>
+      <div className="header-actions">
+        <button 
+          className="header-help-btn" 
+          title="Press ? for keyboard shortcuts"
+          onClick={() => {
+            // Dispatch custom event to trigger shortcuts modal
+            window.dispatchEvent(new CustomEvent('show-shortcuts'));
+          }}
+        >
+          ?
+        </button>
+        <ProfileDropdown />
+      </div>
     </header>
   );
 }

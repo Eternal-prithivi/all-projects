@@ -2,6 +2,8 @@ import React, { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext.jsx";
 import { getDashboardStats, apiClient } from "../api.js";
 import StatCard from "../components/dashboard/StatCard.jsx";
+import LoadingSpinner from "../components/LoadingSpinner.jsx";
+import EmptyState from "../components/EmptyState.jsx";
 import {
   IconDollarSign,
   IconServer,
@@ -19,6 +21,8 @@ function DashboardPage() {
   const [recentActivity, setRecentActivity] = useState([]);
   const [costTrend, setCostTrend] = useState('up');
   const [vmHealth, setVmHealth] = useState({ healthy: 0, warning: 0, critical: 0 });
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     fetchDashboardData();
@@ -26,6 +30,9 @@ function DashboardPage() {
 
   const fetchDashboardData = async () => {
     if (!token) return;
+    
+    setIsLoading(true);
+    setError(null);
     
     try {
       // Fetch dashboard stats
@@ -58,15 +65,30 @@ function DashboardPage() {
       
     } catch (error) {
       console.error("Failed to fetch dashboard data:", error);
+      setError("Failed to load dashboard data. Please try again.");
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  if (!user || !stats) {
+  if (isLoading) {
+    return <LoadingSpinner size="large" text="Loading dashboard data..." />;
+  }
+
+  if (error) {
     return (
-      <div style={{ color: "white", textAlign: "center", paddingTop: "5rem" }}>
-        Loading...
-      </div>
+      <EmptyState
+        icon="⚠️"
+        title="Unable to Load Dashboard"
+        message={error}
+        actionLabel="Retry"
+        onAction={fetchDashboardData}
+      />
     );
+  }
+
+  if (!user || !stats) {
+    return <LoadingSpinner size="large" text="Initializing..." />;
   }
 
   const getActivityIcon = (type) => {
