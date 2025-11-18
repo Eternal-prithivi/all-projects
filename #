@@ -1,0 +1,178 @@
+# backend/app/vm/manager.py
+
+import os
+from google.cloud import compute_v1
+from google.oauth2 import service_account
+from app.utils.config import settings
+from typing import List, Dict, Any, Optional
+
+# Determine the absolute path to the service account key
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__))) # This gets to backend/app
+PROJECT_ROOT = os.path.dirname(BASE_DIR) # This gets to CloudResourceOptimizationPlatform/
+GCP_SA_KEY_FULL_PATH = os.path.join(PROJECT_ROOT, 'backend', settings.GCP_SA_KEY_PATH)
+
+# Initialize credentials
+try:
+    credentials = service_account.Credentials.from_service_account_file(GCP_SA_KEY_FULL_PATH)
+    print(f"GCP Credentials loaded from: {GCP_SA_KEY_FULL_PATH}")
+except Exception as e:
+    print(f"ERROR: Could not load GCP Service Account Key from {GCP_SA_KEY_FULL_PATH}: {e}")
+    credentials = None # Set to None if credentials fail to load
+
+# Initialize Compute Engine client
+instance_client = compute_v1.InstancesClient(credentials=credentials)
+image_client = compute_v1.ImagesClient(credentials=credentials)
+machine_type_client = compute_v1.MachineTypesClient(credentials=credentials)
+
+
+# --- Helper to get default image (Debian 11) ---
+def get_default_image_uri(project_id: str = "debian-cloud") -> str:
+    """Returns the URI for the latest Debian 11 image."""
+    try:
+        image_name = "debian-11" # Using an older, stable Debian image
+        # Construct the request to get the image
+        image_request = compute_v1.GetImageRequest(
+            project=project_id,
+            image=image_name
+        )
+        image = image_client.get(request=image_request)
+        return image.self_link
+    except Exception as e:
+        print(f"Error getting default image URI: {e}. Falling back to hardcoded path.")
+        # Fallback to a common public image URI if API call fails
+        return f"projects/{project_id}/global/images/family/debian-11"
+
+
+# --- VM Management Functions ---
+
+def _generate_instance_name(cluster_type: str) -> str:
+    """Generates a unique instance name."""
+    timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+    return f"{cluster_type}-{timestamp}"
+
+async def list_vms() -> List[Dict[str, Any]]:
+    """Lists all VM instances in the configured zone."""
+    vms_list = []
+    request = compute_v1.ListInstancesRequest(
+        project=settings.GCP_PROJECT_ID,
+        zone=settings.GCP_ZONE,
+    )
+    for instance in await instance_client.list(request=request):
+        vms_list.append({
+            "name": instance.name,
+            "status": instance.status,
+            "machine_type": instance.machine_type.split('/')[-1],
+            "zone": settings.GCP_ZONE,
+            "external_ip": instance.network_interfaces[0].access_configs[0].nat_ip if instance.network_interfaces and instance.network_interfaces[0].access_configs else "N/A"
+        })
+    return vms_list
+
+async def create_vm(
+    name: str,
+    machine_type: str,
+    source_image: str,
+    disk_size_gb: int,
+    labels: Optional[Dict[str, str]] = None
+) -> Dict[str, Any]:
+    """Provisions a new VM instance."""
+    if credentials is None:
+        raise Exception("GCP credentials not loaded. Cannot create VM.")
+
+    image_uri = get_default_image_uri() # Using a default Debian 11 image
+
+    config = compute_v1.Instance(
+        name=name,
+        machine_type=f"zones/{settings.GCP_ZONE}/machineTypes/{machine_type}",
+        disks=[
+            compute_v1.AttachedDisk(
+                auto_delete=True,
+                boot=True,
+                type_=compute_v1.AttachedDisk.Type.PERSISTENT,
+                initialize_params=compute_v1.AttachedDiskInitializeParams(
+                    source_image=image_uri,
+                    disk_size_gb=disk_size_gb
+                ),
+            )
+        ],
+        network_interfaces=[
+            compute_v1.NetworkInterface(
+                name="global/networks/default", # Use the default network
+                access_configs=[
+                    compute_v1.AccessConfig(name="External NAT", type_=compute_v1.AccessConfig.Type.ONE_TO_ONE_NAT)
+                ],
+            )
+        ],
+        labels=labels if labels else {}
+    )
+
+    request = compute_v1.InsertInstanceRequest(
+        project=settings.GCP_PROJECT_ID,
+        zone=settings.GCP_ZONE,
+        instance_resource=config,
+    )
+
+    print(f"Creating VM '{name}' with machine type '{machine_type}' and disk size '{disk_size_gb}GB' in zone '{settings.GCP_ZONE}'...")
+    operation = await instance_client.insert(request=request)
+    await operation.result() # Wait for the operation to complete
+
+    # Fetch details of the created VM to get its IP
+    vm_details = await get_vm_details(name, settings.GCP_ZONE)
+    return {"name": name, "status": "RUNNING", "details": vm_details}
+
+async def start_vm(name: str) -> Dict[str, Any]:
+    """Starts a VM instance."""
+    request = compute_v1.StartInstanceRequest(
+        project=settings.GCP_PROJECT_ID,
+        zone=settings.GCP_ZONE,
+        instance=name,
+    )
+    operation = await instance_client.start(request=request)
+    await operation.result()
+    vm_details = await get_vm_details(name, settings.GCP_ZONE)
+    return {"name": name, "status": "RUNNING", "details": vm_details}
+
+async def stop_vm(name: str) -> Dict[str, Any]:
+    """Stops a VM instance."""
+    request = compute_v1.StopInstanceRequest(
+        project=settings.GCP_PROJECT_ID,
+        zone=settings.GCP_ZONE,
+        instance=name,
+    )
+    operation = await instance_client.stop(request=request)
+    await operation.result()
+    vm_details = await get_vm_details(name, settings.GCP_ZONE)
+    return {"name": name, "status": "TERMINATED", "details": vm_details}
+
+async def delete_vm(name: str) -> Dict[str, Any]:
+    """Deletes a VM instance."""
+    request = compute_v1.DeleteInstanceRequest(
+        project=settings.GCP_PROJECT_ID,
+        zone=settings.GCP_ZONE,
+        instance=name,
+    )
+    operation = await instance_client.delete(request=request)
+    await operation.result()
+    return {"name": name, "status": "DELETED"}
+
+async def get_vm_details(name: str, zone: str) -> Dict[str, Any]:
+    """Retrieves details for a specific VM instance."""
+    request = compute_v1.GetInstanceRequest(
+        project=settings.GCP_PROJECT_ID,
+        zone=zone,
+        instance=name,
+    )
+    instance = await instance_client.get(request=request)
+
+    external_ip = "N/A"
+    if instance.network_interfaces and instance.network_interfaces[0].access_configs:
+        external_ip = instance.network_interfaces[0].access_configs[0].nat_ip
+
+    return {
+        "name": instance.name,
+        "status": instance.status,
+        "machine_type": instance.machine_type.split('/')[-1],
+        "zone": zone,
+        "external_ip": external_ip,
+        "creation_timestamp": instance.creation_timestamp,
+        "labels": dict(instance.labels) # Convert RepeatedComposite to dict
+    }

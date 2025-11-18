@@ -1,0 +1,18 @@
+.secure-storage-container {
+  animation: fadeIn 0.5s ease-out;
+}
+
+.upload-description {
+  color: #a3a3a3;
+  font-size: 0.9rem;
+  margin-bottom: 1.5rem;
+  max-width: 600px;
+}
+
+.encrypt-option {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: #a3a3a3;
+  font-size: 0.9rem;
+}

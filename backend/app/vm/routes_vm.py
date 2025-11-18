@@ -1,0 +1,698 @@
+# backend/app/vm/routes_vm.py
+
+from fastapi import APIRouter, HTTPException, Depends, Body
+from typing import List, Dict, Any, Optional
+from pydantic import BaseModel, Field
+from google.cloud import compute_v1
+from app.vm.manager import (
+    list_vms, create_vm, start_vm, stop_vm, delete_vm, get_vm_details,
+    assign_vm_to_user, migrate_user, release_vm_assignment, 
+    get_user_assignment, get_cluster_health, instance_client
+)
+from app.vm.models import (
+    VMRequestModel, VMAssignmentResponse, VMTransferRequest,
+    VMMetricsResponse, ClusterType, MigrationRecommendation, VMStatus
+)
+from app.vm.migration_recommender import MigrationRecommender
+from app.vm.metrics_collector import VMMetricsCollector
+from app.utils.config import settings
+from app.database.mongo_client import get_database
+from datetime import datetime
+import asyncio # For asynchronous operations
+import time # For cache timing
+
+router = APIRouter()
+DB = get_database()
+
+# Cache for metrics to reduce GCP API calls
+metrics_cache = {}
+METRICS_CACHE_TTL = 600  # Cache for 10 minutes (600 seconds)
+
+# Cache for cluster health (5 minutes TTL)
+cluster_health_cache = {}
+CLUSTER_HEALTH_CACHE_TTL = 300  # 5 minutes
+
+# Cache for recommendations (10 minutes TTL)
+recommendations_cache = {}
+RECOMMENDATIONS_CACHE_TTL = 600  # 10 minutes
+
+# Helper function to invalidate cluster health cache
+def invalidate_cluster_health_cache():
+    """Clear cluster health cache to force fresh data fetch on next request"""
+    global cluster_health_cache
+    cluster_health_cache.clear()
+    print("✓ Cluster health cache invalidated")
+
+# --- Authentication Dependency (Simplified - Replace with real JWT auth) ---
+def get_current_user(authorization: Optional[str] = None) -> str:
+    """
+    Extract user ID from JWT token.
+    For demo: returns 'demo_user' if no token provided.
+    """
+    if not authorization:
+        return "demo_user"
+    # TODO: Implement real JWT validation
+    return "demo_user"
+
+# --- Pydantic Models for Request/Response ---
+
+class VMCreateRequest(BaseModel):
+    cluster_type: str = Field(..., description="Type of cluster to provision from: 'performance' or 'storage'")
+    # vm_name: Optional[str] = Field(None, description="Optional: A specific name for the VM. If not provided, one will be generated.")
+    # machine_type: Optional[str] = Field(None, description="Optional: Machine type for the VM (e.g., 'e2-micro'). Overrides cluster default if provided.")
+    # disk_size_gb: Optional[int] = Field(None, description="Optional: Disk size in GB. Overrides cluster default if provided.")
+
+class VMResponse(BaseModel):
+    name: str
+    status: str
+    machine_type: str
+    zone: str
+    external_ip: str
+    creation_timestamp: Optional[str] = None
+    labels: Optional[Dict[str, str]] = None
+
+class VMListResponse(BaseModel):
+    vms: List[VMResponse]
+
+class OperationStatusResponse(BaseModel):
+    name: str
+    status: str
+    details: Optional[Dict[str, Any]] = None
+
+# --- Helper to get cluster counts and determine next action ---
+async def _get_cluster_vm_counts():
+    all_vms = list_vms()
+    performance_vms = [vm for vm in all_vms if vm.get('labels', {}).get('cluster_type') == 'performance']
+    storage_vms = [vm for vm in all_vms if vm.get('labels', {}).get('cluster_type') == 'storage']
+
+    # Filter for RUNNING/PROVISIONING/STAGING VMs to count towards limits
+    running_performance_vms = [vm for vm in performance_vms if vm['status'] in ['RUNNING', 'PROVISIONING', 'STAGING']]
+    running_storage_vms = [vm for vm in storage_vms if vm['status'] in ['RUNNING', 'PROVISIONING', 'STAGING']]
+
+    return {
+        "performance": {
+            "current_count": len(running_performance_vms),
+            "max_vms": settings.PERFORMANCE_CLUSTER_MAX_VMS,
+            "available_vms": [vm for vm in performance_vms if vm['status'] == 'TERMINATED'] # Ready to be started
+        },
+        "storage": {
+            "current_count": len(running_storage_vms),
+            "max_vms": settings.STORAGE_CLUSTER_MAX_VMS,
+            "available_vms": [vm for vm in storage_vms if vm['status'] == 'TERMINATED'] # Ready to be started
+        }
+    }
+
+
+# --- API Endpoints ---
+
+@router.get("/status", summary="Get VM Cluster Status")
+async def get_vm_cluster_status() -> Dict[str, Any]:
+    """
+    Returns the current status of VM clusters including counts and available slots.
+    """
+    cluster_counts = await _get_cluster_vm_counts()
+    return {
+        "message": "VM Cluster Status",
+        "performance_cluster": {
+            "running_vms": cluster_counts['performance']['current_count'],
+            "max_vms": cluster_counts['performance']['max_vms'],
+            "available_for_start": len(cluster_counts['performance']['available_vms']),
+            "can_provision_new": cluster_counts['performance']['current_count'] < cluster_counts['performance']['max_vms']
+        },
+        "storage_cluster": {
+            "running_vms": cluster_counts['storage']['current_count'],
+            "max_vms": cluster_counts['storage']['max_vms'],
+            "available_for_start": len(cluster_counts['storage']['available_vms']),
+            "can_provision_new": cluster_counts['storage']['current_count'] < cluster_counts['storage']['max_vms']
+        },
+        "all_vms_in_zone": list_vms()
+    }
+
+@router.post("/provision", response_model=OperationStatusResponse, summary="Provision or Assign VM")
+async def provision_or_assign_vm(request: VMCreateRequest) -> OperationStatusResponse:
+    """
+    Provisions a new VM from a cluster or assigns/starts an existing one.
+    """
+    cluster_type = request.cluster_type.lower()
+    if cluster_type not in ["performance", "storage"]:
+        raise HTTPException(status_code=400, detail="Invalid cluster_type. Must be 'performance' or 'storage'.")
+
+    cluster_status = (await _get_cluster_vm_counts())[cluster_type]
+
+    # 1. Check for terminated VMs in the cluster that can be started
+    if cluster_status['available_for_start'] > 0:
+        vm_to_start = cluster_status['available_vms'][0] # Pick the first available
+        print(f"Starting existing VM: {vm_to_start['name']} for {cluster_type} cluster.")
+        result = start_vm(vm_to_start['name'])
+        return OperationStatusResponse(name=vm_to_start['name'], status="STARTING_EXISTING", details=result['details'])
+
+    # 2. If no terminated VMs, try to provision a new one if limits allow
+    if cluster_status['current_count'] < cluster_status['max_vms']:
+        machine_type = settings.PERFORMANCE_VM_MACHINE_TYPE if cluster_type == "performance" else settings.STORAGE_VM_MACHINE_TYPE
+        disk_size = settings.STORAGE_VM_DISK_SIZE_GB if cluster_type == "storage" else 10 # Default disk for performance VMs
+
+        new_vm_name = f"{cluster_type}-vm-{cluster_status['current_count'] + 1}" # Simple naming scheme
+        labels = {"cluster_type": cluster_type}
+
+        print(f"Provisioning new VM: {new_vm_name} for {cluster_type} cluster.")
+        result = create_vm(
+            name=new_vm_name,
+            machine_type=machine_type,
+            source_image="debian-cloud/debian-11", # Using a common free-tier eligible image
+            disk_size_gb=disk_size,
+            labels=labels
+        )
+        return OperationStatusResponse(name=new_vm_name, status="PROVISIONING_NEW", details=result['details'])
+    else:
+        raise HTTPException(
+            status_code=409,
+            detail=f"No available VMs and cluster '{cluster_type}' has reached its maximum capacity of {cluster_status['max_vms']} running instances."
+        )
+
+@router.get("/list", response_model=VMListResponse, summary="List all VMs")
+async def get_all_vms() -> VMListResponse:
+    """
+    Lists all VM instances managed by this application.
+    """
+    vms = list_vms()
+    return VMListResponse(vms=[VMResponse(**vm) for vm in vms])
+
+@router.post("/{vm_name}/start", response_model=OperationStatusResponse, summary="Start a VM")
+async def start_single_vm(vm_name: str) -> OperationStatusResponse:
+    """
+    Starts a specific VM instance.
+    """
+    try:
+        result = start_vm(vm_name)
+        return OperationStatusResponse(name=vm_name, status="STARTING", details=result['details'])
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to start VM: {e}")
+
+@router.post("/{vm_name}/stop", response_model=OperationStatusResponse, summary="Stop a VM")
+async def stop_single_vm(vm_name: str) -> OperationStatusResponse:
+    """
+    Stops a specific VM instance.
+    """
+    try:
+        result = stop_vm(vm_name)
+        return OperationStatusResponse(name=vm_name, status="STOPPING", details=result['details'])
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to stop VM: {e}")
+
+@router.delete("/{vm_name}", response_model=OperationStatusResponse, summary="Delete a VM")
+async def delete_single_vm(vm_name: str) -> OperationStatusResponse:
+    """
+    Deletes a specific VM instance.
+    """
+    try:
+        result = delete_vm(vm_name)
+        return OperationStatusResponse(name=vm_name, status="DELETING", details=result)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to delete VM: {e}")
+
+@router.get("/{vm_name}/details", response_model=VMResponse, summary="Get VM Details")
+async def get_single_vm_details(vm_name: str) -> VMResponse:
+    """
+    Retrieves details for a specific VM instance.
+    """
+    try:
+        details = get_vm_details(vm_name, settings.GCP_ZONE)
+        return VMResponse(**details)
+    except Exception as e:
+        raise HTTPException(status_code=404, detail=f"VM '{vm_name}' not found or error fetching details: {e}")
+
+
+# --- New Advanced VM Management Endpoints ---
+
+@router.post("/request", response_model=VMAssignmentResponse, summary="Request VM Assignment")
+async def request_vm_assignment(
+    request: VMRequestModel,
+    user_id: str = Depends(get_current_user)
+) -> VMAssignmentResponse:
+    """
+    Intelligent VM assignment based on workload analysis.
+    Automatically selects optimal VM using least-connections load balancing.
+    """
+    try:
+        vm_name, vm_ip, ssh_command, cluster_type, assigned_at, expires_at = assign_vm_to_user(
+            user_id=user_id,
+            workload_description=request.workload_description,
+            cluster_preference=request.cluster_preference,
+            priority_level=request.priority_level
+        )
+        
+        # Invalidate cluster health cache to show updated topology
+        invalidate_cluster_health_cache()
+        
+        return VMAssignmentResponse(
+            vm_name=vm_name,
+            vm_ip=vm_ip,
+            ssh_command=ssh_command,
+            cluster_type=cluster_type,
+            status="active",
+            assigned_at=assigned_at,
+            expires_at=expires_at,
+            message="VM assigned successfully"
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"VM assignment failed: {str(e)}")
+
+
+@router.post("/transfer", summary="Migrate User to Another VM")
+async def transfer_vm(
+    request: VMTransferRequest,
+    user_id: str = Depends(get_current_user)
+) -> Dict[str, Any]:
+    """
+    User-initiated or admin-forced migration to another VM.
+    Supports both cluster-based auto-selection and manual VM selection.
+    """
+    try:
+        result = migrate_user(
+            user_id=user_id,
+            target_cluster=request.target_cluster,
+            target_vm_name=request.target_vm_name
+        )
+        
+        # Invalidate cluster health cache to show updated topology
+        invalidate_cluster_health_cache()
+        
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Migration failed: {str(e)}")
+
+
+@router.get("/my-assignment", summary="Get My VM Assignment")
+async def get_my_vm_assignment(
+    user_id: str = Depends(get_current_user)
+) -> Dict[str, Any]:
+    """
+    Retrieve current active VM assignment for the authenticated user.
+    """
+    assignment = get_user_assignment(user_id)
+    
+    if not assignment:
+        raise HTTPException(status_code=404, detail="No active VM assignment found")
+    
+    return assignment
+
+
+@router.get("/my-assignments", summary="Get All My VM Assignments")
+async def get_all_my_vm_assignments(
+    user_id: str = Depends(get_current_user)
+) -> List[Dict[str, Any]]:
+    """
+    Retrieve all active VM assignments for the authenticated user.
+    """
+    from app.vm.manager import get_all_user_assignments
+    assignments = get_all_user_assignments(user_id)
+    return assignments
+
+
+@router.post("/release", summary="Release VM Assignment")
+async def release_vm(
+    assignment_id: Optional[str] = None,
+    user_id: str = Depends(get_current_user)
+) -> Dict[str, Any]:
+    """
+    Release VM assignment. VM will be stopped if no other users remain.
+    If assignment_id is provided, releases that specific assignment.
+    Otherwise, releases the first active assignment (backward compatibility).
+    """
+    if assignment_id:
+        result = release_vm_assignment(user_id, assignment_id)
+    else:
+        result = release_vm_assignment(user_id)
+    
+    if not result["success"]:
+        raise HTTPException(status_code=404, detail=result["message"])
+    
+    # Invalidate cluster health cache to show updated topology
+    invalidate_cluster_health_cache()
+    
+    return result
+
+
+@router.get("/metrics/{vm_name}", response_model=VMMetricsResponse, summary="Get VM Metrics")
+async def get_vm_metrics(vm_name: str, use_real: bool = False) -> VMMetricsResponse:
+    """
+    Fetch real-time performance metrics for a specific VM from GCP Monitoring API.
+    Uses 10-minute cache for expensive GCP metrics (CPU, memory, disk, network).
+    Always fetches fresh user count from MongoDB (free, no cache).
+    
+    Query parameter:
+    - use_real: If true, uses real GCP metrics. If false (default), uses simulated metrics.
+    """
+    try:
+        # Always get fresh user count from MongoDB (no cost, always up-to-date)
+        active_users = DB["vm_assignments"].count_documents({
+            "vm_name": vm_name,
+            "status": "ACTIVE"
+        })
+        
+        # Check cache for expensive GCP metrics - include use_real in cache key
+        cache_key = f"metrics_{vm_name}_{'real' if use_real else 'sim'}"
+        now = datetime.utcnow()
+        
+        if cache_key in metrics_cache:
+            cached_data, cached_time = metrics_cache[cache_key]
+            if (now - cached_time).total_seconds() < METRICS_CACHE_TTL:
+                # Update with fresh user count
+                cached_data["active_users"] = active_users
+                return VMMetricsResponse(**cached_data)
+        
+        # Cache miss or expired - collect fresh metrics
+        print(f"Collecting metrics for {vm_name}...")
+        
+        # Determine cluster type
+        cluster_type = ClusterType.GENERAL if "general" in vm_name else ClusterType.STORAGE
+        
+        # Get VM details to check if running
+        vm_details = get_vm_details(vm_name, settings.GCP_ZONE)
+        last_started = None
+        if vm_details.get("status") == "RUNNING":
+            last_started = now
+        
+        # Collect metrics
+        collector = VMMetricsCollector()
+        metrics_db = await collector.collect_all_metrics(
+            vm_name=vm_name,
+            cluster_type=cluster_type,
+            active_users=active_users,
+            last_started=last_started
+        )
+        
+        # Convert VMMetricsDB object to dict for caching and response
+        # VMMetricsDB returns disk_io_read_mb and disk_io_write_mb separately
+        # Calculate total disk usage for the response
+        total_disk_gb = (metrics_db.disk_io_read_mb + metrics_db.disk_io_write_mb) / 1024.0
+        
+        response_data = {
+            "vm_name": metrics_db.vm_name,
+            "cluster_type": metrics_db.cluster_type,
+            "cpu_usage": metrics_db.cpu_usage,
+            "memory_usage": metrics_db.memory_usage,
+            "disk_usage_gb": total_disk_gb,
+            "disk_io_read_mb": metrics_db.disk_io_read_mb,
+            "disk_io_write_mb": metrics_db.disk_io_write_mb,
+            "network_in_mb": metrics_db.network_in_mb,
+            "network_out_mb": metrics_db.network_out_mb,
+            "active_users": metrics_db.active_users,
+            "uptime_hours": metrics_db.uptime_hours,
+            "estimated_cost_usd": metrics_db.estimated_cost_usd,
+            "status": vm_details.get("status", VMStatus.UNKNOWN),
+            "recorded_at": metrics_db.recorded_at,
+            "recommendation_score": 50,  # Default score, can be enhanced with ML
+            "recommendation_reason": ""  # Can be populated based on metrics thresholds
+        }
+        
+        # Store in cache
+        metrics_cache[cache_key] = (response_data, now)
+        
+        return response_data
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to collect metrics: {str(e)}")
+
+
+@router.get("/config/{vm_name}", summary="Get Detailed VM Configuration")
+async def get_vm_configuration(vm_name: str) -> Dict[str, Any]:
+    """
+    Get comprehensive VM configuration details including:
+    - Machine type (CPU cores, memory)
+    - Disk configuration (size, type)
+    - Network configuration
+    - Current metrics
+    """
+    try:
+        # Get VM instance details from GCP
+        request = compute_v1.GetInstanceRequest(
+            project=settings.GCP_PROJECT_ID,
+            zone=settings.GCP_ZONE,
+            instance=vm_name,
+        )
+        instance = instance_client.get(request=request)
+        
+        # Parse machine type to get CPU and memory info
+        machine_type = instance.machine_type.split('/')[-1]
+        
+        # Common GCP machine types specs
+        machine_specs = {
+            'e2-micro': {'cpus': 2, 'memory_gb': 1},
+            'e2-small': {'cpus': 2, 'memory_gb': 2},
+            'e2-medium': {'cpus': 2, 'memory_gb': 4},
+            'e2-standard-2': {'cpus': 2, 'memory_gb': 8},
+            'e2-standard-4': {'cpus': 4, 'memory_gb': 16},
+            'n1-standard-1': {'cpus': 1, 'memory_gb': 3.75},
+            'n1-standard-2': {'cpus': 2, 'memory_gb': 7.5},
+        }
+        
+        specs = machine_specs.get(machine_type, {'cpus': 2, 'memory_gb': 1})
+        
+        # Get disk information
+        disks = []
+        for disk in instance.disks:
+            disk_info = {
+                'name': disk.device_name,
+                'size_gb': disk.disk_size_gb if hasattr(disk, 'disk_size_gb') else 10,
+                'type': disk.type_ if hasattr(disk, 'type_') else 'PERSISTENT',
+                'boot': disk.boot if hasattr(disk, 'boot') else False
+            }
+            disks.append(disk_info)
+        
+        # Get network information
+        networks = []
+        for interface in instance.network_interfaces:
+            network_info = {
+                'network': interface.network.split('/')[-1] if interface.network else 'default',
+                'internal_ip': interface.network_i_p if hasattr(interface, 'network_i_p') else 'N/A',
+            }
+            
+            # Get external IP if available
+            if interface.access_configs:
+                access_config = interface.access_configs[0]
+                external_ip = getattr(access_config, 'natIP', getattr(access_config, 'nat_i_p', 'N/A'))
+                network_info['external_ip'] = external_ip
+            else:
+                network_info['external_ip'] = None
+            
+            networks.append(network_info)
+        
+        # Get current metrics
+        active_users = DB["vm_assignments"].count_documents({
+            "vm_name": vm_name,
+            "status": "ACTIVE"
+        })
+        
+        latest_metrics = DB["vm_metrics"].find_one(
+            {"vm_name": vm_name},
+            sort=[("collected_at", -1)]
+        )
+        
+        # Get cluster type
+        cluster_type = "GENERAL" if "general" in vm_name else "STORAGE"
+        
+        return {
+            'vm_name': vm_name,
+            'status': instance.status,
+            'cluster_type': cluster_type,
+            'machine_type': machine_type,
+            'cpu_cores': specs['cpus'],
+            'memory_gb': specs['memory_gb'],
+            'disks': disks,
+            'total_disk_gb': sum(d['size_gb'] for d in disks),
+            'networks': networks,
+            'zone': settings.GCP_ZONE,
+            'created': instance.creation_timestamp,
+            'active_users': active_users,
+            'current_metrics': {
+                'cpu_usage': latest_metrics.get('cpu_usage', 0) if latest_metrics else 0,
+                'memory_usage': latest_metrics.get('memory_usage', 0) if latest_metrics else 0,
+                'disk_usage_gb': latest_metrics.get('disk_usage_gb', 0) if latest_metrics else 0,
+                'network_in_mb': latest_metrics.get('network_in_mb', 0) if latest_metrics else 0,
+                'network_out_mb': latest_metrics.get('network_out_mb', 0) if latest_metrics else 0,
+            } if latest_metrics else None
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get VM configuration: {str(e)}")
+
+
+@router.get("/admin/recommendations", response_model=List[MigrationRecommendation], summary="Get AI Migration Recommendations")
+async def get_migration_recommendations(
+    cluster_type: Optional[ClusterType] = None,
+    min_score: int = 50
+) -> List[MigrationRecommendation]:
+    """
+    Admin endpoint: Get AI-powered migration recommendations for load balancing and cost optimization.
+    Cached for 10 minutes to reduce expensive metrics collection.
+    """
+    try:
+        cache_key = f"recommendations_{cluster_type}_{min_score}"
+        
+        # Check cache
+        if cache_key in recommendations_cache:
+            cached_data, cached_time = recommendations_cache[cache_key]
+            if time.time() - cached_time < RECOMMENDATIONS_CACHE_TTL:
+                return cached_data
+        
+        # Fetch current metrics for all VMs
+        collector = VMMetricsCollector()
+        
+        # Determine which clusters to analyze
+        clusters_to_analyze = [cluster_type] if cluster_type else [ClusterType.GENERAL, ClusterType.STORAGE]
+        
+        all_recommendations = []
+        for cluster in clusters_to_analyze:
+            # Get VM metrics for cluster
+            cluster_vms = ["general-vm-1", "general-vm-2"] if cluster == ClusterType.GENERAL else ["storage-vm-1", "storage-vm-2"]
+            vm_metrics = []
+            
+            for vm_name in cluster_vms:
+                try:
+                    # Get active user count
+                    active_users = DB["vm_assignments"].count_documents({
+                        "vm_name": vm_name,
+                        "status": "ACTIVE"
+                    })
+                    
+                    # Get VM details
+                    vm_details = get_vm_details(vm_name, settings.GCP_ZONE)
+                    last_started = None
+                    if vm_details.get("status") == "RUNNING":
+                        last_started = datetime.utcnow()  # Simplified for recommendations
+                    
+                    metrics = await collector.collect_all_metrics(
+                        vm_name=vm_name,
+                        cluster_type=cluster,
+                        active_users=active_users,
+                        last_started=last_started
+                    )
+                    vm_metrics.append(metrics)
+                except Exception as e:
+                    print(f"Error collecting metrics for {vm_name}: {e}")
+                    continue
+            
+            # Get user assignments
+            user_assignments = list(DB["vm_assignments"].find({"status": "ACTIVE"}))
+            
+            # Generate recommendations
+            recommendations = MigrationRecommender.generate_recommendations(
+                cluster_type=cluster,
+                vm_metrics=vm_metrics,
+                user_assignments=user_assignments
+            )
+            
+            all_recommendations.extend(recommendations)
+        
+        # Filter and return top recommendations
+        filtered = MigrationRecommender.filter_recommendations(
+            all_recommendations,
+            min_score=min_score,
+            max_count=10
+        )
+        
+        # Cache the results
+        recommendations_cache[cache_key] = (filtered, time.time())
+        
+        return filtered
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to generate recommendations: {str(e)}")
+
+
+@router.post("/admin/apply-recommendation/{recommendation_id}", summary="Apply Migration Recommendation")
+async def apply_recommendation(recommendation_id: str) -> Dict[str, Any]:
+    """
+    Admin endpoint: Execute a specific migration recommendation.
+    """
+    # Find recommendation in recent recommendations (stored in MongoDB or cache)
+    # For simplicity, this is a placeholder - in production, store recommendations in DB
+    
+    return {
+        "success": True,
+        "message": f"Recommendation {recommendation_id} applied",
+        "note": "Implementation pending: Store recommendations in DB for tracking"
+    }
+
+
+@router.get("/admin/cluster-metrics/{cluster_type}", summary="Get Cluster Health Dashboard")
+async def get_cluster_metrics(cluster_type: ClusterType) -> Dict[str, Any]:
+    """
+    Admin endpoint: Get aggregated health metrics for entire cluster.
+    Used by frontend dashboard for real-time monitoring.
+    Cached for 5 minutes to reduce GCP API calls.
+    """
+    try:
+        cache_key = f"cluster_health_{cluster_type.value}"
+        
+        # Check cache
+        if cache_key in cluster_health_cache:
+            cached_data, cached_time = cluster_health_cache[cache_key]
+            if time.time() - cached_time < CLUSTER_HEALTH_CACHE_TTL:
+                return cached_data
+        
+        # Fetch fresh data
+        health_data = get_cluster_health(cluster_type)
+        
+        # Update cache
+        cluster_health_cache[cache_key] = (health_data, time.time())
+        
+        return health_data
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get cluster health: {str(e)}")
+
+
+@router.get("/admin/predict-load", summary="Predict Cluster Load (1 Hour)")
+async def predict_cluster_load(cluster_type: ClusterType) -> Dict[str, Any]:
+    """
+    Admin endpoint: Predict cluster state in 1 hour using historical trends.
+    """
+    try:
+        collector = VMMetricsCollector()
+        
+        # Get current metrics
+        cluster_vms = ["general-vm-1", "general-vm-2"] if cluster_type == ClusterType.GENERAL else ["storage-vm-1", "storage-vm-2"]
+        current_metrics = []
+        
+        for vm_name in cluster_vms:
+            try:
+                # Get active user count
+                active_users = DB["vm_assignments"].count_documents({
+                    "vm_name": vm_name,
+                    "status": "ACTIVE"
+                })
+                
+                # Determine cluster type from VM name
+                vm_cluster = ClusterType.GENERAL if "general" in vm_name else ClusterType.STORAGE
+                
+                # Get VM details
+                vm_details = get_vm_details(vm_name, settings.GCP_ZONE)
+                last_started = None
+                if vm_details.get("status") == "RUNNING":
+                    last_started = datetime.utcnow()
+                
+                metrics = await collector.collect_all_metrics(
+                    vm_name=vm_name,
+                    cluster_type=vm_cluster,
+                    active_users=active_users,
+                    last_started=last_started
+                )
+                current_metrics.append(metrics)
+            except Exception as e:
+                print(f"Error collecting metrics for {vm_name}: {e}")
+                continue
+                current_metrics.append(metrics)
+            except:
+                continue
+        
+        # Predict (simple trend analysis for now)
+        prediction = MigrationRecommender.predict_cluster_health_1_hour(
+            current_metrics=current_metrics,
+            historical_trend="stable"  # TODO: Calculate from MongoDB historical data
+        )
+        
+        return prediction
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Prediction failed: {str(e)}")

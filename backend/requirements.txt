@@ -1,0 +1,17 @@
+fastapi
+uvicorn[standard]
+pydantic
+pydantic-settings
+passlib==1.7.4
+bcrypt==3.2.0
+python-jose[cryptography]
+email-validator
+pymongo
+python-dotenv
+boto3
+celery[librabbitmq]
+requests
+google-cloud-compute
+google-cloud-monitoring
+google-auth
+pyotp

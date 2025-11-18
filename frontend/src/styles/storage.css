@@ -1,0 +1,367 @@
+/* src/styles/storage.css */
+:root {
+  --primary-gold: #d4af37;
+  --hover-gold: #c8a430;
+  --dark-bg: #121212;
+  --content-bg: #1a1a1a;
+  --border-color: #2a2a2a;
+  --text-primary: #e0e0e0;
+  --text-secondary: #a3a3a3;
+  --danger-red: #dc3545;
+  --primary-blue: #007bff;
+  --success-green: #28a745;
+}
+
+.storage-container {
+  padding: 2rem;
+  color: var(--text-primary);
+  font-family: "Inter", sans-serif;
+}
+
+.storage-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 1.5rem;
+}
+
+.storage-header h2 {
+  font-size: 2.25rem;
+  font-weight: 700;
+  color: #fff;
+  margin: 0;
+}
+
+.upload-section {
+  background: var(--content-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 2.5rem;
+  margin-bottom: 3rem;
+  box-shadow: 0 15px 30px rgba(0, 0, 0, 0.3);
+}
+
+.upload-title {
+  font-size: 1.75rem;
+  font-weight: 600;
+  color: #fff;
+  margin-top: 0;
+  margin-bottom: 1.5rem;
+}
+
+.upload-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.file-input-group {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.preference-group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem;
+  background: #111;
+  border-radius: 8px;
+}
+
+.preference-group label {
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.preference-group select {
+  background: #2a2a2a;
+  color: var(--text-primary);
+  border: 2px solid #444;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-family: "Inter", sans-serif;
+  transition: border-color 0.3s ease;
+}
+
+/* --- Color-coded styles for preference dropdowns --- */
+select.priority-balanced {
+  border-color: var(--text-secondary);
+}
+select.priority-cost {
+  border-color: var(--success-green);
+}
+select.priority-performance {
+  border-color: var(--primary-blue);
+}
+
+select.intent-active {
+  border-color: var(--primary-gold);
+}
+select.intent-infrequent {
+  border-color: #6c757d;
+}
+select.intent-archival {
+  border-color: #6a0dad;
+}
+
+.upload-btn {
+  background-color: var(--primary-gold);
+  color: #000;
+  border: none;
+  border-radius: 8px;
+  padding: 12px 24px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  align-self: flex-start;
+}
+
+.upload-btn:disabled {
+  background-color: #444;
+  color: #888;
+  cursor: not-allowed;
+}
+
+.upload-btn:hover:not(:disabled) {
+  background-color: var(--hover-gold);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(212, 175, 55, 0.2);
+}
+
+.spinner {
+  width: 18px;
+  height: 18px;
+  border: 2px solid rgba(0, 0, 0, 0.2);
+  border-top-color: #000;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.list-title {
+  font-size: 1.75rem;
+  font-weight: 600;
+  margin-bottom: 1.5rem;
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 1rem;
+}
+
+.file-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0 10px;
+}
+
+.file-table th {
+  font-weight: 500;
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 1rem 1.5rem;
+  text-align: left;
+}
+
+.file-table td {
+  padding: 1rem 1.5rem;
+  background: #1c1c1c;
+  vertical-align: middle;
+}
+
+.file-table .date-col {
+  color: #888;
+  font-size: 0.9rem;
+}
+
+.file-table tr td:first-child {
+  border-radius: 8px 0 0 8px;
+}
+.file-table tr td:last-child {
+  border-radius: 0 8px 8px 0;
+}
+.file-table tbody tr:hover {
+  background-color: #2a2a2a;
+}
+
+.action-btn {
+  padding: 0.5rem 1rem;
+  font-size: 0.8rem;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: opacity 0.2s ease;
+  color: white;
+}
+
+.download-btn {
+  background-color: var(--primary-blue);
+}
+.delete-btn {
+  background-color: var(--danger-red);
+  margin-left: 0.5rem;
+}
+.action-btn:hover {
+  opacity: 0.85;
+}
+
+.csp-location-cell {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.csp-icon {
+  width: 24px;
+  height: 24px;
+}
+
+/* --- Modal Styles --- */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  animation: fadeIn 0.3s ease;
+}
+
+.modal-content {
+  background: #252525;
+  padding: 2.5rem;
+  border-radius: 12px;
+  text-align: center;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  animation: slideIn 0.4s ease;
+  max-width: 500px;
+  width: 90%;
+}
+
+.recommendation-title {
+  font-size: 1.75rem;
+  color: #fff;
+  margin-top: 0;
+  margin-bottom: 1rem;
+}
+
+.recommendation-text {
+  color: var(--text-secondary);
+  line-height: 1.6;
+  margin-bottom: 1.5rem;
+}
+
+.recommendation-text strong {
+  color: var(--text-primary);
+}
+
+.recommendation-box {
+  background: #1c1c1c;
+  border: 1px solid var(--border-color);
+  padding: 1.5rem;
+  border-radius: 8px;
+  margin: 1.5rem 0;
+}
+
+.recommendation-box p {
+  margin: 0;
+  color: var(--text-secondary);
+}
+
+.recommendation-csp {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  font-weight: 600;
+  font-size: 1.2rem;
+  margin-top: 0.5rem;
+  color: var(--text-primary);
+}
+
+.modal-buttons {
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+  margin-top: 2rem;
+}
+
+.modal-btn {
+  border-radius: 8px;
+  padding: 0.7rem 1.5rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+}
+
+.modal-btn.confirm {
+  background-color: var(--primary-gold);
+  color: #000;
+}
+
+.modal-btn.cancel {
+  background-color: #6c757d;
+  color: white;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes slideIn {
+  from {
+    transform: translateY(-30px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* --- NEW: Styles for the Override Section in the Modal --- */
+
+.override-section {
+  margin-top: 2rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--border-color);
+}
+
+.override-section label {
+  display: block;
+  color: var(--text-secondary);
+  margin-bottom: 0.75rem;
+  font-size: 0.9rem;
+}
+
+.override-select {
+  width: 100%;
+  background: #2a2a2a;
+  color: var(--text-primary);
+  border: 2px solid #444;
+  padding: 10px 12px;
+  border-radius: 6px;
+  font-family: 'Inter', sans-serif;
+  font-size: 1rem;
+}
