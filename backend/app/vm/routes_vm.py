@@ -17,6 +17,8 @@ from app.vm.migration_recommender import MigrationRecommender
 from app.vm.metrics_collector import VMMetricsCollector
 from app.utils.config import settings
 from app.database.mongo_client import get_database
+from app.users.routes_users import get_current_user  # Import real auth
+from app.users.user_model import User
 from datetime import datetime
 import asyncio # For asynchronous operations
 import time # For cache timing
@@ -42,17 +44,6 @@ def invalidate_cluster_health_cache():
     global cluster_health_cache
     cluster_health_cache.clear()
     print("✓ Cluster health cache invalidated")
-
-# --- Authentication Dependency (Simplified - Replace with real JWT auth) ---
-def get_current_user(authorization: Optional[str] = None) -> str:
-    """
-    Extract user ID from JWT token.
-    For demo: returns 'demo_user' if no token provided.
-    """
-    if not authorization:
-        return "demo_user"
-    # TODO: Implement real JWT validation
-    return "demo_user"
 
 # --- Pydantic Models for Request/Response ---
 
@@ -227,7 +218,7 @@ async def get_single_vm_details(vm_name: str) -> VMResponse:
 @router.post("/request", response_model=VMAssignmentResponse, summary="Request VM Assignment")
 async def request_vm_assignment(
     request: VMRequestModel,
-    user_id: str = Depends(get_current_user)
+    current_user: User = Depends(get_current_user)
 ) -> VMAssignmentResponse:
     """
     Intelligent VM assignment based on workload analysis.
@@ -235,7 +226,7 @@ async def request_vm_assignment(
     """
     try:
         vm_name, vm_ip, ssh_command, cluster_type, assigned_at, expires_at = assign_vm_to_user(
-            user_id=user_id,
+            user_id=current_user.username,
             workload_description=request.workload_description,
             cluster_preference=request.cluster_preference,
             priority_level=request.priority_level
@@ -258,11 +249,11 @@ async def request_vm_assignment(
         raise HTTPException(status_code=500, detail=f"VM assignment failed: {str(e)}")
 
 
-@router.post("/transfer", summary="Migrate User to Another VM")
-async def transfer_vm(
+@router.post("/migrate", response_model=dict)
+async def migrate_vm(
     request: VMTransferRequest,
-    user_id: str = Depends(get_current_user)
-) -> Dict[str, Any]:
+    current_user: User = Depends(get_current_user)
+):
     """
     User-initiated or admin-forced migration to another VM.
     Supports both cluster-based auto-selection and manual VM selection.
@@ -286,12 +277,12 @@ async def transfer_vm(
 
 @router.get("/my-assignment", summary="Get My VM Assignment")
 async def get_my_vm_assignment(
-    user_id: str = Depends(get_current_user)
+    current_user: User = Depends(get_current_user)
 ) -> Dict[str, Any]:
     """
     Retrieve current active VM assignment for the authenticated user.
     """
-    assignment = get_user_assignment(user_id)
+    assignment = get_user_assignment(current_user.username)
     
     if not assignment:
         raise HTTPException(status_code=404, detail="No active VM assignment found")
@@ -311,16 +302,11 @@ async def get_all_my_vm_assignments(
     return assignments
 
 
-@router.post("/release", summary="Release VM Assignment")
+@router.post("/release/{assignment_id}", response_model=dict)
 async def release_vm(
-    assignment_id: Optional[str] = None,
-    user_id: str = Depends(get_current_user)
-) -> Dict[str, Any]:
-    """
-    Release VM assignment. VM will be stopped if no other users remain.
-    If assignment_id is provided, releases that specific assignment.
-    Otherwise, releases the first active assignment (backward compatibility).
-    """
+    assignment_id: str,
+    current_user: User = Depends(get_current_user)
+):
     if assignment_id:
         result = release_vm_assignment(user_id, assignment_id)
     else:
@@ -708,31 +694,99 @@ async def download_ssh_key(
     Returns the key as a downloadable .pem file.
     """
     from fastapi.responses import Response
-    from app.vm.ssh_manager import decrypt_private_key
+    from app.vm.ssh_manager import decrypt_private_key, generate_ssh_keypair, encrypt_private_key, format_ssh_metadata
     from app.utils.config import settings as app_settings
     
     try:
         # Find the assignment
+        print(f"🔍 Looking for assignment: {assignment_id}, user: {current_user.username}")
+        
         assignment = DB["vm_assignments"].find_one({
             "assignment_id": assignment_id,
-            "user_id": user_id,
+            "user_id": current_user.username,
             "status": "ACTIVE"
         })
         
         if not assignment:
+            # Try without user_id filter to see if it exists
+            any_assignment = DB["vm_assignments"].find_one({"assignment_id": assignment_id})
+            if any_assignment:
+                print(f"❌ Assignment exists but belongs to user: {any_assignment.get('user_id')}")
+                print(f"❌ Requested by user: {current_user.username}")
+                print(f"❌ Status: {any_assignment.get('status')}")
+            else:
+                print(f"❌ Assignment {assignment_id} does not exist at all")
+            
             raise HTTPException(
                 status_code=404,
                 detail="Assignment not found or you don't have permission to access it"
             )
         
-        # Decrypt the private key
+        # Check if SSH key exists, if not generate one (for backward compatibility)
         encrypted_key = assignment.get("ssh_private_key_encrypted")
-        if not encrypted_key:
-            raise HTTPException(
-                status_code=404,
-                detail="No SSH key found for this assignment"
-            )
         
+        if not encrypted_key:
+            print(f"⚠ No SSH key found for assignment {assignment_id}, generating new one...")
+            
+            # Generate new keypair
+            private_key, public_key = generate_ssh_keypair()
+            encrypted_private_key = encrypt_private_key(private_key, app_settings.SECRET_KEY)
+            
+            # Update assignment with new keys
+            DB["vm_assignments"].update_one(
+                {"assignment_id": assignment_id, "user_id": current_user.username},
+                {"$set": {
+                    "ssh_username": "vmuser",
+                    "ssh_public_key": public_key,
+                    "ssh_private_key_encrypted": encrypted_private_key
+                }}
+            )
+            
+            # Inject key into VM metadata
+            try:
+                vm_name = assignment["vm_name"]
+                ssh_keys_value = format_ssh_metadata("vmuser", public_key)
+                
+                # Get current VM metadata
+                metadata_request = compute_v1.GetInstanceRequest(
+                    project=settings.GCP_PROJECT_ID,
+                    zone=settings.GCP_ZONE,
+                    instance=vm_name
+                )
+                instance = instance_client.get(request=metadata_request)
+                
+                # Add or update SSH keys
+                metadata_items = list(instance.metadata.items) if instance.metadata and instance.metadata.items else []
+                
+                ssh_keys_found = False
+                for i, item in enumerate(metadata_items):
+                    if item.key == "ssh-keys":
+                        metadata_items[i].value = f"{item.value}\n{ssh_keys_value}"
+                        ssh_keys_found = True
+                        break
+                
+                if not ssh_keys_found:
+                    metadata_items.append(compute_v1.Items(key="ssh-keys", value=ssh_keys_value))
+                
+                # Update VM metadata
+                update_request = compute_v1.SetMetadataInstanceRequest(
+                    project=settings.GCP_PROJECT_ID,
+                    zone=settings.GCP_ZONE,
+                    instance=vm_name,
+                    metadata_resource=compute_v1.Metadata(
+                        items=metadata_items,
+                        fingerprint=instance.metadata.fingerprint if instance.metadata else None
+                    )
+                )
+                operation = instance_client.set_metadata(request=update_request)
+                operation.result()
+                print(f"✓ SSH key injected into {vm_name}")
+            except Exception as e:
+                print(f"⚠ Warning: Could not inject SSH key: {e}")
+            
+            encrypted_key = encrypted_private_key
+        
+        # Decrypt the private key
         private_key = decrypt_private_key(encrypted_key, app_settings.SECRET_KEY)
         
         # Return as downloadable file
@@ -752,7 +806,7 @@ async def download_ssh_key(
 @router.get("/ssh-instructions/{assignment_id}", summary="Get SSH Connection Instructions")
 async def get_ssh_instructions(
     assignment_id: str,
-    user_id: str = Depends(get_current_user)
+    current_user: User = Depends(get_current_user)
 ):
     """
     Get detailed instructions for connecting to the VM via SSH.
@@ -760,7 +814,7 @@ async def get_ssh_instructions(
     try:
         assignment = DB["vm_assignments"].find_one({
             "assignment_id": assignment_id,
-            "user_id": user_id,
+            "user_id": current_user.username,
             "status": "ACTIVE"
         })
         
