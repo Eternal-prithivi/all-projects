@@ -1,0 +1,374 @@
+/* Enhanced Dashboard Styles */
+
+.dashboard-overview {
+  padding: 0;
+}
+
+.welcome-section {
+  margin-bottom: 2rem;
+}
+
+.welcome-section h2 {
+  font-size: 2.5rem;
+  margin-bottom: 0.5rem;
+  background: linear-gradient(135deg, #d4af37, #f4e5a1);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.welcome-section p {
+  color: #999;
+  font-size: 1.1rem;
+}
+
+/* Stats Grid */
+.stats-grid {
+  display: grid;
+  gap: 1.5rem;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  margin-bottom: 2rem;
+}
+
+/* Info Grid - Secondary cards */
+.info-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.info-card {
+  background: #0d0d0d;
+  border: 1px solid #2a2a2a;
+  border-radius: 12px;
+  padding: 1.5rem;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.info-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 20px rgba(212, 175, 55, 0.1);
+}
+
+.info-card h3 {
+  font-size: 1.2rem;
+  margin-bottom: 1.5rem;
+  color: #d4af37;
+}
+
+/* VM Health Card */
+.vm-health-chart {
+  display: flex;
+  justify-content: space-around;
+  margin-bottom: 1.5rem;
+  padding: 1rem 0;
+}
+
+.health-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.health-circle {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  border: 3px solid;
+}
+
+.health-circle.healthy {
+  background: rgba(40, 167, 69, 0.1);
+  border-color: #28a745;
+}
+
+.health-circle.warning {
+  background: rgba(255, 193, 7, 0.1);
+  border-color: #ffc107;
+}
+
+.health-circle.critical {
+  background: rgba(220, 53, 69, 0.1);
+  border-color: #dc3545;
+}
+
+.health-info {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.health-count {
+  font-size: 1.5rem;
+  font-weight: bold;
+  color: #fff;
+}
+
+.health-label {
+  font-size: 0.85rem;
+  color: #999;
+}
+
+/* Budget Status Card */
+.budget-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.budget-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.budget-name {
+  font-weight: 600;
+  color: #fff;
+  font-size: 0.95rem;
+}
+
+.budget-bar-container {
+  width: 100%;
+  height: 8px;
+  background: #1a1a1a;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.budget-bar {
+  height: 100%;
+  border-radius: 10px;
+  transition: width 0.3s ease;
+}
+
+.budget-bar.normal {
+  background: linear-gradient(90deg, #28a745, #20c997);
+}
+
+.budget-bar.warning {
+  background: linear-gradient(90deg, #ffc107, #fd7e14);
+}
+
+.budget-bar.exceeded {
+  background: linear-gradient(90deg, #dc3545, #e83e8c);
+}
+
+.budget-info-text {
+  font-size: 0.85rem;
+  color: #999;
+}
+
+.budget-percentage {
+  font-weight: 600;
+  color: #d4af37;
+}
+
+.no-data {
+  text-align: center;
+  color: #666;
+  padding: 2rem 0;
+  font-style: italic;
+}
+
+/* Recent Activity Card */
+.activity-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.activity-item {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.75rem;
+  background: #1a1a1a;
+  border-radius: 8px;
+  transition: background 0.2s ease;
+}
+
+.activity-item:hover {
+  background: #252525;
+}
+
+.activity-icon {
+  font-size: 1.5rem;
+}
+
+.activity-details {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.activity-action {
+  font-size: 0.9rem;
+  color: #fff;
+  font-weight: 500;
+}
+
+.activity-resource {
+  font-size: 0.8rem;
+  color: #999;
+}
+
+.activity-time {
+  font-size: 0.8rem;
+  color: #666;
+  white-space: nowrap;
+}
+
+.activity-status-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* Quick Actions Card */
+.quick-actions-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1rem;
+}
+
+.action-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1.5rem 1rem;
+  background: #1a1a1a;
+  border: 1px solid #2a2a2a;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.action-btn:hover {
+  background: #252525;
+  border-color: #d4af37;
+  transform: translateY(-2px);
+}
+
+.action-icon {
+  font-size: 2rem;
+}
+
+.action-text {
+  font-size: 0.9rem;
+  color: #fff;
+  font-weight: 500;
+}
+
+/* View Details Button */
+.view-details-btn {
+  width: 100%;
+  padding: 0.75rem;
+  background: transparent;
+  border: 1px solid #d4af37;
+  border-radius: 8px;
+  color: #d4af37;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.view-details-btn:hover {
+  background: #d4af37;
+  color: #000;
+}
+
+/* System Status Banner */
+.system-status-banner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 1.5rem;
+  background: linear-gradient(135deg, rgba(40, 167, 69, 0.1), rgba(40, 167, 69, 0.05));
+  border: 1px solid rgba(40, 167, 69, 0.3);
+  border-radius: 10px;
+  margin-top: 2rem;
+}
+
+.status-indicator {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-weight: 600;
+  color: #28a745;
+}
+
+.status-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+}
+
+.status-dot.healthy {
+  background: #28a745;
+  box-shadow: 0 0 10px rgba(40, 167, 69, 0.5);
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.status-info {
+  color: #999;
+  font-size: 0.85rem;
+}
+
+/* Responsive Design */
+@media (max-width: 1024px) {
+  .info-grid {
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  }
+  
+  .quick-actions-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .welcome-section h2 {
+    font-size: 2rem;
+  }
+  
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .info-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .vm-health-chart {
+    flex-direction: row;
+  }
+  
+  .quick-actions-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+  
+  .system-status-banner {
+    flex-direction: column;
+    gap: 1rem;
+    text-align: center;
+  }
+}

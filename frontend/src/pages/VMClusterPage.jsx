@@ -243,7 +243,7 @@ function VMClusterPage() {
     }
   };
 
-    const handleTransferVM = async () => {
+  const handleTransferVM = async () => {
     if (!transferCluster) {
       toast.error("Please select a target cluster");
       return;
@@ -258,12 +258,80 @@ function VMClusterPage() {
       await transferVM(data, token);
       toast.success("VM migration initiated successfully");
       setShowTransferModal(false);
-      setTransferCluster("");
       await Promise.all([fetchAssignment(), fetchClusterHealth()]);
     } catch (error) {
-      toast.error(error.message || "Failed to transfer VM");
+      toast.error(error.message || "Failed to migrate VM");
     } finally {
       setIsTransferring(false);
+    }
+  };
+
+  const handleDownloadSSHKey = async (assignmentId) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/ssh-key/${assignmentId}`, {
+        method: "GET",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to download SSH key");
+      }
+
+      // Create blob and download
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `vm_${assignmentId}.pem`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
+      toast.success("SSH key downloaded! Remember to set permissions: chmod 400");
+    } catch (error) {
+      toast.error(error.message || "Failed to download SSH key");
+    }
+  };
+
+  const handleViewSSHInstructions = async (assignmentId) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/ssh-instructions/${assignmentId}`, {
+        method: "GET",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch SSH instructions");
+      }
+
+      const instructions = await response.json();
+      
+      // Show instructions in a modal (you can style this better)
+      const instructionsText = `
+🔐 SSH Connection Instructions
+
+VM: ${instructions.vm_name}
+IP: ${instructions.vm_ip}
+Username: ${instructions.ssh_username}
+
+Steps:
+${instructions.steps.map((step) => `
+${step.step}. ${step.title}
+   ${step.command || ""}
+   ${step.description}
+`).join("\n")}
+
+Troubleshooting:
+${instructions.troubleshooting.map((item) => `
+• ${item.issue}
+  → ${item.solution}
+`).join("\n")}
+      `.trim();
+
+      alert(instructionsText); // Replace with a better modal in production
+    } catch (error) {
+      toast.error(error.message || "Failed to fetch instructions");
     }
   };
 
@@ -430,8 +498,28 @@ function VMClusterPage() {
                   <div className="detail-row">
                     <span className="label">SSH Command:</span>
                     <code className="ssh-command">
-                      ssh user@{assignment.vm_ip}
+                      ssh -i ~/.ssh/vm_{assignment.assignment_id}.pem vmuser@{assignment.vm_ip}
                     </code>
+                  </div>
+                  <div className="detail-row ssh-key-download">
+                    <button 
+                      className="btn-download-key"
+                      onClick={() => handleDownloadSSHKey(assignment.assignment_id)}
+                      title="Download SSH private key to connect to this VM"
+                    >
+                      <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                        <path d="M8 12l-4-4h3V0h2v8h3l-4 4z"/>
+                        <path d="M14 14H2v-2h12v2z"/>
+                      </svg>
+                      Download SSH Key
+                    </button>
+                    <button 
+                      className="btn-ssh-instructions"
+                      onClick={() => handleViewSSHInstructions(assignment.assignment_id)}
+                      title="View detailed connection instructions"
+                    >
+                      📋 Instructions
+                    </button>
                   </div>
                   <div className="detail-row">
                     <span className="label">Assigned:</span>

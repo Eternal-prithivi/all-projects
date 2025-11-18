@@ -10,7 +10,10 @@ celery_app = Celery(
     include=[
         "app.storage.tasks",
         "app.storage.tiering_tasks",
-        "app.vm.tasks"  # NEW: VM management tasks
+        "app.vm.tasks",  # VM management tasks
+        "app.pricing.tasks",  # Pricing update tasks
+        "app.cost.tasks_anomaly",  # Cost anomaly detection
+        "app.budgets.tasks"  # Budget monitoring and alerts
     ] 
 )
 
@@ -39,6 +42,24 @@ celery_app.conf.beat_schedule = {
     'cleanup-old-metrics-daily': {
         'task': 'cleanup_old_metrics',
         'schedule': crontab(hour=0, minute=30),  # 12:30 AM UTC
+    },
+    
+    # Pricing updates (NEW)
+    'update-pricing-weekly': {
+        'task': 'update_pricing_cache',
+        'schedule': crontab(day_of_week=1, hour=2, minute=0),  # Every Monday at 2 AM UTC
+    },
+    
+    # Cost anomaly detection
+    'check-cost-anomalies-daily': {
+        'task': 'check_cost_anomalies',
+        'schedule': crontab(hour=1, minute=0),  # Every day at 1 AM UTC
+    },
+    
+    # Budget monitoring and SMS alerts (NEW)
+    'check-budget-alerts-daily': {
+        'task': 'check_budget_alerts',
+        'schedule': crontab(hour=9, minute=0),  # Every day at 9 AM UTC
     },
 }
 

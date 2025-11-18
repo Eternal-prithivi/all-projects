@@ -8,7 +8,12 @@ from app.security import routes_security
 from app.websockets import routes_ws
 from app.security import routes_2fa
 from app.cost import routes_cost
+from app.cost import routes_export
+from app.cost import routes_forecast
+from app.cost import routes_anomaly
 from app.vm import routes_vm
+from app.pricing import routes_pricing
+from app.budgets import routes_budgets
 from app.database.mongo_client import mongodb_client
 from app.utils.config import settings
 import os
@@ -36,7 +41,13 @@ app.include_router(routes_2fa.router, prefix="/api/2fa")
 app.include_router(routes_ws.router, prefix="/ws")
 #app.include_router(routes_cost.router, prefix="/cost", tags=["cost"])
 app.include_router(routes_auth.router, prefix="/auth", tags=["Auth"])
-app.include_router(routes_cost.router, prefix="/cost", tags=["Cost"])
+# Cost analysis endpoints follow /api/<feature> convention for consistency
+app.include_router(routes_cost.router, prefix="/api/cost", tags=["Cost"])
+app.include_router(routes_export.router, prefix="/api/cost", tags=["Cost Export"])
+app.include_router(routes_forecast.router, prefix="/api/cost", tags=["Cost Forecast"])
+app.include_router(routes_anomaly.router, prefix="/api/cost", tags=["Cost Anomaly"])
+app.include_router(routes_pricing.router, prefix="/api", tags=["Pricing"])
+app.include_router(routes_budgets.router, prefix="/api/budgets", tags=["Budgets"])
 app.include_router(routes_vm.router, prefix="/api/vm", tags=["Virtual Machines"])
 
 @app.get("/", tags=["Root"])

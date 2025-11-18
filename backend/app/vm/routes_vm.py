@@ -696,3 +696,119 @@ async def predict_cluster_load(cluster_type: ClusterType) -> Dict[str, Any]:
         return prediction
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Prediction failed: {str(e)}")
+
+
+@router.get("/ssh-key/{assignment_id}", summary="Download SSH Private Key")
+async def download_ssh_key(
+    assignment_id: str,
+    user_id: str = Depends(get_current_user)
+):
+    """
+    Download the SSH private key for a specific VM assignment.
+    Returns the key as a downloadable .pem file.
+    """
+    from fastapi.responses import Response
+    from app.vm.ssh_manager import decrypt_private_key
+    from app.utils.config import settings as app_settings
+    
+    try:
+        # Find the assignment
+        assignment = DB["vm_assignments"].find_one({
+            "assignment_id": assignment_id,
+            "user_id": user_id,
+            "status": "ACTIVE"
+        })
+        
+        if not assignment:
+            raise HTTPException(
+                status_code=404,
+                detail="Assignment not found or you don't have permission to access it"
+            )
+        
+        # Decrypt the private key
+        encrypted_key = assignment.get("ssh_private_key_encrypted")
+        if not encrypted_key:
+            raise HTTPException(
+                status_code=404,
+                detail="No SSH key found for this assignment"
+            )
+        
+        private_key = decrypt_private_key(encrypted_key, app_settings.SECRET_KEY)
+        
+        # Return as downloadable file
+        return Response(
+            content=private_key,
+            media_type="application/x-pem-file",
+            headers={
+                "Content-Disposition": f"attachment; filename=vm_{assignment_id}.pem"
+            }
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to retrieve SSH key: {str(e)}")
+
+
+@router.get("/ssh-instructions/{assignment_id}", summary="Get SSH Connection Instructions")
+async def get_ssh_instructions(
+    assignment_id: str,
+    user_id: str = Depends(get_current_user)
+):
+    """
+    Get detailed instructions for connecting to the VM via SSH.
+    """
+    try:
+        assignment = DB["vm_assignments"].find_one({
+            "assignment_id": assignment_id,
+            "user_id": user_id,
+            "status": "ACTIVE"
+        })
+        
+        if not assignment:
+            raise HTTPException(status_code=404, detail="Assignment not found")
+        
+        vm_ip = assignment.get("vm_ip")
+        ssh_username = assignment.get("ssh_username", "vmuser")
+        
+        instructions = {
+            "assignment_id": assignment_id,
+            "vm_name": assignment["vm_name"],
+            "vm_ip": vm_ip,
+            "ssh_username": ssh_username,
+            "steps": [
+                {
+                    "step": 1,
+                    "title": "Download your SSH key",
+                    "description": f"Click the 'Download SSH Key' button or use: GET /api/vm/ssh-key/{assignment_id}"
+                },
+                {
+                    "step": 2,
+                    "title": "Set correct permissions",
+                    "command": f"chmod 400 ~/.ssh/vm_{assignment_id}.pem",
+                    "description": "Make the key file read-only for security"
+                },
+                {
+                    "step": 3,
+                    "title": "Connect to your VM",
+                    "command": f"ssh -i ~/.ssh/vm_{assignment_id}.pem {ssh_username}@{vm_ip}",
+                    "description": "Use this command to connect to your VM"
+                }
+            ],
+            "troubleshooting": [
+                {
+                    "issue": "Permission denied (publickey)",
+                    "solution": "Ensure you've downloaded the correct key and set permissions with chmod 400"
+                },
+                {
+                    "issue": "Connection timeout",
+                    "solution": "Check if the VM is running and has an external IP. Wait 1-2 minutes after VM starts."
+                }
+            ]
+        }
+        
+        return instructions
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get instructions: {str(e)}")
+

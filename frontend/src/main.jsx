@@ -9,6 +9,9 @@ import DashboardLayout from "./components/dashboard/DashboardLayout.jsx"; // Imp
 import DashboardPage from "./pages/DashboardPage.jsx";
 import StoragePage from "./pages/StoragePage.jsx";
 import VMClusterPage from "./pages/VMClusterPage.jsx";
+import CostAnalysisPage from "./pages/CostAnalysisEnhancedPage.jsx";
+import CostSimulatorPage from "./pages/CostSimulatorPage.jsx";
+import CostOptimizationPage from "./pages/CostOptimizationPage.jsx";
 import ProtectedRoute from "./components/ProtectedRoute.jsx";
 import { AuthProvider } from "./context/AuthContext.jsx";
 import "./index.css";
@@ -33,6 +36,9 @@ const router = createBrowserRouter([
             element: <DashboardLayout />, // The layout is applied here
             children: [
               { index: true, element: <DashboardPage /> },
+              { path: "costs", element: <CostAnalysisPage /> },
+              { path: "simulator", element: <CostSimulatorPage /> },
+              { path: "optimization", element: <CostOptimizationPage /> },
               { path: "storage", element: <StoragePage /> },
               { path: "vmcluster", element: <VMClusterPage /> },
               { path: "security", element: <SecurityPage /> }, // Add this route

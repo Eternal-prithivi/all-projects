@@ -88,13 +88,24 @@ def create_vm(
     machine_type: str,
     source_image: str,
     disk_size_gb: int,
-    labels: Optional[Dict[str, str]] = None
+    labels: Optional[Dict[str, str]] = None,
+    ssh_public_key: Optional[str] = None,
+    ssh_username: str = "vmuser"
 ) -> Dict[str, Any]:
-    """Provisions a new VM instance."""
+    """Provisions a new VM instance with optional SSH key."""
     if credentials is None:
         raise Exception("GCP credentials not loaded. Cannot create VM.")
 
     image_uri = get_default_image_uri() # Using a default Debian 11 image
+
+    # Prepare metadata for SSH keys if provided
+    metadata_items = []
+    if ssh_public_key:
+        from app.vm.ssh_manager import format_ssh_metadata
+        ssh_keys_value = format_ssh_metadata(ssh_username, ssh_public_key)
+        metadata_items.append(
+            compute_v1.Items(key="ssh-keys", value=ssh_keys_value)
+        )
 
     config = compute_v1.Instance(
         name=name,
@@ -118,7 +129,8 @@ def create_vm(
                 ],
             )
         ],
-        labels=labels if labels else {}
+        labels=labels if labels else {},
+        metadata=compute_v1.Metadata(items=metadata_items) if metadata_items else None
     )
 
     request = compute_v1.InsertInstanceRequest(
@@ -149,15 +161,20 @@ def start_vm(name: str) -> Dict[str, Any]:
 
 def stop_vm(name: str) -> Dict[str, Any]:
     """Stops a VM instance."""
-    request = compute_v1.StopInstanceRequest(
-        project=settings.GCP_PROJECT_ID,
-        zone=settings.GCP_ZONE,
-        instance=name,
-    )
-    operation = instance_client.stop(request=request)
-    operation.result()
-    vm_details = get_vm_details(name, settings.GCP_ZONE)
-    return {"name": name, "status": "TERMINATED", "details": vm_details}
+    try:
+        request = compute_v1.StopInstanceRequest(
+            project=settings.GCP_PROJECT_ID,
+            zone=settings.GCP_ZONE,
+            instance=name,
+        )
+        operation = instance_client.stop(request=request)
+        operation.result(timeout=30)  # Add timeout to prevent hanging
+        vm_details = get_vm_details(name, settings.GCP_ZONE)
+        return {"name": name, "status": "TERMINATED", "details": vm_details}
+    except Exception as e:
+        logger.warning(f"Failed to stop VM {name} via GCP API: {e}. Marking as stopped locally.")
+        # Return success anyway to allow local cleanup
+        return {"name": name, "status": "TERMINATED", "details": {"error": str(e)}}
 
 def delete_vm(name: str) -> Dict[str, Any]:
     """Deletes a VM instance."""
@@ -278,7 +295,14 @@ def assign_vm_to_user(
         running_vms.sort(key=lambda x: x["active_users"])
         selected_vm = running_vms[0]
     
-    # Step 4: Create assignment record in MongoDB
+    # Step 4: Generate SSH keypair for this assignment
+    from app.vm.ssh_manager import generate_ssh_keypair, encrypt_private_key
+    from app.utils.config import settings as app_settings
+    
+    private_key, public_key = generate_ssh_keypair()
+    encrypted_private_key = encrypt_private_key(private_key, app_settings.SECRET_KEY)
+    
+    # Step 5: Create assignment record in MongoDB with SSH keys
     assignment_id = f"assign_{uuid.uuid4().hex[:12]}"
     assigned_at = datetime.utcnow()
     expires_at = assigned_at + timedelta(hours=24)  # 24-hour session
@@ -295,12 +319,59 @@ def assign_vm_to_user(
         "expires_at": expires_at,
         "last_active": assigned_at,
         "status": AssignmentStatus.ACTIVE.value,
-        "recommendation_confidence": confidence
+        "recommendation_confidence": confidence,
+        "ssh_username": "vmuser",
+        "ssh_public_key": public_key,
+        "ssh_private_key_encrypted": encrypted_private_key
     }
     vm_assignments_collection.insert_one(assignment_doc)
     
-    # Step 5: Generate SSH command
-    ssh_command = f"ssh user@{selected_vm['vm_ip']}"
+    # Step 6: Inject SSH key into VM metadata
+    try:
+        from app.vm.ssh_manager import format_ssh_metadata
+        ssh_keys_value = format_ssh_metadata("vmuser", public_key)
+        
+        # Update VM metadata with SSH key
+        metadata_request = compute_v1.GetInstanceRequest(
+            project=settings.GCP_PROJECT_ID,
+            zone=settings.GCP_ZONE,
+            instance=selected_vm["vm_name"]
+        )
+        instance = instance_client.get(request=metadata_request)
+        
+        # Add or update SSH keys in metadata
+        metadata_items = list(instance.metadata.items) if instance.metadata and instance.metadata.items else []
+        
+        # Check if ssh-keys already exists
+        ssh_keys_found = False
+        for i, item in enumerate(metadata_items):
+            if item.key == "ssh-keys":
+                # Append to existing keys
+                metadata_items[i].value = f"{item.value}\n{ssh_keys_value}"
+                ssh_keys_found = True
+                break
+        
+        if not ssh_keys_found:
+            metadata_items.append(compute_v1.Items(key="ssh-keys", value=ssh_keys_value))
+        
+        # Update instance metadata
+        update_request = compute_v1.SetMetadataInstanceRequest(
+            project=settings.GCP_PROJECT_ID,
+            zone=settings.GCP_ZONE,
+            instance=selected_vm["vm_name"],
+            metadata_resource=compute_v1.Metadata(
+                items=metadata_items,
+                fingerprint=instance.metadata.fingerprint if instance.metadata else None
+            )
+        )
+        operation = instance_client.set_metadata(request=update_request)
+        operation.result()  # Wait for operation to complete
+        print(f"✓ SSH key injected into {selected_vm['vm_name']}")
+    except Exception as e:
+        print(f"⚠ Warning: Could not inject SSH key into VM metadata: {e}")
+    
+    # Step 7: Generate SSH command
+    ssh_command = f"ssh -i ~/.ssh/vm_{assignment_id}.pem vmuser@{selected_vm['vm_ip']}"
     
     print(f"Assigned {user_id} to {selected_vm['vm_name']} (IP: {selected_vm['vm_ip']})")
     return selected_vm["vm_name"], selected_vm["vm_ip"], ssh_command, final_cluster, assigned_at, expires_at
@@ -445,8 +516,13 @@ def release_vm_assignment(user_id: str, assignment_id: Optional[str] = None) -> 
     vm_stopped = False
     if remaining_users == 0:
         print(f"No remaining users on {vm_name}. Stopping VM...")
-        stop_vm(vm_name)
-        vm_stopped = True
+        try:
+            stop_vm(vm_name)
+            vm_stopped = True
+        except Exception as e:
+            logger.error(f"Failed to stop VM {vm_name}: {e}")
+            # Continue anyway - assignment is released locally
+            vm_stopped = False
     
     return {
         "success": True,

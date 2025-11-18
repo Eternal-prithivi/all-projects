@@ -1,0 +1,497 @@
+/* Cost Simulator Styles */
+
+.cost-simulator-container {
+  padding: 2rem;
+  max-width: 1400px;
+  margin: 0 auto;
+  background: #000;
+  color: #fff;
+  min-height: 100vh;
+}
+
+.simulator-header {
+  text-align: center;
+  margin-bottom: 3rem;
+  position: relative;
+}
+
+.back-button {
+  position: absolute;
+  left: 0;
+  top: 0;
+  padding: 0.75rem 1.5rem;
+  background: #1a1a1a;
+  border: 1px solid #333;
+  border-radius: 8px;
+  color: #d4af37;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.back-button:hover {
+  border-color: #d4af37;
+  transform: translateX(-3px);
+}
+
+.simulator-header > div {
+  display: inline-block;
+}
+
+.simulator-header h1 {
+  font-size: 2.5rem;
+  margin-bottom: 0.5rem;
+  background: linear-gradient(135deg, #d4af37, #f4e5a1);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.simulator-header p {
+  color: #999;
+  font-size: 1.1rem;
+}
+
+/* Service Selector */
+.service-selector {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+  margin-bottom: 3rem;
+}
+
+.service-btn {
+  padding: 1rem 2rem;
+  border: 2px solid #333;
+  background: #1a1a1a;
+  color: #fff;
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 1.1rem;
+  transition: all 0.3s ease;
+}
+
+.service-btn:hover {
+  border-color: #d4af37;
+  transform: translateY(-2px);
+}
+
+.service-btn.active {
+  background: linear-gradient(135deg, #d4af37, #c89f2d);
+  border-color: #d4af37;
+  color: #000;
+  font-weight: bold;
+}
+
+/* Configuration Panel */
+.config-panel {
+  background: #1a1a1a;
+  border: 1px solid #333;
+  border-radius: 15px;
+  padding: 2rem;
+  margin-bottom: 3rem;
+}
+
+.config-panel h2 {
+  margin-bottom: 1.5rem;
+  color: #d4af37;
+}
+
+.config-section {
+  display: grid;
+  gap: 2rem;
+}
+
+.config-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.config-item label {
+  font-weight: 600;
+  color: #fff;
+  font-size: 1rem;
+}
+
+.slider {
+  width: 100%;
+  height: 8px;
+  border-radius: 5px;
+  background: #333;
+  outline: none;
+  -webkit-appearance: none;
+}
+
+.slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #d4af37;
+  cursor: pointer;
+}
+
+.slider::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #d4af37;
+  cursor: pointer;
+  border: none;
+}
+
+.range-labels {
+  display: flex;
+  justify-content: space-between;
+  color: #666;
+  font-size: 0.85rem;
+}
+
+.config-select {
+  padding: 0.75rem;
+  background: #000;
+  border: 1px solid #333;
+  border-radius: 8px;
+  color: #fff;
+  font-size: 1rem;
+  cursor: pointer;
+}
+
+.config-select:focus {
+  outline: none;
+  border-color: #d4af37;
+}
+
+/* Comparison Grid */
+.comparison-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 2rem;
+  margin-bottom: 3rem;
+}
+
+.price-card {
+  background: #1a1a1a;
+  border: 2px solid #333;
+  border-radius: 15px;
+  padding: 2rem;
+  position: relative;
+  transition: all 0.3s ease;
+}
+
+.price-card:hover {
+  transform: translateY(-5px);
+  border-color: #d4af37;
+}
+
+.price-card.cheapest {
+  border-color: #d4af37;
+  background: linear-gradient(135deg, #1a1a1a, #2a2510);
+}
+
+.best-value-badge {
+  position: absolute;
+  top: -15px;
+  right: 20px;
+  background: linear-gradient(135deg, #d4af37, #c89f2d);
+  color: #000;
+  padding: 0.5rem 1rem;
+  border-radius: 20px;
+  font-weight: bold;
+  font-size: 0.85rem;
+}
+
+.card-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.provider-logo-small {
+  height: 40px;
+  width: auto;
+  max-width: 60px;
+  object-fit: contain;
+}
+
+.card-header h3 {
+  font-size: 1.5rem;
+  color: #fff;
+}
+
+.price-amount {
+  text-align: center;
+  margin: 2rem 0;
+  padding: 1.5rem;
+  background: #000;
+  border-radius: 10px;
+}
+
+.currency {
+  font-size: 1.5rem;
+  color: #d4af37;
+  vertical-align: super;
+}
+
+.amount {
+  font-size: 3rem;
+  font-weight: bold;
+  color: #d4af37;
+}
+
+.period {
+  font-size: 1rem;
+  color: #666;
+  margin-left: 0.5rem;
+}
+
+.price-breakdown {
+  border-top: 1px solid #333;
+  padding-top: 1rem;
+  margin-top: 1rem;
+}
+
+.breakdown-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.5rem 0;
+  color: #ccc;
+  font-size: 0.9rem;
+}
+
+.breakdown-item:not(:last-child) {
+  border-bottom: 1px solid #222;
+}
+
+.savings-info {
+  text-align: center;
+  margin-top: 1rem;
+  min-height: 24px;
+}
+
+.more-expensive {
+  color: #ff6b6b;
+  font-size: 0.9rem;
+}
+
+/* Annual Projection */
+.annual-projection {
+  background: #1a1a1a;
+  border: 1px solid #333;
+  border-radius: 15px;
+  padding: 2rem;
+  margin-bottom: 3rem;
+}
+
+.annual-projection h2 {
+  text-align: center;
+  color: #d4af37;
+  margin-bottom: 2rem;
+}
+
+.projection-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 2rem;
+}
+
+.projection-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  background: #000;
+  padding: 1.5rem;
+  border-radius: 10px;
+  border: 1px solid #333;
+}
+
+.provider-name {
+  font-weight: bold;
+  color: #fff;
+}
+
+.annual-amount {
+  font-size: 1.5rem;
+  color: #d4af37;
+  font-weight: bold;
+}
+
+/* Pricing Notes */
+.pricing-notes {
+  background: #1a1a1a;
+  border: 1px solid #333;
+  border-radius: 15px;
+  padding: 2rem;
+}
+
+.pricing-notes h3 {
+  color: #d4af37;
+  margin-bottom: 1rem;
+}
+
+.pricing-notes ul {
+  list-style: none;
+  padding: 0;
+}
+
+.pricing-notes li {
+  padding: 0.5rem 0;
+  color: #999;
+  font-size: 0.9rem;
+  padding-left: 1.5rem;
+  position: relative;
+}
+
+.pricing-notes li:before {
+  content: '→';
+  position: absolute;
+  left: 0;
+  color: #d4af37;
+}
+
+/* Cost Optimization Tips */
+.optimization-tips {
+  margin-top: 3rem;
+}
+
+.optimization-tips h2 {
+  text-align: center;
+  color: #d4af37;
+  margin-bottom: 2rem;
+  font-size: 2rem;
+}
+
+.tips-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+  gap: 2rem;
+  margin-bottom: 2rem;
+}
+
+.tip-card {
+  background: #1a1a1a;
+  border: 1px solid #333;
+  border-radius: 15px;
+  padding: 2rem;
+}
+
+.tip-card h3 {
+  color: #d4af37;
+  margin-bottom: 1rem;
+  font-size: 1.3rem;
+}
+
+.tip-card ul {
+  list-style: none;
+  padding: 0;
+}
+
+.tip-card li {
+  padding: 0.75rem 0;
+  color: #ccc;
+  font-size: 0.9rem;
+  padding-left: 1.5rem;
+  position: relative;
+  border-bottom: 1px solid #222;
+}
+
+.tip-card li:last-child {
+  border-bottom: none;
+}
+
+.tip-card li:before {
+  content: '✓';
+  position: absolute;
+  left: 0;
+  color: #4caf50;
+  font-weight: bold;
+}
+
+.tip-card strong {
+  color: #fff;
+}
+
+.general-tips {
+  background: linear-gradient(135deg, #1a1a1a, #2a2510);
+  border: 2px solid #d4af37;
+  border-radius: 15px;
+  padding: 2rem;
+  margin-top: 2rem;
+}
+
+.general-tips h3 {
+  color: #d4af37;
+  margin-bottom: 1.5rem;
+  text-align: center;
+  font-size: 1.5rem;
+}
+
+.strategy-list {
+  display: grid;
+  gap: 1rem;
+}
+
+.strategy-item {
+  background: #000;
+  padding: 1rem;
+  border-radius: 10px;
+  border-left: 4px solid #d4af37;
+  color: #ccc;
+}
+
+.strategy-item strong {
+  color: #d4af37;
+  margin-right: 0.5rem;
+}
+
+.savings-badge {
+  background: linear-gradient(135deg, #4caf50, #45a049);
+  color: #fff;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  text-align: center;
+  margin-top: 1rem;
+  font-weight: bold;
+  font-size: 0.85rem;
+}
+
+.included-badge {
+  background: linear-gradient(135deg, #2196f3, #1976d2);
+  color: #fff;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  text-align: center;
+  margin-top: 1rem;
+  font-size: 0.85rem;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .cost-simulator-container {
+    padding: 1rem;
+  }
+
+  .simulator-header h1 {
+    font-size: 2rem;
+  }
+
+  .service-selector {
+    flex-direction: column;
+  }
+
+  .service-btn {
+    width: 100%;
+  }
+
+  .comparison-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .amount {
+    font-size: 2rem;
+  }
+}
