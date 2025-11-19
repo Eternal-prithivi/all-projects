@@ -19,6 +19,7 @@ import SecurityPage from "./pages/SecurityPage.jsx";
 import SecuritySettingsPage from "./pages/SecuritySettingsPage.jsx";
 import ProfilePage from "./pages/ProfilePage.jsx";
 import SettingsPage from "./pages/SettingsPage.jsx";
+import BillingPage from "./pages/BillingPage.jsx";
 
 const router = createBrowserRouter([
   {
@@ -40,6 +41,7 @@ const router = createBrowserRouter([
             children: [
               { index: true, element: <DashboardPage /> },
               { path: "costs", element: <CostAnalysisPage /> },
+              { path: "billing", element: <BillingPage /> },
               { path: "simulator", element: <CostSimulatorPage /> },
               { path: "optimization", element: <CostOptimizationPage /> },
               { path: "storage", element: <StoragePage /> },
