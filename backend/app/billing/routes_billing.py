@@ -4,23 +4,79 @@ Manages invoices and billing without real payment integration
 """
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from typing import Optional, Dict, List
+from typing import Optional, Dict, List, Any
 from datetime import datetime, timedelta
 from dateutil.relativedelta import relativedelta
 from ..users.routes_users import get_current_user
 from ..users.user_model import User
 from ..database.mongo_client import get_database
+from ..cost.manager import get_aws_cost_and_usage, get_gcp_billing_data, get_azure_billing_data
 import secrets
 
 router = APIRouter(prefix="/billing", tags=["Billing"])
 DB = get_database()
 
 
+def fetch_real_cloud_costs(start_date: str, end_date: str) -> CostBreakdown:
+    """
+    Fetch real costs from cloud providers for the specified date range
+    Returns CostBreakdown with actual costs or 0.0 if provider not configured
+    """
+    costs = CostBreakdown()
+    
+    try:
+        # Fetch AWS costs
+        aws_data = get_aws_cost_and_usage(
+            start_date=start_date,
+            end_date=end_date,
+            granularity='MONTHLY',
+            group_by=[]
+        )
+        if aws_data and 'ResultsByTime' in aws_data:
+            aws_total = sum(
+                float(period['Total']['UnblendedCost']['Amount']) 
+                for period in aws_data['ResultsByTime']
+            )
+            costs.aws = round(aws_total, 2)
+    except Exception as e:
+        print(f"AWS cost fetch failed: {e}")
+        costs.aws = 0.0
+    
+    try:
+        # Fetch GCP costs
+        gcp_data = get_gcp_billing_data(start_date=start_date, end_date=end_date)
+        if gcp_data and 'TotalCost' in gcp_data:
+            costs.gcp = round(gcp_data['TotalCost'], 2)
+        elif gcp_data and gcp_data.get('status') in ['missing_config', 'missing_dependency', 'error']:
+            costs.gcp = 0.0
+    except Exception as e:
+        print(f"GCP cost fetch failed: {e}")
+        costs.gcp = 0.0
+    
+    try:
+        # Fetch Azure costs
+        azure_data = get_azure_billing_data(start_date=start_date, end_date=end_date)
+        if azure_data and 'TotalCost' in azure_data:
+            costs.azure = round(azure_data['TotalCost'], 2)
+        elif azure_data and azure_data.get('status') in ['missing_config', 'missing_dependency', 'error']:
+            costs.azure = 0.0
+    except Exception as e:
+        print(f"Azure cost fetch failed: {e}")
+        costs.azure = 0.0
+    
+    return costs
+
+
 class CostBreakdown(BaseModel):
     aws: float = 0.0
     gcp: float = 0.0
     azure: float = 0.0
-    platform_fee: float = 0.0
+    platform_fee: float = 29.00  # Fixed platform fee
+
+class BudgetSettings(BaseModel):
+    monthly_budget: float = 0.0
+    alert_threshold: float = 80.0  # Alert when spending reaches 80% of budget
+    email_alerts: bool = True
 
 
 class Invoice(BaseModel):
@@ -65,13 +121,12 @@ async def get_invoices(current_user: User = Depends(get_current_user)):
             if invoice.get('paid_date'):
                 invoice['paid_date'] = datetime.fromisoformat(invoice['paid_date'])
         
-        # Calculate current month costs (mock data for now)
-        current_month_costs = CostBreakdown(
-            aws=125.50,
-            gcp=89.30,
-            azure=45.20,
-            platform_fee=29.00
-        )
+        # Calculate current month costs using real data from cloud providers
+        now = datetime.utcnow()
+        start_of_month = now.replace(day=1).strftime('%Y-%m-%d')
+        end_date = now.strftime('%Y-%m-%d')
+        
+        current_month_costs = fetch_real_cloud_costs(start_of_month, end_date)
         
         return InvoicesListResponse(
             success=True,
@@ -137,13 +192,11 @@ async def generate_invoice(current_user: User = Depends(get_current_user)):
         # Generate invoice ID
         invoice_id = f"INV-{now.strftime('%Y%m')}-{secrets.token_hex(3).upper()}"
         
-        # Mock costs (in production, these would come from actual cloud provider APIs)
-        costs = CostBreakdown(
-            aws=125.50,
-            gcp=89.30,
-            azure=45.20,
-            platform_fee=29.00
-        )
+        # Fetch real costs from cloud providers for the current month
+        start_of_month = now.replace(day=1).strftime('%Y-%m-%d')
+        end_date = now.strftime('%Y-%m-%d')
+        
+        costs = fetch_real_cloud_costs(start_of_month, end_date)
         
         total = costs.aws + costs.gcp + costs.azure + costs.platform_fee
         
@@ -230,19 +283,16 @@ async def mark_invoice_paid(invoice_id: str, current_user: User = Depends(get_cu
 async def get_current_month_summary(current_user: User = Depends(get_current_user)):
     """Get current month's running costs (not yet invoiced)"""
     try:
-        # Mock current month costs
-        # In production, this would aggregate costs from cost analysis data
-        current_costs = CostBreakdown(
-            aws=125.50,
-            gcp=89.30,
-            azure=45.20,
-            platform_fee=29.00
-        )
+        # Fetch real costs from cloud providers for the current month
+        now = datetime.utcnow()
+        start_of_month = now.replace(day=1).strftime('%Y-%m-%d')
+        end_date = now.strftime('%Y-%m-%d')
+        
+        current_costs = fetch_real_cloud_costs(start_of_month, end_date)
         
         total = current_costs.aws + current_costs.gcp + current_costs.azure + current_costs.platform_fee
         
         # Get days remaining in month
-        now = datetime.utcnow()
         next_month = now.replace(day=1) + relativedelta(months=1)
         days_remaining = (next_month - now).days
         
@@ -256,3 +306,54 @@ async def get_current_month_summary(current_user: User = Depends(get_current_use
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch current month summary: {str(e)}")
+
+
+@router.get("/budget")
+async def get_budget(current_user: User = Depends(get_current_user)):
+    """Get user's budget settings"""
+    try:
+        users_collection = DB["users"]
+        user = users_collection.find_one({"username": current_user.username})
+        
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        budget_settings = user.get("budget_settings", {
+            "monthly_budget": 0.0,
+            "alert_threshold": 80.0,
+            "email_alerts": True
+        })
+        
+        return {
+            "success": True,
+            "budget": budget_settings
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch budget: {str(e)}")
+
+
+@router.put("/budget")
+async def update_budget(
+    budget: BudgetSettings, 
+    current_user: User = Depends(get_current_user)
+):
+    """Update user's budget settings"""
+    try:
+        users_collection = DB["users"]
+        
+        result = users_collection.update_one(
+            {"username": current_user.username},
+            {"$set": {"budget_settings": budget.model_dump()}}
+        )
+        
+        if result.matched_count == 0:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        return {
+            "success": True,
+            "message": "Budget settings updated successfully",
+            "budget": budget.model_dump()
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to update budget: {str(e)}")
+

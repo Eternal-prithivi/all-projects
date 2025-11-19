@@ -19,6 +19,9 @@ function Sidebar({ user }) {
         <ul>
           <li><NavLink to="/dashboard" end><IconDashboard className="sidebar-icon" />Overview</NavLink></li>
           <li><NavLink to="/dashboard/costs"><IconBarChart className="sidebar-icon" />Cost Analysis</NavLink></li>
+          <li><NavLink to="/dashboard/storage"><IconHardDrive className="sidebar-icon" />Storage</NavLink></li>
+          <li><NavLink to="/dashboard/vmcluster"><IconServer className="sidebar-icon" />VM Cluster</NavLink></li>
+          <li><NavLink to="/dashboard/security"><IconShield className="sidebar-icon" />Security</NavLink></li>
           <li><NavLink to="/dashboard/billing">
             <svg className="sidebar-icon" width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
               <path d="M4 4a2 2 0 00-2 2v1h16V6a2 2 0 00-2-2H4z"/>
@@ -26,9 +29,6 @@ function Sidebar({ user }) {
             </svg>
             Billing
           </NavLink></li>
-          <li><NavLink to="/dashboard/storage"><IconHardDrive className="sidebar-icon" />Storage</NavLink></li>
-          <li><NavLink to="/dashboard/vmcluster"><IconServer className="sidebar-icon" />VM Cluster</NavLink></li>
-          <li><NavLink to="/dashboard/security"><IconShield className="sidebar-icon" />Security</NavLink></li>
         </ul>
       </nav>
       <div className="user-profile">
