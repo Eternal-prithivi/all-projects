@@ -10,22 +10,21 @@ function BillingPage() {
   const [loading, setLoading] = useState(true);
   const [paymentMethod, setPaymentMethod] = useState(null);
   const [generatingInvoice, setGeneratingInvoice] = useState(false);
-  const [budget, setBudget] = useState({
-    monthly_budget: 0,
-    alert_threshold: 80,
-    email_alerts: true
-  });
-  const [editingBudget, setEditingBudget] = useState(false);
+  const [budgets, setBudgets] = useState([]);
+  const [showBudgetForm, setShowBudgetForm] = useState(false);
   const [budgetForm, setBudgetForm] = useState({
-    monthly_budget: 0,
+    name: 'Monthly Cloud Budget',
+    amount: '',
+    provider: 'all',
+    period: 'monthly',
     alert_threshold: 80,
-    email_alerts: true
+    phone_number: ''
   });
 
   useEffect(() => {
     fetchBillingData();
     fetchPaymentMethod();
-    fetchBudget();
+    fetchBudgets();
   }, []);
 
   const fetchBillingData = async () => {
@@ -58,31 +57,63 @@ function BillingPage() {
     }
   };
 
-  const fetchBudget = async () => {
+  const fetchBudgets = async () => {
     try {
-      const response = await apiClient.get('/billing/budget');
-      setBudget(response.data.budget);
-      setBudgetForm(response.data.budget);
+      const response = await apiClient.get('/budgets/status');
+      setBudgets(response.data);
     } catch (error) {
-      console.error('Failed to fetch budget:', error);
+      console.error('Failed to fetch budgets:', error);
     }
   };
 
-  const updateBudget = async () => {
+  const createBudget = async (e) => {
+    e.preventDefault();
     try {
-      await apiClient.put('/billing/budget', budgetForm);
-      setBudget(budgetForm);
-      setEditingBudget(false);
-      toast.success('Budget settings updated successfully!');
+      await apiClient.post('/budgets/', {
+        ...budgetForm,
+        amount: parseFloat(budgetForm.amount),
+        email_notifications: true
+      });
+      toast.success('Budget created successfully!');
+      setShowBudgetForm(false);
+      setBudgetForm({
+        name: 'Monthly Cloud Budget',
+        amount: '',
+        provider: 'all',
+        period: 'monthly',
+        alert_threshold: 80,
+        phone_number: ''
+      });
+      fetchBudgets();
     } catch (error) {
-      console.error('Failed to update budget:', error);
-      toast.error(error.response?.data?.detail || 'Failed to update budget');
+      console.error('Failed to create budget:', error);
+      toast.error(error.response?.data?.detail || 'Failed to create budget');
     }
   };
 
-  const cancelBudgetEdit = () => {
-    setBudgetForm(budget);
-    setEditingBudget(false);
+  const deleteBudget = async (budgetId) => {
+    try {
+      await apiClient.delete(`/budgets/${budgetId}`);
+      toast.success('Budget deleted successfully!');
+      fetchBudgets();
+    } catch (error) {
+      console.error('Failed to delete budget:', error);
+      toast.error(error.response?.data?.detail || 'Failed to delete budget');
+    }
+  };
+
+  const testSMS = async () => {
+    if (!budgetForm.phone_number) {
+      toast.error('Please enter a phone number first');
+      return;
+    }
+    try {
+      await apiClient.post(`/budgets/test-sms?phone_number=${encodeURIComponent(budgetForm.phone_number)}&budget_name=${encodeURIComponent(budgetForm.name)}`);
+      toast.success(`Test SMS sent to ${budgetForm.phone_number}`);
+    } catch (error) {
+      console.error('Failed to send test SMS:', error);
+      toast.error(error.response?.data?.detail || 'Failed to send test SMS');
+    }
   };
 
   const generateInvoice = async () => {
@@ -164,33 +195,69 @@ function BillingPage() {
       {/* Budget Management */}
       <div className="billing-section budget-card">
         <div className="section-header">
-          <h2>💰 Monthly Budget</h2>
-          {!editingBudget && (
-            <button className="btn-edit-budget" onClick={() => setEditingBudget(true)}>
-              ✏️ Edit Budget
-            </button>
-          )}
+          <h2>💰 Budget Alerts</h2>
+          <button 
+            className="btn-edit-budget" 
+            onClick={() => setShowBudgetForm(!showBudgetForm)}
+          >
+            {showBudgetForm ? 'Cancel' : '+ Create Budget'}
+          </button>
         </div>
 
-        {editingBudget ? (
-          <div className="budget-form">
+        {showBudgetForm && (
+          <form onSubmit={createBudget} className="budget-form">
             <div className="form-group">
-              <label>Monthly Budget ($)</label>
+              <label>Budget Name</label>
+              <input
+                type="text"
+                placeholder="e.g., Monthly Cloud Budget"
+                value={budgetForm.name}
+                onChange={(e) => setBudgetForm({ ...budgetForm, name: e.target.value })}
+                required
+              />
+            </div>
+            <div className="form-group">
+              <label>Amount ($)</label>
               <input
                 type="number"
-                value={budgetForm.monthly_budget}
-                onChange={(e) => setBudgetForm({ ...budgetForm, monthly_budget: parseFloat(e.target.value) || 0 })}
+                value={budgetForm.amount}
+                onChange={(e) => setBudgetForm({ ...budgetForm, amount: e.target.value })}
                 placeholder="0.00"
                 min="0"
-                step="10"
+                step="0.01"
+                required
               />
+            </div>
+            <div className="form-group">
+              <label>Provider</label>
+              <select 
+                value={budgetForm.provider} 
+                onChange={(e) => setBudgetForm({ ...budgetForm, provider: e.target.value })}
+              >
+                <option value="all">All Providers</option>
+                <option value="aws">AWS</option>
+                <option value="gcp">GCP</option>
+                <option value="azure">Azure</option>
+              </select>
+            </div>
+            <div className="form-group">
+              <label>Period</label>
+              <select 
+                value={budgetForm.period} 
+                onChange={(e) => setBudgetForm({ ...budgetForm, period: e.target.value })}
+              >
+                <option value="daily">Daily</option>
+                <option value="weekly">Weekly</option>
+                <option value="monthly">Monthly</option>
+                <option value="yearly">Yearly</option>
+              </select>
             </div>
             <div className="form-group">
               <label>Alert Threshold (%)</label>
               <input
                 type="number"
                 value={budgetForm.alert_threshold}
-                onChange={(e) => setBudgetForm({ ...budgetForm, alert_threshold: parseFloat(e.target.value) || 80 })}
+                onChange={(e) => setBudgetForm({ ...budgetForm, alert_threshold: parseInt(e.target.value) || 80 })}
                 placeholder="80"
                 min="0"
                 max="100"
@@ -198,90 +265,96 @@ function BillingPage() {
               />
               <small>Get notified when spending reaches this percentage of budget</small>
             </div>
-            <div className="form-group checkbox-group">
-              <label>
-                <input
-                  type="checkbox"
-                  checked={budgetForm.email_alerts}
-                  onChange={(e) => setBudgetForm({ ...budgetForm, email_alerts: e.target.checked })}
-                />
-                Enable email alerts
-              </label>
+            <div className="form-group">
+              <label>Phone Number (Optional)</label>
+              <input
+                type="tel"
+                placeholder="+1234567890"
+                value={budgetForm.phone_number}
+                onChange={(e) => setBudgetForm({ ...budgetForm, phone_number: e.target.value })}
+                pattern="\+[0-9]{10,15}"
+                title="Phone number must start with + and include country code"
+              />
+              <small>📱 Receive SMS alerts when budget threshold is reached</small>
             </div>
             <div className="budget-form-actions">
-              <button className="btn-save" onClick={updateBudget}>💾 Save Budget</button>
-              <button className="btn-cancel" onClick={cancelBudgetEdit}>Cancel</button>
+              <button type="submit" className="btn-save">💾 Create Budget</button>
+              {budgetForm.phone_number && (
+                <button type="button" onClick={testSMS} className="btn-test-sms">📱 Test SMS</button>
+              )}
             </div>
-          </div>
-        ) : (
-          <div className="budget-display">
-            {budget.monthly_budget > 0 ? (
-              <>
-                <div className="budget-overview">
-                  <div className="budget-amount">
-                    <span className="budget-label">Monthly Budget</span>
-                    <span className="budget-value">{formatCurrency(budget.monthly_budget)}</span>
-                  </div>
-                  {currentSummary && (
-                    <>
-                      <div className="budget-spent">
-                        <span className="budget-label">Spent This Month</span>
-                        <span className="budget-value">{formatCurrency(currentSummary.total)}</span>
-                      </div>
-                      <div className="budget-remaining">
-                        <span className="budget-label">Remaining</span>
-                        <span className={`budget-value ${currentSummary.total > budget.monthly_budget ? 'over-budget' : ''}`}>
-                          {formatCurrency(Math.max(0, budget.monthly_budget - currentSummary.total))}
-                        </span>
-                      </div>
-                    </>
-                  )}
+          </form>
+        )}
+
+        <div className="budgets-grid">
+          {budgets.length === 0 ? (
+            <div className="no-budget">
+              <p>📊 No budgets configured</p>
+              <p className="no-budget-hint">Create budget alerts to monitor your cloud spending and receive notifications</p>
+              <button className="btn-primary" onClick={() => setShowBudgetForm(true)}>
+                Create First Budget
+              </button>
+            </div>
+          ) : (
+            budgets.map(budgetStatus => (
+              <div 
+                key={budgetStatus.budget.id} 
+                className={`budget-item ${budgetStatus.is_exceeded ? 'exceeded' : budgetStatus.is_near_limit ? 'warning' : ''}`}
+              >
+                <div className="budget-header-row">
+                  <h4>{budgetStatus.budget.name}</h4>
+                  <button 
+                    onClick={() => deleteBudget(budgetStatus.budget.id)} 
+                    className="delete-budget-btn"
+                    title="Delete budget"
+                  >
+                    ×
+                  </button>
                 </div>
-                {currentSummary && (
-                  <div className="budget-progress">
-                    <div className="progress-bar">
-                      <div 
-                        className={`progress-fill ${
-                          (currentSummary.total / budget.monthly_budget) * 100 >= budget.alert_threshold 
-                            ? 'progress-warning' 
-                            : ''
-                        } ${
-                          currentSummary.total > budget.monthly_budget 
-                            ? 'progress-over' 
-                            : ''
-                        }`}
-                        style={{ 
-                          width: `${Math.min(100, (currentSummary.total / budget.monthly_budget) * 100)}%` 
-                        }}
-                      ></div>
-                    </div>
-                    <div className="progress-info">
-                      <span>{((currentSummary.total / budget.monthly_budget) * 100).toFixed(1)}% of budget used</span>
-                      {currentSummary.total > budget.monthly_budget && (
-                        <span className="over-budget-warning">⚠️ Over budget by {formatCurrency(currentSummary.total - budget.monthly_budget)}</span>
-                      )}
-                      {(currentSummary.total / budget.monthly_budget) * 100 >= budget.alert_threshold && currentSummary.total <= budget.monthly_budget && (
-                        <span className="approaching-limit">⚠️ Approaching budget limit</span>
-                      )}
-                    </div>
+                <div className="budget-info">
+                  <div className="budget-amount">
+                    <span className="budget-label">Spent / Budget</span>
+                    <span className="budget-value">
+                      ${budgetStatus.budget.current_spend.toFixed(2)} / ${budgetStatus.budget.amount.toFixed(2)}
+                    </span>
+                  </div>
+                  <div className="budget-meta">
+                    <span>{budgetStatus.budget.period}</span>
+                    <span>•</span>
+                    <span>{budgetStatus.budget.provider.toUpperCase()}</span>
+                    <span>•</span>
+                    <span>{budgetStatus.budget.alert_threshold}% alert</span>
+                  </div>
+                </div>
+                <div className="budget-progress">
+                  <div className="progress-bar">
+                    <div 
+                      className={`progress-fill ${
+                        budgetStatus.is_exceeded ? 'progress-over' : 
+                        budgetStatus.is_near_limit ? 'progress-warning' : ''
+                      }`}
+                      style={{ width: `${Math.min(budgetStatus.utilization_percentage, 100)}%` }}
+                    ></div>
+                  </div>
+                  <div className="progress-info">
+                    <span>{budgetStatus.utilization_percentage.toFixed(1)}% used</span>
+                    <span className={budgetStatus.is_exceeded ? 'over-budget-warning' : ''}>
+                      {budgetStatus.is_exceeded 
+                        ? `⚠️ Over by $${(budgetStatus.budget.current_spend - budgetStatus.budget.amount).toFixed(2)}`
+                        : `$${budgetStatus.remaining_amount.toFixed(2)} remaining`
+                      }
+                    </span>
+                  </div>
+                </div>
+                {budgetStatus.budget.phone_number && (
+                  <div className="budget-alerts">
+                    📱 SMS alerts enabled: {budgetStatus.budget.phone_number}
                   </div>
                 )}
-                <div className="budget-settings">
-                  <span>📧 Email alerts: {budget.email_alerts ? 'Enabled' : 'Disabled'}</span>
-                  <span>🔔 Alert threshold: {budget.alert_threshold}%</span>
-                </div>
-              </>
-            ) : (
-              <div className="no-budget">
-                <p>📊 No budget set</p>
-                <p className="no-budget-hint">Set a monthly budget to track your cloud spending</p>
-                <button className="btn-primary" onClick={() => setEditingBudget(true)}>
-                  Set Budget
-                </button>
               </div>
-            )}
-          </div>
-        )}
+            ))
+          )}
+        </div>
       </div>
 
       {/* Current Month Summary */}

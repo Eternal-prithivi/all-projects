@@ -134,3 +134,7 @@
 [2025-11-19 09:09:29,066: INFO/MainProcess] Scheduler: Sending due task auto-release-inactive-vms-every-10-minutes (auto_release_inactive_vms)
 [2025-11-19 09:09:29,151: INFO/MainProcess] Scheduler: Sending due task cluster-health-check-every-15-minutes (cluster_health_check)
 [2025-11-19 09:14:28,996: INFO/MainProcess] Scheduler: Sending due task collect-vm-metrics-every-5-minutes (collect_vm_metrics)
+[2025-11-19 09:19:29,025: INFO/MainProcess] Scheduler: Sending due task collect-vm-metrics-every-5-minutes (collect_vm_metrics)
+[2025-11-19 09:19:29,104: INFO/MainProcess] Scheduler: Sending due task auto-release-inactive-vms-every-10-minutes (auto_release_inactive_vms)
+[2025-11-19 09:24:29,025: INFO/MainProcess] Scheduler: Sending due task collect-vm-metrics-every-5-minutes (collect_vm_metrics)
+[2025-11-19 09:24:30,622: INFO/MainProcess] Scheduler: Sending due task cluster-health-check-every-15-minutes (cluster_health_check)
