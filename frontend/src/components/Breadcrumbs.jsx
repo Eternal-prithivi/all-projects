@@ -22,12 +22,8 @@ const Breadcrumbs = () => {
   return (
     <nav className="breadcrumbs">
       <Link 
-        to="/dashboard" 
+        to="/" 
         className={`breadcrumb-item ${isOnDashboardRoot ? 'active' : ''}`}
-        onClick={(e) => {
-          e.preventDefault();
-          navigate('/dashboard');
-        }}
       >
         <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
           <path d="M8 1l7 6v8H1V7l7-6zm0 1.5L2 8v6h12V8L8 2.5z"/>

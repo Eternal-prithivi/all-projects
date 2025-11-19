@@ -1,5 +1,5 @@
 import React from 'react';
-import { NavLink } from 'react-router-dom';
+import { NavLink, Link } from 'react-router-dom';
 // Corrected import from our new local file
 import { IconDashboard, IconBarChart, IconHardDrive, IconServer, IconShield } from './Icons.jsx';
 import '../../styles/sidebar.css';
@@ -11,7 +11,9 @@ function Sidebar({ user }) {
   return (
     <aside className="sidebar">
       <div className="sidebar-header">
-        <h3>Zenith</h3>
+        <Link to="/" style={{ textDecoration: 'none', color: 'inherit' }}>
+          <h3>Zenith</h3>
+        </Link>
       </div>
       <nav className="sidebar-nav">
         <ul>

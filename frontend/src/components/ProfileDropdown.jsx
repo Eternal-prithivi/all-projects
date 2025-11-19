@@ -22,7 +22,7 @@ const ProfileDropdown = () => {
 
   const handleLogout = () => {
     logout();
-    navigate('/login');
+    navigate('/');
   };
 
   const getInitials = (name) => {
