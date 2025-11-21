@@ -4,7 +4,7 @@ Analyzes user workload descriptions and recommends optimal cluster assignment.
 """
 
 import re
-from typing import Dict, Tuple, List
+from typing import Dict, Tuple, List, Optional
 from app.vm.models import ClusterType
 
 
