@@ -28,17 +28,26 @@ DB = get_database()
 
 # Cache for metrics to reduce GCP API calls
 metrics_cache = {}
-METRICS_CACHE_TTL = 600  # Cache for 10 minutes (600 seconds)
+METRICS_CACHE_TTL = 120  # Cache for 2 minutes (120 seconds) - reduced for better UX
 
-# Cache for cluster health (5 minutes TTL)
+# Cache for cluster health (reduced for real-time updates after VM operations)
 cluster_health_cache = {}
-CLUSTER_HEALTH_CACHE_TTL = 300  # 5 minutes
+CLUSTER_HEALTH_CACHE_TTL = 60  # 1 minute - will auto-invalidate on VM changes anyway
 
-# Cache for recommendations (10 minutes TTL)
+# Cache for recommendations (reduced for fresher data)
 recommendations_cache = {}
-RECOMMENDATIONS_CACHE_TTL = 600  # 10 minutes
+RECOMMENDATIONS_CACHE_TTL = 180  # 3 minutes
 
-# Helper function to invalidate cluster health cache
+# Helper function to invalidate all caches
+def invalidate_all_caches():
+    """Clear all caches to force fresh data fetch on next request"""
+    global cluster_health_cache, metrics_cache, recommendations_cache
+    cluster_health_cache.clear()
+    metrics_cache.clear()
+    recommendations_cache.clear()
+    print("✓ All VM caches invalidated (cluster health, metrics, recommendations)")
+
+# Helper function to invalidate cluster health cache (backward compatibility)
 def invalidate_cluster_health_cache():
     """Clear cluster health cache to force fresh data fetch on next request"""
     global cluster_health_cache
@@ -232,8 +241,8 @@ async def request_vm_assignment(
             priority_level=request.priority_level
         )
         
-        # Invalidate cluster health cache to show updated topology
-        invalidate_cluster_health_cache()
+        # Invalidate ALL caches to immediately reflect changes
+        invalidate_all_caches()
         
         return VMAssignmentResponse(
             vm_name=vm_name,
@@ -265,8 +274,8 @@ async def migrate_vm(
             target_vm_name=request.target_vm_name
         )
         
-        # Invalidate cluster health cache to show updated topology
-        invalidate_cluster_health_cache()
+        # Invalidate ALL caches to immediately reflect changes
+        invalidate_all_caches()
         
         return result
     except ValueError as e:
@@ -315,8 +324,8 @@ async def release_vm(
     if not result["success"]:
         raise HTTPException(status_code=404, detail=result["message"])
     
-    # Invalidate cluster health cache to show updated topology
-    invalidate_cluster_health_cache()
+    # Invalidate ALL caches to immediately reflect changes in dashboard
+    invalidate_all_caches()
     
     return result
 
