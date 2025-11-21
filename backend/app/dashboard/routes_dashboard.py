@@ -29,7 +29,7 @@ async def get_dashboard_stats(user: dict = Depends(get_current_user)):
     
     try:
         # Get cached monthly costs from AWS (no API call)
-        monthly_costs = aws_cost_cache.get("data", 0.0)
+        monthly_costs = aws_cost_cache.get("data", 0.0) or 0.0
         
         # Get real VM count
         vm_assignments = DB["vm_assignments"]
