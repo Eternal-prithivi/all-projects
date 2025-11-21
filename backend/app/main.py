@@ -60,19 +60,30 @@ class DynamicCORSMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         origin = request.headers.get("origin")
         
-        # Process the request
+        # Handle preflight OPTIONS requests immediately
+        if request.method == "OPTIONS":
+            from starlette.responses import Response
+            response = Response(status_code=200)
+            
+            # Add CORS headers if origin is allowed
+            if origin and is_allowed_origin(origin):
+                response.headers["Access-Control-Allow-Origin"] = origin
+                response.headers["Access-Control-Allow-Credentials"] = "true"
+                response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS, PATCH"
+                response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, Accept, Origin, User-Agent"
+                response.headers["Access-Control-Max-Age"] = "86400"
+            
+            return response
+        
+        # Process the actual request
         response = await call_next(request)
         
-        # Add CORS headers if origin is allowed
+        # Add CORS headers to response if origin is allowed
         if origin and is_allowed_origin(origin):
             response.headers["Access-Control-Allow-Origin"] = origin
             response.headers["Access-Control-Allow-Credentials"] = "true"
-            response.headers["Access-Control-Allow-Methods"] = "*"
-            response.headers["Access-Control-Allow-Headers"] = "*"
-        
-        # Handle preflight requests
-        if request.method == "OPTIONS":
-            response.headers["Access-Control-Max-Age"] = "86400"
+            response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS, PATCH"
+            response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, Accept, Origin, User-Agent"
         
         return response
 
