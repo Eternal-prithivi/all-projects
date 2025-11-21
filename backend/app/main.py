@@ -25,13 +25,20 @@ import os
 app = FastAPI(title="Zenith API")
 
 # CORS configuration - Production ready
-# In production, set FRONTEND_URL in .env to your domain
+# Allow requests from local development and production frontend
 allowed_origins = [
     "http://localhost:5173",  # Local development
     "http://localhost:3000",
-    os.getenv("FRONTEND_URL", "http://localhost:5173"),
+    "https://zenith-frontend-5bd6obaq0-eternal-prithivis-projects.vercel.app",  # Vercel preview
+    "https://zenith-frontend-eternal-prithivis-projects.vercel.app",  # Vercel production
 ]
 
+# Add custom domain if set in environment
+frontend_url = os.getenv("FRONTEND_URL")
+if frontend_url and frontend_url not in allowed_origins:
+    allowed_origins.append(frontend_url)
+
+# In development, allow all origins; in production, use whitelist
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins if os.getenv("ENVIRONMENT") == "production" else ["*"],
