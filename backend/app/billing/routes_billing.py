@@ -19,6 +19,43 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/billing", tags=["Billing"])
 DB = get_database()
 
+
+# Pydantic Models (must be defined before functions that use them)
+class CostBreakdown(BaseModel):
+    aws: float = 0.0
+    gcp: float = 0.0
+    azure: float = 0.0
+    platform_fee: float = 29.00  # Fixed platform fee
+
+class BudgetSettings(BaseModel):
+    monthly_budget: float = 0.0
+    alert_threshold: float = 80.0  # Alert when spending reaches 80% of budget
+    email_alerts: bool = True
+
+
+class Invoice(BaseModel):
+    invoice_id: str
+    username: str
+    billing_period: str  # Format: "2025-11"
+    costs: CostBreakdown
+    total: float
+    status: str  # "paid", "pending", "overdue"
+    due_date: datetime
+    paid_date: Optional[datetime] = None
+    created_at: datetime
+
+
+class InvoiceResponse(BaseModel):
+    success: bool
+    invoice: Invoice
+
+
+class InvoicesListResponse(BaseModel):
+    success: bool
+    invoices: List[Invoice]
+    current_month_costs: CostBreakdown
+
+
 # Cache for billing cost data (1 hour TTL)
 billing_cache = {
     "data": None,
@@ -90,41 +127,6 @@ def fetch_real_cloud_costs(start_date: str, end_date: str, use_cache: bool = Tru
         logger.info(f"Billing cost data cached")
     
     return costs
-
-
-class CostBreakdown(BaseModel):
-    aws: float = 0.0
-    gcp: float = 0.0
-    azure: float = 0.0
-    platform_fee: float = 29.00  # Fixed platform fee
-
-class BudgetSettings(BaseModel):
-    monthly_budget: float = 0.0
-    alert_threshold: float = 80.0  # Alert when spending reaches 80% of budget
-    email_alerts: bool = True
-
-
-class Invoice(BaseModel):
-    invoice_id: str
-    username: str
-    billing_period: str  # Format: "2025-11"
-    costs: CostBreakdown
-    total: float
-    status: str  # "paid", "pending", "overdue"
-    due_date: datetime
-    paid_date: Optional[datetime] = None
-    created_at: datetime
-
-
-class InvoiceResponse(BaseModel):
-    success: bool
-    invoice: Invoice
-
-
-class InvoicesListResponse(BaseModel):
-    success: bool
-    invoices: List[Invoice]
-    current_month_costs: CostBreakdown
 
 
 @router.get("/invoices", response_model=InvoicesListResponse)
