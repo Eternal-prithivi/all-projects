@@ -3,7 +3,7 @@ import axios from "axios";
 // Determine API base URL based on environment
 const API_BASE_URL = import.meta.env.VITE_API_URL || 
   (import.meta.env.PROD 
-    ? 'https://api.yourdomain.com/api'  // Production - UPDATE THIS with your domain
+    ? 'https://zenith-backend-707i.onrender.com/api'  // Production backend
     : 'http://localhost:8000/api'        // Development
   );
 
