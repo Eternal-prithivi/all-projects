@@ -1,11 +1,13 @@
 import axios from "axios";
 
 // Determine API base URL based on environment
-const API_BASE_URL = import.meta.env.VITE_API_URL || 
-  (import.meta.env.PROD 
-    ? 'https://zenith-backend-707i.onrender.com/api'  // Production backend
-    : 'http://localhost:8000/api'        // Development
-  );
+// Force production backend URL (env var was not working)
+const API_BASE_URL = import.meta.env.DEV 
+  ? 'http://localhost:8000/api'
+  : 'https://zenith-backend-707i.onrender.com/api';
+
+console.log('🚀 API Base URL:', API_BASE_URL);
+console.log('🚀 Environment:', import.meta.env.MODE);
 
 // Create a reusable axios client
 export const apiClient = axios.create({
