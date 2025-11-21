@@ -48,7 +48,15 @@ def is_allowed_origin(origin: str) -> bool:
         if re.match(pattern, origin):
             return True
     
-    # Allow custom domain if set
+    # Allow custom domains
+    allowed_domains = [
+        "https://rajverse.me",
+        "https://www.rajverse.me"
+    ]
+    if origin in allowed_domains:
+        return True
+    
+    # Allow custom domain if set via environment
     custom_domain = os.getenv("FRONTEND_URL")
     if custom_domain and origin == custom_domain:
         return True
