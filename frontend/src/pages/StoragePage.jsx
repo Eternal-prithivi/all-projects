@@ -9,7 +9,9 @@ const useAuth = () => ({
 });
 
 // --- API FUNCTIONS ---
-const API_BASE_URL = "http://localhost:8000/api";
+const API_BASE_URL = import.meta.env.DEV 
+  ? 'http://localhost:8000/api'
+  : 'https://zenith-backend-707i.onrender.com/api';
 const handleApiResponse = async (response) => {
   if (!response.ok) {
     // --- MODIFIED: Ensure error details from FastAPI are caught ---

@@ -85,7 +85,9 @@ const SecureFileList = ({
   </div>
 );
 
-const API_BASE_URL = "http://localhost:8000/api";
+const API_BASE_URL = import.meta.env.DEV 
+  ? 'http://localhost:8000/api'
+  : 'https://zenith-backend-707i.onrender.com/api';
 const handleResponse = async (response) => {
   if (!response.ok) throw await response.json();
   if (response.status === 204) return { success: true };
@@ -189,7 +191,10 @@ function SecurityPage() {
     const wsRef = { current: null };
     if (user && token && canAccessSecureArea && !loading) {
       fetchSecureFiles();
-      const ws = new WebSocket(`ws://localhost:8000/ws/status?token=${token}`);
+      const wsUrl = import.meta.env.DEV 
+        ? `ws://localhost:8000/ws/status?token=${token}`
+        : `wss://zenith-backend-707i.onrender.com/ws/status?token=${token}`;
+      const ws = new WebSocket(wsUrl);
       wsRef.current = ws;
       ws.onmessage = (event) => {
         if (event.data === "job_complete") fetchSecureFiles();

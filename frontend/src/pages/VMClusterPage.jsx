@@ -6,7 +6,9 @@ import EmptyState from "../components/EmptyState.jsx";
 import "../styles/vmcluster.css";
 
 // API Functions
-const API_BASE_URL = "http://localhost:8000/api/vm";
+const API_BASE_URL = import.meta.env.DEV 
+  ? 'http://localhost:8000/api/vm'
+  : 'https://zenith-backend-707i.onrender.com/api/vm';
 
 const handleApiResponse = async (response) => {
   if (!response.ok) {
