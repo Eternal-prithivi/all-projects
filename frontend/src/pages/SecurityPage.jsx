@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import { toast, ToastContainer } from "react-toastify";
+import { useNotifications } from "../hooks/useNotifications";
 
 // --- SELF-CONTAINED DEPENDENCIES ---
 
@@ -152,6 +152,7 @@ const uploadSecureFile = (file, encrypt, token) => {
 
 function SecurityPage() {
   const { token, user } = useAuth();
+  const notifications = useNotifications();
   const [file, setFile] = useState(null);
   const [encrypt, setEncrypt] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -179,7 +180,7 @@ function SecurityPage() {
       setSecureFiles(files);
       return files;
     } catch (err) {
-      toast.error("Could not fetch secure file list.");
+      notifications.error("Could not fetch secure file list.");
       return [];
     }
   }, [token, canAccessSecureArea]);
@@ -228,11 +229,11 @@ function SecurityPage() {
     try {
       const res = await verify2FA(token, twoFACode);
       if (res.verified) {
-        toast.success("2FA verified successfully!");
+        notifications.success("2FA verified successfully!");
         setTwoFAStatus((prev) => ({ ...prev, verified: true }));
       }
     } catch (err) {
-      toast.error(err.detail || "Error verifying 2FA");
+      notifications.error(err.detail || "Error verifying 2FA");
     }
   };
   const handleEnable2FA = async () => {
@@ -248,28 +249,28 @@ function SecurityPage() {
         }));
       }
     } catch (err) {
-      toast.error(err.detail || "Failed to enable 2FA");
+      notifications.error(err.detail || "Failed to enable 2FA");
     }
   };
   const handleFinalize2FA = async () => {
     try {
       const res = await finalize2FA(token, twoFACode);
       if (res.verified) {
-        toast.success("2FA setup complete!");
+        notifications.success("2FA setup complete!");
         setTwoFAStatus({ enabled: true, verified: true, secret_exists: true });
         setQrCode(null); // Clear QR code after successful setup
       }
     } catch (err) {
-      toast.error(err.detail || "Invalid code.");
+      notifications.error(err.detail || "Invalid code.");
     }
   };
   const handleDisable2FA = async () => {
     try {
       await disable2FA(token);
-      toast.success("2FA has been disabled.");
+      notifications.success("2FA has been disabled.");
       setTwoFAStatus({ enabled: false, verified: false, secret_exists: false });
     } catch (err) {
-      toast.error(err.detail || "Failed to disable 2FA.");
+      notifications.error(err.detail || "Failed to disable 2FA.");
     }
   };
   const handleFileChange = (e) => setFile(e.target.files[0]);
@@ -280,7 +281,7 @@ function SecurityPage() {
     const uploadedFileName = file.name;
     try {
       await uploadSecureFile(file, encrypt, token);
-      toast.info(`'${uploadedFileName}' accepted. Waiting for processing...`);
+      notifications.info(`'${uploadedFileName}' accepted. Waiting for processing...`);
       pollIntervalRef.current = setInterval(async () => {
         const updatedFiles = await fetchSecureFiles();
         const processedFile = updatedFiles.find(
@@ -288,11 +289,11 @@ function SecurityPage() {
         );
         if (processedFile && typeof processedFile.is_encrypted === "boolean") {
           clearInterval(pollIntervalRef.current);
-          toast.success(`Processing for '${uploadedFileName}' complete.`);
+          notifications.success(`Processing for '${uploadedFileName}' complete.`);
         }
       }, 5000);
     } catch (err) {
-      toast.error(err.detail || "Secure upload failed.");
+      notifications.error(err.detail || "Secure upload failed.");
       if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
     } finally {
       setIsUploading(false);
@@ -307,9 +308,9 @@ function SecurityPage() {
     try {
       await deleteSecureFile(filename, token);
       await fetchSecureFiles();
-      toast.success(`File '${filename}' was deleted successfully.`);
+      notifications.success(`File '${filename}' was deleted successfully.`);
     } catch (err) {
-      toast.error(err.detail || "Could not delete file.");
+      notifications.error(err.detail || "Could not delete file.");
     } finally {
       setIsDeleting(null);
     }
@@ -320,7 +321,7 @@ function SecurityPage() {
       const { presigned_url } = await getSecureDownloadUrl(filename, token);
       window.open(presigned_url, "_blank");
     } catch (error) {
-      toast.error(error.detail || "Could not get download link.");
+      notifications.error(error.detail || "Could not get download link.");
     }
   };
 
@@ -454,7 +455,6 @@ function SecurityPage() {
             Finalize Setup
           </button>
         </div>
-        <ToastContainer position="top-right" autoClose={5000} theme="dark" />
       </>
     );
   }
@@ -485,7 +485,6 @@ function SecurityPage() {
             Verify
           </button>
         </div>
-        <ToastContainer position="top-right" autoClose={5000} theme="dark" />
       </>
     );
   }
@@ -564,7 +563,6 @@ function SecurityPage() {
             </div>
           </div>
         )}
-        <ToastContainer position="top-right" autoClose={5000} theme="dark" />
       </div>
     </>
   );

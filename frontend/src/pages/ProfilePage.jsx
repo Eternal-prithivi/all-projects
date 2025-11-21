@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { toast } from 'react-toastify';
+import { useNotifications } from "../hooks/useNotifications";
 import { apiClient } from '../api';
 import LoadingSpinner from '../components/LoadingSpinner';
 import '../styles/profile.css';
 
 const ProfilePage = () => {
   const { user, token, logout } = useAuth();
+  const notifications = useNotifications();
   const [isEditing, setIsEditing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [stats, setStats] = useState({
@@ -53,7 +54,7 @@ const ProfilePage = () => {
       
     } catch (error) {
       console.error('Failed to fetch profile:', error);
-      toast.error('Failed to load profile data');
+      notifications.error('Failed to load profile data');
     } finally {
       setIsLoading(false);
     }
@@ -77,11 +78,11 @@ const ProfilePage = () => {
         company: formData.company
       });
       
-      toast.success('Profile updated successfully!');
+      notifications.success('Profile updated successfully!');
       setIsEditing(false);
       fetchProfileData();
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Failed to update profile');
+      notifications.error(error.response?.data?.detail || 'Failed to update profile');
     }
   };
 
@@ -96,13 +97,13 @@ const ProfilePage = () => {
 
     // Validate file size (2MB max)
     if (file.size > 2 * 1024 * 1024) {
-      toast.error('File size must be less than 2MB');
+      notifications.error('File size must be less than 2MB');
       return;
     }
 
     // Validate file type
     if (!file.type.startsWith('image/')) {
-      toast.error('Please upload an image file');
+      notifications.error('Please upload an image file');
       return;
     }
 
@@ -115,20 +116,20 @@ const ProfilePage = () => {
           'Content-Type': 'multipart/form-data',
         },
       });
-      toast.success('Profile picture uploaded successfully!');
+      notifications.success('Profile picture uploaded successfully!');
       fetchProfileData();
     } catch (error) {
-      toast.error('Failed to upload profile picture');
+      notifications.error('Failed to upload profile picture');
     }
   };
 
   const handleRemovePicture = async () => {
     try {
       await apiClient.delete('/profile/picture');
-      toast.success('Profile picture removed successfully!');
+      notifications.success('Profile picture removed successfully!');
       fetchProfileData();
     } catch (error) {
-      toast.error('Failed to remove profile picture');
+      notifications.error('Failed to remove profile picture');
     }
   };
 
@@ -148,13 +149,13 @@ const ProfilePage = () => {
     const finalConfirmation = prompt('Type "DELETE" (in capital letters) to permanently delete your account:');
     
     if (finalConfirmation !== 'DELETE') {
-      toast.error('Account deletion cancelled - confirmation text did not match');
+      notifications.error('Account deletion cancelled - confirmation text did not match');
       return;
     }
 
     try {
       await apiClient.delete('/profile/account');
-      toast.success('Account deleted successfully. Redirecting...');
+      notifications.success('Account deleted successfully. Redirecting...');
       
       // Log out after 2 seconds
       setTimeout(() => {
@@ -162,7 +163,7 @@ const ProfilePage = () => {
         window.location.href = '/';
       }, 2000);
     } catch (error) {
-      toast.error('Failed to delete account');
+      notifications.error('Failed to delete account');
     }
   };
 

@@ -11,11 +11,13 @@ import {
   IconShieldCheck,
 } from "../components/dashboard/Icons.jsx";
 import { useNavigate } from 'react-router-dom';
+import { useNotifications } from "../hooks/useNotifications.js";
 import '../styles/dashboard-enhanced.css';
 
 function DashboardPage() {
   const { token, user } = useAuth();
   const navigate = useNavigate();
+  const notifications = useNotifications();
   const [stats, setStats] = useState(null);
   const [budgets, setBudgets] = useState([]);
   const [recentActivity, setRecentActivity] = useState([]);
@@ -23,6 +25,8 @@ function DashboardPage() {
   const [vmHealth, setVmHealth] = useState({ healthy: 0, warning: 0, critical: 0 });
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [isRefreshingCosts, setIsRefreshingCosts] = useState(false);
+  const [lastCostUpdate, setLastCostUpdate] = useState(null);
 
   useEffect(() => {
     fetchDashboardData();
@@ -62,13 +66,42 @@ function DashboardPage() {
       
       // Set cost trend based on data
       setCostTrend('up');
-      
     } catch (error) {
       console.error("Failed to fetch dashboard data:", error);
       setError("Failed to load dashboard data. Please try again.");
+      // Only show notification on error
+      notifications.error('Failed to load dashboard data');
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const refreshCosts = async () => {
+    setIsRefreshingCosts(true);
+    await notifications.executeWithNotification(
+      async () => {
+        const response = await apiClient.post('/dashboard/refresh-costs');
+        if (response.data.success) {
+          // Update stats with new cost data
+          setStats(prevStats => ({
+            ...prevStats,
+            monthly_costs: response.data.monthly_costs
+          }));
+          setLastCostUpdate(new Date().toLocaleTimeString());
+          return response.data;
+        }
+        throw new Error('Refresh failed');
+      },
+      {
+        loadingMessage: 'Refreshing cost data...',
+        getSuccessMessage: (result) => `Cost data refreshed: $${result.monthly_costs.toFixed(2)} (Note: This action costs $0.01)`,
+        errorMessage: 'Failed to refresh cost data',
+      }
+    ).catch((error) => {
+      console.error('Failed to refresh costs:', error);
+    }).finally(() => {
+      setIsRefreshingCosts(false);
+    });
   };
 
   if (isLoading) {
@@ -126,6 +159,17 @@ function DashboardPage() {
             icon={<IconDollarSign />}
             trend={costTrend}
             trendValue="+12.5%"
+            action={
+              <button 
+                className="refresh-costs-btn" 
+                onClick={refreshCosts}
+                disabled={isRefreshingCosts}
+                title="Refresh cost data from AWS (costs $0.01)"
+              >
+                {isRefreshingCosts ? '🔄' : '↻'} Refresh
+              </button>
+            }
+            subtitle={lastCostUpdate ? `Updated: ${lastCostUpdate}` : 'Using cached data'}
           />
           <StatCard
             title="Active VMs"

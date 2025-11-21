@@ -1,0 +1,45 @@
+#!/bin/bash
+
+# Quick Deployment Script
+# Run this before deploying to production
+
+echo "🚀 Pre-Deployment Checklist"
+echo "============================"
+echo ""
+
+# Check if files exist
+echo "✅ Checking required files..."
+[ -f "backend/Dockerfile" ] && echo "  ✓ Backend Dockerfile exists" || echo "  ✗ Backend Dockerfile missing"
+[ -f "backend/Dockerfile.worker" ] && echo "  ✓ Worker Dockerfile exists" || echo "  ✗ Worker Dockerfile missing"
+[ -f "railway.json" ] && echo "  ✓ Railway config exists" || echo "  ✗ Railway config missing"
+[ -f "backend/.env.production.example" ] && echo "  ✓ Production env example exists" || echo "  ✗ Production env example missing"
+
+echo ""
+echo "📝 Action Items:"
+echo "================"
+echo ""
+echo "1. Update frontend/src/api.js:"
+echo "   Change 'api.yourdomain.com' to your actual domain"
+echo ""
+echo "2. Update frontend/.env.production:"
+echo "   Set VITE_API_URL=https://api.yourdomain.com"
+echo ""
+echo "3. Create backend/.env.production:"
+echo "   Copy from .env.production.example and fill in values"
+echo ""
+echo "4. Generate new JWT secret:"
+echo "   Run: openssl rand -hex 32"
+echo "   Add to .env.production: SECRET_KEY=<generated-value>"
+echo ""
+echo "5. Sign up for free services:"
+echo "   - Railway: https://railway.app (Backend hosting)"
+echo "   - Vercel: https://vercel.com (Frontend hosting)"
+echo "   - MongoDB Atlas: https://mongodb.com/cloud/atlas (Database)"
+echo "   - Redis Cloud: https://redis.com/try-free (Cache)"
+echo ""
+echo "6. Configure Namecheap DNS:"
+echo "   Add CNAME records pointing to Vercel and Railway"
+echo ""
+echo "📖 Full guide: See DEPLOYMENT_GUIDE.md"
+echo ""
+echo "Ready to deploy? Follow the guide step by step!"

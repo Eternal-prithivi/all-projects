@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import { toast, ToastContainer } from "react-toastify";
+import { useNotifications } from "../hooks/useNotifications";
 import { useAuth } from "../context/AuthContext.jsx";
 import LoadingSpinner from "../components/LoadingSpinner.jsx";
 import EmptyState from "../components/EmptyState.jsx";
@@ -70,6 +70,7 @@ const getRecommendations = (token, minScore = 50) =>
 
 function VMClusterPage() {
   const { token } = useAuth();
+  const notifications = useNotifications();
   const [currentAssignment, setCurrentAssignment] = useState(null);
   const [allAssignments, setAllAssignments] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -99,13 +100,19 @@ function VMClusterPage() {
 
   // Fetch current assignment
   const fetchAssignment = useCallback(async () => {
-    if (!token) return;
+    if (!token) {
+      console.warn("No token available for fetching assignments");
+      return;
+    }
     try {
       const assignments = await getAllMyAssignments(token);
       setAllAssignments(assignments);
       setCurrentAssignment(assignments[0] || null);
     } catch (error) {
-      if (!error.message.includes("404")) {
+      if (error.status === 401) {
+        console.error("Authentication failed - token may be expired");
+        // Could trigger re-login here
+      } else if (!error.message?.includes("404")) {
         console.error("Error fetching assignments:", error);
       }
       setAllAssignments([]);
@@ -197,7 +204,7 @@ function VMClusterPage() {
 
   const handleRequestVM = async () => {
     if (!workloadDescription.trim()) {
-      toast.error("Please describe your workload");
+      notifications.error("Please describe your workload");
       return;
     }
 
@@ -209,13 +216,17 @@ function VMClusterPage() {
         priority_level: priorityLevel,
       };
       const result = await requestVMAssignment(data, token);
-      toast.success(`VM Assigned: ${result.vm_name}`);
+      notifications.success(`VM Assigned: ${result.vm_name}`);
       setShowRequestModal(false);
       setWorkloadDescription("");
       setClusterPreference("");
-      await Promise.all([fetchAssignment(), fetchClusterHealth()]);
+      
+      // Wait 500ms for MongoDB update to propagate and cache to be invalidated
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      await Promise.all([fetchAssignment(), fetchClusterHealth(), fetchVMMetrics()]);
     } catch (error) {
-      toast.error(error.message || "Failed to request VM");
+      notifications.error(error.message || "Failed to request VM");
     } finally {
       setIsRequesting(false);
     }
@@ -238,16 +249,20 @@ function VMClusterPage() {
         headers: { Authorization: `Bearer ${token}` },
       }).then(handleApiResponse);
       
-      toast.success("VM released successfully");
-      await Promise.all([fetchAssignment(), fetchClusterHealth()]);
+      notifications.success("VM released successfully");
+      
+      // Wait 500ms for MongoDB update to propagate and cache to be invalidated
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      await Promise.all([fetchAssignment(), fetchClusterHealth(), fetchVMMetrics()]);
     } catch (error) {
-      toast.error(error.message || "Failed to release VM");
+      notifications.error(error.message || "Failed to release VM");
     }
   };
 
   const handleTransferVM = async () => {
     if (!transferCluster) {
-      toast.error("Please select a target cluster");
+      notifications.error("Please select a target cluster");
       return;
     }
 
@@ -258,11 +273,11 @@ function VMClusterPage() {
         reason: "User-initiated migration",
       };
       await transferVM(data, token);
-      toast.success("VM migration initiated successfully");
+      notifications.success("VM migration initiated successfully");
       setShowTransferModal(false);
       await Promise.all([fetchAssignment(), fetchClusterHealth()]);
     } catch (error) {
-      toast.error(error.message || "Failed to migrate VM");
+      notifications.error(error.message || "Failed to migrate VM");
     } finally {
       setIsTransferring(false);
     }
@@ -290,9 +305,9 @@ function VMClusterPage() {
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
 
-      toast.success("SSH key downloaded! Remember to set permissions: chmod 400");
+      notifications.success("SSH key downloaded! Remember to set permissions: chmod 400");
     } catch (error) {
-      toast.error(error.message || "Failed to download SSH key");
+      notifications.error(error.message || "Failed to download SSH key");
     }
   };
 
@@ -333,7 +348,7 @@ ${instructions.troubleshooting.map((item) => `
 
       alert(instructionsText); // Replace with a better modal in production
     } catch (error) {
-      toast.error(error.message || "Failed to fetch instructions");
+      notifications.error(error.message || "Failed to fetch instructions");
     }
   };
 
@@ -352,7 +367,7 @@ ${instructions.troubleshooting.map((item) => `
       setSelectedVMConfig(config);
       setShowConfigModal(true);
     } catch (error) {
-      toast.error("Failed to fetch VM configuration");
+      notifications.error("Failed to fetch VM configuration");
       console.error(error);
     }
   };
@@ -369,8 +384,6 @@ ${instructions.troubleshooting.map((item) => `
 
   return (
     <div className="vm-container">
-      <ToastContainer position="top-right" theme="dark" />
-
       {/* Header */}
       <div className="vm-header">
         <div>

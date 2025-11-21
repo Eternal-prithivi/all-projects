@@ -1,5 +1,6 @@
 import React from 'react';
 import ProfileDropdown from '../ProfileDropdown.jsx';
+import NotificationBell from '../NotificationBell.jsx';
 
 function Header({ user, onShowShortcuts }) {
   return (
@@ -16,6 +17,7 @@ function Header({ user, onShowShortcuts }) {
         >
           ?
         </button>
+        <NotificationBell />
         <ProfileDropdown />
       </div>
     </header>

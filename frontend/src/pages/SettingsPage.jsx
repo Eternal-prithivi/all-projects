@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { toast } from 'react-toastify';
+import { useNotifications } from "../hooks/useNotifications";
 import { apiClient } from '../api';
 import LoadingSpinner from '../components/LoadingSpinner';
 import '../styles/settings.css';
@@ -83,9 +83,9 @@ const SettingsPage = () => {
         weekly_reports: newNotifications.weeklyReports,
         maintenance_updates: newNotifications.maintenanceUpdates,
       });
-      toast.success('Notification settings updated');
+      notifications.success('Notification settings updated');
     } catch (error) {
-      toast.error('Failed to update notifications');
+      notifications.error('Failed to update notifications');
       // Revert change
       setNotifications(notifications);
     }
@@ -101,16 +101,16 @@ const SettingsPage = () => {
   const handleSavePreferences = async () => {
     try {
       await apiClient.put('/settings/preferences', preferences);
-      toast.success('Preferences saved successfully!');
+      notifications.success('Preferences saved successfully!');
     } catch (error) {
-      toast.error('Failed to save preferences');
+      notifications.error('Failed to save preferences');
     }
   };
 
   const handleGenerateApiKey = async () => {
     try {
       const response = await apiClient.post('/settings/api-keys');
-      toast.success(
+      notifications.success(
         <div>
           <strong>API Key Generated!</strong><br/>
           <code style={{fontSize: '0.85rem'}}>{response.data.key}</code><br/>
@@ -120,17 +120,17 @@ const SettingsPage = () => {
       );
       fetchApiKeys();
     } catch (error) {
-      toast.error('Failed to generate API key');
+      notifications.error('Failed to generate API key');
     }
   };
 
   const handleRevokeApiKey = async (keyId) => {
     try {
       await apiClient.delete(`/settings/api-keys/${keyId}`);
-      toast.success('API key revoked');
+      notifications.success('API key revoked');
       fetchApiKeys();
     } catch (error) {
-      toast.error('Failed to revoke API key');
+      notifications.error('Failed to revoke API key');
     }
   };
 
@@ -138,12 +138,12 @@ const SettingsPage = () => {
     const cardNumber = prompt('Enter the last 4 digits of your new card:');
     
     if (!cardNumber) {
-      toast.info('Payment method update cancelled');
+      notifications.info('Payment method update cancelled');
       return;
     }
     
     if (cardNumber.length !== 4 || isNaN(cardNumber)) {
-      toast.error('Please enter exactly 4 digits');
+      notifications.error('Please enter exactly 4 digits');
       return;
     }
 
@@ -154,9 +154,9 @@ const SettingsPage = () => {
       
       const newPaymentMethod = `Credit Card ****${cardNumber}`;
       setBilling({ ...billing, paymentMethod: newPaymentMethod });
-      toast.success('Payment method updated successfully!');
+      notifications.success('Payment method updated successfully!');
     } catch (error) {
-      toast.error('Failed to update payment method');
+      notifications.error('Failed to update payment method');
     }
   };
 
@@ -315,9 +315,9 @@ const SettingsPage = () => {
                         auto_renew: newValue,
                         payment_method: billing.paymentMethod
                       });
-                      toast.success('Billing settings updated');
+                      notifications.success('Billing settings updated');
                     } catch (error) {
-                      toast.error('Failed to update billing settings');
+                      notifications.error('Failed to update billing settings');
                       setBilling({ ...billing, autoRenew: !newValue });
                     }
                   }}

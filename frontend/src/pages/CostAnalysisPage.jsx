@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 // api.js does not export a default; it exports named exports including apiClient
 // We import apiClient and use it for raw HTTP calls.
 import { apiClient } from '../api.js';
-import { toast } from 'react-toastify';
+import { useNotifications } from "../hooks/useNotifications";
 import { useNavigate } from 'react-router-dom';
 import '../styles/costanalysis.css';
 
@@ -54,7 +54,7 @@ const CostAnalysisPage = () => {
   // Fetch cost data
   const fetchCostData = async () => {
     if (!startDate || !endDate) {
-      toast.error('Please select both start and end dates');
+      notifications.error('Please select both start and end dates');
       return;
     }
 
@@ -90,10 +90,10 @@ const CostAnalysisPage = () => {
 
       setCostData(response.data);
       processCostData(response.data);
-      toast.success(`${selectedProvider.toUpperCase()} cost data loaded successfully`);
+      notifications.success(`${selectedProvider.toUpperCase()} cost data loaded successfully`);
     } catch (error) {
       console.error('Error fetching cost data:', error);
-      toast.error(error.response?.data?.detail || 'Failed to fetch cost data');
+      notifications.error(error.response?.data?.detail || 'Failed to fetch cost data');
       setCostData(null);
     } finally {
       setLoading(false);

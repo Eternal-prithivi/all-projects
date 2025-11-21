@@ -3,16 +3,22 @@ from typing import List
 from datetime import datetime, timedelta
 from bson import ObjectId
 import logging
+import time
 
 from app.auth.auth_utils import get_current_user
 from app.database.mongo_client import get_database
 from .models import BudgetCreate, BudgetUpdate, BudgetDB, BudgetStatus
+from app.config.demo_mode import is_demo_mode, MockDataGenerator, log_demo_mode_call
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
 DB = get_database()
 budgets_collection = DB["budgets"]
+
+# Cache for budget cost data (15 minutes TTL to reduce API calls)
+budget_cost_cache = {}
+BUDGET_CACHE_TTL = 900  # 15 minutes in seconds
 
 def calculate_period_start(period: str) -> datetime:
     """Calculate the start date for the budget period"""
@@ -75,12 +81,45 @@ async def get_budgets():
 
 @router.get("/status", response_model=List[BudgetStatus])
 async def get_budget_status():
-    """Get status of all budgets with current spending"""
+    """
+    Get status of all budgets with current spending.
+    
+    ⚠️ OPTIMIZED: Uses caching (15 min TTL) and batches cost queries by date range
+    to minimize Cost Explorer API calls. Each unique date range is fetched once.
+    """
     try:
         from app.cost.manager import get_aws_cost_and_usage, get_gcp_billing_data, get_azure_billing_data
         
+        # Demo mode: Return budgets with mock spend data (zero API cost)
+        if is_demo_mode():
+            log_demo_mode_call("Budget Status (Cost Explorer)")
+            cursor = budgets_collection.find({"user_id": "default_user", "is_active": True})
+            statuses = []
+            for doc in cursor:
+                doc["id"] = str(doc["_id"])
+                doc.pop("_id", None)
+                budget = BudgetDB(**doc)
+                
+                # Generate realistic mock spend (60-90% of budget)
+                mock_spend = MockDataGenerator.mock_budget_status(budget.amount)
+                budget.current_spend = mock_spend
+                utilization = (mock_spend / budget.amount * 100) if budget.amount > 0 else 0
+                
+                statuses.append(BudgetStatus(
+                    budget=budget,
+                    utilization_percentage=utilization,
+                    is_exceeded=mock_spend >= budget.amount,
+                    is_near_limit=utilization >= budget.alert_threshold,
+                    remaining_amount=max(0, budget.amount - mock_spend)
+                ))
+            return statuses
+        
         budgets = []
         cursor = budgets_collection.find({"user_id": "default_user", "is_active": True})  # Default user
+        
+        # OPTIMIZATION: Batch cost queries by date range to avoid duplicate API calls
+        cost_data_cache = {}  # Key: f"{provider}_{start_date}_{end_date}"
+        current_time = time.time()
         
         statuses = []
         for doc in cursor:
@@ -93,34 +132,90 @@ async def get_budget_status():
             start_date = period_start.strftime("%Y-%m-%d")
             end_date = datetime.utcnow().strftime("%Y-%m-%d")
             
+            # Create cache key for this date range
+            cache_key = f"{budget.provider}_{start_date}_{end_date}"
+            
             current_spend = 0.0
             try:
-                if budget.provider == "all":
-                    # Sum all providers
-                    aws_data = get_aws_cost_and_usage(start_date, end_date, "DAILY")
-                    gcp_data = get_gcp_billing_data(start_date, end_date)
-                    azure_data = get_azure_billing_data(start_date, end_date)
+                # Check if we have cached data for this date range
+                if cache_key in budget_cost_cache:
+                    cached_spend, cached_timestamp = budget_cost_cache[cache_key]
+                    if (current_time - cached_timestamp) < BUDGET_CACHE_TTL:
+                        logger.debug(f"Using cached cost data for budget '{budget.name}' (cache key: {cache_key})")
+                        current_spend = cached_spend
+                    else:
+                        # Cache expired, remove it
+                        del budget_cost_cache[cache_key]
+                
+                # Fetch fresh data if not cached
+                if cache_key not in budget_cost_cache or current_spend == 0.0:
+                    logger.info(f"Fetching cost data for budget '{budget.name}' (cache key: {cache_key}) - Cost Explorer API call")
                     
-                    current_spend += sum(float(item.get("Total", {}).get("UnblendedCost", {}).get("Amount", 0)) 
-                                       for item in aws_data.get("data", {}).get("ResultsByTime", []))
-                    current_spend += sum(float(item.get("Total", {}).get("UnblendedCost", {}).get("Amount", 0)) 
-                                       for item in gcp_data.get("data", {}).get("ResultsByTime", []))
-                    current_spend += sum(float(item.get("Total", {}).get("UnblendedCost", {}).get("Amount", 0)) 
-                                       for item in azure_data.get("data", {}).get("ResultsByTime", []))
-                elif budget.provider == "aws":
-                    aws_data = get_aws_cost_and_usage(start_date, end_date, "DAILY")
-                    current_spend = sum(float(item.get("Total", {}).get("UnblendedCost", {}).get("Amount", 0)) 
-                                      for item in aws_data.get("data", {}).get("ResultsByTime", []))
-                elif budget.provider == "gcp":
-                    gcp_data = get_gcp_billing_data(start_date, end_date)
-                    current_spend = sum(float(item.get("Total", {}).get("UnblendedCost", {}).get("Amount", 0)) 
-                                      for item in gcp_data.get("data", {}).get("ResultsByTime", []))
-                elif budget.provider == "azure":
-                    azure_data = get_azure_billing_data(start_date, end_date)
-                    current_spend = sum(float(item.get("Total", {}).get("UnblendedCost", {}).get("Amount", 0)) 
-                                      for item in azure_data.get("data", {}).get("ResultsByTime", []))
+                    if budget.provider == "all":
+                        # Sum all providers - check individual caches first
+                        aws_key = f"aws_{start_date}_{end_date}"
+                        gcp_key = f"gcp_{start_date}_{end_date}"
+                        azure_key = f"azure_{start_date}_{end_date}"
+                        
+                        # Fetch AWS if not cached
+                        if aws_key not in cost_data_cache:
+                            cost_data_cache[aws_key] = get_aws_cost_and_usage(start_date, end_date, "DAILY")
+                        aws_data = cost_data_cache[aws_key]
+                        
+                        # Fetch GCP if not cached
+                        if gcp_key not in cost_data_cache:
+                            cost_data_cache[gcp_key] = get_gcp_billing_data(start_date, end_date)
+                        gcp_data = cost_data_cache[gcp_key]
+                        
+                        # Fetch Azure if not cached
+                        if azure_key not in cost_data_cache:
+                            cost_data_cache[azure_key] = get_azure_billing_data(start_date, end_date)
+                        azure_data = cost_data_cache[azure_key]
+                        
+                        # Calculate total spend
+                        current_spend += sum(float(item.get("Total", {}).get("UnblendedCost", {}).get("Amount", 0)) 
+                                           for item in aws_data.get("ResultsByTime", []))
+                        current_spend += sum(float(item.get("Total", {}).get("UnblendedCost", {}).get("Amount", 0)) 
+                                           for item in gcp_data.get("data", {}).get("ResultsByTime", []))
+                        current_spend += sum(float(item.get("Total", {}).get("UnblendedCost", {}).get("Amount", 0)) 
+                                           for item in azure_data.get("data", {}).get("ResultsByTime", []))
+                        
+                        # Cache the result
+                        budget_cost_cache[cache_key] = (current_spend, current_time)
+                        
+                    elif budget.provider == "aws":
+                        # Check if we already fetched this date range in this request
+                        if cache_key not in cost_data_cache:
+                            cost_data_cache[cache_key] = get_aws_cost_and_usage(start_date, end_date, "DAILY")
+                        aws_data = cost_data_cache[cache_key]
+                        current_spend = sum(float(item.get("Total", {}).get("UnblendedCost", {}).get("Amount", 0)) 
+                                          for item in aws_data.get("ResultsByTime", []))
+                        # Cache the result
+                        budget_cost_cache[cache_key] = (current_spend, current_time)
+                        
+                    elif budget.provider == "gcp":
+                        if cache_key not in cost_data_cache:
+                            cost_data_cache[cache_key] = get_gcp_billing_data(start_date, end_date)
+                        gcp_data = cost_data_cache[cache_key]
+                        current_spend = sum(float(item.get("Total", {}).get("UnblendedCost", {}).get("Amount", 0)) 
+                                          for item in gcp_data.get("data", {}).get("ResultsByTime", []))
+                        budget_cost_cache[cache_key] = (current_spend, current_time)
+                        
+                    elif budget.provider == "azure":
+                        if cache_key not in cost_data_cache:
+                            cost_data_cache[cache_key] = get_azure_billing_data(start_date, end_date)
+                        azure_data = cost_data_cache[cache_key]
+                        current_spend = sum(float(item.get("Total", {}).get("UnblendedCost", {}).get("Amount", 0)) 
+                                          for item in azure_data.get("data", {}).get("ResultsByTime", []))
+                        budget_cost_cache[cache_key] = (current_spend, current_time)
+                
             except Exception as cost_error:
                 logger.warning(f"Error fetching cost data for budget {budget.id}: {str(cost_error)}")
+                # Use cached value if available, otherwise 0
+                if cache_key in budget_cost_cache:
+                    current_spend, _ = budget_cost_cache[cache_key]
+                else:
+                    current_spend = 0.0
             
             # Update current spend in database
             budgets_collection.update_one(
@@ -173,6 +268,11 @@ async def get_budget_status():
                 is_near_limit=is_near_limit,
                 remaining_amount=round(remaining, 2)
             ))
+        
+        # Log optimization metrics
+        api_calls_made = len(cost_data_cache)
+        budgets_checked = len(statuses)
+        logger.info(f"Budget status check complete: {budgets_checked} budgets checked, {api_calls_made} Cost Explorer API calls made (optimized from potential {budgets_checked} calls)")
         
         return statuses
     except Exception as e:

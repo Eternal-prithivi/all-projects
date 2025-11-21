@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import { toast, ToastContainer } from "react-toastify";
+import { useNotifications } from "../hooks/useNotifications";
 import "../styles/storage.css"; // We use the external stylesheet
 
 // --- MOCKED DEPENDENCIES for a self-contained component ---
@@ -81,6 +81,7 @@ const CspIcon = ({ csp }) => {
 
 function StoragePage() {
   const { token } = useAuth();
+  const notifications = useNotifications();
   const [selectedFile, setSelectedFile] = useState(null);
   const [files, setFiles] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -111,7 +112,7 @@ function StoragePage() {
       const fileList = await listFiles(token);
       setFiles(fileList);
     } catch (error) {
-      toast.error(error.message || "Failed to fetch files."); // --- MODIFIED: Use error.message ---
+      notifications.error(error.message || "Failed to fetch files.");
     } finally {
       setIsLoading(false);
     }
@@ -140,7 +141,7 @@ function StoragePage() {
       setRecommendation(result);
       setShowRecommendationModal(true);
     } catch (error) {
-      toast.error(error.message || "Analysis failed."); // --- MODIFIED: Use error.message ---
+      notifications.error(error.message || "Analysis failed.");
     } finally {
       setIsAnalyzing(false);
     }
@@ -161,14 +162,14 @@ function StoragePage() {
 
     try {
       await uploadFileToCSP(selectedFile, finalCsp, storageClass, token);
-      toast.success(
+      notifications.success(
         `'${selectedFile.name}' uploaded successfully to ${finalCsp}!`
       );
       setSelectedFile(null);
       if (fileInputRef.current) fileInputRef.current.value = "";
       await fetchFiles();
     } catch (error) {
-      toast.error(error.message || `Upload to ${finalCsp} failed.`); // --- MODIFIED: Use error.message ---
+      notifications.error(error.message || `Upload to ${finalCsp} failed.`);
     } finally {
       setIsUploading(false);
     }
@@ -183,10 +184,10 @@ function StoragePage() {
     if (!fileToDelete) return;
     try {
       await deleteFile(fileToDelete, token);
-      toast.success(`'${fileToDelete}' deleted successfully.`);
+      notifications.success(`'${fileToDelete}' deleted successfully.`);
       await fetchFiles();
     } catch (error) {
-      toast.error(error.message || "Failed to delete file."); // --- MODIFIED: Use error.message ---
+      notifications.error(error.message || "Failed to delete file.");
     } finally {
       setShowDeleteModal(false);
       setFileToDelete(null);
@@ -203,12 +204,12 @@ function StoragePage() {
       if (error.message.includes("is in GLACIER storage") && error.message.includes("412")) {
         setFileToRestore(filename);
         setShowRestoreModal(true); // Open the restore modal
-        toast.info("This file is in Glacier. It needs to be restored before download.");
+        notifications.info("This file is in Glacier. It needs to be restored before download.");
       } else if (error.message.includes("is currently being restored") && error.message.includes("409")) {
-        toast.info(error.message); // Inform user it's already restoring
+        notifications.info(error.message); // Inform user it's already restoring
       }
       else {
-        toast.error(error.message || "Could not get download link.");
+        notifications.error(error.message || "Could not get download link.");
       }
     }
   };
@@ -226,13 +227,13 @@ function StoragePage() {
     setIsRestoring(true);
     try {
       const result = await initiateGlacierRestore(fileToRestore, restoreTier, restoreDays, token);
-      toast.success(result.message || `'${fileToRestore}' restore initiated.`);
+      notifications.success(result.message || `'${fileToRestore}' restore initiated.`);
       setShowRestoreModal(false);
       setFileToRestore(null);
       // Re-fetch files to potentially update their status in the UI
       await fetchFiles();
     } catch (error) {
-      toast.error(error.message || `Failed to initiate restore for '${fileToRestore}'.`);
+      notifications.error(error.message || `Failed to initiate restore for '${fileToRestore}'.`);
     } finally {
       setIsRestoring(false);
     }
@@ -243,7 +244,6 @@ function StoragePage() {
 
   return (
     <div className="storage-container">
-      <ToastContainer theme="dark" position="top-right" autoClose={5000} />
       <div className="storage-header">
         <h2>Standard Storage</h2>
       </div>

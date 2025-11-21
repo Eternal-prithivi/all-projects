@@ -12,16 +12,35 @@ from ..users.user_model import User
 from ..database.mongo_client import get_database
 from ..cost.manager import get_aws_cost_and_usage, get_gcp_billing_data, get_azure_billing_data
 import secrets
+import time
+import logging
 
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/billing", tags=["Billing"])
 DB = get_database()
 
+# Cache for billing cost data (1 hour TTL)
+billing_cache = {
+    "data": None,
+    "timestamp": 0,
+    "ttl": 3600  # 1 hour
+}
 
-def fetch_real_cloud_costs(start_date: str, end_date: str) -> CostBreakdown:
+
+def fetch_real_cloud_costs(start_date: str, end_date: str, use_cache: bool = True) -> CostBreakdown:
     """
-    Fetch real costs from cloud providers for the specified date range
+    Fetch real costs from cloud providers for the specified date range (cached for 1 hour)
     Returns CostBreakdown with actual costs or 0.0 if provider not configured
     """
+    # Check cache first
+    if use_cache:
+        current_time = time.time()
+        cache_key = f"{start_date}_{end_date}"
+        if billing_cache["data"] is not None and (current_time - billing_cache["timestamp"]) < billing_cache["ttl"]:
+            logger.info(f"Using cached billing cost data for {cache_key}")
+            return billing_cache["data"]
+    
+    logger.info(f"Fetching fresh billing cost data for {start_date} to {end_date} (Cost Explorer API call)")
     costs = CostBreakdown()
     
     try:
@@ -63,6 +82,12 @@ def fetch_real_cloud_costs(start_date: str, end_date: str) -> CostBreakdown:
     except Exception as e:
         print(f"Azure cost fetch failed: {e}")
         costs.azure = 0.0
+    
+    # Update cache
+    if use_cache:
+        billing_cache["data"] = costs
+        billing_cache["timestamp"] = time.time()
+        logger.info(f"Billing cost data cached")
     
     return costs
 

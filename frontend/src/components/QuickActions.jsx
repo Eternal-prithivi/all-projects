@@ -6,26 +6,31 @@ const QuickActions = () => {
   const [isOpen, setIsOpen] = useState(false);
   const navigate = useNavigate();
 
+  // Detect platform for display
+  const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0 || 
+                navigator.userAgent.toUpperCase().indexOf('MAC') >= 0;
+  const modifierKey = isMac ? '⌥' : 'Alt';
+
   const actions = [
     {
       id: 'vm',
       label: 'Request VM',
       icon: '🖥️',
-      shortcut: 'N',
+      shortcut: `${modifierKey} + Shift + N`,
       onClick: () => navigate('/vm-cluster')
     },
     {
       id: 'upload',
       label: 'Upload File',
       icon: '📤',
-      shortcut: 'U',
+      shortcut: `${modifierKey} + Shift + U`,
       onClick: () => navigate('/storage')
     },
     {
       id: 'costs',
       label: 'View Costs',
       icon: '💰',
-      shortcut: 'C',
+      shortcut: `${modifierKey} + Shift + C`,
       onClick: () => navigate('/dashboard')
     },
     {

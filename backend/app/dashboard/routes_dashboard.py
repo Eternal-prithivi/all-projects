@@ -1,10 +1,18 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from app.users.routes_users import get_current_user
 from app.database.mongo_client import get_database
 from datetime import datetime, timedelta
 import logging
+import time
 
 logger = logging.getLogger(__name__)
+
+# Cache for AWS cost data (1 hour TTL)
+aws_cost_cache = {
+    "data": None,
+    "timestamp": 0,
+    "ttl": 3600  # 1 hour in seconds
+}
 
 # The prefix is now handled in main.py, so it's removed from here.
 router = APIRouter(
@@ -15,25 +23,13 @@ router = APIRouter(
 async def get_dashboard_stats(user: dict = Depends(get_current_user)):
     """
     Returns real statistics for the main dashboard overview.
+    Uses cached AWS cost data (1 hour TTL).
     """
     DB = get_database()
     
     try:
-        # Get real monthly costs from AWS
-        from app.cost.manager import get_aws_cost_and_usage
-        end_date = datetime.utcnow().strftime("%Y-%m-%d")
-        start_date = (datetime.utcnow() - timedelta(days=30)).strftime("%Y-%m-%d")
-        
-        monthly_costs = 0.0
-        try:
-            aws_data = get_aws_cost_and_usage(start_date, end_date, "DAILY")
-            monthly_costs = sum(
-                float(item.get("Total", {}).get("UnblendedCost", {}).get("Amount", 0))
-                for item in aws_data.get("ResultsByTime", [])
-            )
-        except Exception as e:
-            logger.warning(f"Could not fetch AWS costs: {e}")
-            monthly_costs = 0.0
+        # Get cached monthly costs from AWS (no API call)
+        monthly_costs = aws_cost_cache.get("data", 0.0)
         
         # Get real VM count
         vm_assignments = DB["vm_assignments"]
@@ -99,3 +95,38 @@ async def get_dashboard_stats(user: dict = Depends(get_current_user)):
             "total_files": 0,
             "vm_health": {"healthy": 0, "warning": 0, "critical": 0}
         }
+
+@router.post("/refresh-costs")
+async def refresh_aws_costs(user: dict = Depends(get_current_user)):
+    """
+    Manually refresh AWS cost data (triggers Cost Explorer API call).
+    Use this sparingly to avoid API charges ($0.01 per call).
+    """
+    from app.cost.manager import get_aws_cost_and_usage
+    
+    try:
+        end_date = datetime.utcnow().strftime("%Y-%m-%d")
+        start_date = (datetime.utcnow() - timedelta(days=30)).strftime("%Y-%m-%d")
+        
+        logger.info("Manual refresh: Fetching AWS cost data")
+        aws_data = get_aws_cost_and_usage(start_date, end_date, "DAILY")
+        monthly_costs = sum(
+            float(item.get("Total", {}).get("UnblendedCost", {}).get("Amount", 0))
+            for item in aws_data.get("ResultsByTime", [])
+        )
+        
+        # Update cache
+        aws_cost_cache["data"] = monthly_costs
+        aws_cost_cache["timestamp"] = time.time()
+        
+        logger.info(f"AWS costs refreshed: ${monthly_costs:.2f}")
+        
+        return {
+            "success": True,
+            "monthly_costs": round(monthly_costs, 2),
+            "cached_at": datetime.utcnow().isoformat(),
+            "message": "Cost data refreshed successfully (Cost Explorer API call made)"
+        }
+    except Exception as e:
+        logger.error(f"Error refreshing AWS costs: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to refresh costs: {str(e)}")

@@ -30,6 +30,70 @@
   margin-bottom: 2rem;
 }
 
+.stat-card {
+  background: #0d0d0d;
+  border: 1px solid #2a2a2a;
+  border-radius: 12px;
+  padding: 1.5rem;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.stat-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 1rem;
+}
+
+.card-action {
+  margin-left: auto;
+}
+
+.refresh-costs-btn {
+  background: rgba(212, 175, 55, 0.1);
+  border: 1px solid rgba(212, 175, 55, 0.3);
+  color: #d4af37;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.refresh-costs-btn:hover:not(:disabled) {
+  background: rgba(212, 175, 55, 0.2);
+  border-color: #d4af37;
+  transform: translateY(-1px);
+}
+
+.refresh-costs-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.card-subtitle {
+  font-size: 0.85rem;
+  color: #777;
+  margin-top: 0.5rem;
+}
+
+.card-trend {
+  font-size: 0.9rem;
+  margin-top: 0.5rem;
+  font-weight: 600;
+}
+
+.card-trend.up {
+  color: #28a745;
+}
+
+.card-trend.down {
+  color: #dc3545;
+}
+
 /* Info Grid - Secondary cards */
 .info-grid {
   display: grid;

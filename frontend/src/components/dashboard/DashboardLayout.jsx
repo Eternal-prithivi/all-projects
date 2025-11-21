@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { Outlet, useNavigate } from "react-router-dom";
+import { ToastContainer, toast } from "react-toastify";
 import { useAuth } from "../../context/AuthContext.jsx";
+import { NotificationProvider } from "../../context/NotificationContext.jsx";
 import Sidebar from "./Sidebar.jsx";
 import Header from "./Header.jsx";
 import Footer from "../Footer.jsx";
@@ -10,6 +12,7 @@ import KeyboardShortcuts from "../KeyboardShortcuts.jsx";
 import GlobalSearch from "../GlobalSearch.jsx";
 import "../../styles/dashboard.css";
 import "../../styles/cards.css";
+import "react-toastify/dist/ReactToastify.css";
 import "../../styles/toast-custom.css";
 
 function DashboardLayout() {
@@ -38,20 +41,21 @@ function DashboardLayout() {
         setShowSearch(true);
       }
       
-      // Quick actions
-      if (e.key === 'n' || e.key === 'N') {
+      // Quick actions - Alt/Option + Shift + key
+      // altKey works for both Mac (Option) and Windows (Alt)
+      if (e.altKey && e.shiftKey && (e.key === 'n' || e.key === 'N')) {
         if (!showSearch && !showShortcuts) {
           e.preventDefault();
           navigate('/dashboard/vmcluster');
         }
       }
-      if (e.key === 'u' || e.key === 'U') {
+      if (e.altKey && e.shiftKey && (e.key === 'u' || e.key === 'U')) {
         if (!showSearch && !showShortcuts) {
           e.preventDefault();
           navigate('/dashboard/storage');
         }
       }
-      if (e.key === 'c' || e.key === 'C') {
+      if (e.altKey && e.shiftKey && (e.key === 'c' || e.key === 'C')) {
         if (!showSearch && !showShortcuts) {
           e.preventDefault();
           navigate('/dashboard/costs');
@@ -73,28 +77,48 @@ function DashboardLayout() {
   }, [navigate, showSearch, showShortcuts]);
 
   return (
-    <div className="dashboard-page">
-      <Sidebar user={user} />
-      <div className="dashboard-main">
-        <Header user={user} />
-        <div className="dashboard-breadcrumbs-wrapper">
-          <Breadcrumbs />
+    <NotificationProvider>
+      <div className="dashboard-page">
+        <Sidebar user={user} />
+        <div className="dashboard-main">
+          <Header user={user} />
+          <div className="dashboard-breadcrumbs-wrapper">
+            <Breadcrumbs />
+          </div>
+          <main className="dashboard-content">
+            <Outlet />
+          </main>
+          <Footer />
         </div>
-        <main className="dashboard-content">
-          <Outlet />
-        </main>
-        <Footer />
+        <QuickActions />
+        <KeyboardShortcuts 
+          isOpen={showShortcuts} 
+          onClose={() => setShowShortcuts(false)} 
+        />
+        <GlobalSearch 
+          isOpen={showSearch} 
+          onClose={() => setShowSearch(false)} 
+        />
+        <ToastContainer
+          position="top-right"
+          autoClose={5000}
+          hideProgressBar={false}
+          newestOnTop={true}
+          closeOnClick
+          rtl={false}
+          pauseOnFocusLoss={false}
+          draggable={false}
+          pauseOnHover
+          theme="dark"
+          limit={5}
+          enableMultiContainer={false}
+          containerId="main-toast-container"
+          style={{ 
+            zIndex: 99999,
+          }}
+        />
       </div>
-      <QuickActions />
-      <KeyboardShortcuts 
-        isOpen={showShortcuts} 
-        onClose={() => setShowShortcuts(false)} 
-      />
-      <GlobalSearch 
-        isOpen={showSearch} 
-        onClose={() => setShowSearch(false)} 
-      />
-    </div>
+    </NotificationProvider>
   );
 }
 

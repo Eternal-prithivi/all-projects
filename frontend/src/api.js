@@ -1,8 +1,15 @@
 import axios from "axios";
 
+// Determine API base URL based on environment
+const API_BASE_URL = import.meta.env.VITE_API_URL || 
+  (import.meta.env.PROD 
+    ? 'https://api.yourdomain.com/api'  // Production - UPDATE THIS with your domain
+    : 'http://localhost:8000/api'        // Development
+  );
+
 // Create a reusable axios client
 export const apiClient = axios.create({
-  baseURL: "http://localhost:8000/api", // Correct base URL with /api prefix
+  baseURL: API_BASE_URL,
 });
 
 // Add request interceptor to automatically attach token

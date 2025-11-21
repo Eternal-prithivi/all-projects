@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { apiClient } from '../api';
-import { toast } from 'react-toastify';
+import { useNotifications } from "../hooks/useNotifications";
 import '../styles/billing.css';
 
 function BillingPage() {
@@ -43,7 +43,7 @@ function BillingPage() {
       setLoading(false);
     } catch (error) {
       console.error('Failed to fetch billing data:', error);
-      toast.error('Failed to load billing data');
+      notifications.error('Failed to load billing data');
       setLoading(false);
     }
   };
@@ -74,7 +74,7 @@ function BillingPage() {
         amount: parseFloat(budgetForm.amount),
         email_notifications: true
       });
-      toast.success('Budget created successfully!');
+      notifications.success('Budget created successfully!');
       setShowBudgetForm(false);
       setBudgetForm({
         name: 'Monthly Cloud Budget',
@@ -87,32 +87,32 @@ function BillingPage() {
       fetchBudgets();
     } catch (error) {
       console.error('Failed to create budget:', error);
-      toast.error(error.response?.data?.detail || 'Failed to create budget');
+      notifications.error(error.response?.data?.detail || 'Failed to create budget');
     }
   };
 
   const deleteBudget = async (budgetId) => {
     try {
       await apiClient.delete(`/budgets/${budgetId}`);
-      toast.success('Budget deleted successfully!');
+      notifications.success('Budget deleted successfully!');
       fetchBudgets();
     } catch (error) {
       console.error('Failed to delete budget:', error);
-      toast.error(error.response?.data?.detail || 'Failed to delete budget');
+      notifications.error(error.response?.data?.detail || 'Failed to delete budget');
     }
   };
 
   const testSMS = async () => {
     if (!budgetForm.phone_number) {
-      toast.error('Please enter a phone number first');
+      notifications.error('Please enter a phone number first');
       return;
     }
     try {
       await apiClient.post(`/budgets/test-sms?phone_number=${encodeURIComponent(budgetForm.phone_number)}&budget_name=${encodeURIComponent(budgetForm.name)}`);
-      toast.success(`Test SMS sent to ${budgetForm.phone_number}`);
+      notifications.success(`Test SMS sent to ${budgetForm.phone_number}`);
     } catch (error) {
       console.error('Failed to send test SMS:', error);
-      toast.error(error.response?.data?.detail || 'Failed to send test SMS');
+      notifications.error(error.response?.data?.detail || 'Failed to send test SMS');
     }
   };
 
@@ -120,11 +120,11 @@ function BillingPage() {
     try {
       setGeneratingInvoice(true);
       await apiClient.post('/billing/invoices/generate');
-      toast.success('Invoice generated successfully!');
+      notifications.success('Invoice generated successfully!');
       fetchBillingData();
     } catch (error) {
       console.error('Failed to generate invoice:', error);
-      toast.error(error.response?.data?.detail || 'Failed to generate invoice');
+      notifications.error(error.response?.data?.detail || 'Failed to generate invoice');
     } finally {
       setGeneratingInvoice(false);
     }
@@ -133,11 +133,11 @@ function BillingPage() {
   const markAsPaid = async (invoiceId) => {
     try {
       await apiClient.put(`/billing/invoices/${invoiceId}/mark-paid`);
-      toast.success('Invoice marked as paid!');
+      notifications.success('Invoice marked as paid!');
       fetchBillingData();
     } catch (error) {
       console.error('Failed to mark invoice as paid:', error);
-      toast.error(error.response?.data?.detail || 'Failed to update invoice');
+      notifications.error(error.response?.data?.detail || 'Failed to update invoice');
     }
   };
 
@@ -149,7 +149,7 @@ function BillingPage() {
     downloadAnchor.setAttribute('href', dataUri);
     downloadAnchor.setAttribute('download', `${invoice.invoice_id}.json`);
     downloadAnchor.click();
-    toast.success('Invoice downloaded');
+    notifications.success('Invoice downloaded');
   };
 
   const getStatusBadgeClass = (status) => {

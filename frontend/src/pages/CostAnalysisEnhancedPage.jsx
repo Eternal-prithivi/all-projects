@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { apiClient } from '../api.js';
-import { toast } from 'react-toastify';
+import { useNotifications } from "../hooks/useNotifications";
 import { useNavigate } from 'react-router-dom';
 import '../styles/costanalysis.css';
 
@@ -98,7 +98,7 @@ const CostAnalysisEnhancedPage = () => {
   // Fetch cost data
   const fetchCostData = async () => {
     if (!startDate || !endDate) {
-      toast.error('Please select both start and end dates');
+      notifications.error('Please select both start and end dates');
       return;
     }
 
@@ -133,10 +133,10 @@ const CostAnalysisEnhancedPage = () => {
 
       setCostData(response.data);
       processCostData(response.data);
-      toast.success(`${selectedProvider.toUpperCase()} cost data loaded successfully`);
+      notifications.success(`${selectedProvider.toUpperCase()} cost data loaded successfully`);
     } catch (error) {
       console.error('Error fetching cost data:', error);
-      toast.error(error.response?.data?.detail || 'Failed to fetch cost data');
+      notifications.error(error.response?.data?.detail || 'Failed to fetch cost data');
       setCostData(null);
     } finally {
       setLoading(false);
@@ -248,35 +248,35 @@ const CostAnalysisEnhancedPage = () => {
         amount: parseFloat(budgetForm.amount),
         email_notifications: true
       });
-      toast.success('Budget created successfully');
+      notifications.success('Budget created successfully');
       setShowBudgetForm(false);
       setBudgetForm({ name: '', amount: '', provider: 'all', period: 'monthly', alert_threshold: 80, phone_number: '' });
       fetchBudgets();
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Failed to create budget');
+      notifications.error(error.response?.data?.detail || 'Failed to create budget');
     }
   };
 
   const deleteBudget = async (budgetId) => {
     try {
       await apiClient.delete(`/budgets/${budgetId}`);
-      toast.success('Budget deleted');
+      notifications.success('Budget deleted');
       fetchBudgets();
     } catch (error) {
-      toast.error('Failed to delete budget');
+      notifications.error('Failed to delete budget');
     }
   };
 
   const testSMS = async () => {
     if (!budgetForm.phone_number) {
-      toast.error('Please enter a phone number first');
+      notifications.error('Please enter a phone number first');
       return;
     }
     try {
       const response = await apiClient.post(`/budgets/test-sms?phone_number=${encodeURIComponent(budgetForm.phone_number)}&budget_name=Test Alert`);
-      toast.success(`SMS sent successfully to ${budgetForm.phone_number}`);
+      notifications.success(`SMS sent successfully to ${budgetForm.phone_number}`);
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Failed to send test SMS');
+      notifications.error(error.response?.data?.detail || 'Failed to send test SMS');
     }
   };
 
@@ -289,21 +289,21 @@ const CostAnalysisEnhancedPage = () => {
       setForecast(response.data);
       setShowForecast(true);
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Failed to fetch forecast');
+      notifications.error(error.response?.data?.detail || 'Failed to fetch forecast');
     }
   };
 
   const fetchDemoForecast = async () => {
     try {
-      toast.info('Loading ML demo with synthetic data...');
+      notifications.info('Loading ML demo with synthetic data...');
       const response = await apiClient.get(`/cost/forecast/${selectedProvider}`, {
         params: { days_ahead: 30, demo_mode: true }
       });
       setForecast(response.data);
       setShowForecast(true);
-      toast.success('ML model demo loaded! This uses 90 days of synthetic data with increasing trend.');
+      notifications.success('ML model demo loaded! This uses 90 days of synthetic data with increasing trend.');
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Failed to fetch demo forecast');
+      notifications.error(error.response?.data?.detail || 'Failed to fetch demo forecast');
     }
   };
 
@@ -333,11 +333,11 @@ const CostAnalysisEnhancedPage = () => {
   const acknowledgeAnomaly = async (anomalyId) => {
     try {
       await apiClient.put(`/cost/anomalies/${anomalyId}/acknowledge`);
-      toast.success('Anomaly acknowledged');
+      notifications.success('Anomaly acknowledged');
       fetchAnomalies();
       fetchAnomalySummary();
     } catch (error) {
-      toast.error('Failed to acknowledge anomaly');
+      notifications.error('Failed to acknowledge anomaly');
     }
   };
 
@@ -360,9 +360,9 @@ const CostAnalysisEnhancedPage = () => {
       document.body.appendChild(link);
       link.click();
       link.remove();
-      toast.success(`Report exported as ${format.toUpperCase()}`);
+      notifications.success(`Report exported as ${format.toUpperCase()}`);
     } catch (error) {
-      toast.error('Failed to export report');
+      notifications.error('Failed to export report');
     }
   };
 

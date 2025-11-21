@@ -260,7 +260,7 @@ async def migrate_vm(
     """
     try:
         result = migrate_user(
-            user_id=user_id,
+            user_id=current_user.username,
             target_cluster=request.target_cluster,
             target_vm_name=request.target_vm_name
         )
@@ -646,7 +646,7 @@ async def predict_cluster_load(cluster_type: ClusterType) -> Dict[str, Any]:
         for vm_name in cluster_vms:
             try:
                 # Get active user count
-                stats["active_users"] = DB["vm_assignments"].count_documents({
+                active_users = DB["vm_assignments"].count_documents({
                     "vm_name": vm_name,
                     "status": "active"
                 })
@@ -669,9 +669,6 @@ async def predict_cluster_load(cluster_type: ClusterType) -> Dict[str, Any]:
                 current_metrics.append(metrics)
             except Exception as e:
                 print(f"Error collecting metrics for {vm_name}: {e}")
-                continue
-                current_metrics.append(metrics)
-            except:
                 continue
         
         # Predict (simple trend analysis for now)

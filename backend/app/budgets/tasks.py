@@ -9,6 +9,8 @@ def check_budget_alerts():
     """
     Celery task to check all active budgets and send SMS alerts if thresholds exceeded.
     Runs hourly via Celery Beat.
+    
+    ⚠️ OPTIMIZATION: Only runs if there are active budgets to avoid unnecessary Cost Explorer API calls.
     """
     from app.database.mongo_client import get_database
     from app.budgets.models import BudgetDB
@@ -19,7 +21,13 @@ def check_budget_alerts():
     DB = get_database()
     budgets_collection = DB["budgets"]
     
-    logger.info("Starting automatic budget check...")
+    # OPTIMIZATION: Check if there are any active budgets first
+    active_budget_count = budgets_collection.count_documents({"is_active": True})
+    if active_budget_count == 0:
+        logger.info("⏭️  No active budgets found. Skipping budget check to save Cost Explorer API calls.")
+        return {"budgets_checked": 0, "alerts_sent": 0, "skipped": True, "reason": "No active budgets"}
+    
+    logger.info(f"Starting automatic budget check for {active_budget_count} active budget(s)...")
     
     try:
         # Find all active budgets

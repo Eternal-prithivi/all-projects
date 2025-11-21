@@ -15,12 +15,17 @@ const KeyboardShortcuts = ({ isOpen, onClose }) => {
 
   if (!isOpen) return null;
 
+  // Detect platform for display
+  const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0 || 
+                navigator.userAgent.toUpperCase().indexOf('MAC') >= 0;
+  const modifierKey = isMac ? '⌥' : 'Alt';
+  
   const shortcuts = [
     { key: '?', description: 'Show/hide keyboard shortcuts' },
     { key: '/', description: 'Focus search bar' },
-    { key: 'N', description: 'Request new VM' },
-    { key: 'U', description: 'Upload file' },
-    { key: 'C', description: 'View cost analysis' },
+    { key: `${modifierKey} + Shift + N`, description: 'Request new VM' },
+    { key: `${modifierKey} + Shift + U`, description: 'Upload file' },
+    { key: `${modifierKey} + Shift + C`, description: 'View cost analysis' },
     { key: 'ESC', description: 'Close modals' },
     { key: '⌘/Ctrl + K', description: 'Quick command palette' },
   ];

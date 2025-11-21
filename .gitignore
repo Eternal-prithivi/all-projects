@@ -3,11 +3,66 @@ __pycache__/
 *.pyc
 *.pyo
 *.pyd
+*.pyd.so
+.Python
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Environment files (NEVER commit these!)
 .env
+.env.local
+.env.production
+backend/.env
+backend/.env.local
+backend/.env.production
+frontend/.env.local
 
 # Node/React
 node_modules/
 build/
 dist/
-.env
-backend/.env
+.vite/
+*.log
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+logs/
+*.log
+celerybeat-schedule
+celerybeat-schedule.*
+
+# Cloud credentials (NEVER commit these!)
+*-key.json
+*.pem
+*.key
+credentials.json
+service-account.json
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+logs/
+*.log
+celerybeat-schedule*

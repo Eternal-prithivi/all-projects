@@ -53,6 +53,14 @@ class Settings(BaseSettings):
     # VM Metrics Configuration
     USE_REAL_METRICS: bool = False  # Set to True for real GCP metrics, False for simulated
 
+    # --- Demo Mode Configuration ---
+    DEMO_MODE: bool = False  # Set to True to use mock data instead of real API calls (zero cost!)
+    
+    # --- Production Configuration ---
+    FRONTEND_URL: str = "http://localhost:5173"  # Update to your production domain
+    BACKEND_URL: str = "http://localhost:8000"   # Update to your production API domain
+    ENVIRONMENT: str = "development"  # development, staging, production
+
     # --- Azure Credentials ---
     AZURE_STORAGE_ACCOUNT_NAME: str
     AZURE_STORAGE_ACCOUNT_KEY: str

@@ -1,0 +1,133 @@
+═══════════════════════════════════════════════════════════
+🎭 DEMO MODE - MANUAL VERIFICATION TEST
+═══════════════════════════════════════════════════════════
+
+Run these commands in your terminal to verify demo mode is working:
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📋 TEST 1: Check if Python can load demo mode
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+cd /Users/a.prithiviraj/Documents/CloudResourceOptimizationPlatform
+source venv/bin/activate
+cd backend
+python3 -c "from app.config.demo_mode import is_demo_mode, DEMO_MODE; print(f'✅ DEMO_MODE={DEMO_MODE}'); print(f'✅ is_demo_mode()={is_demo_mode()}')"
+
+EXPECTED OUTPUT if working:
+✅ DEMO_MODE=True
+✅ is_demo_mode()=True
+
+If you see "True", demo mode is ENABLED! ✅
+If you see "False", demo mode is DISABLED (using real APIs)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📋 TEST 2: Start backend and check logs
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+# Keep venv activated from Test 1
+uvicorn app.main:app --reload
+
+WATCH FOR: Backend should start without errors
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📋 TEST 3: Call API and verify mock data
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+# In a NEW terminal:
+cd /Users/a.prithiviraj/Documents/CloudResourceOptimizationPlatform
+curl "http://localhost:8000/api/cost/aws?start_date=2025-01-01&end_date=2025-01-31" | python3 -m json.tool | grep demo_mode
+
+EXPECTED OUTPUT if demo mode working:
+  "demo_mode": true   ← ✅ THIS MEANS MOCK DATA!
+
+If you see "demo_mode": true → NO REAL API CALLS = $0.00 ✅
+If you see "demo_mode": false → REAL API CALLS (with caching)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📋 TEST 4: Check backend logs for demo mode messages
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+# In the backend terminal (where uvicorn is running),
+# after making the curl request, you should see:
+
+🎭 DEMO MODE: Using mock data for AWS Cost Explorer (zero cost)
+
+This confirms NO real AWS API call was made!
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✅ SUCCESS CRITERIA
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Demo mode is working if you see:
+
+✅ Test 1: DEMO_MODE=True
+✅ Test 2: Backend starts without errors
+✅ Test 3: API response has "demo_mode": true
+✅ Test 4: Backend logs show "🎭 DEMO MODE: Using mock data..."
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🔧 TROUBLESHOOTING
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Problem: Test 1 shows DEMO_MODE=False but .env has DEMO_MODE=true
+
+Solution: Check backend/.env file:
+  cat backend/.env | grep DEMO_MODE
+
+Make sure it says exactly:
+  DEMO_MODE=true
+
+NOT:
+  DEMO_MODE = true   (spaces cause issues)
+  DEMO_MODE="true"   (quotes cause issues)
+  # DEMO_MODE=true   (commented out)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Problem: ModuleNotFoundError: No module named 'dotenv'
+
+Solution: Install python-dotenv:
+  cd backend
+  source ../venv/bin/activate
+  pip install python-dotenv
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Problem: Backend won't start
+
+Solution: Check logs:
+  tail -20 logs/backend.log
+
+Look for import errors or other issues.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+💡 QUICK SUMMARY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+DEMO_MODE=true  (in backend/.env)
+  ↓
+Backend loads .env on startup
+  ↓
+API calls check is_demo_mode()
+  ↓
+If True → Return mock data (NO real API call)
+  ↓
+You see: "demo_mode": true in API response
+  ↓
+Backend logs: "🎭 DEMO MODE: Using mock data..."
+  ↓
+RESULT: $0.00 cost! ✅
+
+═══════════════════════════════════════════════════════════
+
+Run TEST 1 first to verify the fix worked!
+
+═══════════════════════════════════════════════════════════
+

@@ -24,10 +24,17 @@ import os
 
 app = FastAPI(title="Zenith API")
 
-# Correct CORS middleware configuration
+# CORS configuration - Production ready
+# In production, set FRONTEND_URL in .env to your domain
+allowed_origins = [
+    "http://localhost:5173",  # Local development
+    "http://localhost:3000",
+    os.getenv("FRONTEND_URL", "http://localhost:5173"),
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=allowed_origins if os.getenv("ENVIRONMENT") == "production" else ["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
