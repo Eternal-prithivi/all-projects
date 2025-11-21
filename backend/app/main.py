@@ -1,5 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request
 from app.auth import routes_auth
 from app.dashboard import routes_dashboard
 from app.users import routes_users
@@ -21,31 +23,61 @@ from app.billing import routes_billing
 from app.database.mongo_client import mongodb_client
 from app.utils.config import settings
 import os
+import re
 
 app = FastAPI(title="Zenith API")
 
-# CORS configuration - Production ready
-# Allow requests from local development and production frontend
-allowed_origins = [
-    "http://localhost:5173",  # Local development
-    "http://localhost:3000",
-    "https://zenith-frontend-5bd6obaq0-eternal-prithivis-projects.vercel.app",  # Vercel preview
-    "https://zenith-frontend-eternal-prithivis-projects.vercel.app",  # Vercel production
-]
+# CORS configuration - Allow Vercel preview deployments with pattern matching
+def is_allowed_origin(origin: str) -> bool:
+    """Check if origin is allowed (localhost or Vercel domains)"""
+    if not origin:
+        return False
+    
+    # Allow localhost
+    if origin.startswith("http://localhost:"):
+        return True
+    
+    # Allow all Vercel preview and production URLs
+    vercel_patterns = [
+        r"https://zenith-frontend-.*\.vercel\.app$",
+        r"https://zenith-frontend-.*-eternal-prithivis-projects\.vercel\.app$",
+        r"https://zenith-.*-eternal-prithivis-projects\.vercel\.app$",
+    ]
+    
+    for pattern in vercel_patterns:
+        if re.match(pattern, origin):
+            return True
+    
+    # Allow custom domain if set
+    custom_domain = os.getenv("FRONTEND_URL")
+    if custom_domain and origin == custom_domain:
+        return True
+    
+    return False
 
-# Add custom domain if set in environment
-frontend_url = os.getenv("FRONTEND_URL")
-if frontend_url and frontend_url not in allowed_origins:
-    allowed_origins.append(frontend_url)
+# Custom CORS middleware to handle dynamic Vercel URLs
+class DynamicCORSMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        origin = request.headers.get("origin")
+        
+        # Process the request
+        response = await call_next(request)
+        
+        # Add CORS headers if origin is allowed
+        if origin and is_allowed_origin(origin):
+            response.headers["Access-Control-Allow-Origin"] = origin
+            response.headers["Access-Control-Allow-Credentials"] = "true"
+            response.headers["Access-Control-Allow-Methods"] = "*"
+            response.headers["Access-Control-Allow-Headers"] = "*"
+        
+        # Handle preflight requests
+        if request.method == "OPTIONS":
+            response.headers["Access-Control-Max-Age"] = "86400"
+        
+        return response
 
-# In development, allow all origins; in production, use whitelist
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=allowed_origins if os.getenv("ENVIRONMENT") == "production" else ["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# Add the custom CORS middleware
+app.add_middleware(DynamicCORSMiddleware)
 
 
 # Include all API routers with the /api prefix
