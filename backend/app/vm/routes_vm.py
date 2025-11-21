@@ -38,6 +38,11 @@ CLUSTER_HEALTH_CACHE_TTL = 60  # 1 minute - will auto-invalidate on VM changes a
 recommendations_cache = {}
 RECOMMENDATIONS_CACHE_TTL = 180  # 3 minutes
 
+# Helper function to check if caching is enabled
+def is_caching_enabled():
+    """Check if caching is enabled (disabled in REAL_TIME_MODE)"""
+    return not settings.REAL_TIME_MODE
+
 # Helper function to invalidate all caches
 def invalidate_all_caches():
     """Clear all caches to force fresh data fetch on next request"""
@@ -45,7 +50,8 @@ def invalidate_all_caches():
     cluster_health_cache.clear()
     metrics_cache.clear()
     recommendations_cache.clear()
-    print("✓ All VM caches invalidated (cluster health, metrics, recommendations)")
+    mode = "REAL-TIME" if settings.REAL_TIME_MODE else "CACHED"
+    print(f"✓ All VM caches invalidated (cluster health, metrics, recommendations) - Mode: {mode}")
 
 # Helper function to invalidate cluster health cache (backward compatibility)
 def invalidate_cluster_health_cache():
@@ -334,7 +340,7 @@ async def release_vm(
 async def get_vm_metrics(vm_name: str, use_real: bool = False) -> VMMetricsResponse:
     """
     Fetch real-time performance metrics for a specific VM from GCP Monitoring API.
-    Uses 10-minute cache for expensive GCP metrics (CPU, memory, disk, network).
+    Uses cache for expensive GCP metrics (CPU, memory, disk, network) unless REAL_TIME_MODE=true.
     Always fetches fresh user count from MongoDB (free, no cache).
     
     Query parameter:
@@ -348,18 +354,20 @@ async def get_vm_metrics(vm_name: str, use_real: bool = False) -> VMMetricsRespo
         })
         
         # Check cache for expensive GCP metrics - include use_real in cache key
+        # Skip cache if REAL_TIME_MODE is enabled
         cache_key = f"metrics_{vm_name}_{'real' if use_real else 'sim'}"
         now = datetime.utcnow()
         
-        if cache_key in metrics_cache:
+        if is_caching_enabled() and cache_key in metrics_cache:
             cached_data, cached_time = metrics_cache[cache_key]
             if (now - cached_time).total_seconds() < METRICS_CACHE_TTL:
                 # Update with fresh user count
                 cached_data["active_users"] = active_users
                 return VMMetricsResponse(**cached_data)
         
-        # Cache miss or expired - collect fresh metrics
-        print(f"Collecting metrics for {vm_name}...")
+        # Cache miss or expired or REAL_TIME_MODE - collect fresh metrics
+        mode_msg = "REAL-TIME" if settings.REAL_TIME_MODE else "cached"
+        print(f"Collecting metrics for {vm_name}... (Mode: {mode_msg})")
         
         # Determine cluster type
         cluster_type = ClusterType.GENERAL if "general" in vm_name else ClusterType.STORAGE
@@ -403,8 +411,9 @@ async def get_vm_metrics(vm_name: str, use_real: bool = False) -> VMMetricsRespo
             "recommendation_reason": ""  # Can be populated based on metrics thresholds
         }
         
-        # Store in cache
-        metrics_cache[cache_key] = (response_data, now)
+        # Store in cache only if caching is enabled
+        if is_caching_enabled():
+            metrics_cache[cache_key] = (response_data, now)
         
         return response_data
         
@@ -522,13 +531,13 @@ async def get_migration_recommendations(
 ) -> List[MigrationRecommendation]:
     """
     Admin endpoint: Get AI-powered migration recommendations for load balancing and cost optimization.
-    Cached for 10 minutes to reduce expensive metrics collection.
+    Cached for 3 minutes to reduce expensive metrics collection (unless REAL_TIME_MODE=true).
     """
     try:
         cache_key = f"recommendations_{cluster_type}_{min_score}"
         
-        # Check cache
-        if cache_key in recommendations_cache:
+        # Check cache only if caching is enabled
+        if is_caching_enabled() and cache_key in recommendations_cache:
             cached_data, cached_time = recommendations_cache[cache_key]
             if time.time() - cached_time < RECOMMENDATIONS_CACHE_TTL:
                 return cached_data
@@ -590,8 +599,9 @@ async def get_migration_recommendations(
             max_count=10
         )
         
-        # Cache the results
-        recommendations_cache[cache_key] = (filtered, time.time())
+        # Cache the results only if caching is enabled
+        if is_caching_enabled():
+            recommendations_cache[cache_key] = (filtered, time.time())
         
         return filtered
     except Exception as e:
@@ -618,13 +628,13 @@ async def get_cluster_metrics(cluster_type: ClusterType) -> Dict[str, Any]:
     """
     Admin endpoint: Get aggregated health metrics for entire cluster.
     Used by frontend dashboard for real-time monitoring.
-    Cached for 5 minutes to reduce GCP API calls.
+    Cached for 1 minute to reduce GCP API calls (unless REAL_TIME_MODE=true).
     """
     try:
         cache_key = f"cluster_health_{cluster_type.value}"
         
-        # Check cache
-        if cache_key in cluster_health_cache:
+        # Check cache only if caching is enabled
+        if is_caching_enabled() and cache_key in cluster_health_cache:
             cached_data, cached_time = cluster_health_cache[cache_key]
             if time.time() - cached_time < CLUSTER_HEALTH_CACHE_TTL:
                 return cached_data
@@ -632,12 +642,14 @@ async def get_cluster_metrics(cluster_type: ClusterType) -> Dict[str, Any]:
         # Fetch fresh data
         health_data = get_cluster_health(cluster_type)
         
-        # Update cache
-        cluster_health_cache[cache_key] = (health_data, time.time())
+        # Update cache only if caching is enabled
+        if is_caching_enabled():
+            cluster_health_cache[cache_key] = (health_data, time.time())
         
         return health_data
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get cluster health: {str(e)}")
+
 
 
 @router.get("/admin/predict-load", summary="Predict Cluster Load (1 Hour)")

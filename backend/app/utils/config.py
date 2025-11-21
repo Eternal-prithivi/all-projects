@@ -56,6 +56,9 @@ class Settings(BaseSettings):
     # --- Demo Mode Configuration ---
     DEMO_MODE: bool = False  # Set to True to use mock data instead of real API calls (zero cost!)
     
+    # --- Real-Time Mode Configuration ---
+    REAL_TIME_MODE: bool = False  # Set to True to disable all caching and fetch live data (higher costs!)
+    
     # --- Production Configuration ---
     FRONTEND_URL: str = "http://localhost:5173"  # Update to your production domain
     BACKEND_URL: str = "http://localhost:8000"   # Update to your production API domain
