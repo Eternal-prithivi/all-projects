@@ -59,6 +59,11 @@ class Settings(BaseSettings):
     # --- Real-Time Mode Configuration ---
     REAL_TIME_MODE: bool = False  # Set to True to disable all caching and fetch live data (higher costs!)
     
+    # --- Stripe Payment Configuration ---
+    STRIPE_SECRET_KEY: str = ""  # Stripe secret key (sk_test_xxx for test mode)
+    STRIPE_PUBLISHABLE_KEY: str = ""  # Stripe publishable key (pk_test_xxx for test mode)
+    STRIPE_WEBHOOK_SECRET: str = ""  # Webhook signing secret (whsec_xxx)
+    
     # --- Production Configuration ---
     FRONTEND_URL: str = "http://localhost:5173"  # Update to your production domain
     BACKEND_URL: str = "http://localhost:8000"   # Update to your production API domain

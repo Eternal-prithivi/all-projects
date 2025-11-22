@@ -20,6 +20,7 @@ from app.vm import routes_admin_cleanup  # Temporary admin cleanup endpoint
 from app.pricing import routes_pricing
 from app.budgets import routes_budgets
 from app.billing import routes_billing
+from app.payments import routes_payments
 from app.database.mongo_client import mongodb_client
 from app.utils.config import settings
 import os
@@ -122,6 +123,7 @@ app.include_router(routes_budgets.router, prefix="/api/budgets", tags=["Budgets"
 app.include_router(routes_vm.router, prefix="/api/vm", tags=["Virtual Machines"])
 app.include_router(routes_admin_cleanup.router, prefix="/api", tags=["Admin"])  # Cleanup endpoint
 app.include_router(routes_billing.router, prefix="/api", tags=["Billing"])
+app.include_router(routes_payments.router, prefix="/api/payments", tags=["Payments"])
 
 @app.get("/", tags=["Root"])
 def read_root():
