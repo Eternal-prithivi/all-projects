@@ -4,7 +4,9 @@ from fastapi import APIRouter, HTTPException, Depends, Request
 from typing import Dict, Any, List, Optional
 from pydantic import BaseModel, Field
 from datetime import datetime, timedelta
-import stripe
+import razorpay
+import hmac
+import hashlib
 from app.utils.config import settings
 from app.database.mongo_client import get_database
 from app.users.routes_users import get_current_user
@@ -13,8 +15,8 @@ from app.users.user_model import User
 router = APIRouter()
 DB = get_database()
 
-# Initialize Stripe
-stripe.api_key = settings.STRIPE_SECRET_KEY
+# Initialize Razorpay
+razorpay_client = razorpay.Client(auth=(settings.RAZORPAY_KEY_ID, settings.RAZORPAY_KEY_SECRET))
 
 # --- Pydantic Models ---
 
@@ -31,11 +33,9 @@ class PaymentPlan(BaseModel):
     priority_support: bool
 
 class CheckoutRequest(BaseModel):
-    """Request to create checkout session"""
+    """Request to create checkout/payment"""
     plan_id: str = Field(..., description="Plan ID: 'free', 'basic', 'pro', 'enterprise'")
     billing_cycle: str = Field(..., description="'monthly' or 'yearly'")
-    success_url: str = Field(default="https://rajverse.me/dashboard?payment=success")
-    cancel_url: str = Field(default="https://rajverse.me/pricing?payment=cancelled")
 
 class SubscriptionResponse(BaseModel):
     """Current subscription details"""
@@ -45,7 +45,7 @@ class SubscriptionResponse(BaseModel):
     status: str
     current_period_start: Optional[datetime]
     current_period_end: Optional[datetime]
-    cancel_at_period_end: bool
+    auto_renew: bool
     vm_limit: int
     storage_gb: int
 
@@ -140,10 +140,11 @@ def get_user_subscription(user_id: str) -> Dict[str, Any]:
             "plan_id": "free",
             "status": "active",
             "subscription_id": None,
-            "stripe_customer_id": None,
+            "razorpay_subscription_id": None,
+            "razorpay_customer_id": None,
             "current_period_start": None,
             "current_period_end": None,
-            "cancel_at_period_end": False
+            "auto_renew": True
         }
     
     return subscription
@@ -188,19 +189,19 @@ async def get_my_subscription(
         status=subscription["status"],
         current_period_start=subscription.get("current_period_start"),
         current_period_end=subscription.get("current_period_end"),
-        cancel_at_period_end=subscription.get("cancel_at_period_end", False),
+        auto_renew=subscription.get("auto_renew", True),
         vm_limit=plan.vm_limit,
         storage_gb=plan.storage_gb
     )
 
-@router.post("/create-checkout", summary="Create Stripe Checkout Session")
-async def create_checkout_session(
+@router.post("/create-order", summary="Create Razorpay Order")
+async def create_razorpay_order(
     request: CheckoutRequest,
     current_user: User = Depends(get_current_user)
-) -> Dict[str, str]:
+) -> Dict[str, Any]:
     """
-    Create a Stripe checkout session for upgrading subscription.
-    Returns checkout URL to redirect user to Stripe payment page.
+    Create a Razorpay order for subscription payment.
+    Returns order details to initiate payment on frontend.
     """
     try:
         if request.plan_id not in PLANS or request.plan_id == "free":
@@ -208,158 +209,196 @@ async def create_checkout_session(
         
         plan = PLANS[request.plan_id]
         
-        # Calculate price based on billing cycle
+        # Calculate price based on billing cycle (in paise - Razorpay uses paise)
         amount = plan.price_yearly if request.billing_cycle == "yearly" else plan.price_monthly
+        amount_paise = int(amount * 100)  # Convert to paise
         
-        # Get or create Stripe customer
-        subscription_data = get_user_subscription(current_user.username)
-        stripe_customer_id = subscription_data.get("stripe_customer_id")
-        
-        if not stripe_customer_id:
-            # Create new Stripe customer
-            customer = stripe.Customer.create(
-                email=current_user.email,
-                name=current_user.username,
-                metadata={
-                    "user_id": current_user.username,
-                    "plan_id": request.plan_id
-                }
-            )
-            stripe_customer_id = customer.id
-            
-            # Save customer ID to MongoDB
-            DB["subscriptions"].update_one(
-                {"user_id": current_user.username},
-                {"$set": {"stripe_customer_id": stripe_customer_id}},
-                upsert=True
-            )
-        
-        # Create Stripe checkout session
-        session = stripe.checkout.Session.create(
-            customer=stripe_customer_id,
-            payment_method_types=['card'],
-            line_items=[{
-                'price_data': {
-                    'currency': 'inr',
-                    'unit_amount': int(amount * 100),  # Convert to paise
-                    'product_data': {
-                        'name': f"{plan.name} Plan - {request.billing_cycle.title()}",
-                        'description': plan.description,
-                    },
-                    'recurring': {
-                        'interval': 'year' if request.billing_cycle == 'yearly' else 'month',
-                        'interval_count': 1,
-                    }
-                },
-                'quantity': 1,
-            }],
-            mode='subscription',
-            success_url=request.success_url,
-            cancel_url=request.cancel_url,
-            metadata={
-                'user_id': current_user.username,
-                'plan_id': request.plan_id,
-                'billing_cycle': request.billing_cycle
+        # Create Razorpay order
+        order_data = {
+            "amount": amount_paise,
+            "currency": "INR",
+            "receipt": f"order_{current_user.username}_{datetime.utcnow().strftime('%Y%m%d%H%M%S')}",
+            "notes": {
+                "user_id": current_user.username,
+                "plan_id": request.plan_id,
+                "billing_cycle": request.billing_cycle,
+                "plan_name": plan.name
             }
-        )
-        
-        return {
-            "checkout_url": session.url,
-            "session_id": session.id
         }
         
-    except stripe.error.StripeError as e:
-        raise HTTPException(status_code=500, detail=f"Stripe error: {str(e)}")
+        order = razorpay_client.order.create(data=order_data)
+        
+        # Save pending order to MongoDB
+        DB["payment_orders"].insert_one({
+            "order_id": order["id"],
+            "user_id": current_user.username,
+            "plan_id": request.plan_id,
+            "billing_cycle": request.billing_cycle,
+            "amount": amount,
+            "status": "created",
+            "created_at": datetime.utcnow()
+        })
+        
+        return {
+            "order_id": order["id"],
+            "amount": amount,
+            "currency": "INR",
+            "key_id": settings.RAZORPAY_KEY_ID,  # Frontend needs this
+            "plan_name": plan.name,
+            "billing_cycle": request.billing_cycle
+        }
+        
+    except razorpay.errors.BadRequestError as e:
+        raise HTTPException(status_code=400, detail=f"Razorpay error: {str(e)}")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Payment initialization failed: {str(e)}")
 
-@router.post("/webhook", summary="Stripe Webhook Handler")
-async def stripe_webhook(request: Request):
+@router.post("/verify-payment", summary="Verify Razorpay Payment")
+async def verify_payment(
+    payment_data: Dict[str, str],
+    current_user: User = Depends(get_current_user)
+):
     """
-    Handle Stripe webhooks for subscription events.
-    This endpoint is called by Stripe when subscription status changes.
+    Verify payment signature and activate subscription.
+    Called from frontend after successful payment.
+    """
+    try:
+        # Extract payment details
+        razorpay_order_id = payment_data.get("razorpay_order_id")
+        razorpay_payment_id = payment_data.get("razorpay_payment_id")
+        razorpay_signature = payment_data.get("razorpay_signature")
+        
+        if not all([razorpay_order_id, razorpay_payment_id, razorpay_signature]):
+            raise HTTPException(status_code=400, detail="Missing payment details")
+        
+        # Verify signature
+        generated_signature = hmac.new(
+            settings.RAZORPAY_KEY_SECRET.encode(),
+            f"{razorpay_order_id}|{razorpay_payment_id}".encode(),
+            hashlib.sha256
+        ).hexdigest()
+        
+        if generated_signature != razorpay_signature:
+            raise HTTPException(status_code=400, detail="Invalid payment signature")
+        
+        # Get order details from MongoDB
+        order = DB["payment_orders"].find_one({"order_id": razorpay_order_id})
+        if not order:
+            raise HTTPException(status_code=404, detail="Order not found")
+        
+        # Calculate subscription period
+        billing_cycle = order["billing_cycle"]
+        current_period_start = datetime.utcnow()
+        current_period_end = (
+            current_period_start + timedelta(days=365) if billing_cycle == "yearly"
+            else current_period_start + timedelta(days=30)
+        )
+        
+        # Create/update subscription in MongoDB
+        DB["subscriptions"].update_one(
+            {"user_id": current_user.username},
+            {"$set": {
+                "plan_id": order["plan_id"],
+                "status": "active",
+                "razorpay_payment_id": razorpay_payment_id,
+                "razorpay_order_id": razorpay_order_id,
+                "billing_cycle": billing_cycle,
+                "current_period_start": current_period_start,
+                "current_period_end": current_period_end,
+                "auto_renew": True,
+                "updated_at": datetime.utcnow()
+            }},
+            upsert=True
+        )
+        
+        # Update user limits
+        update_user_limits(current_user.username, order["plan_id"])
+        
+        # Update order status
+        DB["payment_orders"].update_one(
+            {"order_id": razorpay_order_id},
+            {"$set": {
+                "status": "paid",
+                "payment_id": razorpay_payment_id,
+                "paid_at": datetime.utcnow()
+            }}
+        )
+        
+        print(f"✓ Subscription activated for user {current_user.username}: {order['plan_id']}")
+        
+        return {
+            "success": True,
+            "message": "Payment verified and subscription activated",
+            "plan_id": order["plan_id"],
+            "valid_until": current_period_end
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Payment verification failed: {str(e)}")
+
+
+@router.post("/webhook", summary="Razorpay Webhook Handler")
+async def razorpay_webhook(request: Request):
+    """
+    Handle Razorpay webhooks for payment events.
+    This endpoint is called by Razorpay when payment status changes.
     """
     try:
         payload = await request.body()
-        sig_header = request.headers.get('stripe-signature')
+        webhook_signature = request.headers.get('X-Razorpay-Signature')
         
+        # Verify webhook signature
         try:
-            event = stripe.Webhook.construct_event(
-                payload, sig_header, settings.STRIPE_WEBHOOK_SECRET
+            razorpay_client.utility.verify_webhook_signature(
+                payload.decode(),
+                webhook_signature,
+                settings.RAZORPAY_WEBHOOK_SECRET
             )
-        except ValueError as e:
-            raise HTTPException(status_code=400, detail="Invalid payload")
-        except stripe.error.SignatureVerificationError as e:
+        except razorpay.errors.SignatureVerificationError:
             raise HTTPException(status_code=400, detail="Invalid signature")
         
-        # Handle different event types
-        if event['type'] == 'checkout.session.completed':
-            session = event['data']['object']
-            user_id = session['metadata']['user_id']
-            plan_id = session['metadata']['plan_id']
-            subscription_id = session.get('subscription')
-            
-            # Get subscription details from Stripe
-            stripe_subscription = stripe.Subscription.retrieve(subscription_id)
-            
-            # Update subscription in MongoDB
-            DB["subscriptions"].update_one(
-                {"user_id": user_id},
-                {"$set": {
-                    "plan_id": plan_id,
-                    "status": "active",
-                    "subscription_id": subscription_id,
-                    "stripe_customer_id": session['customer'],
-                    "current_period_start": datetime.fromtimestamp(stripe_subscription.current_period_start),
-                    "current_period_end": datetime.fromtimestamp(stripe_subscription.current_period_end),
-                    "cancel_at_period_end": False,
-                    "updated_at": datetime.utcnow()
-                }},
-                upsert=True
-            )
-            
-            # Update user limits
-            update_user_limits(user_id, plan_id)
-            
-            print(f"✓ Subscription activated for user {user_id}: {plan_id}")
+        # Parse webhook event
+        import json
+        event = json.loads(payload)
+        event_type = event.get("event")
         
-        elif event['type'] == 'customer.subscription.updated':
-            subscription = event['data']['object']
-            customer_id = subscription['customer']
+        # Handle payment.captured event
+        if event_type == "payment.captured":
+            payment = event["payload"]["payment"]["entity"]
+            order_id = payment.get("order_id")
             
-            # Find user by customer ID
-            sub_data = DB["subscriptions"].find_one({"stripe_customer_id": customer_id})
-            if sub_data:
-                DB["subscriptions"].update_one(
-                    {"stripe_customer_id": customer_id},
+            if order_id:
+                # Find order in MongoDB
+                order = DB["payment_orders"].find_one({"order_id": order_id})
+                if order:
+                    # Update order status
+                    DB["payment_orders"].update_one(
+                        {"order_id": order_id},
+                        {"$set": {
+                            "status": "paid",
+                            "payment_id": payment["id"],
+                            "paid_at": datetime.utcnow()
+                        }}
+                    )
+                    print(f"✓ Payment captured for order {order_id}")
+        
+        # Handle payment.failed event
+        elif event_type == "payment.failed":
+            payment = event["payload"]["payment"]["entity"]
+            order_id = payment.get("order_id")
+            
+            if order_id:
+                DB["payment_orders"].update_one(
+                    {"order_id": order_id},
                     {"$set": {
-                        "status": subscription['status'],
-                        "current_period_start": datetime.fromtimestamp(subscription['current_period_start']),
-                        "current_period_end": datetime.fromtimestamp(subscription['current_period_end']),
-                        "cancel_at_period_end": subscription.get('cancel_at_period_end', False),
-                        "updated_at": datetime.utcnow()
+                        "status": "failed",
+                        "failed_at": datetime.utcnow(),
+                        "error_description": payment.get("error_description")
                     }}
                 )
-        
-        elif event['type'] == 'customer.subscription.deleted':
-            subscription = event['data']['object']
-            customer_id = subscription['customer']
-            
-            # Downgrade to free tier
-            sub_data = DB["subscriptions"].find_one({"stripe_customer_id": customer_id})
-            if sub_data:
-                user_id = sub_data["user_id"]
-                DB["subscriptions"].update_one(
-                    {"stripe_customer_id": customer_id},
-                    {"$set": {
-                        "plan_id": "free",
-                        "status": "cancelled",
-                        "subscription_id": None,
-                        "updated_at": datetime.utcnow()
-                    }}
-                )
-                update_user_limits(user_id, "free")
-                print(f"✓ User {user_id} downgraded to free tier")
+                print(f"✗ Payment failed for order {order_id}")
         
         return {"status": "success"}
         
@@ -372,7 +411,8 @@ async def cancel_subscription(
     current_user: User = Depends(get_current_user)
 ) -> Dict[str, Any]:
     """
-    Cancel current subscription. Access continues until end of billing period.
+    Cancel current subscription. For Razorpay, we disable auto-renewal.
+    Access continues until end of billing period.
     """
     try:
         subscription_data = get_user_subscription(current_user.username)
@@ -380,21 +420,11 @@ async def cancel_subscription(
         if subscription_data["plan_id"] == "free":
             raise HTTPException(status_code=400, detail="You are on the free tier")
         
-        subscription_id = subscription_data.get("subscription_id")
-        if not subscription_id:
-            raise HTTPException(status_code=404, detail="No active subscription found")
-        
-        # Cancel at period end (don't immediately revoke access)
-        stripe.Subscription.modify(
-            subscription_id,
-            cancel_at_period_end=True
-        )
-        
-        # Update MongoDB
+        # Update MongoDB to disable auto-renewal
         DB["subscriptions"].update_one(
             {"user_id": current_user.username},
             {"$set": {
-                "cancel_at_period_end": True,
+                "auto_renew": False,
                 "updated_at": datetime.utcnow()
             }}
         )
@@ -403,56 +433,50 @@ async def cancel_subscription(
         
         return {
             "success": True,
-            "message": "Subscription will be cancelled at the end of billing period",
+            "message": "Subscription will not auto-renew. Access continues until end of billing period.",
             "access_until": period_end
         }
         
-    except stripe.error.StripeError as e:
-        raise HTTPException(status_code=500, detail=f"Stripe error: {str(e)}")
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.post("/reactivate-subscription", summary="Reactivate Cancelled Subscription")
+@router.post("/reactivate-subscription", summary="Reactivate Subscription")
 async def reactivate_subscription(
     current_user: User = Depends(get_current_user)
 ) -> Dict[str, Any]:
     """
-    Reactivate a subscription that was cancelled but still within billing period.
+    Reactivate auto-renewal for subscription that was cancelled.
     """
     try:
         subscription_data = get_user_subscription(current_user.username)
-        subscription_id = subscription_data.get("subscription_id")
         
-        if not subscription_id:
+        if subscription_data["plan_id"] == "free":
             raise HTTPException(status_code=404, detail="No subscription found")
         
-        if not subscription_data.get("cancel_at_period_end"):
-            raise HTTPException(status_code=400, detail="Subscription is not cancelled")
+        if subscription_data.get("auto_renew"):
+            raise HTTPException(status_code=400, detail="Subscription is already active")
         
-        # Reactivate subscription
-        stripe.Subscription.modify(
-            subscription_id,
-            cancel_at_period_end=False
-        )
+        # Check if subscription is still valid
+        current_period_end = subscription_data.get("current_period_end")
+        if current_period_end and datetime.utcnow() > current_period_end:
+            raise HTTPException(status_code=400, detail="Subscription has expired. Please purchase a new plan.")
         
-        # Update MongoDB
+        # Enable auto-renewal
         DB["subscriptions"].update_one(
             {"user_id": current_user.username},
             {"$set": {
-                "cancel_at_period_end": False,
+                "auto_renew": True,
                 "updated_at": datetime.utcnow()
             }}
         )
         
         return {
             "success": True,
-            "message": "Subscription reactivated successfully"
+            "message": "Auto-renewal reactivated successfully"
         }
         
-    except stripe.error.StripeError as e:
-        raise HTTPException(status_code=500, detail=f"Stripe error: {str(e)}")
     except HTTPException:
         raise
     except Exception as e:
@@ -463,34 +487,30 @@ async def get_payment_history(
     current_user: User = Depends(get_current_user)
 ) -> List[Dict[str, Any]]:
     """
-    Get payment history for the current user.
+    Get payment history for the current user from MongoDB.
     """
     try:
-        subscription_data = get_user_subscription(current_user.username)
-        customer_id = subscription_data.get("stripe_customer_id")
-        
-        if not customer_id:
-            return []
-        
-        # Retrieve payment intents from Stripe
-        charges = stripe.Charge.list(customer=customer_id, limit=20)
+        # Get all paid orders for this user
+        orders = DB["payment_orders"].find({
+            "user_id": current_user.username,
+            "status": "paid"
+        }).sort("paid_at", -1).limit(20)
         
         history = []
-        for charge in charges.data:
+        for order in orders:
             history.append({
-                "id": charge.id,
-                "amount": charge.amount / 100,  # Convert from paise to rupees
-                "currency": charge.currency.upper(),
-                "status": charge.status,
-                "description": charge.description,
-                "receipt_url": charge.receipt_url,
-                "created": datetime.fromtimestamp(charge.created),
-                "paid": charge.paid
+                "id": order["order_id"],
+                "amount": order["amount"],
+                "currency": "INR",
+                "status": order["status"],
+                "plan_id": order.get("plan_id"),
+                "billing_cycle": order.get("billing_cycle"),
+                "payment_id": order.get("payment_id"),
+                "created": order.get("created_at"),
+                "paid_at": order.get("paid_at")
             })
         
         return history
         
-    except stripe.error.StripeError as e:
-        raise HTTPException(status_code=500, detail=f"Stripe error: {str(e)}")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"Failed to fetch payment history: {str(e)}")

@@ -59,10 +59,10 @@ class Settings(BaseSettings):
     # --- Real-Time Mode Configuration ---
     REAL_TIME_MODE: bool = False  # Set to True to disable all caching and fetch live data (higher costs!)
     
-    # --- Stripe Payment Configuration ---
-    STRIPE_SECRET_KEY: str = ""  # Stripe secret key (sk_test_xxx for test mode)
-    STRIPE_PUBLISHABLE_KEY: str = ""  # Stripe publishable key (pk_test_xxx for test mode)
-    STRIPE_WEBHOOK_SECRET: str = ""  # Webhook signing secret (whsec_xxx)
+    # --- Razorpay Payment Configuration ---
+    RAZORPAY_KEY_ID: str = ""  # Razorpay Key ID (rzp_test_xxx for test mode)
+    RAZORPAY_KEY_SECRET: str = ""  # Razorpay Key Secret
+    RAZORPAY_WEBHOOK_SECRET: str = ""  # Webhook secret for signature verification
     
     # --- Production Configuration ---
     FRONTEND_URL: str = "http://localhost:5173"  # Update to your production domain
