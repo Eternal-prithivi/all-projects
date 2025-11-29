@@ -4,7 +4,7 @@ AI-powered migration recommendation engine.
 Analyzes cluster state and suggests optimal migrations with confidence scores.
 """
 
-from typing import List, Dict, Tuple, Optional
+from typing import List, Dict, Tuple, Optional, Any
 from datetime import datetime, timedelta
 import uuid
 from app.vm.models import (
