@@ -1,10 +1,10 @@
 import axios from "axios";
 
 // Determine API base URL based on environment
-// Force production backend URL (env var was not working)
-const API_BASE_URL = import.meta.env.DEV 
-  ? 'http://localhost:8000/api'
-  : 'https://zenith-backend-707i.onrender.com/api';
+// Use local backend for development
+const API_BASE_URL = import.meta.env.MODE === 'production' 
+  ? 'https://zenith-backend-707i.onrender.com/api'
+  : 'http://localhost:8000/api';
 
 console.log('🚀 API Base URL:', API_BASE_URL);
 console.log('🚀 Environment:', import.meta.env.MODE);
