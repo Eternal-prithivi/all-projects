@@ -117,7 +117,8 @@ function BillingPage() {
       // Create order for total bill (cloud costs + subscription)
       const orderResponse = await apiClient.post('/payments/create-order', {
         plan_id: subscription.plan_id,
-        billing_cycle: subscription.billing_cycle || 'monthly'
+        billing_cycle: subscription.billing_cycle || 'monthly',
+        cloud_costs_usd: billBreakdown.cloudUSD  // Include cloud costs in payment
       });
 
       const { order_id, amount, currency, key_id, plan_name } = orderResponse.data;

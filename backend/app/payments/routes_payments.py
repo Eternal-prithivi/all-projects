@@ -36,6 +36,7 @@ class CheckoutRequest(BaseModel):
     """Request to create checkout/payment"""
     plan_id: str = Field(..., description="Plan ID: 'free', 'basic', 'pro', 'enterprise'")
     billing_cycle: str = Field(..., description="'monthly' or 'yearly'")
+    cloud_costs_usd: float = Field(0.0, description="Cloud usage costs in USD to be added to subscription")
 
 class SubscriptionResponse(BaseModel):
     """Current subscription details"""
@@ -209,9 +210,15 @@ async def create_razorpay_order(
         
         plan = PLANS[request.plan_id]
         
-        # Calculate price based on billing cycle (in paise - Razorpay uses paise)
-        amount = plan.price_yearly if request.billing_cycle == "yearly" else plan.price_monthly
-        amount_paise = int(amount * 100)  # Convert to paise
+        # Calculate price based on billing cycle
+        subscription_amount = plan.price_yearly if request.billing_cycle == "yearly" else plan.price_monthly
+        
+        # Add cloud costs (convert USD to INR at rate of 83)
+        cloud_costs_inr = request.cloud_costs_usd * 83.0
+        
+        # Total amount = subscription + cloud costs
+        total_amount = subscription_amount + cloud_costs_inr
+        amount_paise = int(total_amount * 100)  # Convert to paise
         
         # Create Razorpay order
         order_data = {
@@ -234,14 +241,19 @@ async def create_razorpay_order(
             "user_id": current_user.username,
             "plan_id": request.plan_id,
             "billing_cycle": request.billing_cycle,
-            "amount": amount,
+            "subscription_amount": subscription_amount,
+            "cloud_costs_usd": request.cloud_costs_usd,
+            "cloud_costs_inr": cloud_costs_inr,
+            "total_amount": total_amount,
             "status": "created",
             "created_at": datetime.utcnow()
         })
         
         return {
             "order_id": order["id"],
-            "amount": amount,
+            "amount": total_amount,
+            "subscription_amount": subscription_amount,
+            "cloud_costs_inr": cloud_costs_inr,
             "currency": "INR",
             "key_id": settings.RAZORPAY_KEY_ID,  # Frontend needs this
             "plan_name": plan.name,
