@@ -94,13 +94,13 @@ async def get_current_user_ws(
     except JWTError:
         # Close the connection with a specific code for authentication failure
         await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
-        return
+        raise credentials_exception
 
     users_col = get_users_collection()
     user_data = users_col.find_one({"username": username})
 
     if user_data is None:
         await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
-        return
+        raise credentials_exception
         
     return UserInDB(**user_data)

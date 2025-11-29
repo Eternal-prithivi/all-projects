@@ -35,7 +35,7 @@ class WorkloadAnalyzer:
     HIGH_WEIGHT_STORAGE = ['storage-heavy', 'data-intensive', 'large files', 'terabyte']
     
     @staticmethod
-    def analyze(workload_description: str) -> Tuple[ClusterType, int, Dict[str, any]]:
+    def analyze(workload_description: str) -> Tuple[ClusterType, int, Dict[str, Any]]:
         """
         Analyze workload description and return recommended cluster.
         

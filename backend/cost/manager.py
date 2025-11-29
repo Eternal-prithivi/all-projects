@@ -70,3 +70,19 @@ def get_azure_billing_data(start_date: str, end_date: str) -> Dict[str, Any]:
     return {"message": "Azure cost data not available."}
 
 print("DEBUG in manager.py: After defining all functions. Current global scope after functions:", list(globals().keys())) # Diagnostic line
+
+if __name__ == "__main__":
+    print("\n--- Running manager.py as a script for testing ---")
+    print(f"Functions available in manager.py's __main__ scope: {list(globals().keys())}")
+    if 'get_aws_cost_and_usage' in globals():
+        print("SUCCESS: 'get_aws_cost_and_usage' is defined when manager.py is run directly.")
+    else:
+        print("FAILURE: 'get_aws_cost_and_usage' is NOT defined when manager.py is run directly.")
+
+    # Try to call a placeholder if defined
+    try:
+        result = get_gcp_billing_data("2023-01-01", "2023-01-02")
+        print(f"Test call to get_gcp_billing_data: {result}")
+    except NameError as e:
+        print(f"Could not call get_gcp_billing_data: {e}")
+# --- END TEMPORARY TEST BLOCK ---

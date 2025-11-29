@@ -107,7 +107,7 @@ class MigrationRecommender:
     def generate_recommendations(
         cluster_type: ClusterType,
         vm_metrics: List[VMMetricsResponse],
-        user_assignments: List[Dict[str, any]]
+        user_assignments: List[Dict[str, Any]]
     ) -> List[MigrationRecommendation]:
         """
         Generate all migration recommendations for a cluster.
@@ -260,7 +260,7 @@ class MigrationRecommender:
     def predict_cluster_health_1_hour(
         current_metrics: List[VMMetricsResponse],
         historical_trend: Optional[str] = None
-    ) -> Dict[str, any]:
+    ) -> Dict[str, Any]:
         """
         Predict cluster state in 1 hour based on current metrics and trends.
         Simple linear extrapolation (can be replaced with ML model).
