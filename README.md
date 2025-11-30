@@ -6,7 +6,7 @@
 ![Backend](https://img.shields.io/badge/Backend-FastAPI-green)
 ![Frontend](https://img.shields.io/badge/Frontend-React%2019-blue)
 ![Database](https://img.shields.io/badge/Database-MongoDB-green)
-![License](https://img.shields.io/badge/License-MIT-yellow)
+![License](https://img.shields.io/badge/License-Proprietary-red)
 
 ## 📋 Table of Contents
 
@@ -586,13 +586,9 @@ Follow [Conventional Commits](https://www.conventionalcommits.org/):
 
 ## 🤝 Contributing
 
-We welcome contributions! Please follow these steps:
+This is a proprietary project. External contributions are not currently accepted.
 
-1. Fork the repository
-2. Create your feature branch
-3. Commit your changes
-4. Push to the branch
-5. Open a Pull Request
+For internal development:
 
 ### Development Branch Strategy
 
@@ -603,7 +599,11 @@ We welcome contributions! Please follow these steps:
 
 ## 📄 License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This software is proprietary and confidential. All rights reserved.
+
+**Copyright (c) 2025 Cloud Resource Optimization Platform. All Rights Reserved.**
+
+Unauthorized copying, distribution, modification, or use of this software, via any medium, is strictly prohibited without explicit written permission from the copyright holder.
 
 ## 🙏 Acknowledgments
 
