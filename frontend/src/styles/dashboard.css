@@ -1,5 +1,24 @@
 /* src/styles/dashboard.css */
 
+/* Accessibility: Skip to main content link */
+.skip-to-main {
+  position: absolute;
+  top: -100px;
+  left: 10px;
+  background: #7c3aed;
+  color: white;
+  padding: 8px 16px;
+  text-decoration: none;
+  border-radius: 4px;
+  z-index: 100000;
+  font-weight: 600;
+  transition: top 0.2s ease;
+}
+
+.skip-to-main:focus {
+  top: 10px;
+}
+
 .dashboard-page {
   display: flex;
   min-height: 100vh;

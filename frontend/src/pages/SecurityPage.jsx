@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useNotifications } from "../hooks/useNotifications";
+import EncryptionChoiceModal from "../components/EncryptionChoiceModal";
+import DecryptionPasswordModal from "../components/DecryptionPasswordModal";
 
 // --- SELF-CONTAINED DEPENDENCIES ---
 
@@ -9,83 +11,89 @@ const useAuth = () => ({
   user: mockUser,
 });
 
-// --- FIX: Added a new InfoTooltip component ---
-const InfoTooltip = ({ text }) => (
-  <div className="info-tooltip-container">
-    <svg
-      className="info-icon"
-      xmlns="http://www.w3.org/2000/svg"
-      width="16"
-      height="16"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <circle cx="12" cy="12" r="10"></circle>
-      <line x1="12" y1="16" x2="12" y2="12"></line>
-      <line x1="12" y1="8" x2="12.01" y2="8"></line>
-    </svg>
-    <div className="info-tooltip-text">{text}</div>
-  </div>
-);
-
 const SecureFileList = ({
   files,
   handleDelete,
   handleDownload,
+  handleChooseEncryption,
   isDeleting,
 }) => (
-  <div className="list-section">
-    <div className="list-title-container">
-      <h3 className="list-title">Your Secure Files</h3>
-      {/* --- FIX: The new info tooltip is placed here --- */}
-      <InfoTooltip text="Files in this section are protected with Server Side Encryption. For enhanced durability, ENCRYPTED Tagged files are encrypted using AES-256 and Server Side which are replicated to a secondary storage at different region(country), which may incur higher costs." />
-    </div>
-    {files && files.length > 0 ? (
-      <ul className="secure-file-list">
-        {files.map((file) => (
-          <li key={file.filename} className="file-list-item">
-            <div className="file-info">
-              <span className="file-name">{file.filename}</span>
-              {file.is_encrypted && (
-                <span className="encrypted-tag">Encrypted</span>
-              )}
-            </div>
-            <div className="file-actions">
-              {isDeleting === file.filename ? (
-                <span className="deleting-indicator">Deleting...</span>
-              ) : (
-                <>
-                  <button
-                    onClick={() => handleDownload(file.filename)}
-                    className="btn download-btn"
-                  >
-                    Download
-                  </button>
-                  <button
-                    onClick={() => handleDelete(file.filename)}
-                    className="btn danger-btn"
-                  >
-                    Delete
-                  </button>
-                </>
-              )}
-            </div>
-          </li>
-        ))}
-      </ul>
-    ) : (
-      <p className="empty-list-message">
-        No secure files have been uploaded yet.
-      </p>
-    )}
+  <div className="files-section">
+    <h3 className="section-title">Your Secure Files</h3>
+    <table className="file-table">
+      <thead>
+        <tr>
+          <th>Filename</th>
+          <th>Size (KB)</th>
+          <th>Upload Date</th>
+          <th>Status</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {files && files.length > 0 ? (
+          files.map((file) => {
+            const showEncryptionChoice = file.awaiting_encryption_choice && file.encryption_status === 'awaiting_choice';
+            
+            return (
+              <tr key={file.filename}>
+                <td>{file.filename}</td>
+                <td>{(file.size_bytes / 1024).toFixed(2)}</td>
+                <td className="date-col">
+                  {file.upload_date ? new Date(file.upload_date).toLocaleDateString() : 'N/A'}
+                </td>
+                <td>
+                  {file.is_encrypted && (
+                    <span className="encrypted-tag">Encrypted</span>
+                  )}
+                  {showEncryptionChoice && (
+                    <span className="awaiting-tag">⚠️ Action Required</span>
+                  )}
+                  {!file.is_encrypted && !showEncryptionChoice && (
+                    <span className="status-tag">Normal</span>
+                  )}
+                </td>
+                <td>
+                  {isDeleting === file.filename ? (
+                    <span className="deleting-indicator">Deleting...</span>
+                  ) : showEncryptionChoice ? (
+                    <button
+                      onClick={() => handleChooseEncryption(file)}
+                      className="action-btn primary-btn"
+                    >
+                      Choose Encryption
+                    </button>
+                  ) : (
+                    <>
+                      <button
+                        onClick={() => handleDownload(file)}
+                        className="action-btn download-btn"
+                      >
+                        Download
+                      </button>
+                      <button
+                        onClick={() => handleDelete(file.filename)}
+                        className="action-btn delete-btn"
+                      >
+                        Delete
+                      </button>
+                    </>
+                  )}
+                </td>
+              </tr>
+            );
+          })
+        ) : (
+          <tr>
+            <td colSpan="5" style={{ textAlign: "center" }}>
+              No secure files have been uploaded yet.
+            </td>
+          </tr>
+        )}
+      </tbody>
+    </table>
   </div>
-);
-
-const API_BASE_URL = import.meta.env.DEV 
+);const API_BASE_URL = import.meta.env.DEV 
   ? 'http://localhost:8000/api'
   : 'https://zenith-backend-707i.onrender.com/api';
 const handleResponse = async (response) => {
@@ -149,6 +157,61 @@ const uploadSecureFile = (file, encrypt, token) => {
     body: formData,
   }).then(handleResponse);
 };
+const chooseEncryption = (filename, encryptionMethod, password, token) =>
+  fetch(`${API_BASE_URL}/security/choose-encryption`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({
+      filename,
+      encryption_method: encryptionMethod,
+      password: password || null,
+    }),
+  }).then(handleResponse);
+
+const decryptAndDownload = async (filename, password, token) => {
+  console.log('Making decrypt request for:', filename);
+  const response = await fetch(`${API_BASE_URL}/security/decrypt-download`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ filename, password }),
+  });
+
+  console.log('Decrypt response status:', response.status);
+  
+  if (!response.ok) {
+    const error = await response.json();
+    throw error;
+  }
+
+  // Get the blob
+  const blob = await response.blob();
+  console.log('Blob received, size:', blob.size);
+
+  // Create download link
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  link.style.display = 'none';
+  
+  document.body.appendChild(link);
+  console.log('Triggering download for:', filename);
+  link.click();
+  
+  setTimeout(() => {
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+    console.log('Download cleanup complete');
+  }, 100);
+
+  return { success: true, message: "File downloaded successfully" };
+};
 
 // --- MAIN COMPONENT ---
 
@@ -172,6 +235,10 @@ function SecurityPage() {
   const [fileToDelete, setFileToDelete] = useState(null);
   const [isDeleting, setIsDeleting] = useState(null);
   const pollIntervalRef = useRef(null);
+  const [showEncryptionModal, setShowEncryptionModal] = useState(false);
+  const [fileAwaitingEncryption, setFileAwaitingEncryption] = useState(null);
+  const [showDecryptionModal, setShowDecryptionModal] = useState(false);
+  const [fileToDecrypt, setFileToDecrypt] = useState(null);
 
   const canAccessSecureArea = !twoFAStatus.enabled || twoFAStatus.verified;
 
@@ -285,25 +352,55 @@ function SecurityPage() {
     setIsUploading(true);
     const uploadedFileName = file.name;
     try {
-      await uploadSecureFile(file, encrypt, token);
-      notifications.info(`'${uploadedFileName}' accepted. Waiting for processing...`);
-      pollIntervalRef.current = setInterval(async () => {
-        const updatedFiles = await fetchSecureFiles();
-        const processedFile = updatedFiles.find(
-          (f) => f.filename === uploadedFileName
-        );
-        if (processedFile && typeof processedFile.is_encrypted === "boolean") {
-          clearInterval(pollIntervalRef.current);
-          notifications.success(`Processing for '${uploadedFileName}' complete.`);
-        }
-      }, 5000);
+      const response = await uploadSecureFile(file, encrypt, token);
+      
+      // Check if encryption choice is needed IMMEDIATELY
+      if (response.needs_encryption && response.status === 'awaiting_encryption_choice') {
+        notifications.warning(`⚠️ Action Required: Choose encryption method for '${uploadedFileName}'`);
+        await fetchSecureFiles(); // Refresh to show the file
+      } else {
+        notifications.success(`✅ '${uploadedFileName}' uploaded successfully!`);
+        await fetchSecureFiles();
+      }
     } catch (err) {
       notifications.error(err.detail || "Secure upload failed.");
-      if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
     } finally {
       setIsUploading(false);
       setFile(null);
       if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
+  const handleChooseEncryption = (file) => {
+    setFileAwaitingEncryption(file);
+    setShowEncryptionModal(true);
+  };
+
+  const handleEncryptionChoice = async (encryptionMethod, password) => {
+    if (!fileAwaitingEncryption) return;
+
+    console.log('Sending encryption choice:', {
+      filename: fileAwaitingEncryption.filename,
+      encryptionMethod,
+      hasPassword: !!password
+    });
+
+    try {
+      await chooseEncryption(
+        fileAwaitingEncryption.filename,
+        encryptionMethod,
+        password,
+        token
+      );
+      notifications.success(`${encryptionMethod} encryption applied successfully for '${fileAwaitingEncryption.filename}'`);
+      setShowEncryptionModal(false);
+      setFileAwaitingEncryption(null);
+      
+      // Refresh file list immediately to show encrypted file
+      await fetchSecureFiles();
+    } catch (err) {
+      console.error('Encryption choice error:', err);
+      notifications.error(err.detail || "Failed to apply encryption");
     }
   };
 
@@ -321,12 +418,50 @@ function SecurityPage() {
     }
   };
 
-  const handleDownload = async (filename) => {
+  const handleDownload = async (file) => {
     try {
-      const { presigned_url } = await getSecureDownloadUrl(filename, token);
-      window.open(presigned_url, "_blank");
+      const response = await getSecureDownloadUrl(file.filename, token);
+      
+      // Check if file is client-side encrypted
+      if (response.client_side_encrypted) {
+        // Show password modal
+        setFileToDecrypt(file);
+        setShowDecryptionModal(true);
+      } else {
+        // Direct download for non-encrypted or server-side encrypted files
+        window.open(response.presigned_url, "_blank");
+      }
     } catch (error) {
       notifications.error(error.detail || "Could not get download link.");
+    }
+  };
+
+  const handleDecryptDownload = async (password) => {
+    if (!fileToDecrypt) return;
+
+    console.log('=== DECRYPT HANDLER STARTED ===');
+    console.log('File:', fileToDecrypt);
+    console.log('Password length:', password?.length);
+    console.log('Token exists:', !!token);
+
+    try {
+      console.log('Starting decryption for:', fileToDecrypt.filename);
+      const response = await decryptAndDownload(fileToDecrypt.filename, password, token);
+      console.log('Decryption response:', response);
+      
+      // Check your browser's Downloads folder!
+      notifications.success("File decrypted and downloaded successfully! Check your Downloads folder.");
+      setShowDecryptionModal(false);
+      setFileToDecrypt(null);
+    } catch (error) {
+      console.error('=== DECRYPT ERROR CAUGHT ===');
+      console.error('Error:', error);
+      console.error('Error type:', typeof error);
+      console.error('Error constructor:', error?.constructor?.name);
+      console.error('Error message:', error?.message);
+      console.error('Error detail:', error?.detail);
+      console.error('Error stack:', error?.stack);
+      throw new Error(error.detail || error.message || "Decryption failed");
     }
   };
 
@@ -342,10 +477,15 @@ function SecurityPage() {
     .page-title { font-size: 1.75rem; font-weight: 600; color: #fff; margin-top: 0; margin-bottom: 1.5rem; }
     .page-description { color: var(--text-secondary); margin-bottom: 2rem; line-height: 1.6; }
     .form-group { display: flex; flex-wrap: wrap; align-items: center; gap: 1.5rem; }
+    .form-group.horizontal-form { flex-wrap: nowrap; justify-content: flex-start; align-items: center; gap: 1rem; }
+    .form-group.horizontal-form .file-input { flex: 1; min-width: 0; }
+    .form-group.horizontal-form .checkbox-group { flex-shrink: 0; white-space: nowrap; }
+    .form-group.horizontal-form .upload-btn { flex-shrink: 0; white-space: nowrap; }
     .form-group input[type="file"] { color: #999; font-family: 'Inter', sans-serif; }
     .form-group input[type="file"]::file-selector-button { background-color: var(--primary-gold); color: #000; border: none; padding: 12px 24px; border-radius: 8px; cursor: pointer; font-weight: 600; transition: all 0.2s ease; font-family: 'Inter', sans-serif; margin-right: 1rem; }
     .form-group input[type="file"]::file-selector-button:hover { background-color: var(--hover-gold); transform: translateY(-2px); box-shadow: 0 6px 20px rgba(212, 175, 55, 0.2); }
     .checkbox-group { display: flex; align-items: center; gap: 0.5rem; }
+    .checkbox-group label { margin: 0; cursor: pointer; user-select: none; }
     .btn { background-color: var(--primary-gold); color: #000; border: none; padding: 12px 24px; border-radius: 8px; cursor: pointer; font-weight: 600; transition: all 0.2s ease; }
     .btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,0,0,0.2); }
     .btn.danger-btn { background-color: var(--danger-red); color: #fff; }
@@ -355,60 +495,141 @@ function SecurityPage() {
     .btn.success-btn { background-color: var(--success-green); color: #fff; }
     .btn.success-btn:hover { box-shadow: 0 6px 20px rgba(40, 167, 69, 0.3); }
     .btn:disabled { background-color: #444; color: #888; cursor: not-allowed; transform: none; box-shadow: none; }
-    .list-title { font-size: 1.5rem; font-weight: 600; margin-top: 2rem; padding-bottom: 1rem; border-bottom: 1px solid var(--border-color); }
-    .secure-file-list { list-style: none; padding: 0; }
-    .file-list-item { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; padding: 1rem; background: #1c1c1c; border-radius: 8px; }
-    .file-info { display: flex; align-items: center; }
-    .file-name { font-weight: 500; }
-    .file-actions { display: flex; gap: 0.5rem; min-width: 190px; justify-content: flex-end; }
-    .encrypted-tag { background-color: #6a0dad; color: white; padding: 4px 10px; border-radius: 12px; font-size: 0.75rem; font-weight: 600; margin-left: 12px; text-transform: uppercase; }
+    
+    /* File table styles */
+    .files-section { background: var(--content-bg); border: 1px solid var(--border-color); border-radius: 12px; padding: 2rem; margin-top: 2rem; }
+    .section-title { font-size: 1.75rem; font-weight: 600; color: #fff; margin-top: 0; margin-bottom: 1.5rem; border-bottom: 1px solid var(--border-color); padding-bottom: 1rem; }
+    .file-table { width: 100%; border-collapse: collapse; }
+    .file-table thead th { background: #111; color: var(--text-secondary); font-weight: 600; text-align: left; padding: 1rem; border-bottom: 2px solid var(--border-color); text-transform: uppercase; font-size: 0.85rem; letter-spacing: 0.5px; }
+    .file-table tbody td { padding: 1rem; border-bottom: 1px solid var(--border-color); color: var(--text-primary); }
+    .file-table tbody tr:hover { background: #1c1c1c; }
+    .file-table tbody tr:last-child td { border-bottom: none; }
+    .date-col { color: var(--text-secondary); font-size: 0.9rem; }
+    
+    /* Status tags */
+    .encrypted-tag { background-color: #6a0dad; color: white; padding: 4px 10px; border-radius: 12px; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; }
+    .awaiting-tag { background-color: #f59e0b; color: white; padding: 4px 10px; border-radius: 12px; font-size: 0.75rem; font-weight: 600; }
+    .processing-tag { background-color: #10b981; color: white; padding: 4px 10px; border-radius: 12px; font-size: 0.75rem; font-weight: 600; }
+    .status-tag { background-color: #4b5563; color: white; padding: 4px 10px; border-radius: 12px; font-size: 0.75rem; font-weight: 600; }
+    
+    /* Action buttons */
+    .action-btn { background-color: var(--primary-blue); color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: 500; margin-right: 0.5rem; transition: all 0.2s ease; font-size: 0.9rem; }
+    .action-btn:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
+    .action-btn.primary-btn { background-color: var(--primary-gold); color: #000; }
+    .action-btn.download-btn { background-color: var(--primary-blue); }
+    .action-btn.delete-btn { background-color: var(--danger-red); }
+    .action-btn:last-child { margin-right: 0; }
+    
+    .deleting-indicator, .processing-indicator { color: var(--text-secondary); font-size: 0.9rem; font-style: italic; }
     .empty-list-message { color: var(--text-secondary); text-align: center; padding: 2rem; }
-    .deleting-indicator { color: var(--danger-red); font-size: 0.9rem; font-style: italic; }
     .twofa-container { max-width: 500px; margin: 4rem auto; background: var(--content-bg); border: 1px solid var(--border-color); border-radius: 12px; padding: 2.5rem; box-shadow: 0 10px 30px rgba(0,0,0,0.3); text-align: center; }
     .twofa-title { font-size: 1.75rem; font-weight: 600; color: #fff; margin-top: 0; margin-bottom: 1rem; }
     .twofa-description { color: var(--text-secondary); margin-bottom: 2rem; line-height: 1.6; }
     .twofa-input { display: block; width: 100%; box-sizing: border-box; padding: 12px; margin-bottom: 1.5rem; border-radius: 8px; border: 1px solid var(--border-color); background: #111; color: var(--text-primary); font-size: 1.2rem; text-align: center; letter-spacing: 0.3em; }
-    .confirm-modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); display: flex; align-items: center; justify-content: center; }
+    .confirm-modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); display: flex; align-items: center; justify-content: center; z-index: 1000; }
     .modal-content { background: #252525; padding: 2.5rem; border-radius: 12px; text-align: center; }
     .modal-content p { margin-bottom: 2rem; }
     .modal-buttons .btn { margin: 0 0.5rem; }
-
-    /* --- FIX: Styles for the new info icon and tooltip --- */
-    .list-title-container {
+    
+    /* Security Process Info */
+    .security-process-info {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 1.5rem;
+      margin: 2rem 0;
+      padding: 1.5rem;
+      background: #111;
+      border-radius: 12px;
+      border: 1px solid var(--border-color);
+    }
+    
+    .process-step {
+      display: flex;
+      align-items: flex-start;
+      gap: 1rem;
+    }
+    
+    .process-icon {
+      width: 48px;
+      height: 48px;
+      min-width: 48px;
+      border-radius: 50%;
       display: flex;
       align-items: center;
-      gap: 0.75rem;
-    }
-    .info-tooltip-container {
+      justify-content: center;
       position: relative;
-      display: inline-block;
-      cursor: pointer;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
     }
-    .info-icon {
-      color: var(--text-secondary);
+    
+    .process-icon svg {
+      width: 24px;
+      height: 24px;
+      z-index: 2;
     }
-    .info-tooltip-text {
-      visibility: hidden;
-      width: 280px;
-      background-color: #333;
+    
+    .process-icon.scan {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+    }
+    
+    .process-icon.encrypt {
+      background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+      color: white;
+    }
+    
+    .process-icon.replicate {
+      background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+      color: white;
+      animation: pulse 2s ease-in-out infinite;
+    }
+    
+    .process-icon.secure {
+      background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+      color: white;
+    }
+    
+    @keyframes pulse {
+      0%, 100% {
+        transform: scale(1);
+        box-shadow: 0 4px 12px rgba(0,242,254,0.3);
+      }
+      50% {
+        transform: scale(1.05);
+        box-shadow: 0 6px 20px rgba(0,242,254,0.5);
+      }
+    }
+    
+    .process-text {
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+    }
+    
+    .process-text strong {
       color: #fff;
-      text-align: left;
-      border-radius: 6px;
-      padding: 10px;
-      position: absolute;
-      z-index: 1;
-      bottom: 150%;
-      left: 50%;
-      margin-left: -140px; /* Use half of the width to center */
-      opacity: 0;
-      transition: opacity 0.3s;
-      font-size: 0.85rem;
-      font-weight: 400;
-      line-height: 1.5;
+      font-size: 0.95rem;
+      font-weight: 600;
     }
-    .info-tooltip-container:hover .info-tooltip-text {
-      visibility: visible;
-      opacity: 1;
+    
+    .process-text span {
+      color: var(--text-secondary);
+      font-size: 0.85rem;
+      line-height: 1.4;
+    }
+    
+    @media (max-width: 768px) {
+      .security-process-info {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+      }
+      
+      .process-step {
+        padding: 0.5rem;
+      }
+      
+      .form-group.horizontal-form {
+        flex-wrap: wrap;
+      }
     }
   `;
 
@@ -521,8 +742,69 @@ function SecurityPage() {
             Files uploaded here are automatically scanned for sensitive data. If
             found, they will be encrypted.
           </p>
-          <div className="form-group">
-            <input ref={fileInputRef} type="file" onChange={handleFileChange} />
+
+          {/* Security Process Flow */}
+          <div className="security-process-info">
+            <div className="process-step">
+              <div className="process-icon scan">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+                  <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
+                  <line x1="12" y1="22.08" x2="12" y2="12"/>
+                </svg>
+              </div>
+              <div className="process-text">
+                <strong>AI-Powered Scan</strong>
+                <span>Automatic detection of sensitive data</span>
+              </div>
+            </div>
+
+            <div className="process-step">
+              <div className="process-icon encrypt">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                  <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                </svg>
+              </div>
+              <div className="process-text">
+                <strong>AES-256 Encryption</strong>
+                <span>Client or server-side options</span>
+              </div>
+            </div>
+
+            <div className="process-step">
+              <div className="process-icon replicate">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+                  <polyline points="7.5 4.21 12 6.81 16.5 4.21"/>
+                  <polyline points="7.5 19.79 7.5 14.6 3 12"/>
+                  <polyline points="21 12 16.5 14.6 16.5 19.79"/>
+                  <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
+                  <line x1="12" y1="22.08" x2="12" y2="12"/>
+                </svg>
+              </div>
+              <div className="process-text">
+                <strong>Data Replication</strong>
+                <span>+20% cost for redundancy & backup</span>
+              </div>
+            </div>
+
+            <div className="process-step">
+              <div className="process-icon secure">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                  <path d="M9 12l2 2 4-4"/>
+                </svg>
+              </div>
+              <div className="process-text">
+                <strong>Secure Storage</strong>
+                <span>AWS S3 with 2FA protection</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="form-group horizontal-form">
+            <input ref={fileInputRef} type="file" onChange={handleFileChange} className="file-input" />
             <div className="checkbox-group">
               <input
                 type="checkbox"
@@ -535,7 +817,7 @@ function SecurityPage() {
             <button
               onClick={handleUpload}
               disabled={isUploading || !file}
-              className="btn"
+              className="btn upload-btn"
             >
               {isUploading ? "Uploading..." : "Upload Secure File"}
             </button>
@@ -548,8 +830,34 @@ function SecurityPage() {
             setShowModal(true);
           }}
           handleDownload={handleDownload}
+          handleChooseEncryption={handleChooseEncryption}
           isDeleting={isDeleting}
         />
+        
+        {/* Encryption Choice Modal */}
+        {showEncryptionModal && fileAwaitingEncryption && (
+          <EncryptionChoiceModal
+            file={fileAwaitingEncryption}
+            onClose={() => {
+              setShowEncryptionModal(false);
+              setFileAwaitingEncryption(null);
+            }}
+            onChoose={handleEncryptionChoice}
+          />
+        )}
+
+        {/* Decryption Password Modal */}
+        {showDecryptionModal && fileToDecrypt && (
+          <DecryptionPasswordModal
+            file={fileToDecrypt}
+            onClose={() => {
+              setShowDecryptionModal(false);
+              setFileToDecrypt(null);
+            }}
+            onDecrypt={handleDecryptDownload}
+          />
+        )}
+
         {showModal && (
           <div className="confirm-modal-overlay">
             <div className="modal-content">

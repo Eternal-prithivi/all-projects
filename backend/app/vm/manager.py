@@ -4,6 +4,7 @@ import os
 from google.cloud import compute_v1
 from google.oauth2 import service_account
 from app.utils.config import settings
+from app.utils.logger import setup_logger
 from typing import List, Dict, Any, Optional, Tuple
 from datetime import datetime, timedelta
 from app.database.mongo_client import get_database
@@ -14,6 +15,9 @@ from app.vm.models import (
 from app.vm.workload_analyzer import WorkloadAnalyzer
 from app.vm.metrics_collector import VMMetricsCollector
 import uuid
+
+# Set up logger
+logger = setup_logger(__name__)
 
 # Determine the absolute path to the service account key
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__))) # This gets to backend/app
@@ -34,14 +38,14 @@ else:
 
 # Initialize credentials
 if not GCP_SA_KEY_FULL_PATH:
-    print("WARNING: No GCP service account key path configured (settings missing). GCP operations will be disabled.")
+    logger.warning("No GCP service account key path configured. GCP operations will be disabled.")
     credentials = None
 else:
     try:
         credentials = service_account.Credentials.from_service_account_file(GCP_SA_KEY_FULL_PATH)
-        print(f"GCP Credentials loaded from: {GCP_SA_KEY_FULL_PATH}")
+        logger.info(f"GCP Credentials loaded successfully from: {GCP_SA_KEY_FULL_PATH}")
     except Exception as e:
-        print(f"ERROR: Could not load GCP Service Account Key from {GCP_SA_KEY_FULL_PATH}: {e}")
+        logger.error(f"Failed to load GCP Service Account Key from {GCP_SA_KEY_FULL_PATH}: {str(e)}")
         credentials = None # Set to None if credentials fail to load
 
 # Initialize Compute Engine client
@@ -63,7 +67,7 @@ def get_default_image_uri(project_id: str = "debian-cloud") -> str:
         image = image_client.get(request=image_request)
         return image.self_link
     except Exception as e:
-        print(f"Error getting default image URI: {e}. Falling back to hardcoded path.")
+        logger.error(f"Error getting default image URI: {str(e)}. Falling back to hardcoded path.")
         # Fallback to a common public image URI if API call fails
         return f"projects/{project_id}/global/images/family/debian-11"
 
@@ -127,7 +131,7 @@ def create_vm(
         instance_resource=config,
     )
 
-    print(f"Creating VM '{name}' with machine type '{machine_type}' and disk size '{disk_size_gb}GB' in zone '{settings.GCP_ZONE}'...")
+    logger.info(f"Creating VM '{name}' with machine type '{machine_type}' and disk size '{disk_size_gb}GB' in zone '{settings.GCP_ZONE}'")
     operation = instance_client.insert(request=request)
     operation.result() # Wait for the operation to complete
 
@@ -226,7 +230,7 @@ def assign_vm_to_user(
     # Step 2: Validate user preference
     if cluster_preference:
         if cluster_preference != recommended_cluster:
-            print(f"Warning: User preference ({cluster_preference}) differs from recommendation ({recommended_cluster})")
+            logger.warning(f"User preference ({cluster_preference}) differs from recommendation ({recommended_cluster})")
             final_cluster = cluster_preference  # Respect user choice
         else:
             final_cluster = cluster_preference
@@ -250,7 +254,7 @@ def assign_vm_to_user(
             vm_status = vm_details["status"]
             vm_ip = vm_details["external_ip"]
         except Exception as e:
-            print(f"Error fetching VM {vm_name} details: {e}")
+            logger.error(f"Error fetching VM {vm_name} details: {e}")
             continue
         
         vm_loads.append({
@@ -266,7 +270,7 @@ def assign_vm_to_user(
     if not running_vms:
         # No running VMs, start the first VM in cluster
         vm_to_start = cluster_vms[0]
-        print(f"No running VMs in {final_cluster} cluster. Starting {vm_to_start}...")
+        logger.info(f"No running VMs in {final_cluster} cluster. Starting {vm_to_start}")
         start_result = start_vm(vm_to_start)
         selected_vm = {
             "vm_name": vm_to_start,
@@ -302,7 +306,7 @@ def assign_vm_to_user(
     # Step 5: Generate SSH command
     ssh_command = f"ssh user@{selected_vm['vm_ip']}"
     
-    print(f"Assigned {user_id} to {selected_vm['vm_name']} (IP: {selected_vm['vm_ip']})")
+    logger.info(f"Assigned {user_id} to {selected_vm['vm_name']} (IP: {selected_vm['vm_ip']})")
     return selected_vm["vm_name"], selected_vm["vm_ip"], ssh_command, final_cluster, assigned_at, expires_at
 
 
@@ -357,7 +361,7 @@ def migrate_user(
     # Step 3: Start target VM if stopped
     target_vm_details = get_vm_details(final_target_vm, settings.GCP_ZONE)
     if target_vm_details["status"] != "RUNNING":
-        print(f"Starting target VM {final_target_vm}...")
+        logger.info(f"Starting target VM {final_target_vm}")
         start_vm(final_target_vm)
         target_vm_details = get_vm_details(final_target_vm, settings.GCP_ZONE)
     
@@ -384,11 +388,11 @@ def migrate_user(
     })
     
     if remaining_users == 0:
-        print(f"No remaining users on {source_vm_name}. Stopping VM to save costs...")
+        logger.info(f"No remaining users on {source_vm_name}. Stopping VM to save costs")
         stop_vm(source_vm_name)
         source_vm_stopped = True
     else:
-        print(f"{remaining_users} users still active on {source_vm_name}. Keeping VM running.")
+        logger.info(f"{remaining_users} users still active on {source_vm_name}. Keeping VM running")
         source_vm_stopped = False
     
     return {
@@ -444,7 +448,7 @@ def release_vm_assignment(user_id: str, assignment_id: Optional[str] = None) -> 
     
     vm_stopped = False
     if remaining_users == 0:
-        print(f"No remaining users on {vm_name}. Stopping VM...")
+        logger.info(f"No remaining users on {vm_name}. Stopping VM")
         stop_vm(vm_name)
         vm_stopped = True
     
@@ -502,7 +506,7 @@ def get_cluster_health(cluster_type: ClusterType) -> Dict[str, Any]:
     # Batch fetch all VM statuses at once (single API call)
     vm_statuses = {}
     try:
-        print(f"Attempting batch fetch for cluster: {cluster_type.value}")
+        logger.debug(f"Attempting batch fetch for cluster: {cluster_type.value}")
         response = instance_client.list(
             request=compute_v1.ListInstancesRequest(
                 project=settings.GCP_PROJECT_ID,
@@ -514,10 +518,10 @@ def get_cluster_health(cluster_type: ClusterType) -> Dict[str, Any]:
         instances_list = list(response)
         for instance in instances_list:
             vm_statuses[instance.name] = instance.status
-        print(f"✓ Batch fetched {len(vm_statuses)} VM statuses: {vm_statuses}")
+        logger.info(f"Batch fetched {len(vm_statuses)} VM statuses")
     except Exception as e:
-        print(f"✗ Error in batch VM fetch: {type(e).__name__}: {e}")
-        print(f"Falling back to individual VM status checks")
+        logger.error(f"Error in batch VM fetch: {type(e).__name__}: {e}")
+        logger.info(f"Falling back to individual VM status checks")
     
     for vm_name in cluster_vms:
         # Get latest metrics from MongoDB (fast, local)
@@ -540,9 +544,9 @@ def get_cluster_health(cluster_type: ClusterType) -> Dict[str, Any]:
             try:
                 vm_details = get_vm_details(vm_name, settings.GCP_ZONE)
                 status = vm_details.get("status", "UNKNOWN")
-                print(f"Individual fetch for {vm_name}: {status}")
+                logger.debug(f"Individual fetch for {vm_name}: {status}")
             except Exception as e:
-                print(f"Failed to get status for {vm_name}: {e}")
+                logger.error(f"Failed to get status for {vm_name}: {e}")
                 status = "UNKNOWN"
         
         vm_health = {

@@ -6,6 +6,9 @@ from typing import List, Dict, Any
 import os
 
 from app.utils.config import settings
+from app.utils.logger import setup_logger
+
+logger = setup_logger(__name__)
 
 # --- AWS Cost Explorer Functions ---
 
@@ -54,7 +57,7 @@ def get_aws_cost_and_usage(
         )
         return response
     except Exception as e:
-        print(f"Error fetching AWS cost and usage data: {e}")
+        logger.error(f"Error fetching AWS cost and usage data: {e}")
         raise # Re-raise the exception to be handled by the FastAPI route
 
 # --- GCP Cost Functions with BigQuery ---

@@ -3,7 +3,9 @@ from fastapi import APIRouter, HTTPException
 from app.database.mongo_client import get_database
 from app.vm.manager import stop_vm
 from app.utils.config import settings
+from app.utils.logger import setup_logger
 
+logger = setup_logger(__name__)
 router = APIRouter(prefix="/admin", tags=["admin"])
 DB = get_database()
 
@@ -32,7 +34,7 @@ async def cleanup_all_assignments():
                 stop_vm(vm_name, settings.GCP_ZONE)
                 stopped_vms.append(vm_name)
             except Exception as e:
-                print(f"Failed to stop {vm_name}: {e}")
+                logger.error(f"Failed to stop {vm_name}: {e}")
         
         return {
             "success": True,

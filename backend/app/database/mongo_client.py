@@ -1,5 +1,8 @@
 from pymongo import MongoClient
-from app.utils.config import settings # Correct import
+from app.utils.config import settings
+from app.utils.logger import setup_logger
+
+logger = setup_logger(__name__) # Correct import
 
 class MongoDB:
     def __init__(self):

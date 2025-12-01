@@ -17,28 +17,36 @@ const QuickActions = () => {
       label: 'Request VM',
       icon: '🖥️',
       shortcut: `${modifierKey} + Shift + N`,
-      onClick: () => navigate('/vm-cluster')
+      onClick: () => {
+        navigate('/dashboard/vmcluster');
+      }
     },
     {
       id: 'upload',
       label: 'Upload File',
       icon: '📤',
       shortcut: `${modifierKey} + Shift + U`,
-      onClick: () => navigate('/storage')
+      onClick: () => {
+        navigate('/dashboard/storage');
+      }
     },
     {
       id: 'costs',
       label: 'View Costs',
       icon: '💰',
       shortcut: `${modifierKey} + Shift + C`,
-      onClick: () => navigate('/dashboard')
+      onClick: () => {
+        navigate('/dashboard/costs');
+      }
     },
     {
       id: 'docs',
       label: 'Documentation',
       icon: '📚',
       shortcut: '?',
-      onClick: () => window.open('#', '_blank')
+      onClick: () => {
+        navigate('/help');
+      }
     }
   ];
 
@@ -61,9 +69,12 @@ const QuickActions = () => {
             <button
               key={action.id}
               className="quick-action-item"
-              onClick={() => {
-                action.onClick();
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
                 setIsOpen(false);
+                action.onClick();
               }}
             >
               <span className="quick-action-icon">{action.icon}</span>

@@ -11,11 +11,12 @@ from app.vm.metrics_collector import VMMetricsCollector
 from app.vm.manager import release_vm_assignment, get_cluster_health
 from app.database.mongo_client import get_database
 from app.utils.config import settings
+from app.utils.logger import setup_logger
 from datetime import datetime, timedelta
 import asyncio
 from typing import List
 
-
+logger = setup_logger(__name__)
 DB = get_database()
 vm_assignments_collection = DB["vm_assignments"]
 vm_metrics_collection = DB["vm_metrics"]
@@ -27,7 +28,7 @@ def collect_vm_metrics_task():
     Collect real-time metrics for all running VMs.
     Runs every 5 minutes via Celery Beat.
     """
-    print(f"[{datetime.utcnow()}] Starting VM metrics collection...")
+    logger.info(f"Starting VM metrics collection")
     
     collector = VMMetricsCollector(
         project_id=settings.GCP_PROJECT_ID,
@@ -64,13 +65,13 @@ def collect_vm_metrics_task():
             
             vm_metrics_collection.insert_one(metrics_doc)
             collected_count += 1
-            print(f"✓ Collected metrics for {vm_name}: CPU={metrics.cpu_usage}%, MEM={metrics.memory_usage}%")
+            logger.info(f"Collected metrics for {vm_name}: CPU={metrics.cpu_usage}%, MEM={metrics.memory_usage}%")
             
         except Exception as e:
             failed_count += 1
-            print(f"✗ Failed to collect metrics for {vm_name}: {e}")
+            logger.error(f"Failed to collect metrics for {vm_name}: {e}")
     
-    print(f"Metrics collection complete: {collected_count} succeeded, {failed_count} failed")
+    logger.info(f"Metrics collection complete: {collected_count} succeeded, {failed_count} failed")
     
     return {
         "success": True,
@@ -87,7 +88,7 @@ def auto_release_inactive_vms_task():
     Stops VMs with zero users to save costs.
     Runs every 10 minutes via Celery Beat.
     """
-    print(f"[{datetime.utcnow()}] Checking for inactive VM assignments...")
+    logger.info(f"Checking for inactive VM assignments")
     
     inactivity_threshold = datetime.utcnow() - timedelta(minutes=30)
     
@@ -113,14 +114,14 @@ def auto_release_inactive_vms_task():
                 
                 if result["vm_stopped"]:
                     stopped_vms.append(vm_name)
-                    print(f"✓ Released {user_id} from {vm_name} (VM stopped - no remaining users)")
+                    logger.info(f"Released {user_id} from {vm_name} (VM stopped - no remaining users)")
                 else:
-                    print(f"✓ Released {user_id} from {vm_name} (VM still running - {result['remaining_users']} users remain)")
+                    logger.info(f"Released {user_id} from {vm_name} (VM still running - {result['remaining_users']} users remain)")
             
         except Exception as e:
-            print(f"✗ Failed to release {user_id} from {vm_name}: {e}")
+            logger.error(f"Failed to release {user_id} from {vm_name}: {e}")
     
-    print(f"Auto-release complete: {released_count} assignments released, {len(stopped_vms)} VMs stopped")
+    logger.info(f"Auto-release complete: {released_count} assignments released, {len(stopped_vms)} VMs stopped")
     
     return {
         "success": True,
@@ -137,7 +138,7 @@ def cluster_health_check_task():
     Sends alerts if CPU > 80% or user count exceeds safe limits.
     Runs every 15 minutes via Celery Beat.
     """
-    print(f"[{datetime.utcnow()}] Running cluster health checks...")
+    logger.info(f"Running cluster health checks")
     
     from app.vm.models import ClusterType
     
@@ -172,19 +173,19 @@ def cluster_health_check_task():
                     "recommendation": "Start VM immediately"
                 })
             
-            print(f"✓ {cluster_type.value} cluster: {health['running_vms']}/{health['total_vms']} VMs running, "
+            logger.info(f"{cluster_type.value} cluster: {health['running_vms']}/{health['total_vms']} VMs running, "
                   f"{health['total_active_users']} users, {health['average_cpu_usage']:.1f}% avg CPU")
             
         except Exception as e:
-            print(f"✗ Failed health check for {cluster_type.value}: {e}")
+            logger.error(f"Failed health check for {cluster_type.value}: {e}")
     
     if alerts:
-        print(f"⚠️  {len(alerts)} alerts generated:")
+        logger.warning(f"{len(alerts)} alerts generated")
         for alert in alerts:
-            print(f"  [{alert['severity']}] {alert['cluster']}: {alert['message']}")
+            logger.warning(f"[{alert['severity']}] {alert['cluster']}: {alert['message']}")
             # TODO: Send alerts via email/Slack/SNS
     else:
-        print("✓ All clusters healthy")
+        logger.info("All clusters healthy")
     
     return {
         "success": True,
@@ -199,7 +200,7 @@ def cleanup_old_metrics_task():
     Delete metrics older than 7 days to save MongoDB storage.
     Runs daily at midnight via Celery Beat.
     """
-    print(f"[{datetime.utcnow()}] Cleaning up old metrics...")
+    logger.info(f"Cleaning up old metrics")
     
     cutoff_date = datetime.utcnow() - timedelta(days=7)
     
@@ -208,7 +209,7 @@ def cleanup_old_metrics_task():
     })
     
     deleted_count = result.deleted_count
-    print(f"✓ Deleted {deleted_count} old metric records")
+    logger.info(f"Deleted {deleted_count} old metric records")
     
     return {
         "success": True,

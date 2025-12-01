@@ -10,7 +10,10 @@ from datetime import datetime, timedelta
 from typing import Dict, Optional, List
 from app.utils.config import settings
 from app.vm.models import VMMetricsDB, ClusterType, VMStatus
+from app.utils.logger import setup_logger
 import os
+
+logger = setup_logger(__name__)
 
 
 class VMMetricsCollector:
@@ -50,7 +53,7 @@ class VMMetricsCollector:
             instance = self.compute_client.get(request=request)
             return VMStatus(instance.status)
         except Exception as e:
-            print(f"Error fetching VM status for {vm_name}: {e}")
+            logger.error(f"Error fetching VM status for {vm_name}: {e}")
             return None
     
     def get_vm_ip(self, vm_name: str) -> Optional[str]:
@@ -67,7 +70,7 @@ class VMMetricsCollector:
                 return instance.network_interfaces[0].access_configs[0].nat_i_p
             return None
         except Exception as e:
-            print(f"Error fetching VM IP for {vm_name}: {e}")
+            logger.error(f"Error fetching VM IP for {vm_name}: {e}")
             return None
     
     def get_cpu_utilization(self, vm_name: str, minutes: int = 5) -> float:
@@ -124,7 +127,7 @@ class VMMetricsCollector:
             import random
             return round(random.uniform(20.0, 45.0), 2)
         except Exception as e:
-            print(f"Error fetching CPU metrics for {vm_name}: {e}")
+            logger.error(f"Error fetching CPU metrics for {vm_name}: {e}")
             import random
             return round(random.uniform(20.0, 40.0), 2)
     
@@ -183,7 +186,7 @@ class VMMetricsCollector:
             import random
             return round(random.uniform(35.0, 60.0), 2)
         except Exception as e:
-            print(f"Error fetching memory metrics for {vm_name}: {e}")
+            logger.error(f"Error fetching memory metrics for {vm_name}: {e}")
             import random
             return round(random.uniform(35.0, 55.0), 2)
     
@@ -201,7 +204,7 @@ class VMMetricsCollector:
                 "write_mb": round(random.uniform(2.0, 30.0), 2)
             }
         except Exception as e:
-            print(f"Error fetching disk I/O for {vm_name}: {e}")
+            logger.error(f"Error fetching disk I/O for {vm_name}: {e}")
             return {"read_mb": 0.0, "write_mb": 0.0}
     
     def get_network_traffic(self, vm_name: str, minutes: int = 5) -> Dict[str, float]:
@@ -218,7 +221,7 @@ class VMMetricsCollector:
                 "out_mb": round(random.uniform(0.5, 15.0), 2)
             }
         except Exception as e:
-            print(f"Error fetching network traffic for {vm_name}: {e}")
+            logger.error(f"Error fetching network traffic for {vm_name}: {e}")
             return {"in_mb": 0.0, "out_mb": 0.0}
     
     def calculate_uptime_hours(self, vm_name: str, last_started: Optional[datetime]) -> float:
@@ -258,7 +261,7 @@ class VMMetricsCollector:
         Collect all metrics for a VM and return structured data.
         This is the main method to call for complete metrics collection.
         """
-        print(f"Collecting metrics for {vm_name}...")
+        logger.debug(f"Collecting metrics for {vm_name}")
         
         cpu_usage = self.get_cpu_utilization(vm_name)
         memory_usage = self.get_memory_utilization(vm_name)

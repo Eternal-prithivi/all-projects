@@ -1,0 +1,19 @@
+{
+  "name": "Zenith Cloud Platform",
+  "short_name": "Zenith",
+  "description": "Multi-cloud resource optimization and management platform",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#1a1a2e",
+  "theme_color": "#6366f1",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["productivity", "business", "utilities"],
+  "orientation": "portrait-primary"
+}

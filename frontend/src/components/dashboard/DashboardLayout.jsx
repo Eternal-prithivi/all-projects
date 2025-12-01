@@ -5,7 +5,7 @@ import { useAuth } from "../../context/AuthContext.jsx";
 import { NotificationProvider } from "../../context/NotificationContext.jsx";
 import Sidebar from "./Sidebar.jsx";
 import Header from "./Header.jsx";
-import Footer from "../Footer.jsx";
+import Footer from "../layout/Footer.jsx";
 import Breadcrumbs from "../Breadcrumbs.jsx";
 import QuickActions from "../QuickActions.jsx";
 import KeyboardShortcuts from "../KeyboardShortcuts.jsx";
@@ -79,13 +79,17 @@ function DashboardLayout() {
   return (
     <NotificationProvider>
       <div className="dashboard-page">
+        {/* Skip to main content link for keyboard navigation */}
+        <a href="#main-content" className="skip-to-main" tabIndex={0}>
+          Skip to main content
+        </a>
         <Sidebar user={user} />
         <div className="dashboard-main">
           <Header user={user} />
           <div className="dashboard-breadcrumbs-wrapper">
             <Breadcrumbs />
           </div>
-          <main className="dashboard-content">
+          <main id="main-content" className="dashboard-content" role="main" aria-label="Main dashboard content">
             <Outlet />
           </main>
           <Footer />
@@ -113,6 +117,8 @@ function DashboardLayout() {
           limit={5}
           enableMultiContainer={false}
           containerId="main-toast-container"
+          role="alert"
+          aria-live="polite"
           style={{ 
             zIndex: 99999,
           }}

@@ -95,7 +95,7 @@ def fetch_real_cloud_costs(start_date: str, end_date: str, use_cache: bool = Tru
             )
             costs.aws = round(aws_total, 2)
     except Exception as e:
-        print(f"AWS cost fetch failed: {e}")
+        logger.error(f"AWS cost fetch failed: {e}")
         costs.aws = 0.0
     
     try:
@@ -106,7 +106,7 @@ def fetch_real_cloud_costs(start_date: str, end_date: str, use_cache: bool = Tru
         elif gcp_data and gcp_data.get('status') in ['missing_config', 'missing_dependency', 'error']:
             costs.gcp = 0.0
     except Exception as e:
-        print(f"GCP cost fetch failed: {e}")
+        logger.error(f"GCP cost fetch failed: {e}")
         costs.gcp = 0.0
     
     try:
@@ -117,7 +117,7 @@ def fetch_real_cloud_costs(start_date: str, end_date: str, use_cache: bool = Tru
         elif azure_data and azure_data.get('status') in ['missing_config', 'missing_dependency', 'error']:
             costs.azure = 0.0
     except Exception as e:
-        print(f"Azure cost fetch failed: {e}")
+        logger.error(f"Azure cost fetch failed: {e}")
         costs.azure = 0.0
     
     # Update cache

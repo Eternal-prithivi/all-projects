@@ -6,8 +6,10 @@ from azure.storage.blob import BlobServiceClient
 from datetime import datetime, timedelta
 from botocore.config import Config
 from fastapi import HTTPException, status # <--- ADD THIS IMPORT!
-
 from app.utils.config import settings
+from app.utils.logger import setup_logger
+
+logger = setup_logger(__name__)
 
 # --- AWS Specialist Functions ---
 
@@ -31,7 +33,7 @@ def delete_from_aws(object_key: str):
     # Use the centralized s3_client_regular
     # You were initializing a new client and using settings.S3_BUCKET_NAME
     s3_client_regular.delete_object(Bucket=settings.REGULAR_S3_BUCKET_NAME, Key=object_key) # <--- Use REGULAR_S3_BUCKET_NAME
-    print(f"Successfully deleted {object_key} from AWS S3.")
+    logger.info(f"Deleted {object_key} from AWS S3")
 
 
 def get_download_url_from_aws(object_key: str) -> str:
@@ -53,7 +55,7 @@ def get_download_url_from_aws(object_key: str) -> str:
         if storage_class == 'GLACIER' or storage_class == 'DEEP_ARCHIVE':
             if restore_status and 'ongoing-request="false"' in restore_status:
                 # File is restored and ready for download
-                print(f"INFO: Object '{object_key}' is in {storage_class} but already restored. Proceeding with download.")
+                logger.info(f"Object '{object_key}' is in {storage_class} but already restored. Proceeding with download")
                 pass # Fall through to generate_presigned_url
             elif restore_status and 'ongoing-request="true"' in restore_status:
                 # File is currently being restored
@@ -138,7 +140,7 @@ def change_tier_on_aws(object_key: str, new_tier: str):
             StorageClass=new_tier,
             MetadataDirective='COPY' # This ensures metadata is preserved
         )
-        print(f"Successfully tiered {object_key} to {new_tier} on AWS S3.")
+        logger.info(f"Tiered {object_key} to {new_tier} on AWS S3")
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -156,7 +158,7 @@ def delete_from_gcp(object_key: str):
     bucket = storage_client.bucket(settings.GCP_BUCKET_NAME)
     blob = bucket.blob(object_key)
     blob.delete()
-    print(f"Successfully deleted {object_key} from GCP Cloud Storage.")
+    logger.info(f"Deleted {object_key} from GCP Cloud Storage")
 
 def get_download_url_from_gcp(object_key: str) -> str:
     """Generates a pre-signed download URL for an object in GCP Cloud Storage."""
@@ -177,7 +179,7 @@ def change_tier_on_gcp(object_key: str, new_tier: str):
     bucket = storage_client.bucket(settings.GCP_BUCKET_NAME)
     blob = bucket.blob(object_key)
     blob.update_storage_class(new_tier)
-    print(f"Successfully tiered {object_key} to {new_tier} on GCP Cloud Storage.")
+    logger.info(f"Tiered {object_key} to {new_tier} on GCP Cloud Storage")
 
 
 # --- Azure Specialist Functions ---
@@ -193,7 +195,7 @@ def delete_from_azure(object_key: str):
         container=settings.AZURE_CONTAINER_NAME, blob=object_key
     )
     blob_client.delete_blob()
-    print(f"Successfully deleted {object_key} from Azure Blob Storage.")
+    logger.info(f"Deleted {object_key} from Azure Blob Storage")
 
 def get_download_url_from_azure(object_key: str) -> str:
     """Generates a pre-signed download URL for an object in Azure Blob Storage."""
@@ -225,4 +227,4 @@ def change_tier_on_azure(object_key: str, new_tier: str):
         container=settings.AZURE_CONTAINER_NAME, blob=object_key
     )
     blob_client.set_standard_blob_tier(new_tier)
-    print(f"Successfully tiered {object_key} to {new_tier} on Azure Blob Storage.")
+    logger.info(f"Tiered {object_key} to {new_tier} on Azure Blob Storage")

@@ -2,12 +2,16 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 from app.auth import routes_auth
 from app.dashboard import routes_dashboard
 from app.users import routes_users
 from app.users import routes_profile
 from app.users import routes_settings
 from app.storage import routes_storage
+from app.contact import routes_contact
 from app.security import routes_security
 from app.websockets import routes_ws
 from app.security import routes_2fa
@@ -17,6 +21,8 @@ from app.cost import routes_forecast
 from app.cost import routes_anomaly
 from app.vm import routes_vm
 from app.vm import routes_admin_cleanup  # Temporary admin cleanup endpoint
+from app.admin import routes_admin
+from app.setup import routes_setup
 from app.pricing import routes_pricing
 from app.budgets import routes_budgets
 from app.billing import routes_billing
@@ -26,7 +32,14 @@ from app.utils.config import settings
 import os
 import re
 
+# Initialize rate limiter
+limiter = Limiter(key_func=get_remote_address)
+
 app = FastAPI(title="Zenith API")
+
+# Add rate limiter to app state
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # CORS configuration - Allow Vercel preview deployments with pattern matching
 def is_allowed_origin(origin: str) -> bool:
@@ -108,6 +121,7 @@ app.include_router(routes_profile.router, prefix="/api")
 app.include_router(routes_settings.router, prefix="/api")
 app.include_router(routes_dashboard.router, prefix="/api/dashboard")
 app.include_router(routes_storage.router, prefix="/api/storage")
+app.include_router(routes_contact.router)
 app.include_router(routes_security.router, prefix="/api/security")
 app.include_router(routes_2fa.router, prefix="/api/2fa")
 app.include_router(routes_ws.router, prefix="/ws")
@@ -122,6 +136,7 @@ app.include_router(routes_pricing.router, prefix="/api", tags=["Pricing"])
 app.include_router(routes_budgets.router, prefix="/api/budgets", tags=["Budgets"])
 app.include_router(routes_vm.router, prefix="/api/vm", tags=["Virtual Machines"])
 app.include_router(routes_admin_cleanup.router, prefix="/api", tags=["Admin"])  # Cleanup endpoint
+app.include_router(routes_admin.router)
 app.include_router(routes_billing.router, prefix="/api", tags=["Billing"])
 app.include_router(routes_payments.router, prefix="/api/payments", tags=["Payments"])
 

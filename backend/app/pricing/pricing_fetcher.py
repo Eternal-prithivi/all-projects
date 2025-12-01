@@ -4,6 +4,9 @@ import boto3
 import requests
 from datetime import datetime
 from typing import Dict, Any
+from app.utils.logger import setup_logger
+
+logger = setup_logger(__name__)
 
 def fetch_aws_pricing() -> Dict[str, Any]:
     """Fetch AWS pricing data"""
@@ -44,7 +47,7 @@ def fetch_aws_pricing() -> Dict[str, Any]:
         
         return pricing_data
     except Exception as e:
-        print(f"Error fetching AWS pricing: {e}")
+        logger.error(f"Error fetching AWS pricing: {e}")
         return get_fallback_pricing()['aws']
 
 def fetch_gcp_pricing() -> Dict[str, Any]:
@@ -85,7 +88,7 @@ def fetch_gcp_pricing() -> Dict[str, Any]:
         
         return pricing_data
     except Exception as e:
-        print(f"Error fetching GCP pricing: {e}")
+        logger.error(f"Error fetching GCP pricing: {e}")
         return get_fallback_pricing()['gcp']
 
 def fetch_azure_pricing() -> Dict[str, Any]:
@@ -127,7 +130,7 @@ def fetch_azure_pricing() -> Dict[str, Any]:
         
         return pricing_data
     except Exception as e:
-        print(f"Error fetching Azure pricing: {e}")
+        logger.error(f"Error fetching Azure pricing: {e}")
         return get_fallback_pricing()['azure']
 
 def get_fallback_pricing() -> Dict[str, Any]:

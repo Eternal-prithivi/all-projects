@@ -3,6 +3,7 @@ import { useNotifications } from "../hooks/useNotifications";
 import { useAuth } from "../context/AuthContext.jsx";
 import LoadingSpinner from "../components/LoadingSpinner.jsx";
 import EmptyState from "../components/EmptyState.jsx";
+import { VMClusterSkeleton } from "../components/Skeletons.jsx";
 import "../styles/vmcluster.css";
 
 // API Functions
@@ -381,7 +382,7 @@ ${instructions.troubleshooting.map((item) => `
   };
 
   if (isLoading) {
-    return <LoadingSpinner size="large" text="Loading VM Cluster Data..." />;
+    return <VMClusterSkeleton />;
   }
 
   return (
@@ -397,6 +398,64 @@ ${instructions.troubleshooting.map((item) => `
         <div className="live-indicator">
           <span className="live-dot"></span>
           <span className="live-text">Live</span>
+        </div>
+      </div>
+
+      {/* VM Process Flow */}
+      <div className="vm-process-info">
+        <div className="process-step">
+          <div className="process-icon workload">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
+              <line x1="8" y1="21" x2="16" y2="21"/>
+              <line x1="12" y1="17" x2="12" y2="21"/>
+            </svg>
+          </div>
+          <div className="process-text">
+            <strong>Workload Analysis</strong>
+            <span>AI determines optimal cluster & VM specs</span>
+          </div>
+        </div>
+
+        <div className="process-step">
+          <div className="process-icon assign">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="12" cy="12" r="10"/>
+              <polyline points="12 6 12 12 16 14"/>
+            </svg>
+          </div>
+          <div className="process-text">
+            <strong>Smart Assignment</strong>
+            <span>Least-loaded VM with capacity optimization</span>
+          </div>
+        </div>
+
+        <div className="process-step">
+          <div className="process-icon monitor">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+            </svg>
+          </div>
+          <div className="process-text">
+            <strong>Real-Time Monitoring</strong>
+            <span>CPU, memory, users tracked live via GCP</span>
+          </div>
+        </div>
+
+        <div className="process-step">
+          <div className="process-icon scale">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <polyline points="16 3 21 3 21 8"/>
+              <line x1="4" y1="20" x2="21" y2="3"/>
+              <polyline points="21 16 21 21 16 21"/>
+              <line x1="15" y1="15" x2="21" y2="21"/>
+              <line x1="4" y1="4" x2="9" y2="9"/>
+            </svg>
+          </div>
+          <div className="process-text">
+            <strong>Auto Migration</strong>
+            <span>Seamless transfers between clusters</span>
+          </div>
         </div>
       </div>
 
@@ -469,6 +528,7 @@ ${instructions.troubleshooting.map((item) => `
               className="btn-request"
               onClick={() => setShowRequestModal(true)}
               title="Request another VM"
+              aria-label="Request another virtual machine"
             >
               + Request Another VM
             </button>
@@ -487,6 +547,7 @@ ${instructions.troubleshooting.map((item) => `
                         setShowTransferModal(true);
                       }}
                       title="Migrate this VM"
+                      aria-label={`Migrate VM ${assignment.vm_name}`}
                     >
                       Migrate
                     </button>
@@ -494,6 +555,7 @@ ${instructions.troubleshooting.map((item) => `
                       className="btn-release" 
                       onClick={() => handleReleaseVM(assignment.assignment_id, assignment.vm_name)}
                       title="Release this VM"
+                      aria-label={`Release VM ${assignment.vm_name}`}
                     >
                       Release
                     </button>
@@ -525,8 +587,9 @@ ${instructions.troubleshooting.map((item) => `
                       className="btn-download-key"
                       onClick={() => handleDownloadSSHKey(assignment.assignment_id)}
                       title="Download SSH private key to connect to this VM"
+                      aria-label={`Download SSH key for ${assignment.vm_name}`}
                     >
-                      <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                      <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
                         <path d="M8 12l-4-4h3V0h2v8h3l-4 4z"/>
                         <path d="M14 14H2v-2h12v2z"/>
                       </svg>
@@ -536,6 +599,7 @@ ${instructions.troubleshooting.map((item) => `
                       className="btn-ssh-instructions"
                       onClick={() => handleViewSSHInstructions(assignment.assignment_id)}
                       title="View detailed connection instructions"
+                      aria-label={`View SSH instructions for ${assignment.vm_name}`}
                     >
                       📋 Instructions
                     </button>

@@ -24,4 +24,8 @@ class FileMetadata(BaseModel):
     # --- Fields for security feature (now correctly re-integrated) ---
     is_sensitive: bool = False
     is_encrypted: Optional[bool] = False
+    encryption_method: Optional[str] = "none"  # "none" | "server-side" | "client-side"
+    encryption_status: Optional[str] = "none"  # "none" | "pending" | "awaiting_choice" | "encrypted" | "failed"
+    awaiting_encryption_choice: bool = False
+    client_side_encrypted: bool = False  # True if encrypted with user's password
 

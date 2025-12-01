@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
+import Footer from '../components/layout/Footer.jsx';
 import '../styles/home.css';
 
 function HomePage() {
@@ -217,35 +218,7 @@ function HomePage() {
       </section>
 
       {/* Footer */}
-      <footer className="landing-footer">
-        <div className="footer-content">
-          <div className="footer-section">
-            <h4>Zenith</h4>
-            <p>The intelligent cloud optimization platform</p>
-          </div>
-          <div className="footer-section">
-            <h4>Product</h4>
-            <a href="#features">Features</a>
-            <a href="#pricing">Pricing</a>
-            <a href="#">Documentation</a>
-          </div>
-          <div className="footer-section">
-            <h4>Company</h4>
-            <a href="#">About</a>
-            <a href="#">Blog</a>
-            <a href="#">Careers</a>
-          </div>
-          <div className="footer-section">
-            <h4>Legal</h4>
-            <a href="#">Privacy</a>
-            <a href="#">Terms</a>
-            <a href="#">Security</a>
-          </div>
-        </div>
-        <div className="footer-bottom">
-          <p>&copy; 2025 Zenith. All rights reserved.</p>
-        </div>
-      </footer>
+      <Footer />
     </div>
   );
 }

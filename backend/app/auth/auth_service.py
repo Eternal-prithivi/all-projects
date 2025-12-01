@@ -3,18 +3,19 @@
 from . import auth_utils
 from ..users.user_model import UserCreate, UserInDB
 from pymongo.collection import Collection
+from app.utils.logger import setup_logger
+
+logger = setup_logger(__name__)
 
 def register_user(user: UserCreate, users_collection: Collection) -> UserInDB:
     """
     Registers a new user in the MongoDB database.
     Accepts the collection as a parameter.
     """
-    # --- DEBUGGING STEP ---
-    print("\n--- Inside register_user service ---")
-    print(f"Is users_collection available? {users_collection is not None}")
+    logger.debug(f"Register user attempt: {user.username}")
 
     if users_collection.find_one({"username": user.username}):
-        print(f"DEBUG: User '{user.username}' already exists.")
+        logger.warning(f"User '{user.username}' already exists")
         return None
     
     hashed_password = auth_utils.get_password_hash(user.password)
@@ -25,14 +26,12 @@ def register_user(user: UserCreate, users_collection: Collection) -> UserInDB:
         hashed_password=hashed_password
     )
     
-    print(f"DEBUG: Attempting to insert document: {user_in_db.model_dump()}")
+    logger.debug(f"Inserting user document for: {user.username}")
     
     # Insert the new user into the 'users' collection
     result = users_collection.insert_one(user_in_db.model_dump())
     
-    print(f"DEBUG: Insert result acknowledged: {result.acknowledged}")
-    print(f"DEBUG: Inserted document ID: {result.inserted_id}")
-    print("--- End of register_user service ---\n")
+    logger.info(f"User registered successfully: {user.username}")
     
     return user_in_db
 

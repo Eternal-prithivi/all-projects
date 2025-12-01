@@ -5,6 +5,7 @@ class User(BaseModel):
     username: str = Field(..., min_length=3, max_length=50)
     email: EmailStr
     hashed_password: str
+    role: str = Field(default="user")  # user or admin
 
 class UserCreate(BaseModel):
     username: str = Field(..., min_length=3, max_length=50)
@@ -17,6 +18,7 @@ class UserInDB(User):
     two_fa_secret: Optional[str] = None
     two_fa_enabled: bool = Field(False)
     two_fa_verified: bool = Field(False)
+    role: str = Field(default="user")  # user or admin
 
 class Token(BaseModel):
     access_token: str

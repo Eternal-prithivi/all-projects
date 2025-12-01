@@ -11,7 +11,9 @@ from app.utils.config import settings
 from app.database.mongo_client import get_database
 from app.users.routes_users import get_current_user
 from app.users.user_model import User
+from app.utils.logger import setup_logger
 
+logger = setup_logger(__name__)
 router = APIRouter()
 DB = get_database()
 
@@ -336,7 +338,22 @@ async def verify_payment(
             }}
         )
         
-        print(f"✓ Subscription activated for user {current_user.username}: {order['plan_id']}")
+        # Also create a payment record for admin analytics
+        DB["payments"].insert_one({
+            "username": current_user.username,
+            "plan_id": order["plan_id"],
+            "amount": order["total_amount"],
+            "currency": "INR",
+            "status": "success",
+            "payment_method": "razorpay",
+            "razorpay_order_id": razorpay_order_id,
+            "razorpay_payment_id": razorpay_payment_id,
+            "billing_cycle": order["billing_cycle"],
+            "created_at": datetime.utcnow()
+        })
+        
+        logger.info(f"Subscription activated for user {current_user.username}: {order['plan_id']}")
+        logger.info(f"Payment record created: ₹{order['total_amount']}")
         
         return {
             "success": True,
@@ -394,7 +411,23 @@ async def razorpay_webhook(request: Request):
                             "paid_at": datetime.utcnow()
                         }}
                     )
-                    print(f"✓ Payment captured for order {order_id}")
+                    
+                    # Create payment record for admin analytics
+                    DB["payments"].insert_one({
+                        "username": order["user_id"],
+                        "plan_id": order["plan_id"],
+                        "amount": order["total_amount"],
+                        "currency": "INR",
+                        "status": "success",
+                        "payment_method": "razorpay",
+                        "razorpay_order_id": order_id,
+                        "razorpay_payment_id": payment["id"],
+                        "billing_cycle": order["billing_cycle"],
+                        "created_at": datetime.utcnow()
+                    })
+                    
+                    logger.info(f"Payment captured for order {order_id}")
+                    logger.info(f"Payment record created for user {order['user_id']}")
         
         # Handle payment.failed event
         elif event_type == "payment.failed":
@@ -402,20 +435,38 @@ async def razorpay_webhook(request: Request):
             order_id = payment.get("order_id")
             
             if order_id:
-                DB["payment_orders"].update_one(
-                    {"order_id": order_id},
-                    {"$set": {
+                order = DB["payment_orders"].find_one({"order_id": order_id})
+                if order:
+                    DB["payment_orders"].update_one(
+                        {"order_id": order_id},
+                        {"$set": {
+                            "status": "failed",
+                            "failed_at": datetime.utcnow(),
+                            "error_description": payment.get("error_description")
+                        }}
+                    )
+                    
+                    # Create failed payment record
+                    DB["payments"].insert_one({
+                        "username": order["user_id"],
+                        "plan_id": order["plan_id"],
+                        "amount": order["total_amount"],
+                        "currency": "INR",
                         "status": "failed",
-                        "failed_at": datetime.utcnow(),
-                        "error_description": payment.get("error_description")
-                    }}
-                )
-                print(f"✗ Payment failed for order {order_id}")
+                        "payment_method": "razorpay",
+                        "razorpay_order_id": order_id,
+                        "billing_cycle": order["billing_cycle"],
+                        "error_description": payment.get("error_description"),
+                        "created_at": datetime.utcnow()
+                    })
+                    
+                    logger.warning(f"Payment failed for order {order_id}")
+
         
         return {"status": "success"}
         
     except Exception as e:
-        print(f"Webhook error: {str(e)}")
+        logger.error(f"Webhook error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/cancel-subscription", summary="Cancel Subscription")

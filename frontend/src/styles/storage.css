@@ -10,6 +10,7 @@
   --danger-red: #dc3545;
   --primary-blue: #007bff;
   --success-green: #28a745;
+  --warning-yellow: #ffc107;
 }
 
 .storage-container {
@@ -40,7 +41,7 @@
   border-radius: 12px;
   padding: 2.5rem;
   margin-bottom: 3rem;
-  box-shadow: 0 15px 30px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
 }
 
 .upload-title {
@@ -48,13 +49,13 @@
   font-weight: 600;
   color: #fff;
   margin-top: 0;
-  margin-bottom: 1.5rem;
+  margin-bottom: 2rem;
 }
 
 .upload-form {
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
+  gap: 1.75rem;
 }
 
 .file-input-group {
@@ -63,12 +64,34 @@
   gap: 1.5rem;
 }
 
+.file-input-group input[type="file"] {
+  font-size: 0.95rem;
+}
+
+.file-input-group input[type="file"]::file-selector-button {
+  background-color: var(--primary-gold);
+  color: #000;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  font-family: "Inter", sans-serif;
+  font-size: 0.95rem;
+  transition: all 0.2s ease;
+}
+
+.file-input-group input[type="file"]::file-selector-button:hover {
+  background-color: var(--hover-gold);
+  transform: translateY(-1px);
+}
+
 .preference-group {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 1rem;
-  padding: 1rem;
+  gap: 1.5rem;
+  padding: 1.25rem 1.5rem;
   background: #111;
   border-radius: 8px;
 }
@@ -76,16 +99,21 @@
 .preference-group label {
   font-weight: 500;
   color: var(--text-secondary);
+  font-size: 0.95rem;
+  white-space: nowrap;
 }
 
 .preference-group select {
   background: #2a2a2a;
   color: var(--text-primary);
   border: 2px solid #444;
-  padding: 8px 12px;
+  padding: 10px 14px;
   border-radius: 6px;
   font-family: "Inter", sans-serif;
   transition: border-color 0.3s ease;
+  min-width: 180px;
+  font-size: 0.95rem;
+  cursor: pointer;
 }
 
 /* --- Color-coded styles for preference dropdowns --- */
@@ -114,7 +142,7 @@ select.intent-archival {
   color: #000;
   border: none;
   border-radius: 8px;
-  padding: 12px 24px;
+  padding: 12px 28px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -123,18 +151,21 @@ select.intent-archival {
   justify-content: center;
   gap: 0.5rem;
   align-self: flex-start;
+  font-size: 0.95rem;
+  font-family: "Inter", sans-serif;
 }
 
 .upload-btn:disabled {
   background-color: #444;
   color: #888;
   cursor: not-allowed;
+  transform: none;
 }
 
 .upload-btn:hover:not(:disabled) {
   background-color: var(--hover-gold);
   transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(212, 175, 55, 0.2);
+  box-shadow: 0 6px 20px rgba(212, 175, 55, 0.3);
 }
 
 .spinner {
@@ -152,10 +183,15 @@ select.intent-archival {
   }
 }
 
+.list-section {
+  margin-top: 2rem;
+}
+
 .list-title {
   font-size: 1.75rem;
   font-weight: 600;
-  margin-bottom: 1.5rem;
+  margin-bottom: 2rem;
+  color: #fff;
   border-bottom: 1px solid var(--border-color);
   padding-bottom: 1rem;
 }
@@ -163,13 +199,13 @@ select.intent-archival {
 .file-table {
   width: 100%;
   border-collapse: separate;
-  border-spacing: 0 10px;
+  border-spacing: 0 12px;
 }
 
 .file-table th {
-  font-weight: 500;
+  font-weight: 600;
   color: var(--text-secondary);
-  font-size: 0.8rem;
+  font-size: 0.85rem;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   padding: 1rem 1.5rem;
@@ -177,9 +213,11 @@ select.intent-archival {
 }
 
 .file-table td {
-  padding: 1rem 1.5rem;
-  background: #1c1c1c;
+  padding: 1.25rem 1.5rem;
+  background: var(--content-bg);
+  border: 1px solid var(--border-color);
   vertical-align: middle;
+  font-size: 0.95rem;
 }
 
 .file-table .date-col {
@@ -198,24 +236,41 @@ select.intent-archival {
 }
 
 .action-btn {
-  padding: 0.5rem 1rem;
-  font-size: 0.8rem;
+  padding: 0.6rem 1.2rem;
+  font-size: 0.875rem;
   border: none;
   border-radius: 6px;
   cursor: pointer;
-  transition: opacity 0.2s ease;
+  transition: all 0.2s ease;
   color: white;
+  font-weight: 500;
+  font-family: "Inter", sans-serif;
 }
 
 .download-btn {
   background-color: var(--primary-blue);
 }
+
+.restore-btn {
+  background-color: var(--warning-yellow);
+  color: #000;
+  margin-left: 0.5rem;
+}
+
 .delete-btn {
   background-color: var(--danger-red);
   margin-left: 0.5rem;
 }
-.action-btn:hover {
+
+.action-btn:hover:not(:disabled) {
   opacity: 0.85;
+  transform: translateY(-1px);
+}
+
+.action-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
 }
 
 .csp-location-cell {
@@ -245,13 +300,14 @@ select.intent-archival {
 }
 
 .modal-content {
-  background: #252525;
+  background: var(--content-bg);
   padding: 2.5rem;
   border-radius: 12px;
   text-align: center;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  border: 1px solid var(--border-color);
   animation: slideIn 0.4s ease;
-  max-width: 500px;
+  max-width: 550px;
   width: 90%;
 }
 
@@ -259,30 +315,35 @@ select.intent-archival {
   font-size: 1.75rem;
   color: #fff;
   margin-top: 0;
-  margin-bottom: 1rem;
+  margin-bottom: 1.25rem;
+  font-weight: 600;
 }
 
 .recommendation-text {
   color: var(--text-secondary);
-  line-height: 1.6;
+  line-height: 1.7;
   margin-bottom: 1.5rem;
+  font-size: 0.95rem;
 }
 
 .recommendation-text strong {
   color: var(--text-primary);
+  font-weight: 600;
 }
 
 .recommendation-box {
-  background: #1c1c1c;
+  background: #111;
   border: 1px solid var(--border-color);
-  padding: 1.5rem;
-  border-radius: 8px;
+  padding: 1.75rem;
+  border-radius: 10px;
   margin: 1.5rem 0;
 }
 
 .recommendation-box p {
-  margin: 0;
+  margin: 0 0 0.5rem 0;
   color: var(--text-secondary);
+  font-size: 0.9rem;
+  line-height: 1.6;
 }
 
 .recommendation-csp {
@@ -291,9 +352,15 @@ select.intent-archival {
   justify-content: center;
   gap: 0.75rem;
   font-weight: 600;
-  font-size: 1.2rem;
-  margin-top: 0.5rem;
+  font-size: 1.25rem;
+  margin-top: 0.75rem;
   color: var(--text-primary);
+}
+
+.recommendation-csp img {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
 }
 
 .modal-buttons {
@@ -305,10 +372,13 @@ select.intent-archival {
 
 .modal-btn {
   border-radius: 8px;
-  padding: 0.7rem 1.5rem;
+  padding: 0.75rem 2rem;
   font-weight: 600;
   cursor: pointer;
   border: none;
+  font-size: 0.95rem;
+  font-family: "Inter", sans-serif;
+  transition: all 0.2s ease;
 }
 
 .modal-btn.confirm {
@@ -316,9 +386,19 @@ select.intent-archival {
   color: #000;
 }
 
+.modal-btn.confirm:hover {
+  background-color: var(--hover-gold);
+  transform: translateY(-1px);
+}
+
 .modal-btn.cancel {
-  background-color: #6c757d;
+  background-color: #444;
   color: white;
+}
+
+.modal-btn.cancel:hover {
+  background-color: #555;
+  transform: translateY(-1px);
 }
 
 @keyframes fadeIn {
@@ -363,5 +443,163 @@ select.intent-archival {
   padding: 10px 12px;
   border-radius: 6px;
   font-family: 'Inter', sans-serif;
+}
+
+/* Storage Process Info */
+.storage-process-info {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1.5rem;
+  margin: 2rem 0;
+  padding: 2rem;
+  background: var(--content-bg);
+  border-radius: 12px;
+  border: 1px solid var(--border-color);
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
+}
+
+.storage-process-info .process-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  padding: 0.75rem;
+  min-height: 80px;
+}
+
+.storage-process-info .process-icon {
+  width: 48px;
+  height: 48px;
+  min-width: 48px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.storage-process-info .process-icon svg {
+  width: 24px;
+  height: 24px;
+  z-index: 2;
+}
+
+.storage-process-info .process-icon.analyze {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+}
+
+.storage-process-info .process-icon.recommend {
+  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+  color: white;
+}
+
+.storage-process-info .process-icon.tier {
+  background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+  color: white;
+  animation: tier-pulse 2s ease-in-out infinite;
+}
+
+.storage-process-info .process-icon.save {
+  background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+  color: white;
+}
+
+@keyframes tier-pulse {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 4px 12px rgba(0, 242, 254, 0.3);
+  }
+  50% {
+    transform: scale(1.05);
+    box-shadow: 0 6px 20px rgba(0, 242, 254, 0.5);
+  }
+}
+
+.storage-process-info .process-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  flex: 1;
+}
+
+.storage-process-info .process-text strong {
+  color: #fff;
   font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.storage-process-info .process-text span {
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+@media (max-width: 1200px) {
+  .storage-process-info {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .storage-container {
+    padding: 1rem;
+  }
+
+  .storage-header h2 {
+    font-size: 1.75rem;
+  }
+
+  .storage-process-info {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+    padding: 1.5rem;
+  }
+  
+  .storage-process-info .process-step {
+    padding: 0.5rem;
+    min-height: 60px;
+  }
+
+  .upload-section {
+    padding: 1.5rem;
+  }
+
+  .upload-title {
+    font-size: 1.5rem;
+  }
+
+  .preference-group {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 1rem;
+  }
+
+  .preference-group select {
+    width: 100%;
+  }
+
+  .file-table {
+    font-size: 0.85rem;
+  }
+
+  .file-table th,
+  .file-table td {
+    padding: 0.75rem 1rem;
+  }
+
+  .action-btn {
+    padding: 0.5rem 0.875rem;
+    font-size: 0.8rem;
+  }
+
+  .modal-content {
+    padding: 2rem;
+    max-width: 95%;
+  }
+
+  .recommendation-title {
+    font-size: 1.5rem;
+  }
 }

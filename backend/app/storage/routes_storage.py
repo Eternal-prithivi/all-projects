@@ -19,7 +19,9 @@ from app.users.routes_users import get_current_user
 from app.users.user_model import User
 from app.database.mongo_client import mongodb_client
 from app.storage.models_storage import FileMetadata
+from app.utils.logger import setup_logger
 
+logger = setup_logger(__name__)
 router = APIRouter(tags=["Storage"])
 
 def get_files_collection() -> Collection:
@@ -101,7 +103,7 @@ async def generate_download_url(
             "$inc": {"access_frequency_score": 1} # Increment the access counter by 1
         }
     )
-    print(f"INFO: Tracked access for file '{filename}'.")
+    logger.debug(f"Tracked access for file '{filename}'")
 
     csp = file_record.get("csp")
     object_key = file_record.get("s3_key")

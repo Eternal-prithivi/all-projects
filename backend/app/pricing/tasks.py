@@ -4,6 +4,9 @@ from celery import shared_task
 from datetime import datetime, timedelta
 from app.pricing.pricing_fetcher import fetch_all_pricing
 from app.database.mongo_client import get_database
+from app.utils.logger import setup_logger
+
+logger = setup_logger(__name__)
 
 @shared_task(name="update_pricing_cache")
 def update_pricing_cache():
@@ -12,7 +15,7 @@ def update_pricing_cache():
     Scheduled in celery_worker.py
     """
     try:
-        print(f"[{datetime.utcnow()}] Starting weekly pricing update...")
+        logger.info(f"Starting weekly pricing update")
         
         # Fetch fresh pricing from all providers
         pricing_data = fetch_all_pricing()
@@ -28,7 +31,7 @@ def update_pricing_cache():
             "last_updated": {"$lt": (old_date - timedelta(weeks=12)).isoformat()}
         })
         
-        print(f"[{datetime.utcnow()}] Pricing updated successfully!")
+        logger.info(f"Pricing updated successfully")
         
         return {
             "status": "success",
@@ -36,7 +39,7 @@ def update_pricing_cache():
         }
         
     except Exception as e:
-        print(f"[{datetime.utcnow()}] Error updating pricing: {e}")
+        logger.error(f"Error updating pricing: {e}")
         return {
             "status": "error",
             "error": str(e)

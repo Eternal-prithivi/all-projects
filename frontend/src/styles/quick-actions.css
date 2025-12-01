@@ -3,6 +3,7 @@
   bottom: 2rem;
   right: 2rem;
   z-index: 999;
+  pointer-events: auto;
 }
 
 .quick-actions-trigger {
@@ -19,11 +20,16 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  pointer-events: auto;
 }
 
 .quick-actions-trigger:hover {
   transform: scale(1.1);
   box-shadow: 0 6px 20px rgba(244, 197, 66, 0.5);
+}
+
+.quick-actions-trigger:active {
+  transform: scale(1.05);
 }
 
 .quick-actions-trigger.open {
@@ -34,13 +40,14 @@
   position: absolute;
   bottom: 70px;
   right: 0;
-  min-width: 240px;
+  min-width: 260px;
   background: #1a1a1a;
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 12px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
   animation: slideUp 0.3s ease;
   overflow: hidden;
+  pointer-events: auto;
 }
 
 @keyframes slideUp {
@@ -75,6 +82,9 @@
   cursor: pointer;
   transition: all 0.2s ease;
   border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  pointer-events: auto;
+  position: relative;
+  z-index: 1;
 }
 
 .quick-action-item:last-child {
@@ -85,14 +95,20 @@
   background: rgba(244, 197, 66, 0.1);
 }
 
+.quick-action-item:active {
+  background: rgba(244, 197, 66, 0.2);
+}
+
 .quick-action-icon {
   font-size: 1.25rem;
   flex-shrink: 0;
+  pointer-events: none;
 }
 
 .quick-action-label {
   flex: 1;
   font-size: 0.9rem;
+  pointer-events: none;
 }
 
 .quick-action-shortcut {
@@ -103,6 +119,7 @@
   font-size: 0.75rem;
   font-family: monospace;
   color: #888;
+  pointer-events: none;
 }
 
 @media (max-width: 768px) {

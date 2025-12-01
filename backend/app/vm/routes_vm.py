@@ -19,10 +19,12 @@ from app.utils.config import settings
 from app.database.mongo_client import get_database
 from app.users.routes_users import get_current_user  # Import real auth
 from app.users.user_model import User
+from app.utils.logger import setup_logger
 from datetime import datetime
 import asyncio # For asynchronous operations
 import time # For cache timing
 
+logger = setup_logger(__name__)
 router = APIRouter()
 DB = get_database()
 
@@ -51,14 +53,14 @@ def invalidate_all_caches():
     metrics_cache.clear()
     recommendations_cache.clear()
     mode = "REAL-TIME" if settings.REAL_TIME_MODE else "CACHED"
-    print(f"✓ All VM caches invalidated (cluster health, metrics, recommendations) - Mode: {mode}")
+    logger.info(f"All VM caches invalidated (cluster health, metrics, recommendations) - Mode: {mode}")
 
 # Helper function to invalidate cluster health cache (backward compatibility)
 def invalidate_cluster_health_cache():
     """Clear cluster health cache to force fresh data fetch on next request"""
     global cluster_health_cache
     cluster_health_cache.clear()
-    print("✓ Cluster health cache invalidated")
+    logger.info("Cluster health cache invalidated")
 
 # --- Pydantic Models for Request/Response ---
 
@@ -148,7 +150,7 @@ async def provision_or_assign_vm(request: VMCreateRequest) -> OperationStatusRes
     # 1. Check for terminated VMs in the cluster that can be started
     if cluster_status['available_for_start'] > 0:
         vm_to_start = cluster_status['available_vms'][0] # Pick the first available
-        print(f"Starting existing VM: {vm_to_start['name']} for {cluster_type} cluster.")
+        logger.info(f"Starting existing VM: {vm_to_start['name']} for {cluster_type} cluster")
         result = start_vm(vm_to_start['name'])
         return OperationStatusResponse(name=vm_to_start['name'], status="STARTING_EXISTING", details=result['details'])
 
@@ -160,7 +162,7 @@ async def provision_or_assign_vm(request: VMCreateRequest) -> OperationStatusRes
         new_vm_name = f"{cluster_type}-vm-{cluster_status['current_count'] + 1}" # Simple naming scheme
         labels = {"cluster_type": cluster_type}
 
-        print(f"Provisioning new VM: {new_vm_name} for {cluster_type} cluster.")
+        logger.info(f"Provisioning new VM: {new_vm_name} for {cluster_type} cluster")
         result = create_vm(
             name=new_vm_name,
             machine_type=machine_type,
@@ -367,7 +369,7 @@ async def get_vm_metrics(vm_name: str, use_real: bool = False) -> VMMetricsRespo
         
         # Cache miss or expired or REAL_TIME_MODE - collect fresh metrics
         mode_msg = "REAL-TIME" if settings.REAL_TIME_MODE else "cached"
-        print(f"Collecting metrics for {vm_name}... (Mode: {mode_msg})")
+        logger.debug(f"Collecting metrics for {vm_name} (Mode: {mode_msg})")
         
         # Determine cluster type
         cluster_type = ClusterType.GENERAL if "general" in vm_name else ClusterType.STORAGE
@@ -576,7 +578,7 @@ async def get_migration_recommendations(
                     )
                     vm_metrics.append(metrics)
                 except Exception as e:
-                    print(f"Error collecting metrics for {vm_name}: {e}")
+                    logger.error(f"Error collecting metrics for {vm_name}: {e}")
                     continue
             
             # Get user assignments
@@ -689,7 +691,7 @@ async def predict_cluster_load(cluster_type: ClusterType) -> Dict[str, Any]:
                 )
                 current_metrics.append(metrics)
             except Exception as e:
-                print(f"Error collecting metrics for {vm_name}: {e}")
+                logger.error(f"Error collecting metrics for {vm_name}: {e}")
                 continue
         
         # Predict (simple trend analysis for now)
@@ -733,7 +735,7 @@ async def download_ssh_key(
         encrypted_key = assignment.get("ssh_private_key_encrypted")
         
         if not encrypted_key:
-            print(f"⚠ No SSH key found for assignment {assignment_id}, generating new one...")
+            logger.warning(f"No SSH key found for assignment {assignment_id}, generating new one")
             
             # Generate new keypair
             private_key, public_key = generate_ssh_keypair()
@@ -787,9 +789,9 @@ async def download_ssh_key(
                 )
                 operation = instance_client.set_metadata(request=update_request)
                 operation.result()
-                print(f"✓ SSH key injected into {vm_name}")
+                logger.info(f"SSH key injected into {vm_name}")
             except Exception as e:
-                print(f"⚠ Warning: Could not inject SSH key: {e}")
+                logger.warning(f"Could not inject SSH key: {e}")
             
             encrypted_key = encrypted_private_key
         

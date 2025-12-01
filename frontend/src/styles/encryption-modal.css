@@ -1,0 +1,370 @@
+/* Encryption Choice Modal Styles */
+
+.encryption-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 1rem;
+}
+
+.encryption-modal {
+  background: #1a1a1a;
+  border: 1px solid #2a2a2a;
+  border-radius: 16px;
+  max-width: 900px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+
+.encryption-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 2rem;
+  border-bottom: 1px solid #2a2a2a;
+}
+
+.encryption-modal-header h2 {
+  margin: 0;
+  font-size: 1.75rem;
+  color: #fff;
+  font-weight: 600;
+}
+
+.close-btn {
+  background: transparent;
+  border: none;
+  color: #999;
+  font-size: 2rem;
+  cursor: pointer;
+  padding: 0;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  transition: all 0.2s;
+}
+
+.close-btn:hover {
+  background: #2a2a2a;
+  color: #fff;
+}
+
+.encryption-modal-body {
+  padding: 2rem;
+}
+
+.file-info-banner {
+  background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
+  padding: 1.5rem;
+  border-radius: 12px;
+  margin-bottom: 2rem;
+}
+
+.file-info-banner p {
+  margin: 0.5rem 0;
+  color: #fff;
+  font-size: 1rem;
+}
+
+.file-info-banner strong {
+  color: #fbbf24;
+}
+
+.sensitive-warning {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.2);
+  font-weight: 500;
+}
+
+.encryption-options {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.encryption-option {
+  background: #111;
+  border: 2px solid #2a2a2a;
+  border-radius: 12px;
+  padding: 1.5rem;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.encryption-option:hover {
+  border-color: #3b82f6;
+  background: #1a1a1a;
+}
+
+.encryption-option.selected {
+  border-color: #d4af37;
+  background: linear-gradient(135deg, rgba(212, 175, 55, 0.05) 0%, rgba(212, 175, 55, 0.1) 100%);
+  box-shadow: 0 4px 20px rgba(212, 175, 55, 0.2);
+}
+
+.option-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.option-header input[type="radio"] {
+  width: 20px;
+  height: 20px;
+  cursor: pointer;
+  accent-color: #d4af37;
+}
+
+.option-header h3 {
+  margin: 0;
+  font-size: 1.25rem;
+  color: #fff;
+  font-weight: 600;
+}
+
+.option-description {
+  margin-left: 2rem;
+  color: #a3a3a3;
+}
+
+.option-description p {
+  margin: 0.5rem 0;
+  font-size: 0.95rem;
+}
+
+.option-description ul {
+  list-style: none;
+  padding: 0;
+  margin: 1rem 0;
+}
+
+.option-description li {
+  padding: 0.5rem 0;
+  font-size: 0.9rem;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.recommendation {
+  background: rgba(59, 130, 246, 0.1);
+  border-left: 3px solid #3b82f6;
+  padding: 0.75rem 1rem;
+  margin-top: 1rem;
+  border-radius: 4px;
+  color: #3b82f6 !important;
+}
+
+.password-form {
+  background: #0a0a0a;
+  border: 2px solid #d4af37;
+  border-radius: 12px;
+  padding: 2rem;
+  margin-top: 2rem;
+}
+
+.password-warning {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid #ef4444;
+  border-radius: 8px;
+  padding: 1rem;
+  margin-bottom: 1.5rem;
+  color: #fca5a5;
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+
+.form-group {
+  margin-bottom: 1.5rem;
+}
+
+.form-group label {
+  display: block;
+  color: #e5e7eb;
+  font-weight: 500;
+  margin-bottom: 0.5rem;
+  font-size: 0.95rem;
+}
+
+.password-input {
+  width: 100%;
+  padding: 1rem;
+  background: #1a1a1a;
+  border: 1px solid #2a2a2a;
+  border-radius: 8px;
+  color: #fff;
+  font-size: 1rem;
+  font-family: 'Courier New', monospace;
+  letter-spacing: 0.05em;
+}
+
+.password-input:focus {
+  outline: none;
+  border-color: #d4af37;
+  box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.1);
+}
+
+.password-strength {
+  margin-top: 0.5rem;
+}
+
+.password-strength p {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.encryption-modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 1rem;
+  padding: 2rem;
+  border-top: 1px solid #2a2a2a;
+}
+
+.btn-cancel,
+.btn-encrypt {
+  padding: 0.875rem 2rem;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: none;
+}
+
+.btn-cancel {
+  background: transparent;
+  border: 1px solid #4a4a4a;
+  color: #999;
+}
+
+.btn-cancel:hover {
+  background: #2a2a2a;
+  color: #fff;
+}
+
+.btn-encrypt {
+  background: linear-gradient(135deg, #d4af37 0%, #c8a430 100%);
+  color: #000;
+  font-weight: 700;
+}
+
+.btn-encrypt:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(212, 175, 55, 0.3);
+}
+
+.btn-encrypt:disabled {
+  background: #444;
+  color: #888;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Password Strength Indicator */
+.password-strength-container {
+  margin-top: 0.75rem;
+}
+
+.password-strength-bar {
+  height: 6px;
+  background: #2a2a2a;
+  border-radius: 3px;
+  overflow: hidden;
+  margin-bottom: 0.5rem;
+}
+
+.strength-fill {
+  height: 100%;
+  transition: all 0.3s ease;
+  border-radius: 3px;
+}
+
+.strength-0 .strength-fill { width: 0%; background: transparent; }
+.strength-1 .strength-fill { width: 20%; background: #dc3545; }
+.strength-2 .strength-fill { width: 40%; background: #dc3545; }
+.strength-3 .strength-fill { width: 60%; background: #ffc107; }
+.strength-4 .strength-fill { width: 80%; background: #28a745; }
+.strength-5 .strength-fill { width: 100%; background: #28a745; }
+
+.strength-text {
+  font-size: 0.875rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+.strength-text.strength-1,
+.strength-text.strength-2 { color: #dc3545; }
+.strength-text.strength-3,
+.strength-text.strength-4 { color: #ffc107; }
+.strength-text.strength-5 { color: #28a745; }
+
+.password-requirements {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+}
+
+.password-requirements small {
+  font-size: 0.8rem;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  background: #2a2a2a;
+}
+
+.password-requirements small.met {
+  color: #28a745;
+  background: rgba(40, 167, 69, 0.1);
+}
+
+.password-requirements small.unmet {
+  color: #999;
+}
+
+.error-text {
+  color: #dc3545;
+  font-size: 0.875rem;
+  margin-top: 0.5rem;
+  font-weight: 600;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .encryption-modal {
+    margin: 1rem;
+  }
+
+  .encryption-modal-header,
+  .encryption-modal-body,
+  .encryption-modal-footer {
+    padding: 1.5rem;
+  }
+
+  .encryption-modal-header h2 {
+    font-size: 1.5rem;
+  }
+
+  .option-description {
+    margin-left: 0;
+  }
+}

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useNotifications } from "../hooks/useNotifications";
+import { TableSkeleton } from "../components/Skeletons.jsx";
 import "../styles/storage.css"; // We use the external stylesheet
 
 // --- MOCKED DEPENDENCIES for a self-contained component ---
@@ -250,6 +251,60 @@ function StoragePage() {
         <h2>Standard Storage</h2>
       </div>
 
+      {/* Storage Process Flow */}
+      <div className="storage-process-info">
+        <div className="process-step">
+          <div className="process-icon analyze">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+              <circle cx="12" cy="12" r="3"/>
+            </svg>
+          </div>
+          <div className="process-text">
+            <strong>ML-Powered Analysis</strong>
+            <span>Analyzes file size, access patterns & intent</span>
+          </div>
+        </div>
+
+        <div className="process-step">
+          <div className="process-icon recommend">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+              <path d="M2 17l10 5 10-5M2 12l10 5 10-5"/>
+            </svg>
+          </div>
+          <div className="process-text">
+            <strong>Smart Recommendations</strong>
+            <span>AWS, GCP, or Azure based on cost & performance</span>
+          </div>
+        </div>
+
+        <div className="process-step">
+          <div className="process-icon tier">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M3 3h7v7H3zM14 3h7v7h-7zM14 14h7v7h-7zM3 14h7v7H3z"/>
+            </svg>
+          </div>
+          <div className="process-text">
+            <strong>Intelligent Tiering</strong>
+            <span>Hot → Cool → Archive based on access</span>
+          </div>
+        </div>
+
+        <div className="process-step">
+          <div className="process-icon save">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <line x1="12" y1="1" x2="12" y2="23"/>
+              <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+            </svg>
+          </div>
+          <div className="process-text">
+            <strong>Cost Optimization</strong>
+            <span>Save up to 60% vs standard storage</span>
+          </div>
+        </div>
+      </div>
+
       <div className="upload-section">
         <h3 className="upload-title">Intelligent File Ingestion</h3>
         <div className="upload-form">
@@ -295,7 +350,7 @@ function StoragePage() {
       <div className="list-section">
         <h3 className="list-title">Your Files</h3>
         {isLoading ? (
-          <p>Loading files...</p>
+          <TableSkeleton rows={5} columns={5} />
         ) : (
           <table className="file-table">
             <thead>

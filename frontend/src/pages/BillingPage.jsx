@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { apiClient } from '../api';
 import { toast } from 'react-toastify';
 import { useNavigate } from 'react-router-dom';
+import { PageSkeleton } from '../components/Skeletons.jsx';
 import '../styles/billing.css';
 
 function BillingPage() {
@@ -211,11 +212,7 @@ function BillingPage() {
   };
 
   if (loading) {
-    return (
-      <div className="billing-page">
-        <div className="loading-spinner">Loading billing data...</div>
-      </div>
-    );
+    return <PageSkeleton />;
   }
 
   const nextBillingAmount = calculateNextBillingAmount();

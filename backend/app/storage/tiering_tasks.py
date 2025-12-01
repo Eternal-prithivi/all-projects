@@ -4,6 +4,9 @@ from datetime import datetime, timedelta, timezone
 
 from app.utils.config import settings
 from app.storage.manager import change_tier_on_aws, change_tier_on_gcp, change_tier_on_azure
+from app.utils.logger import setup_logger
+
+logger = setup_logger(__name__)
 
 # This map is now used for both demotions and promotions across all tiers.
 TIER_MAP = {
@@ -23,7 +26,7 @@ def run_storage_optimization():
     The main scheduled task for the complete long-term storage optimization model.
     Handles multi-level demotions and intelligent, one-level-up promotions.
     """
-    print(f"\n--- [{datetime.now(timezone.utc)}] Running Scheduled Storage Optimization Task ---")
+    logger.info(f"Running scheduled storage optimization task")
     
     mongo_client = MongoClient(settings.MONGO_CONNECTION_STRING)
     db = mongo_client['CloudResourceOptimizationDB']
@@ -40,7 +43,7 @@ def run_storage_optimization():
     # --- PART 1: TIERING DOWN (DEMOTION LOGIC) ---
     
     # --- Demotion 1: Hot -> Warm ---
-    print("\n[INFO] --- Starting Demotion Analysis (Hot -> Warm) ---")
+    logger.info("Starting demotion analysis (Hot -> Warm)")
     cooldown_period = now - timedelta(days=30)
     thirty_days_ago = now - timedelta(days=30)
     
@@ -50,13 +53,13 @@ def run_storage_optimization():
         "$or": [{"last_accessed_at": None}, {"last_accessed_at": {"$lt": thirty_days_ago}}]
     }))
 
-    print(f"Found {len(candidates_to_warm)} candidates to move to WARM storage.")
+    logger.info(f"Found {len(candidates_to_warm)} candidates to move to WARM storage")
     for file_record in candidates_to_warm:
         # This is a helper function to perform the actual move
         _perform_tier_change(file_record, "warm", tier_change_functions, files_db)
 
     # --- Demotion 2: Warm -> Cold (Archival) ---
-    print("\n[INFO] --- Starting Demotion Analysis (Warm -> Cold) ---")
+    logger.info("Starting demotion analysis (Warm -> Cold)")
     # A longer inactivity period is required to move to deep archive.
     ninety_days_ago = now - timedelta(days=90)
 
@@ -66,13 +69,13 @@ def run_storage_optimization():
         "last_accessed_at": {"$lt": ninety_days_ago}
     }))
     
-    print(f"Found {len(candidates_to_cold)} candidates to move to COLD (Archive) storage.")
+    logger.info(f"Found {len(candidates_to_cold)} candidates to move to COLD (Archive) storage")
     for file_record in candidates_to_cold:
         _perform_tier_change(file_record, "cold", tier_change_functions, files_db)
 
 
     # --- PART 2: TIERING UP (PROMOTION LOGIC) ---
-    print("\n[INFO] --- Starting Promotion Analysis (Warm/Cold -> Hot) ---")
+    logger.info("Starting promotion analysis (Warm/Cold -> Hot)")
     # --- NEW RULE: Stricter time window of 5 days ---
     five_days_ago = now - timedelta(days=5)
     
@@ -84,7 +87,7 @@ def run_storage_optimization():
         "access_frequency_score": {"$gt": 2} 
     }))
 
-    print(f"Found {len(candidates_to_promote)} candidates for promotion.")
+    logger.info(f"Found {len(candidates_to_promote)} candidates for promotion")
     for file_record in candidates_to_promote:
         current_tier = file_record.get("storage_class")
         
@@ -99,7 +102,7 @@ def run_storage_optimization():
              _perform_tier_change(file_record, target_tier_name, tier_change_functions, files_db, is_promotion=True)
 
 
-    print("\n--- Storage Optimization Task Finished ---\n")
+    logger.info("Storage optimization task finished")
     
     mongo_client.close()
     return f"Task complete."
@@ -116,7 +119,7 @@ def _perform_tier_change(file_record, target_tier, tier_change_functions, files_
     if change_function and new_tier_api_name:
         try:
             action = "Promoting" if is_promotion else "Demoting"
-            print(f"[ACTION] {action} '{filename}' on {csp} to {target_tier.upper()} tier ({new_tier_api_name})...")
+            logger.info(f"{action} '{filename}' on {csp} to {target_tier.upper()} tier ({new_tier_api_name})")
             
             change_function(object_key, new_tier_api_name)
             
@@ -126,9 +129,9 @@ def _perform_tier_change(file_record, target_tier, tier_change_functions, files_
                 update_operation["$set"]["access_frequency_score"] = 0
 
             files_db.update_one({"_id": file_record["_id"]}, update_operation)
-            print(f"Successfully moved '{filename}'.")
+            logger.info(f"Successfully moved '{filename}'")
         except Exception as e:
-            print(f"!!! ERROR moving '{filename}': {e}")
+            logger.error(f"Error moving '{filename}': {e}")
     else:
-        print(f"[WARNING] No tiering action configured for CSP '{csp}' or tier '{target_tier}'.")
+        logger.warning(f"No tiering action configured for CSP '{csp}' or tier '{target_tier}'")
 

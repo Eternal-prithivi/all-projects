@@ -184,6 +184,99 @@ export const deleteSecureFile = async (filename, token) => {
   }
 };
 
+export const chooseEncryption = async (filename, encryptionMethod, password, token) => {
+  try {
+    const response = await apiClient.post(
+      "/security/choose-encryption",
+      {
+        filename,
+        encryption_method: encryptionMethod,
+        password: password || null,
+      },
+      {
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+    return response.data;
+  } catch (error) {
+    throw error.response?.data || error;
+  }
+};
+
+export const decryptAndDownload = async (filename, password, token) => {
+  try {
+    console.log('Making decrypt request for:', filename);
+    const response = await apiClient.post(
+      "/security/decrypt-download",
+      {
+        filename,
+        password,
+      },
+      {
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        responseType: 'blob', // Important: handle binary file data
+      }
+    );
+    
+    console.log('Full response:', response);
+    console.log('Response data:', response.data);
+    console.log('Response data type:', typeof response.data);
+    console.log('Is Blob?:', response.data instanceof Blob);
+    
+    if (response.data instanceof Blob) {
+      console.log('Response received, blob size:', response.data.size, 'type:', response.data.type);
+    }
+    
+    // Check if response is actually an error (blob might be JSON error)
+    if (response.data.type === 'application/json') {
+      const text = await response.data.text();
+      const error = JSON.parse(text);
+      throw error;
+    }
+    
+    // Create a download link and trigger download
+    const blob = new Blob([response.data]);
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename; // Use download property instead of setAttribute
+    link.style.display = 'none';
+    
+    // Add to DOM, click, then remove
+    document.body.appendChild(link);
+    console.log('Triggering download for:', filename);
+    link.click();
+    
+    // Cleanup after a short delay
+    setTimeout(() => {
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      console.log('Download cleanup complete');
+    }, 100);
+    
+    return { success: true, message: "File downloaded successfully" };
+  } catch (error) {
+    console.error('Decrypt API error:', error);
+    // If error.response exists and is a blob, parse it
+    if (error.response?.data instanceof Blob) {
+      try {
+        const text = await error.response.data.text();
+        const errorData = JSON.parse(text);
+        throw errorData;
+      } catch (parseError) {
+        throw { detail: "Decryption failed" };
+      }
+    }
+    throw error.response?.data || error;
+  }
+};
+
 // ---------------- 2FA ----------------
 
 export const status2FA = async (token) => {
@@ -260,3 +353,6 @@ export const disable2FA = async (token) => {
     throw error.response?.data || error;
   }
 };
+
+// Export apiClient as default for convenience
+export default apiClient;

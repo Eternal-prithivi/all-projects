@@ -12,6 +12,7 @@ import {
 } from "../components/dashboard/Icons.jsx";
 import { useNavigate } from 'react-router-dom';
 import { useNotifications } from "../hooks/useNotifications.js";
+import { DashboardSkeleton } from "../components/Skeletons.jsx";
 import '../styles/dashboard-enhanced.css';
 
 function DashboardPage() {
@@ -105,7 +106,7 @@ function DashboardPage() {
   };
 
   if (isLoading) {
-    return <LoadingSpinner size="large" text="Loading dashboard data..." />;
+    return <DashboardSkeleton />;
   }
 
   if (error) {
@@ -287,19 +288,47 @@ function DashboardPage() {
           <div className="info-card quick-actions-card">
             <h3>Quick Actions</h3>
             <div className="quick-actions-grid">
-              <button className="action-btn" onClick={() => navigate('/dashboard/vmcluster')}>
+              <button 
+                className="action-btn" 
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  navigate('/dashboard/vmcluster');
+                }}
+              >
                 <span className="action-icon">🖥️</span>
                 <span className="action-text">Manage VMs</span>
               </button>
-              <button className="action-btn" onClick={() => navigate('/dashboard/storage')}>
+              <button 
+                className="action-btn" 
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  navigate('/dashboard/storage');
+                }}
+              >
                 <span className="action-icon">📁</span>
                 <span className="action-text">Upload Files</span>
               </button>
-              <button className="action-btn" onClick={() => navigate('/dashboard/costs')}>
+              <button 
+                className="action-btn" 
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  navigate('/dashboard/costs');
+                }}
+              >
                 <span className="action-icon">📊</span>
                 <span className="action-text">Cost Analysis</span>
               </button>
-              <button className="action-btn" onClick={() => navigate('/dashboard/security')}>
+              <button 
+                className="action-btn" 
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  navigate('/dashboard/security');
+                }}
+              >
                 <span className="action-icon">🔒</span>
                 <span className="action-text">Security</span>
               </button>
