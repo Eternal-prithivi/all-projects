@@ -58,7 +58,7 @@ function BillingPage() {
   };
 
   const calculateNextBillingAmount = () => {
-    if (!subscription || subscription.plan_id === 'free') return 0;
+    if (!subscription?.plan_id || subscription.plan_id === 'free') return 0;
     
     const plans = {
       basic: { monthly: 499, yearly: 4990 },
@@ -106,7 +106,7 @@ function BillingPage() {
       return;
     }
 
-    if (!subscription || subscription.plan_id === 'free') {
+    if (!subscription?.plan_id || subscription.plan_id === 'free') {
       toast.info('You are on the free plan. Upgrade to a paid plan first.');
       navigate('/dashboard/pricing');
       return;
@@ -199,7 +199,7 @@ function BillingPage() {
   };
 
   const getStatusBadge = (status) => {
-    if (subscription?.status === 'active') {
+    if (subscription?.status === 'active' && subscription?.current_period_end) {
       const now = new Date();
       const endDate = new Date(subscription.current_period_end);
       const daysRemaining = Math.ceil((endDate - now) / (1000 * 60 * 60 * 24));
@@ -419,7 +419,7 @@ function BillingPage() {
             )}
             {subscription?.plan_id !== 'free' && (
               <div className="summary-row highlight">
-                <span>Subscription - {getPlanDisplayName(subscription.plan_id)} ({subscription.billing_cycle})</span>
+                <span>Subscription - {getPlanDisplayName(subscription?.plan_id)} ({subscription?.billing_cycle || 'monthly'})</span>
                 <span className="summary-amount">{formatCurrency(nextBillingAmount)}</span>
               </div>
             )}
