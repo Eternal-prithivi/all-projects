@@ -1,29 +1,32 @@
-/* src/styles/dashboard.css */
+/* src/styles/dashboard.css — Premium Dashboard Layout */
 
 /* Accessibility: Skip to main content link */
 .skip-to-main {
   position: absolute;
   top: -100px;
   left: 10px;
-  background: #7c3aed;
-  color: white;
+  background: var(--gold-primary);
+  color: #000;
   padding: 8px 16px;
   text-decoration: none;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   z-index: 100000;
   font-weight: 600;
-  transition: top 0.2s ease;
+  transition: top 0.2s var(--ease-out);
 }
 
 .skip-to-main:focus {
   top: 10px;
 }
 
+/* ========================================
+   DASHBOARD PAGE LAYOUT
+   ======================================== */
 .dashboard-page {
   display: flex;
   min-height: 100vh;
-  background-color: #000000;
-  color: #f5f5f5;
+  background-color: var(--bg-base);
+  color: var(--text-primary);
   font-family: "Inter", sans-serif;
 }
 
@@ -40,85 +43,121 @@
   overflow: hidden;
 }
 
+/* ========================================
+   HEADER — Premium Bar
+   ======================================== */
 .dashboard-header {
-  padding: 1rem 2.5rem;
-  background-color: #0a0a0a;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  padding: 0.85rem 2.5rem;
+  background-color: var(--bg-surface);
+  border-bottom: 1px solid var(--border-subtle);
   display: flex;
   justify-content: space-between;
   align-items: center;
+  position: relative;
+}
+
+/* Gold shimmer accent line at bottom of header */
+.dashboard-header::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(212, 175, 55, 0.08) 20%,
+    rgba(212, 175, 55, 0.3) 50%,
+    rgba(212, 175, 55, 0.08) 80%,
+    transparent 100%
+  );
 }
 
 .header-title {
-  font-size: 1.25rem;
+  font-size: 1.1rem;
   font-weight: 600;
+  color: var(--text-primary);
+  letter-spacing: -0.01em;
 }
 
 .header-actions {
   display: flex;
   align-items: center;
-  gap: 1rem;
+  gap: 0.75rem;
 }
 
 .header-help-btn {
-  width: 36px;
-  height: 36px;
+  width: 34px;
+  height: 34px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  color: #fff;
-  font-size: 1rem;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  font-size: 0.9rem;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: all var(--duration-normal) var(--ease-out);
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
 .header-help-btn:hover {
-  background: rgba(244, 197, 66, 0.1);
-  border-color: #f4c542;
-  color: #f4c542;
-  transform: scale(1.1);
+  background: rgba(212, 175, 55, 0.08);
+  border-color: var(--gold-border);
+  color: var(--gold-primary);
+  transform: scale(1.05);
 }
 
+/* ========================================
+   BREADCRUMBS
+   ======================================== */
 .dashboard-breadcrumbs-wrapper {
   padding: 0 2.5rem;
-  background-color: #0a0a0a;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  background-color: var(--bg-surface);
+  border-bottom: 1px solid var(--border-subtle);
 }
 
+/* ========================================
+   CONTENT AREA
+   ======================================== */
 .dashboard-content {
-  padding: 2.5rem;
+  padding: 2rem 2.5rem;
   overflow-y: auto;
   flex-grow: 1;
+  animation: fadeIn var(--duration-normal) var(--ease-out);
 }
 
-/* --- Other styles --- */
+/* ========================================
+   WELCOME MESSAGE
+   ======================================== */
 .welcome-message h2 {
-  font-size: 2.25rem;
+  font-size: clamp(1.5rem, 3vw, 2.25rem);
+  letter-spacing: -0.02em;
 }
 
 .welcome-message p {
-  color: #a3a3a3;
-  margin-bottom: 2.5rem;
+  color: var(--text-muted);
+  margin-bottom: var(--space-xl);
 }
 
 .stats-grid {
   display: grid;
-  gap: 1.5rem;
+  gap: var(--space-lg);
   grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
 }
 
-/* Responsive Design */
+/* ========================================
+   RESPONSIVE
+   ======================================== */
 @media (max-width: 1024px) {
   .sidebar {
     width: 240px;
   }
   
   .dashboard-content {
-    padding: 2rem;
+    padding: 1.5rem 2rem;
   }
 }
 
@@ -135,21 +174,21 @@
   }
   
   .dashboard-header {
-    padding: 1rem 1.5rem;
+    padding: 0.75rem 1.25rem;
     flex-wrap: wrap;
-    gap: 1rem;
+    gap: 0.75rem;
   }
   
   .header-title {
-    font-size: 1.1rem;
+    font-size: 1rem;
   }
   
   .dashboard-breadcrumbs-wrapper {
-    padding: 0 1.5rem;
+    padding: 0 1.25rem;
   }
   
   .dashboard-content {
-    padding: 1.5rem;
+    padding: 1.25rem;
   }
   
   .stats-grid {
@@ -159,7 +198,7 @@
 
 @media (max-width: 480px) {
   .dashboard-header {
-    padding: 0.75rem 1rem;
+    padding: 0.6rem 1rem;
   }
   
   .dashboard-content {

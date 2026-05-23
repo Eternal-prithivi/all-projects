@@ -57,16 +57,17 @@ function DashboardPage() {
         console.log('Budgets not available');
       }
 
-      // Generate mock activity data
-      setRecentActivity([
-        { id: 1, type: 'vm', action: 'Created VM instance', resource: 'web-server-01', time: '2 hours ago', status: 'success' },
-        { id: 2, type: 'storage', action: 'Uploaded files', resource: 'backup-storage', time: '5 hours ago', status: 'success' },
-        { id: 3, type: 'cost', action: 'Budget alert triggered', resource: 'Monthly AWS', time: '1 day ago', status: 'warning' },
-        { id: 4, type: 'security', action: 'Security scan completed', resource: 'All resources', time: '2 days ago', status: 'success' },
-      ]);
+      // Fetch recent activity from API
+      try {
+        const activityResponse = await apiClient.get('/dashboard/recent-activity?limit=4');
+        setRecentActivity(activityResponse.data || []);
+      } catch (err) {
+        console.log('Activity data not available');
+        setRecentActivity([]);
+      }
       
-      // Set cost trend based on data
-      setCostTrend('up');
+      // Set cost trend based on actual data
+      setCostTrend(statsData.monthly_costs > 0 ? 'up' : 'stable');
     } catch (error) {
       console.error("Failed to fetch dashboard data:", error);
       setError("Failed to load dashboard data. Please try again.");
@@ -158,6 +159,7 @@ function DashboardPage() {
             title="Monthly Costs"
             value={`$${stats.monthly_costs.toLocaleString()}`}
             icon={<IconDollarSign />}
+            type="costs"
             trend={costTrend}
             trendValue="+12.5%"
             action={
@@ -176,18 +178,21 @@ function DashboardPage() {
             title="Active VMs"
             value={stats.active_vms}
             icon={<IconServer />}
+            type="vms"
             subtitle={`${vmHealth.healthy} healthy, ${vmHealth.warning} warnings`}
           />
           <StatCard
             title="Storage Used"
             value={`${stats.storage_used_tb} TB`}
             icon={<IconHardDrive />}
+            type="storage"
             subtitle="82% of capacity"
           />
           <StatCard
             title="Security Alerts"
             value={stats.security_alerts}
             icon={<IconShieldCheck />}
+            type="security"
             subtitle={stats.security_alerts > 0 ? "Needs attention" : "All clear"}
           />
         </div>
@@ -266,22 +271,26 @@ function DashboardPage() {
           {/* Recent Activity */}
           <div className="info-card activity-card">
             <h3>Recent Activity</h3>
-            <div className="activity-list">
-              {recentActivity.map((activity) => (
-                <div key={activity.id} className="activity-item">
-                  <span className="activity-icon">{getActivityIcon(activity.type)}</span>
-                  <div className="activity-details">
-                    <div className="activity-action">{activity.action}</div>
-                    <div className="activity-resource">{activity.resource}</div>
+            {recentActivity.length > 0 ? (
+              <div className="activity-list">
+                {recentActivity.map((activity, index) => (
+                  <div key={activity.id || index} className="activity-item">
+                    <span className="activity-icon">{getActivityIcon(activity.type || activity.action_type)}</span>
+                    <div className="activity-details">
+                      <div className="activity-action">{activity.action || activity.description}</div>
+                      <div className="activity-resource">{activity.resource || activity.details || ''}</div>
+                    </div>
+                    <div className="activity-time">{activity.time || activity.timestamp || ''}</div>
+                    <div 
+                      className="activity-status-dot"
+                      style={{ backgroundColor: getStatusColor(activity.status || 'success') }}
+                    ></div>
                   </div>
-                  <div className="activity-time">{activity.time}</div>
-                  <div 
-                    className="activity-status-dot"
-                    style={{ backgroundColor: getStatusColor(activity.status) }}
-                  ></div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            ) : (
+              <p className="no-data">No recent activity — start managing your cloud resources!</p>
+            )}
           </div>
 
           {/* Quick Actions */}

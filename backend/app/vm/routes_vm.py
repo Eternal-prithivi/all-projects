@@ -7,7 +7,7 @@ from google.cloud import compute_v1
 from app.vm.manager import (
     list_vms, create_vm, start_vm, stop_vm, delete_vm, get_vm_details,
     assign_vm_to_user, migrate_user, release_vm_assignment, 
-    get_user_assignment, get_cluster_health, instance_client
+    get_user_assignment, get_cluster_health, _get_instance_client
 )
 from app.vm.models import (
     VMRequestModel, VMAssignmentResponse, VMTransferRequest,
@@ -439,7 +439,7 @@ async def get_vm_configuration(vm_name: str) -> Dict[str, Any]:
             zone=settings.GCP_ZONE,
             instance=vm_name,
         )
-        instance = instance_client.get(request=request)
+        instance = _get_instance_client().get(request=request)
         
         # Parse machine type to get CPU and memory info
         machine_type = instance.machine_type.split('/')[-1]
@@ -544,6 +544,11 @@ async def get_migration_recommendations(
             if time.time() - cached_time < RECOMMENDATIONS_CACHE_TTL:
                 return cached_data
         
+        # Skip recommendations entirely if GCP credentials are not configured
+        if not settings.GCP_SERVICE_ACCOUNT_JSON_PATH:
+            logger.info("GCP credentials not configured — returning empty recommendations")
+            return []
+        
         # Fetch current metrics for all VMs
         collector = VMMetricsCollector()
         
@@ -564,7 +569,7 @@ async def get_migration_recommendations(
                         "status": "active"
                     })
                     
-                    # Get VM details
+                    # Get VM details (requires GCP)
                     vm_details = get_vm_details(vm_name, settings.GCP_ZONE)
                     last_started = None
                     if vm_details.get("status") == "RUNNING":
@@ -578,11 +583,14 @@ async def get_migration_recommendations(
                     )
                     vm_metrics.append(metrics)
                 except Exception as e:
-                    logger.error(f"Error collecting metrics for {vm_name}: {e}")
+                    logger.warning(f"Skipping {vm_name} for recommendations (GCP unavailable): {type(e).__name__}")
                     continue
             
+            if len(vm_metrics) < 2:
+                # Need at least 2 VMs with metrics for migration recommendations
+                continue
+            
             # Get user assignments
-            # Get all active assignments
             user_assignments = list(DB["vm_assignments"].find({"status": "active"}))
             
             # Generate recommendations
@@ -607,7 +615,8 @@ async def get_migration_recommendations(
         
         return filtered
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to generate recommendations: {str(e)}")
+        logger.error(f"Recommendations generation failed: {e}")
+        return []  # Return empty list instead of 500
 
 
 @router.post("/admin/apply-recommendation/{recommendation_id}", summary="Apply Migration Recommendation")
@@ -762,7 +771,7 @@ async def download_ssh_key(
                     zone=settings.GCP_ZONE,
                     instance=vm_name
                 )
-                instance = instance_client.get(request=metadata_request)
+                instance = _get_instance_client().get(request=metadata_request)
                 
                 # Add or update SSH keys
                 metadata_items = list(instance.metadata.items) if instance.metadata and instance.metadata.items else []
@@ -787,7 +796,7 @@ async def download_ssh_key(
                         fingerprint=instance.metadata.fingerprint if instance.metadata else None
                     )
                 )
-                operation = instance_client.set_metadata(request=update_request)
+                operation = _get_instance_client().set_metadata(request=update_request)
                 operation.result()
                 logger.info(f"SSH key injected into {vm_name}")
             except Exception as e:

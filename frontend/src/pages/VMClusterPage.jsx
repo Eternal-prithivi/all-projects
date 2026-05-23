@@ -74,12 +74,23 @@ const getRecommendations = (token, minScore = 50) =>
 function VMClusterPage() {
   const { token } = useAuth();
   const notifications = useNotifications();
-  const [currentAssignment, setCurrentAssignment] = useState(null);
-  const [allAssignments, setAllAssignments] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [generalClusterHealth, setGeneralClusterHealth] = useState(null);
-  const [storageClusterHealth, setStorageClusterHealth] = useState(null);
-  const [recommendations, setRecommendations] = useState([]);
+  const [currentAssignment, setCurrentAssignment] = useState(() => {
+    try { const d = JSON.parse(sessionStorage.getItem('cache_vm_assignments')); return d?.[0] || null; } catch { return null; }
+  });
+  const [allAssignments, setAllAssignments] = useState(() => {
+    try { return JSON.parse(sessionStorage.getItem('cache_vm_assignments')) || []; } catch { return []; }
+  });
+  // Only show loading skeleton if we have NO cached data
+  const [isLoading, setIsLoading] = useState(() => !sessionStorage.getItem('cache_vm_clusterGeneral'));
+  const [generalClusterHealth, setGeneralClusterHealth] = useState(() => {
+    try { return JSON.parse(sessionStorage.getItem('cache_vm_clusterGeneral')) || null; } catch { return null; }
+  });
+  const [storageClusterHealth, setStorageClusterHealth] = useState(() => {
+    try { return JSON.parse(sessionStorage.getItem('cache_vm_clusterStorage')) || null; } catch { return null; }
+  });
+  const [recommendations, setRecommendations] = useState(() => {
+    try { return JSON.parse(sessionStorage.getItem('cache_vm_recs')) || []; } catch { return []; }
+  });
   const [vmMetrics, setVmMetrics] = useState({});
 
   // Request VM Modal
@@ -111,10 +122,10 @@ function VMClusterPage() {
       const assignments = await getAllMyAssignments(token);
       setAllAssignments(assignments);
       setCurrentAssignment(assignments[0] || null);
+      sessionStorage.setItem('cache_vm_assignments', JSON.stringify(assignments));
     } catch (error) {
       if (error.status === 401) {
         console.error("Authentication failed - token may be expired");
-        // Could trigger re-login here
       } else if (!error.message?.includes("404")) {
         console.error("Error fetching assignments:", error);
       }
@@ -133,6 +144,8 @@ function VMClusterPage() {
       ]);
       setGeneralClusterHealth(general);
       setStorageClusterHealth(storage);
+      sessionStorage.setItem('cache_vm_clusterGeneral', JSON.stringify(general));
+      sessionStorage.setItem('cache_vm_clusterStorage', JSON.stringify(storage));
     } catch (error) {
       console.error("Error fetching cluster health:", error);
     }
@@ -144,6 +157,7 @@ function VMClusterPage() {
     try {
       const recs = await getRecommendations(token);
       setRecommendations(recs);
+      sessionStorage.setItem('cache_vm_recs', JSON.stringify(recs));
     } catch (error) {
       console.error("Error fetching recommendations:", error);
     }
@@ -175,7 +189,10 @@ function VMClusterPage() {
     if (!token) return;
 
     const loadData = async () => {
-      setIsLoading(true);
+      // Only show skeleton if we have no cached data
+      if (!sessionStorage.getItem('cache_vm_clusterGeneral')) {
+        setIsLoading(true);
+      }
       await Promise.all([
         fetchAssignment(),
         fetchClusterHealth(),
@@ -224,9 +241,6 @@ function VMClusterPage() {
       setWorkloadDescription("");
       setClusterPreference("");
       
-      // Wait 500ms for MongoDB update to propagate and cache to be invalidated
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
       await Promise.all([fetchAssignment(), fetchClusterHealth(), fetchVMMetrics()]);
     } catch (error) {
       notifications.error(error.message || "Failed to request VM");
@@ -253,9 +267,6 @@ function VMClusterPage() {
       }).then(handleApiResponse);
       
       notifications.success("VM released successfully");
-      
-      // Wait 500ms for MongoDB update to propagate and cache to be invalidated
-      await new Promise(resolve => setTimeout(resolve, 500));
       
       await Promise.all([fetchAssignment(), fetchClusterHealth(), fetchVMMetrics()]);
     } catch (error) {

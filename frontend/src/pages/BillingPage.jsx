@@ -6,10 +6,17 @@ import { PageSkeleton } from '../components/Skeletons.jsx';
 import '../styles/billing.css';
 
 function BillingPage() {
-  const [subscription, setSubscription] = useState(null);
-  const [paymentHistory, setPaymentHistory] = useState([]);
-  const [currentMonthCosts, setCurrentMonthCosts] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [subscription, setSubscription] = useState(() => {
+    try { return JSON.parse(sessionStorage.getItem('cache_billing_sub')) || null; } catch { return null; }
+  });
+  const [paymentHistory, setPaymentHistory] = useState(() => {
+    try { return JSON.parse(sessionStorage.getItem('cache_billing_history')) || []; } catch { return []; }
+  });
+  const [currentMonthCosts, setCurrentMonthCosts] = useState(() => {
+    try { return JSON.parse(sessionStorage.getItem('cache_billing_costs')) || null; } catch { return null; }
+  });
+  // Only show loading skeleton if we have NO cached data at all
+  const [loading, setLoading] = useState(() => !sessionStorage.getItem('cache_billing_sub'));
   const [processingPayment, setProcessingPayment] = useState(false);
   const navigate = useNavigate();
 
@@ -31,7 +38,10 @@ function BillingPage() {
 
   const loadBillingData = async () => {
     try {
-      setLoading(true);
+      // Only show skeleton if we don't have cached data
+      if (!sessionStorage.getItem('cache_billing_sub')) {
+        setLoading(true);
+      }
       const [subRes, historyRes] = await Promise.all([
         apiClient.get('/payments/my-subscription'),
         apiClient.get('/payments/payment-history')
@@ -39,6 +49,8 @@ function BillingPage() {
       
       setSubscription(subRes.data);
       setPaymentHistory(historyRes.data);
+      sessionStorage.setItem('cache_billing_sub', JSON.stringify(subRes.data));
+      sessionStorage.setItem('cache_billing_history', JSON.stringify(historyRes.data));
     } catch (error) {
       console.error('Failed to load billing data:', error);
       toast.error('Failed to load billing data');
@@ -51,6 +63,7 @@ function BillingPage() {
     try {
       const response = await apiClient.get('/billing/current-month-summary');
       setCurrentMonthCosts(response.data);
+      sessionStorage.setItem('cache_billing_costs', JSON.stringify(response.data));
     } catch (error) {
       console.error('Failed to load cloud costs:', error);
       // Don't show error toast, costs are optional
@@ -107,8 +120,7 @@ function BillingPage() {
     }
 
     if (!subscription?.plan_id || subscription.plan_id === 'free') {
-      toast.info('You are on the free plan. Upgrade to a paid plan first.');
-      navigate('/dashboard/pricing');
+      toast.info('Please select a plan first to enable billing.');
       return;
     }
 
@@ -428,20 +440,29 @@ function BillingPage() {
             <span className="total-label">Total Bill Due</span>
             <span className="total-amount">{formatCurrency(Math.round(billBreakdown.totalINR))}</span>
           </div>
-          <button 
-            className="btn-pay-now" 
-            onClick={handlePayNow}
-            disabled={processingPayment}
-          >
-            {processingPayment ? (
-              <>
-                <span className="spinner"></span>
-                Processing...
-              </>
-            ) : (
-              `Pay Total Bill - ${formatCurrency(Math.round(billBreakdown.totalINR))}`
-            )}
-          </button>
+          {subscription?.plan_id === 'free' ? (
+            <button 
+              className="btn-upgrade-plan" 
+              onClick={() => navigate('/dashboard/pricing')}
+            >
+              ⬆️ Upgrade Plan to Pay Bills
+            </button>
+          ) : (
+            <button 
+              className="btn-pay-now" 
+              onClick={handlePayNow}
+              disabled={processingPayment}
+            >
+              {processingPayment ? (
+                <>
+                  <span className="spinner"></span>
+                  Processing...
+                </>
+              ) : (
+                `Pay Total Bill - ${formatCurrency(Math.round(billBreakdown.totalINR))}`
+              )}
+            </button>
+          )}
           <div className="cost-note">
             💡 Pay now to cover cloud usage + subscription for the next month
           </div>

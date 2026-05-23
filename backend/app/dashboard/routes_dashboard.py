@@ -96,6 +96,94 @@ async def get_dashboard_stats(user: dict = Depends(get_current_user)):
             "vm_health": {"healthy": 0, "warning": 0, "critical": 0}
         }
 
+
+@router.get("/recent-activity")
+async def get_recent_activity(limit: int = 4, user: dict = Depends(get_current_user)):
+    """
+    Returns recent activity across VM assignments, file uploads, and security events.
+    """
+    DB = get_database()
+    activities = []
+
+    try:
+        # Recent VM assignments
+        for doc in DB["vm_assignments"].find(
+            {"user_id": user.username},
+            {"vm_name": 1, "assigned_at": 1, "status": 1, "cluster_type": 1}
+        ).sort("assigned_at", -1).limit(limit):
+            ts = doc.get("assigned_at")
+            activities.append({
+                "id": str(doc["_id"]),
+                "type": "vm",
+                "action": f"VM assigned: {doc.get('vm_name', 'N/A')}",
+                "resource": f"{doc.get('cluster_type', '')} Cluster",
+                "status": "success" if doc.get("status") == "assigned" else "info",
+                "timestamp": ts.isoformat() if ts else "",
+                "time": _relative_time(ts),
+            })
+
+        # Recent file uploads
+        for doc in DB["files"].find(
+            {"owner_username": user.username},
+            {"filename": 1, "upload_date": 1, "csp": 1, "size_bytes": 1}
+        ).sort("upload_date", -1).limit(limit):
+            ts = doc.get("upload_date")
+            activities.append({
+                "id": str(doc["_id"]),
+                "type": "upload",
+                "action": f"Uploaded: {doc.get('filename', 'N/A')}",
+                "resource": doc.get("csp", "Storage"),
+                "status": "success",
+                "timestamp": ts.isoformat() if ts else "",
+                "time": _relative_time(ts),
+            })
+
+        # Recent secure file events
+        for doc in DB["secure_files"].find(
+            {"owner_username": user.username},
+            {"filename": 1, "upload_date": 1, "is_encrypted": 1}
+        ).sort("upload_date", -1).limit(limit):
+            ts = doc.get("upload_date")
+            enc = "Encrypted" if doc.get("is_encrypted") else "Scanned"
+            activities.append({
+                "id": str(doc["_id"]),
+                "type": "security",
+                "action": f"Secure upload: {doc.get('filename', 'N/A')}",
+                "resource": enc,
+                "status": "success",
+                "timestamp": ts.isoformat() if ts else "",
+                "time": _relative_time(ts),
+            })
+
+        # Sort all activities by timestamp descending
+        activities.sort(key=lambda a: a.get("timestamp", ""), reverse=True)
+        return activities[:limit]
+
+    except Exception as e:
+        logger.error(f"Error fetching recent activity: {e}")
+        return []
+
+
+def _relative_time(dt):
+    """Convert a datetime to a human-readable relative time string."""
+    if not dt:
+        return ""
+    now = datetime.utcnow()
+    diff = now - dt
+    seconds = int(diff.total_seconds())
+    if seconds < 60:
+        return "just now"
+    minutes = seconds // 60
+    if minutes < 60:
+        return f"{minutes}m ago"
+    hours = minutes // 60
+    if hours < 24:
+        return f"{hours}h ago"
+    days = hours // 24
+    if days < 30:
+        return f"{days}d ago"
+    return dt.strftime("%b %d")
+
 @router.post("/refresh-costs")
 async def refresh_aws_costs(user: dict = Depends(get_current_user)):
     """

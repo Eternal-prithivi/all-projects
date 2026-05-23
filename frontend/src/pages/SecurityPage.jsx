@@ -3,215 +3,20 @@ import { useNotifications } from "../hooks/useNotifications";
 import EncryptionChoiceModal from "../components/EncryptionChoiceModal";
 import DecryptionPasswordModal from "../components/DecryptionPasswordModal";
 
-// --- SELF-CONTAINED DEPENDENCIES ---
-
-const mockUser = { username: "tanjiro" };
-const useAuth = () => ({
-  token: localStorage.getItem("authToken"),
-  user: mockUser,
-});
-
-const SecureFileList = ({
-  files,
-  handleDelete,
-  handleDownload,
-  handleChooseEncryption,
-  isDeleting,
-}) => (
-  <div className="files-section">
-    <h3 className="section-title">Your Secure Files</h3>
-    <table className="file-table">
-      <thead>
-        <tr>
-          <th>Filename</th>
-          <th>Size (KB)</th>
-          <th>Upload Date</th>
-          <th>Status</th>
-          <th>Actions</th>
-        </tr>
-      </thead>
-      <tbody>
-        {files && files.length > 0 ? (
-          files.map((file) => {
-            const showEncryptionChoice = file.awaiting_encryption_choice && file.encryption_status === 'awaiting_choice';
-            
-            return (
-              <tr key={file.filename}>
-                <td>{file.filename}</td>
-                <td>{(file.size_bytes / 1024).toFixed(2)}</td>
-                <td className="date-col">
-                  {file.upload_date ? new Date(file.upload_date).toLocaleDateString() : 'N/A'}
-                </td>
-                <td>
-                  {file.is_encrypted && (
-                    <span className="encrypted-tag">Encrypted</span>
-                  )}
-                  {showEncryptionChoice && (
-                    <span className="awaiting-tag">⚠️ Action Required</span>
-                  )}
-                  {!file.is_encrypted && !showEncryptionChoice && (
-                    <span className="status-tag">Normal</span>
-                  )}
-                </td>
-                <td>
-                  {isDeleting === file.filename ? (
-                    <span className="deleting-indicator">Deleting...</span>
-                  ) : showEncryptionChoice ? (
-                    <button
-                      onClick={() => handleChooseEncryption(file)}
-                      className="action-btn primary-btn"
-                    >
-                      Choose Encryption
-                    </button>
-                  ) : (
-                    <>
-                      <button
-                        onClick={() => handleDownload(file)}
-                        className="action-btn download-btn"
-                      >
-                        Download
-                      </button>
-                      <button
-                        onClick={() => handleDelete(file.filename)}
-                        className="action-btn delete-btn"
-                      >
-                        Delete
-                      </button>
-                    </>
-                  )}
-                </td>
-              </tr>
-            );
-          })
-        ) : (
-          <tr>
-            <td colSpan="5" style={{ textAlign: "center" }}>
-              No secure files have been uploaded yet.
-            </td>
-          </tr>
-        )}
-      </tbody>
-    </table>
-  </div>
-);const API_BASE_URL = import.meta.env.DEV 
-  ? 'http://localhost:8000/api'
-  : 'https://zenith-backend-707i.onrender.com/api';
-const handleResponse = async (response) => {
-  if (!response.ok) throw await response.json();
-  if (response.status === 204) return { success: true };
-  const contentType = response.headers.get("content-type");
-  return contentType?.includes("application/json") ? response.json() : {};
-};
-const status2FA = (token) =>
-  fetch(`${API_BASE_URL}/2fa/status-2fa`, {
-    headers: { Authorization: `Bearer ${token}` },
-  }).then(handleResponse);
-const enable2FA = (token) =>
-  fetch(`${API_BASE_URL}/2fa/enable-2fa`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${token}` },
-  }).then(handleResponse);
-const finalize2FA = (token, code) =>
-  fetch(`${API_BASE_URL}/2fa/finalize-2fa`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify({ code }),
-  }).then(handleResponse);
-const verify2FA = (token, code) =>
-  fetch(`${API_BASE_URL}/2fa/verify-2fa`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify({ code }),
-  }).then(handleResponse);
-const disable2FA = (token) =>
-  fetch(`${API_BASE_URL}/2fa/disable-2fa`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${token}` },
-  }).then(handleResponse);
-const listSecureFiles = (token) =>
-  fetch(`${API_BASE_URL}/security/list-secure`, {
-    headers: { Authorization: `Bearer ${token}` },
-  }).then(handleResponse);
-const deleteSecureFile = (filename, token) =>
-  fetch(`${API_BASE_URL}/security/delete/${filename}`, {
-    method: "DELETE",
-    headers: { Authorization: `Bearer ${token}` },
-  }).then(handleResponse);
-const getSecureDownloadUrl = (filename, token) =>
-  fetch(`${API_BASE_URL}/security/download/${filename}`, {
-    headers: { Authorization: `Bearer ${token}` },
-  }).then(handleResponse);
-const uploadSecureFile = (file, encrypt, token) => {
-  const formData = new FormData();
-  formData.append("file", file);
-  formData.append("encrypt_manual", encrypt);
-  return fetch(`${API_BASE_URL}/security/upload-secure`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${token}` },
-    body: formData,
-  }).then(handleResponse);
-};
-const chooseEncryption = (filename, encryptionMethod, password, token) =>
-  fetch(`${API_BASE_URL}/security/choose-encryption`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify({
-      filename,
-      encryption_method: encryptionMethod,
-      password: password || null,
-    }),
-  }).then(handleResponse);
-
-const decryptAndDownload = async (filename, password, token) => {
-  console.log('Making decrypt request for:', filename);
-  const response = await fetch(`${API_BASE_URL}/security/decrypt-download`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify({ filename, password }),
-  });
-
-  console.log('Decrypt response status:', response.status);
-  
-  if (!response.ok) {
-    const error = await response.json();
-    throw error;
-  }
-
-  // Get the blob
-  const blob = await response.blob();
-  console.log('Blob received, size:', blob.size);
-
-  // Create download link
-  const url = window.URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = filename;
-  link.style.display = 'none';
-  
-  document.body.appendChild(link);
-  console.log('Triggering download for:', filename);
-  link.click();
-  
-  setTimeout(() => {
-    document.body.removeChild(link);
-    window.URL.revokeObjectURL(url);
-    console.log('Download cleanup complete');
-  }, 100);
-
-  return { success: true, message: "File downloaded successfully" };
-};
+import { useAuth } from "../context/AuthContext.jsx";
+import {
+  status2FA,
+  enable2FA,
+  finalize2FA,
+  verify2FA,
+  disable2FA,
+  listSecureFiles,
+  deleteSecureFile,
+  getSecureDownloadUrl,
+  uploadSecureFile,
+  chooseEncryption,
+  decryptAndDownload
+} from "../api";
 
 // --- MAIN COMPONENT ---
 
@@ -221,12 +26,19 @@ function SecurityPage() {
   const [file, setFile] = useState(null);
   const [encrypt, setEncrypt] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
-  const [secureFiles, setSecureFiles] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [twoFAStatus, setTwoFAStatus] = useState({
-    enabled: false,
-    verified: false,
-    secret_exists: false,
+  const [secureFiles, setSecureFiles] = useState(() => {
+    try { return JSON.parse(sessionStorage.getItem('cache_secureFiles')) || []; } catch { return []; }
+  });
+  // Only show loading spinner if we have NO cached 2FA status
+  const [loading, setLoading] = useState(() => !sessionStorage.getItem('cache_2faStatus'));
+  const [twoFAStatus, setTwoFAStatus] = useState(() => {
+    try {
+      return JSON.parse(sessionStorage.getItem('cache_2faStatus')) || {
+        enabled: false, verified: false, secret_exists: false,
+      };
+    } catch {
+      return { enabled: false, verified: false, secret_exists: false };
+    }
   });
   const [qrCode, setQrCode] = useState(null);
   const [twoFACode, setTwoFACode] = useState("");
@@ -247,6 +59,7 @@ function SecurityPage() {
     try {
       const files = await listSecureFiles(token);
       setSecureFiles(files);
+      sessionStorage.setItem('cache_secureFiles', JSON.stringify(files));
       return files;
     } catch (err) {
       notifications.error("Could not fetch secure file list.");
@@ -282,13 +95,12 @@ function SecurityPage() {
       try {
         const res = await status2FA(token);
         setTwoFAStatus(res);
+        sessionStorage.setItem('cache_2faStatus', JSON.stringify(res));
       } catch (err) {
         if (err.detail?.includes("2FA token verification is required")) {
-          setTwoFAStatus({
-            enabled: true,
-            verified: false,
-            secret_exists: true,
-          });
+          const status = { enabled: true, verified: false, secret_exists: true };
+          setTwoFAStatus(status);
+          sessionStorage.setItem('cache_2faStatus', JSON.stringify(status));
         }
       } finally {
         setLoading(false);
@@ -823,16 +635,66 @@ function SecurityPage() {
             </button>
           </div>
         </div>
-        <SecureFileList
-          files={secureFiles}
-          handleDelete={(filename) => {
-            setFileToDelete(filename);
-            setShowModal(true);
-          }}
-          handleDownload={handleDownload}
-          handleChooseEncryption={handleChooseEncryption}
-          isDeleting={isDeleting}
-        />
+        {/* Secure Files Table */}
+        <div className="files-section">
+          <h3 className="section-title">Your Secure Files</h3>
+          <table className="file-table">
+            <thead>
+              <tr>
+                <th>Filename</th>
+                <th>Size (KB)</th>
+                <th>Upload Date</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {secureFiles && secureFiles.length > 0 ? (
+                secureFiles.map((f) => {
+                  const showEncryptionChoice = f.awaiting_encryption_choice && f.encryption_status === 'awaiting_choice';
+                  return (
+                    <tr key={f.filename}>
+                      <td>{f.filename}</td>
+                      <td>{(f.size_bytes / 1024).toFixed(2)}</td>
+                      <td className="date-col">
+                        {f.upload_date ? new Date(f.upload_date).toLocaleDateString() : 'N/A'}
+                      </td>
+                      <td>
+                        {f.is_encrypted && <span className="encrypted-tag">Encrypted</span>}
+                        {showEncryptionChoice && <span className="awaiting-tag">⚠️ Action Required</span>}
+                        {!f.is_encrypted && !showEncryptionChoice && <span className="status-tag">Normal</span>}
+                      </td>
+                      <td>
+                        {isDeleting === f.filename ? (
+                          <span className="deleting-indicator">Deleting...</span>
+                        ) : showEncryptionChoice ? (
+                          <button onClick={() => handleChooseEncryption(f)} className="action-btn primary-btn">
+                            Choose Encryption
+                          </button>
+                        ) : (
+                          <>
+                            <button onClick={() => handleDownload(f)} className="action-btn download-btn">
+                              Download
+                            </button>
+                            <button onClick={() => { setFileToDelete(f.filename); setShowModal(true); }} className="action-btn delete-btn">
+                              Delete
+                            </button>
+                          </>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })
+              ) : (
+                <tr>
+                  <td colSpan="5" style={{ textAlign: "center" }}>
+                    No secure files have been uploaded yet.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
         
         {/* Encryption Choice Modal */}
         {showEncryptionModal && fileAwaitingEncryption && (
