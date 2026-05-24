@@ -1,0 +1,525 @@
+/* ============================================
+   ZENITH LIGHT THEME
+   Warm gold-on-cream palette — premium feel
+   Applied via [data-theme="light"] on <html>
+   ============================================ */
+
+[data-theme="light"] {
+  /* Color Palette Overrides */
+  --gold-primary: #b8860b;
+  --gold-light: #d4a017;
+  --gold-dark: #8b6508;
+  --gold-glow: rgba(184, 134, 11, 0.12);
+  --gold-border: rgba(184, 134, 11, 0.2);
+
+  --bg-base: #f5f2eb;
+  --bg-surface: rgba(255, 255, 255, 0.85);
+  --bg-elevated: rgba(255, 255, 255, 0.95);
+  --bg-card: rgba(255, 255, 255, 0.7);
+  --bg-card-hover: rgba(255, 255, 255, 0.9);
+  --bg-input: rgba(245, 242, 235, 0.9);
+
+  --border-subtle: rgba(0, 0, 0, 0.04);
+  --border-default: rgba(0, 0, 0, 0.08);
+  --border-strong: rgba(0, 0, 0, 0.15);
+
+  --text-primary: #1a1a1a;
+  --text-secondary: #555555;
+  --text-muted: #999999;
+
+  --success: #16a34a;
+  --warning: #d97706;
+  --danger: #dc2626;
+  --info: #2563eb;
+
+  /* Shadows (lighter for light mode) */
+  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-elevated: 0 4px 20px rgba(0, 0, 0, 0.1);
+  --shadow-gold: 0 4px 25px rgba(184, 134, 11, 0.1);
+  --shadow-gold-lg: 0 8px 40px rgba(184, 134, 11, 0.15);
+
+  color-scheme: light;
+}
+
+/* ============================================
+   BASE ELEMENT OVERRIDES
+   ============================================ */
+
+[data-theme="light"] body {
+  background-color: var(--bg-base);
+  background-image: radial-gradient(circle at 50% 0%, rgba(184, 134, 11, 0.06) 0%, transparent 50%),
+                    radial-gradient(circle at 0% 100%, rgba(37, 99, 235, 0.03) 0%, transparent 50%);
+  color: var(--text-secondary);
+}
+
+/* Selection */
+[data-theme="light"] ::selection {
+  background-color: rgba(184, 134, 11, 0.2);
+  color: #1a1a1a;
+}
+
+/* Scrollbar */
+[data-theme="light"] ::-webkit-scrollbar-track {
+  background: var(--bg-base);
+}
+
+[data-theme="light"] ::-webkit-scrollbar-thumb {
+  background: #ccc;
+  border: 2px solid var(--bg-base);
+}
+
+[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
+  background: rgba(184, 134, 11, 0.5);
+}
+
+[data-theme="light"] ::-webkit-scrollbar-corner {
+  background: var(--bg-base);
+}
+
+/* ============================================
+   GLASS SURFACE OVERRIDE
+   ============================================ */
+[data-theme="light"] .glass-surface {
+  background: var(--bg-card);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--border-default);
+  box-shadow: var(--shadow-card);
+}
+
+/* ============================================
+   GOLD SHIMMER LINE (softer for light bg)
+   ============================================ */
+[data-theme="light"] .gold-shimmer-line {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(184, 134, 11, 0.08) 15%,
+    rgba(184, 134, 11, 0.4) 50%,
+    rgba(184, 134, 11, 0.08) 85%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+}
+
+/* ============================================
+   SIDEBAR / NAV RAIL
+   ============================================ */
+[data-theme="light"] .nav-rail {
+  background: rgba(255, 255, 255, 0.92);
+  border-right-color: var(--border-default);
+  box-shadow: 1px 0 8px rgba(0, 0, 0, 0.05);
+}
+
+[data-theme="light"] .nav-rail .nav-link {
+  color: var(--text-secondary);
+}
+
+[data-theme="light"] .nav-rail .nav-link:hover {
+  background: rgba(184, 134, 11, 0.08);
+  color: var(--text-primary);
+}
+
+[data-theme="light"] .nav-rail .nav-link.active {
+  color: var(--gold-primary);
+  background: rgba(184, 134, 11, 0.06);
+}
+
+[data-theme="light"] .nav-rail .nav-link.active::before {
+  background: var(--gold-primary);
+}
+
+/* ============================================
+   HEADER
+   ============================================ */
+[data-theme="light"] .dashboard-header {
+  background: rgba(255, 255, 255, 0.9);
+  border-bottom-color: var(--border-default);
+  backdrop-filter: blur(12px);
+}
+
+[data-theme="light"] .header-search input {
+  background: var(--bg-input);
+  border-color: var(--border-default);
+  color: var(--text-primary);
+}
+
+[data-theme="light"] .header-search input::placeholder {
+  color: var(--text-muted);
+}
+
+/* ============================================
+   DASHBOARD CARDS (Bento Grid)
+   ============================================ */
+[data-theme="light"] .bento-card,
+[data-theme="light"] .stat-card {
+  background: var(--bg-card);
+  border-color: var(--border-default);
+  box-shadow: var(--shadow-card);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+[data-theme="light"] .bento-card:hover,
+[data-theme="light"] .stat-card:hover {
+  background: var(--bg-card-hover);
+  box-shadow: var(--shadow-gold);
+  border-color: var(--gold-border);
+}
+
+[data-theme="light"] .card-title {
+  color: var(--text-primary);
+}
+
+[data-theme="light"] .stat-value {
+  color: var(--text-primary);
+}
+
+/* ============================================
+   SETTINGS PAGE
+   ============================================ */
+[data-theme="light"] .settings-card {
+  background: var(--bg-card);
+  border-color: var(--border-default);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+[data-theme="light"] .settings-card h3 {
+  color: var(--text-primary);
+}
+
+[data-theme="light"] .settings-card h3 svg {
+  color: var(--gold-primary);
+}
+
+[data-theme="light"] .setting-item {
+  background: rgba(0, 0, 0, 0.02);
+  border-color: var(--border-default);
+}
+
+[data-theme="light"] .setting-info h4 {
+  color: var(--text-primary);
+}
+
+[data-theme="light"] .setting-info p {
+  color: var(--text-secondary);
+}
+
+[data-theme="light"] .settings-select {
+  background: var(--bg-input);
+  border-color: var(--border-default);
+  color: var(--text-primary);
+}
+
+[data-theme="light"] .settings-select:focus {
+  border-color: var(--gold-primary);
+  background: rgba(255, 255, 255, 0.9);
+}
+
+[data-theme="light"] .settings-select option {
+  background: #fff;
+  color: var(--text-primary);
+}
+
+[data-theme="light"] .setting-item-full label {
+  color: var(--text-secondary);
+}
+
+[data-theme="light"] .toggle-slider {
+  background-color: rgba(0, 0, 0, 0.12);
+}
+
+[data-theme="light"] .toggle-slider:before {
+  background-color: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+}
+
+[data-theme="light"] input:checked + .toggle-slider {
+  background-color: var(--gold-primary);
+}
+
+[data-theme="light"] .btn-save {
+  background: var(--gold-primary);
+  color: #fff;
+}
+
+[data-theme="light"] .btn-save:hover {
+  background: var(--gold-dark);
+  box-shadow: 0 4px 12px rgba(184, 134, 11, 0.25);
+}
+
+/* ============================================
+   AUTH PAGES (Login/Register)
+   ============================================ */
+[data-theme="light"] .auth-container {
+  background: var(--bg-base);
+}
+
+[data-theme="light"] .auth-card,
+[data-theme="light"] .auth-form-card {
+  background: rgba(255, 255, 255, 0.85);
+  border-color: var(--border-default);
+  box-shadow: var(--shadow-elevated);
+}
+
+/* ============================================
+   DASHBOARD ENHANCED (stat cards, rings, etc.)
+   ============================================ */
+[data-theme="light"] .mc-greeting h2 {
+  color: var(--text-primary);
+}
+
+[data-theme="light"] .greeting-date {
+  color: var(--text-secondary);
+}
+
+[data-theme="light"] .quick-actions-grid .action-btn {
+  background: var(--bg-card);
+  border-color: var(--border-default);
+  color: var(--text-primary);
+}
+
+[data-theme="light"] .quick-actions-grid .action-btn:hover {
+  background: var(--bg-card-hover);
+  border-color: var(--gold-border);
+  box-shadow: var(--shadow-gold);
+}
+
+[data-theme="light"] .timeline-card {
+  background: var(--bg-card);
+  border-color: var(--border-default);
+}
+
+[data-theme="light"] .system-status-banner {
+  background: var(--bg-card);
+  border-color: var(--border-default);
+}
+
+/* ============================================
+   PROFILE / BILLING CARDS
+   ============================================ */
+[data-theme="light"] .profile-card,
+[data-theme="light"] .billing-card {
+  background: var(--bg-card);
+  border-color: var(--border-default);
+  box-shadow: var(--shadow-card);
+}
+
+/* ============================================
+   BYOC SECTION
+   ============================================ */
+[data-theme="light"] .byoc-card {
+  border-color: rgba(184, 134, 11, 0.15) !important;
+}
+
+[data-theme="light"] .byoc-provider-card {
+  background: rgba(0, 0, 0, 0.02);
+  border-color: var(--border-default);
+}
+
+[data-theme="light"] .byoc-provider-card:hover {
+  border-color: var(--border-strong);
+}
+
+[data-theme="light"] .byoc-provider-card.connected {
+  border-color: rgba(22, 163, 74, 0.3);
+  background: rgba(22, 163, 74, 0.03);
+}
+
+[data-theme="light"] .byoc-provider-info h4 {
+  color: var(--text-primary);
+}
+
+[data-theme="light"] .method-btn {
+  background: rgba(0, 0, 0, 0.02);
+  border-color: var(--border-default);
+  color: var(--text-secondary);
+}
+
+[data-theme="light"] .method-btn.active {
+  border-color: var(--gold-primary);
+  background: rgba(184, 134, 11, 0.06);
+}
+
+[data-theme="light"] .byoc-field input,
+[data-theme="light"] .byoc-field select,
+[data-theme="light"] .byoc-field textarea {
+  background: var(--bg-input);
+  border-color: var(--border-default);
+  color: var(--text-primary);
+}
+
+[data-theme="light"] .byoc-field input:focus,
+[data-theme="light"] .byoc-field select:focus,
+[data-theme="light"] .byoc-field textarea:focus {
+  border-color: var(--gold-primary);
+}
+
+[data-theme="light"] .policy-json {
+  background: #f5f2eb;
+  border-color: var(--border-default);
+  color: #16a34a;
+}
+
+[data-theme="light"] .readonly-value {
+  background: rgba(184, 134, 11, 0.05);
+  border-color: rgba(184, 134, 11, 0.15);
+}
+
+[data-theme="light"] .readonly-value code {
+  color: var(--gold-primary);
+}
+
+/* ============================================
+   API KEY ITEMS
+   ============================================ */
+[data-theme="light"] .api-key-item {
+  background: rgba(0, 0, 0, 0.02);
+  border-color: var(--border-default);
+}
+
+[data-theme="light"] .api-key-info h4 {
+  color: var(--text-primary);
+}
+
+[data-theme="light"] .api-key-info code {
+  background: rgba(0, 0, 0, 0.04);
+  border-color: var(--border-default);
+  color: var(--gold-primary);
+}
+
+/* ============================================
+   STORAGE PAGE
+   ============================================ */
+[data-theme="light"] .storage-container {
+  color: var(--text-primary);
+}
+
+/* ============================================
+   HOME PAGE (public)
+   ============================================ */
+[data-theme="light"] .home-hero {
+  background: linear-gradient(135deg, var(--bg-base) 0%, rgba(184, 134, 11, 0.05) 100%);
+}
+
+/* ============================================
+   FOOTER
+   ============================================ */
+[data-theme="light"] .footer {
+  background: rgba(255, 255, 255, 0.85);
+  border-top-color: var(--border-default);
+}
+
+[data-theme="light"] .footer a {
+  color: var(--text-secondary);
+}
+
+[data-theme="light"] .footer a:hover {
+  color: var(--gold-primary);
+}
+
+/* ============================================
+   MODALS & OVERLAYS
+   ============================================ */
+[data-theme="light"] .modal-overlay {
+  background: rgba(0, 0, 0, 0.3);
+}
+
+[data-theme="light"] .modal-content {
+  background: rgba(255, 255, 255, 0.95);
+  border-color: var(--border-default);
+  box-shadow: var(--shadow-elevated);
+}
+
+/* ============================================
+   FORM ELEMENTS GLOBAL
+   ============================================ */
+[data-theme="light"] input,
+[data-theme="light"] textarea,
+[data-theme="light"] select {
+  color: var(--text-primary);
+}
+
+[data-theme="light"] input::placeholder,
+[data-theme="light"] textarea::placeholder {
+  color: var(--text-muted);
+}
+
+/* ============================================
+   FREE PLAN CARD (Settings Billing)
+   ============================================ */
+[data-theme="light"] .free-plan-card {
+  background: rgba(184, 134, 11, 0.04);
+  border-color: rgba(184, 134, 11, 0.15);
+}
+
+/* ============================================
+   COMING SOON BADGE
+   ============================================ */
+[data-theme="light"] .coming-soon-badge {
+  background: rgba(0, 0, 0, 0.06);
+  color: var(--text-muted);
+  border-color: var(--border-default);
+}
+
+/* ============================================
+   404 / ERROR PAGES
+   ============================================ */
+[data-theme="light"] .error-page-container {
+  background: var(--bg-base);
+}
+
+/* ============================================
+   BREADCRUMBS
+   ============================================ */
+[data-theme="light"] .breadcrumb-link {
+  color: var(--text-secondary);
+}
+
+[data-theme="light"] .breadcrumb-link:hover {
+  color: var(--gold-primary);
+}
+
+/* ============================================
+   LOADING SPINNER
+   ============================================ */
+[data-theme="light"] .loading-spinner-text {
+  color: var(--text-secondary);
+}
+
+/* ============================================
+   MOBILE BOTTOM TAB BAR
+   ============================================ */
+[data-theme="light"] .mobile-tab-bar {
+  background: rgba(255, 255, 255, 0.95);
+  border-top-color: var(--border-default);
+  backdrop-filter: blur(12px);
+}
+
+[data-theme="light"] .mobile-tab-bar .tab-item {
+  color: var(--text-muted);
+}
+
+[data-theme="light"] .mobile-tab-bar .tab-item.active {
+  color: var(--gold-primary);
+}
+
+/* ============================================
+   TRANSITIONS — smooth theme switch
+   ============================================ */
+html[data-theme] body,
+html[data-theme] .nav-rail,
+html[data-theme] .dashboard-header,
+html[data-theme] .bento-card,
+html[data-theme] .stat-card,
+html[data-theme] .settings-card,
+html[data-theme] .setting-item,
+html[data-theme] .byoc-provider-card,
+html[data-theme] .footer,
+html[data-theme] .mobile-tab-bar {
+  transition: background-color 0.35s ease,
+              color 0.35s ease,
+              border-color 0.35s ease,
+              box-shadow 0.35s ease;
+}

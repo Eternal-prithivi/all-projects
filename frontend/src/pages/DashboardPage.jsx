@@ -1,7 +1,10 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useAuth } from "../context/AuthContext.jsx";
+import { usePreferences } from "../context/PreferencesContext.jsx";
 import { getDashboardStats, apiClient } from "../api.js";
 import StatCard from "../components/dashboard/StatCard.jsx";
+import SparklineChart from "../components/dashboard/SparklineChart.jsx";
+import ProgressRing from "../components/dashboard/ProgressRing.jsx";
 import LoadingSpinner from "../components/LoadingSpinner.jsx";
 import EmptyState from "../components/EmptyState.jsx";
 import {
@@ -12,11 +15,42 @@ import {
 } from "../components/dashboard/Icons.jsx";
 import { useNavigate } from 'react-router-dom';
 import { useNotifications } from "../hooks/useNotifications.js";
+import { useCountUp } from "../hooks/useCountUp.js";
 import { DashboardSkeleton } from "../components/Skeletons.jsx";
 import '../styles/dashboard-enhanced.css';
 
+// --- Helpers ---
+
+const getGreeting = () => {
+  const hour = new Date().getHours();
+  if (hour < 12) return { text: "Good morning", emoji: "☀️" };
+  if (hour < 17) return { text: "Good afternoon", emoji: "🌤️" };
+  if (hour < 21) return { text: "Good evening", emoji: "🌅" };
+  return { text: "Good night", emoji: "🌙" };
+};
+
+// getFormattedDate is now handled by PreferencesContext.formatDateFriendly()
+
+/**
+ * Generate synthetic 7-day cost trend data from a monthly total.
+ * This creates a realistic-looking curve until the real cost-trend API exists.
+ */
+const generateCostTrend = (monthlyTotal) => {
+  const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  const dailyAvg = monthlyTotal / 30;
+  // Create a realistic variation pattern
+  const multipliers = [0.85, 1.1, 0.95, 1.2, 1.05, 0.7, 0.6];
+  return days.map((day, i) => ({
+    name: day,
+    value: Math.round(dailyAvg * multipliers[i] * 100) / 100,
+  }));
+};
+
+// --- Main Component ---
+
 function DashboardPage() {
   const { token, user } = useAuth();
+  const { formatCurrency, formatDateFriendly, currencySymbol } = usePreferences();
   const navigate = useNavigate();
   const notifications = useNotifications();
   const [stats, setStats] = useState(null);
@@ -29,6 +63,26 @@ function DashboardPage() {
   const [isRefreshingCosts, setIsRefreshingCosts] = useState(false);
   const [lastCostUpdate, setLastCostUpdate] = useState(null);
 
+  const greeting = useMemo(getGreeting, []);
+  const formattedDate = useMemo(() => formatDateFriendly(new Date()), [formatDateFriendly]);
+
+  // Animated counters
+  const animatedCost = useCountUp(stats?.monthly_costs || 0, 1400, 2);
+  const animatedVMs = useCountUp(stats?.active_vms || 0, 1000);
+  const animatedAlerts = useCountUp(stats?.security_alerts || 0, 800);
+
+  // Synthetic sparkline data
+  const sparklineData = useMemo(() => {
+    if (!stats) return [];
+    return generateCostTrend(stats.monthly_costs);
+  }, [stats?.monthly_costs]);
+
+  // Storage percentage (mock: 82% as shown in design)
+  const storagePercentage = useMemo(() => {
+    if (!stats) return 0;
+    return Math.min(Math.round((stats.storage_used_tb / 5) * 100), 100); // 5TB assumed max
+  }, [stats?.storage_used_tb]);
+
   useEffect(() => {
     fetchDashboardData();
   }, [token]);
@@ -40,38 +94,32 @@ function DashboardPage() {
     setError(null);
     
     try {
-      // Fetch dashboard stats
       const statsData = await getDashboardStats(token);
       setStats(statsData);
       
-      // Set VM health from API response
       if (statsData.vm_health) {
         setVmHealth(statsData.vm_health);
       }
 
-      // Fetch budgets
       try {
         const budgetResponse = await apiClient.get('/budgets/status');
-        setBudgets(budgetResponse.data.slice(0, 3)); // Top 3 budgets
+        setBudgets(budgetResponse.data.slice(0, 3));
       } catch (err) {
         console.log('Budgets not available');
       }
 
-      // Fetch recent activity from API
       try {
-        const activityResponse = await apiClient.get('/dashboard/recent-activity?limit=4');
+        const activityResponse = await apiClient.get('/dashboard/recent-activity?limit=6');
         setRecentActivity(activityResponse.data || []);
       } catch (err) {
         console.log('Activity data not available');
         setRecentActivity([]);
       }
       
-      // Set cost trend based on actual data
       setCostTrend(statsData.monthly_costs > 0 ? 'up' : 'stable');
     } catch (error) {
       console.error("Failed to fetch dashboard data:", error);
       setError("Failed to load dashboard data. Please try again.");
-      // Only show notification on error
       notifications.error('Failed to load dashboard data');
     } finally {
       setIsLoading(false);
@@ -84,7 +132,6 @@ function DashboardPage() {
       async () => {
         const response = await apiClient.post('/dashboard/refresh-costs');
         if (response.data.success) {
-          // Update stats with new cost data
           setStats(prevStats => ({
             ...prevStats,
             monthly_costs: response.data.monthly_costs
@@ -96,7 +143,8 @@ function DashboardPage() {
       },
       {
         loadingMessage: 'Refreshing cost data...',
-        getSuccessMessage: (result) => `Cost data refreshed: $${result.monthly_costs.toFixed(2)} (Note: This action costs $0.01)`,
+        getSuccessMessage: (result) => `Cost data refreshed: ${formatCurrency(result.monthly_costs)}`,
+
         errorMessage: 'Failed to refresh cost data',
       }
     ).catch((error) => {
@@ -104,6 +152,16 @@ function DashboardPage() {
     }).finally(() => {
       setIsRefreshingCosts(false);
     });
+  };
+
+  const getActivityIcon = (type) => {
+    switch(type) {
+      case 'vm': return '🖥️';
+      case 'storage': return '💾';
+      case 'cost': return '💰';
+      case 'security': return '🔒';
+      default: return '📋';
+    }
   };
 
   if (isLoading) {
@@ -126,237 +184,188 @@ function DashboardPage() {
     return <LoadingSpinner size="large" text="Initializing..." />;
   }
 
-  const getActivityIcon = (type) => {
-    switch(type) {
-      case 'vm': return '🖥️';
-      case 'storage': return '💾';
-      case 'cost': return '💰';
-      case 'security': return '🔒';
-      default: return '📋';
-    }
-  };
-
-  const getStatusColor = (status) => {
-    switch(status) {
-      case 'success': return '#28a745';
-      case 'warning': return '#ffc107';
-      case 'critical': return '#dc3545';
-      default: return '#6c757d';
-    }
-  };
+  const totalVMs = vmHealth.healthy + vmHealth.warning + vmHealth.critical;
 
   return (
-    <>
-      <div className="dashboard-overview">
-        <div className="welcome-section">
-          <h2>Dashboard Overview</h2>
-          <p>Welcome back, {user.username}! Here's a snapshot of your cloud environment.</p>
-        </div>
-
-        {/* Main Stats Grid */}
-        <div className="stats-grid">
-          <StatCard
-            title="Monthly Costs"
-            value={`$${stats.monthly_costs.toLocaleString()}`}
-            icon={<IconDollarSign />}
-            type="costs"
-            trend={costTrend}
-            trendValue="+12.5%"
-            action={
-              <button 
-                className="refresh-costs-btn" 
-                onClick={refreshCosts}
-                disabled={isRefreshingCosts}
-                title="Refresh cost data from AWS (costs $0.01)"
-              >
-                {isRefreshingCosts ? '🔄' : '↻'} Refresh
-              </button>
-            }
-            subtitle={lastCostUpdate ? `Updated: ${lastCostUpdate}` : 'Using cached data'}
-          />
-          <StatCard
-            title="Active VMs"
-            value={stats.active_vms}
-            icon={<IconServer />}
-            type="vms"
-            subtitle={`${vmHealth.healthy} healthy, ${vmHealth.warning} warnings`}
-          />
-          <StatCard
-            title="Storage Used"
-            value={`${stats.storage_used_tb} TB`}
-            icon={<IconHardDrive />}
-            type="storage"
-            subtitle="82% of capacity"
-          />
-          <StatCard
-            title="Security Alerts"
-            value={stats.security_alerts}
-            icon={<IconShieldCheck />}
-            type="security"
-            subtitle={stats.security_alerts > 0 ? "Needs attention" : "All clear"}
-          />
-        </div>
-
-        {/* Secondary Info Grid */}
-        <div className="info-grid">
-          {/* VM Health Overview */}
-          <div className="info-card vm-health-card">
-            <h3>VM Health Status</h3>
-            <div className="vm-health-chart">
-              <div className="health-stat">
-                <div className="health-circle healthy"></div>
-                <div className="health-info">
-                  <span className="health-count">{vmHealth.healthy}</span>
-                  <span className="health-label">Healthy</span>
-                </div>
-              </div>
-              <div className="health-stat">
-                <div className="health-circle warning"></div>
-                <div className="health-info">
-                  <span className="health-count">{vmHealth.warning}</span>
-                  <span className="health-label">Warning</span>
-                </div>
-              </div>
-              <div className="health-stat">
-                <div className="health-circle critical"></div>
-                <div className="health-info">
-                  <span className="health-count">{vmHealth.critical}</span>
-                  <span className="health-label">Critical</span>
-                </div>
-              </div>
-            </div>
-            <button className="view-details-btn" onClick={() => navigate('/dashboard/vmcluster')}>
-              View VM Cluster →
-            </button>
-          </div>
-
-          {/* Budget Status */}
-          <div className="info-card budget-status-card">
-            <h3>Budget Status</h3>
-            {budgets.length > 0 ? (
-              <div className="budget-list">
-                {budgets.map((budgetStatus) => {
-                  const budget = budgetStatus.budget || budgetStatus;
-                  const spend = budget.current_spend || 0;
-                  const amount = budget.amount || 1;
-                  const utilization = budgetStatus.utilization || ((spend / amount) * 100);
-                  const isExceeded = budgetStatus.is_exceeded || spend >= amount;
-                  const isNearLimit = budgetStatus.is_near_limit || utilization >= 80;
-                  
-                  return (
-                    <div key={budget.id} className="budget-item">
-                      <div className="budget-name">{budget.name}</div>
-                      <div className="budget-bar-container">
-                        <div 
-                          className={`budget-bar ${isExceeded ? 'exceeded' : isNearLimit ? 'warning' : 'normal'}`}
-                          style={{ width: `${Math.min(utilization, 100)}%` }}
-                        ></div>
-                      </div>
-                      <div className="budget-info-text">
-                        ${spend.toFixed(2)} / ${amount.toFixed(2)} 
-                        <span className="budget-percentage"> ({utilization.toFixed(0)}%)</span>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <p className="no-data">No budgets configured</p>
-            )}
-            <button className="view-details-btn" onClick={() => navigate('/dashboard/costs')}>
-              Manage Budgets →
-            </button>
-          </div>
-
-          {/* Recent Activity */}
-          <div className="info-card activity-card">
-            <h3>Recent Activity</h3>
-            {recentActivity.length > 0 ? (
-              <div className="activity-list">
-                {recentActivity.map((activity, index) => (
-                  <div key={activity.id || index} className="activity-item">
-                    <span className="activity-icon">{getActivityIcon(activity.type || activity.action_type)}</span>
-                    <div className="activity-details">
-                      <div className="activity-action">{activity.action || activity.description}</div>
-                      <div className="activity-resource">{activity.resource || activity.details || ''}</div>
-                    </div>
-                    <div className="activity-time">{activity.time || activity.timestamp || ''}</div>
-                    <div 
-                      className="activity-status-dot"
-                      style={{ backgroundColor: getStatusColor(activity.status || 'success') }}
-                    ></div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="no-data">No recent activity — start managing your cloud resources!</p>
-            )}
-          </div>
-
-          {/* Quick Actions */}
-          <div className="info-card quick-actions-card">
-            <h3>Quick Actions</h3>
-            <div className="quick-actions-grid">
-              <button 
-                className="action-btn" 
-                type="button"
-                onClick={(e) => {
-                  e.preventDefault();
-                  navigate('/dashboard/vmcluster');
-                }}
-              >
-                <span className="action-icon">🖥️</span>
-                <span className="action-text">Manage VMs</span>
-              </button>
-              <button 
-                className="action-btn" 
-                type="button"
-                onClick={(e) => {
-                  e.preventDefault();
-                  navigate('/dashboard/storage');
-                }}
-              >
-                <span className="action-icon">📁</span>
-                <span className="action-text">Upload Files</span>
-              </button>
-              <button 
-                className="action-btn" 
-                type="button"
-                onClick={(e) => {
-                  e.preventDefault();
-                  navigate('/dashboard/costs');
-                }}
-              >
-                <span className="action-icon">📊</span>
-                <span className="action-text">Cost Analysis</span>
-              </button>
-              <button 
-                className="action-btn" 
-                type="button"
-                onClick={(e) => {
-                  e.preventDefault();
-                  navigate('/dashboard/security');
-                }}
-              >
-                <span className="action-icon">🔒</span>
-                <span className="action-text">Security</span>
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* System Status Banner */}
-        <div className="system-status-banner">
-          <div className="status-indicator">
-            <span className="status-dot healthy"></span>
-            <span>All Systems Operational</span>
-          </div>
-          <div className="status-info">
-            <span>Last updated: {new Date().toLocaleTimeString()}</span>
-          </div>
+    <div className="dashboard-overview">
+      {/* ============ GREETING ============ */}
+      <div className="mc-greeting">
+        <div className="mc-greeting-text">
+          <h2>
+            {greeting.text}, {user.username}
+            <span className="greeting-emoji">{greeting.emoji}</span>
+          </h2>
+          <p className="greeting-date">{formattedDate} — Here's your cloud overview</p>
         </div>
       </div>
-    </>
+
+      {/* ============ BENTO GRID ============ */}
+      <div className="bento-grid">
+        {/* --- Cost Overview (Large, 2-col, 2-row) --- */}
+        <StatCard
+          title="Cost Overview"
+          value={`${currencySymbol}${animatedCost}`}
+          icon={<IconDollarSign />}
+          type="costs"
+          size="lg"
+          trend={costTrend}
+          trendValue="+12.5%"
+          action={
+            <button 
+              className="refresh-costs-btn" 
+              onClick={refreshCosts}
+              disabled={isRefreshingCosts}
+              title="Refresh cost data from AWS"
+            >
+              {isRefreshingCosts ? '🔄' : '↻'} Refresh
+            </button>
+          }
+          subtitle={lastCostUpdate ? `Updated: ${lastCostUpdate}` : '7-day spending trend'}
+        >
+          <SparklineChart data={sparklineData} height={140} showXAxis={true} />
+        </StatCard>
+
+        {/* --- VM Health (Medium) --- */}
+        <StatCard
+          title="VM Health"
+          icon={<IconServer />}
+          type="vms"
+          size="md"
+          value={`${animatedVMs} Active`}
+        >
+          <div className="vm-rings-row">
+            <div className="vm-ring-item">
+              <ProgressRing 
+                percentage={totalVMs > 0 ? (vmHealth.healthy / Math.max(totalVMs, 1)) * 100 : 0} 
+                color="var(--success)" 
+                size={56} 
+                strokeWidth={5}
+              >
+                <span className="ring-count">{vmHealth.healthy}</span>
+              </ProgressRing>
+              <span className="ring-label">Healthy</span>
+            </div>
+            <div className="vm-ring-item">
+              <ProgressRing 
+                percentage={totalVMs > 0 ? (vmHealth.warning / Math.max(totalVMs, 1)) * 100 : 0} 
+                color="var(--warning)" 
+                size={56} 
+                strokeWidth={5}
+              >
+                <span className="ring-count">{vmHealth.warning}</span>
+              </ProgressRing>
+              <span className="ring-label">Warning</span>
+            </div>
+            <div className="vm-ring-item">
+              <ProgressRing 
+                percentage={totalVMs > 0 ? (vmHealth.critical / Math.max(totalVMs, 1)) * 100 : 0} 
+                color="var(--danger)" 
+                size={56} 
+                strokeWidth={5}
+              >
+                <span className="ring-count">{vmHealth.critical}</span>
+              </ProgressRing>
+              <span className="ring-label">Critical</span>
+            </div>
+          </div>
+          <button className="view-details-btn" onClick={() => navigate('/dashboard/vmcluster')}>
+            View VM Cluster →
+          </button>
+        </StatCard>
+
+        {/* --- Storage Used (Small) --- */}
+        <StatCard
+          title="Storage"
+          icon={<IconHardDrive />}
+          type="storage"
+          size="sm"
+        >
+          <div className="storage-ring-center">
+            <ProgressRing 
+              percentage={storagePercentage} 
+              color="var(--gold-primary)" 
+              size={90} 
+              strokeWidth={7}
+            >
+              <span className="ring-value">{stats.storage_used_tb}</span>
+              <span className="ring-unit">TB</span>
+            </ProgressRing>
+            <span className="storage-capacity">{storagePercentage}% of capacity</span>
+          </div>
+        </StatCard>
+
+        {/* --- Security Alerts (Small) --- */}
+        <StatCard
+          title="Security"
+          icon={<IconShieldCheck />}
+          type="security"
+          size="sm"
+          value={animatedAlerts}
+          subtitle={stats.security_alerts > 0 ? "Needs attention" : "All clear"}
+        >
+          <button className="view-details-btn" onClick={() => navigate('/dashboard/security')}>
+            View Security →
+          </button>
+        </StatCard>
+      </div>
+
+      {/* ============ QUICK ACTIONS + ACTIVITY ============ */}
+      <div className="mc-bottom-row">
+        {/* Quick Actions */}
+        <div className="bento-card mc-quick-actions">
+          <h3 className="card-title">Quick Actions</h3>
+          <div className="quick-actions-grid">
+            <button className="action-btn" type="button" onClick={() => navigate('/dashboard/vmcluster')}>
+              <span className="action-icon">🖥️</span>
+              <span className="action-text">Manage VMs</span>
+            </button>
+            <button className="action-btn" type="button" onClick={() => navigate('/dashboard/storage')}>
+              <span className="action-icon">📁</span>
+              <span className="action-text">Upload Files</span>
+            </button>
+            <button className="action-btn" type="button" onClick={() => navigate('/dashboard/costs')}>
+              <span className="action-icon">📊</span>
+              <span className="action-text">Cost Analysis</span>
+            </button>
+            <button className="action-btn" type="button" onClick={() => navigate('/dashboard/security')}>
+              <span className="action-icon">🔒</span>
+              <span className="action-text">Security</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Activity Timeline (horizontal scroll) */}
+        <div className="bento-card mc-activity-timeline">
+          <h3 className="card-title">Recent Activity</h3>
+          {recentActivity.length > 0 ? (
+            <div className="activity-scroll">
+              {recentActivity.map((activity, index) => (
+                <div key={activity.id || index} className="timeline-card">
+                  <span className="timeline-icon">{getActivityIcon(activity.type || activity.action_type)}</span>
+                  <div className="timeline-content">
+                    <span className="timeline-action">{activity.action || activity.description}</span>
+                    <span className="timeline-time">{activity.time || activity.timestamp || ''}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="no-data">No recent activity — start managing your cloud resources!</p>
+          )}
+        </div>
+      </div>
+
+      {/* System Status */}
+      <div className="system-status-banner">
+        <div className="status-indicator">
+          <span className="status-dot healthy"></span>
+          <span>All Systems Operational</span>
+        </div>
+        <div className="status-info">
+          <span>Last updated: {new Date().toLocaleTimeString()}</span>
+        </div>
+      </div>
+    </div>
   );
 }
 

@@ -265,3 +265,32 @@ async def update_payment_method(
         return {"success": True, "message": "Payment method updated"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to update payment method: {str(e)}")
+
+
+@router.get("/preferences-summary")
+async def get_preferences_summary(current_user: User = Depends(get_current_user)):
+    """
+    Lightweight endpoint returning just notification preferences.
+    Designed for backend services to check before sending emails.
+    """
+    try:
+        users_collection = DB["users"]
+        user = users_collection.find_one(
+            {"username": current_user.username},
+            {"settings.notifications": 1, "_id": 0}
+        )
+
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        notif_settings = user.get("settings", {}).get("notifications", {})
+
+        return {
+            "username": current_user.username,
+            "notifications": NotificationSettings(**notif_settings).model_dump(),
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch preferences summary: {str(e)}")
+
