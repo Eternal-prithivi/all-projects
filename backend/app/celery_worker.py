@@ -16,6 +16,7 @@ celery_app = Celery(
         "app.budgets.tasks",  # Budget monitoring and alerts
         "app.security.tasks_alerts",  # Security alert pipeline (email + SMS)
         "app.ml.tasks_feedback",  # Phase 8 feedback evaluation/retraining readiness
+        "app.provision.tasks",  # Phase 11 Terraform drift detection
     ] 
 )
 
@@ -81,7 +82,14 @@ celery_app.conf.beat_schedule = {
         'task': 'retrain_ml_models_from_feedback',
         'schedule': crontab(day_of_week=0, hour=3, minute=30),  # Sunday 3:30 AM UTC
     },
+
+    # Phase 11: Terraform drift detection
+    'check-provision-drift-daily': {
+        'task': 'app.provision.tasks.scheduled_drift_check',
+        'schedule': crontab(hour=6, minute=0),  # Every day at 6 AM UTC
+    },
 }
 
 # Optional but recommended: Set the timezone to ensure the schedule runs predictably.
 celery_app.conf.timezone = 'UTC'
+

@@ -1,0 +1,86 @@
+rules:
+- name: public_s3_bucket
+  description: 'S3 bucket is configured to allow public access. Public S3 buckets
+    are a leading cause of data breaches. Deploy will be blocked until this is fixed.
+
+    '
+  severity: block
+  condition: s3_bucket_public == True
+- name: open_ssh_port
+  description: 'SSH port 22 is open to the entire internet (0.0.0.0/0). This exposes
+    the server to brute-force attacks. Restrict SSH to a specific IP range.
+
+    '
+  severity: block
+  condition: ssh_open_to_world == True
+- name: open_rdp_port
+  description: 'RDP port 3389 is open to the entire internet (0.0.0.0/0). This is
+    a critical security risk. Restrict RDP to a specific IP range.
+
+    '
+  severity: block
+  condition: rdp_open_to_world == True
+- name: iam_wildcard_permissions
+  description: 'IAM policy contains wildcard (*) permissions. This violates least
+    privilege and grants excessive access. Use specific actions and resources.
+
+    '
+  severity: block
+  condition: iam_wildcard == True
+- name: expensive_ec2_instance
+  description: 'EC2 instance type is not free-tier eligible. This will incur real
+    AWS costs. For development and testing, use t2.micro (free for 12 months on new
+    accounts).
+
+    '
+  severity: warning
+  condition: instance_type not in ['t2.micro', 't3.micro', 't4g.micro']
+- name: missing_s3_encryption
+  description: 'S3 bucket does not have server-side encryption enabled. Enable AES256
+    encryption to protect data at rest. Required for most compliance frameworks.
+
+    '
+  severity: warning
+  condition: s3_encryption == False
+- name: missing_resource_tags
+  description: 'Resources are missing tags. Tags are required for cost attribution,
+    ownership tracking, and governance. Add at minimum: Owner and Project tags.
+
+    '
+  severity: warning
+  condition: tags is None or tags == {}
+- name: cloudtrail_disabled
+  description: >-
+    AWS CloudTrail is not enabled. CloudTrail records all API calls for
+    audit purposes. Strongly recommended for any production environment.
+  severity: warning
+  condition: cloudtrail_enabled == False
+
+- name: s3_missing_bucket_name
+  description: >-
+    S3 is enabled but no bucket name is specified. S3 bucket names must be
+    globally unique. Deployment will fail without a valid bucket name.
+  severity: block
+  condition: enable_s3 == True and (bucket_name is None or bucket_name == '')
+
+- name: high_budget_limit
+  description: >-
+    Budget limit is set above $10/month. For development and testing environments,
+    keep budgets low to avoid unexpected charges. Review if this is intentional.
+  severity: warning
+  condition: budget_limit is not None and int(budget_limit) > 10
+
+- name: production_without_monitoring
+  description: >-
+    EC2 is enabled in a production environment but CloudWatch monitoring is
+    disabled. Production workloads should always have monitoring and alerting
+    configured to detect issues early.
+  severity: warning
+  condition: environment == 'production' and enable_ec2 == True and enable_cloudwatch == False
+
+- name: ec2_without_vpc
+  description: >-
+    EC2 is enabled but VPC is disabled. EC2 instances require a VPC for network
+    isolation and security group assignment. Enable VPC when using EC2.
+  severity: block
+  condition: enable_ec2 == True and enable_vpc == False

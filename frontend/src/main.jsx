@@ -56,6 +56,7 @@ const AccessDeniedPage = lazy(() => import("./pages/AccessDeniedPage.jsx"));
 const NotFoundPage = lazy(() => import("./pages/NotFoundPage.jsx"));
 const ServerErrorPage = lazy(() => import("./pages/ServerErrorPage.jsx"));
 const ServiceUnavailablePage = lazy(() => import("./pages/ServiceUnavailablePage.jsx"));
+const ProvisionPage = lazy(() => import("./pages/ProvisionPage.jsx"));
 
 // Admin pages (lazy loaded - only for admins)
 const AdminLayout = lazy(() => import("./components/admin/AdminLayout.jsx"));
@@ -108,6 +109,7 @@ const router = createBrowserRouter([
               { path: "security-settings", element: <Suspense fallback={<LazyLoadFallback />}><SecuritySettingsPage /></Suspense> },
               { path: "profile", element: <Suspense fallback={<LazyLoadFallback />}><ProfilePage /></Suspense> },
               { path: "settings", element: <Suspense fallback={<LazyLoadFallback />}><SettingsPage /></Suspense> },
+              { path: "provision", element: <Suspense fallback={<LazyLoadFallback />}><ProvisionPage /></Suspense> },
             ],
           },
           {

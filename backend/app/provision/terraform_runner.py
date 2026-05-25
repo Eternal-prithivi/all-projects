@@ -1,0 +1,287 @@
+# =============================================================================
+# MODULE: provision/terraform_runner.py
+# PURPOSE: Wraps Terraform CLI subprocess calls — plan, apply, destroy, init
+# USED BY: routes_provision.py (all deploy endpoints), tasks.py (drift check)
+# DEPENDS ON: Terraform CLI installed on server, BYOC credentials for AWS auth
+# DO NOT:
+#   - Run terraform commands without injecting BYOC credentials as env vars
+#   - Remove -no-color flag — SSE streaming parses plain text output
+#   - Remove -input=false — prevents terraform from waiting for stdin
+# =============================================================================
+from __future__ import annotations
+
+import asyncio
+import json
+import logging
+import os
+import shutil
+import subprocess
+import tempfile
+from pathlib import Path
+from typing import Any, AsyncGenerator, Optional
+
+logger = logging.getLogger(__name__)
+
+# Path to the Terraform modules/configs inside Zenith's backend
+TERRAFORM_ROOT = Path(__file__).resolve().parent.parent.parent / "terraform"
+
+
+def check_terraform_installed() -> bool:
+    """Check if the terraform CLI is available on PATH."""
+    return shutil.which("terraform") is not None
+
+
+def get_terraform_version() -> Optional[str]:
+    """Return the installed terraform version string, or None if not installed."""
+    try:
+        result = subprocess.run(
+            ["terraform", "version", "-json"],
+            capture_output=True, text=True, timeout=10,
+        )
+        if result.returncode == 0:
+            data = json.loads(result.stdout)
+            return data.get("terraform_version", "unknown")
+    except Exception:
+        pass
+    return None
+
+
+class TerraformRunner:
+    """
+    Manages Terraform operations for a single user deployment.
+
+    Each deployment gets its own workspace directory (copy of TERRAFORM_ROOT)
+    so multiple users' deployments don't collide.
+    """
+
+    def __init__(self, workspace_dir: str, aws_credentials: Optional[dict] = None):
+        """
+        Args:
+            workspace_dir: Absolute path to the workspace for this deployment.
+            aws_credentials: Dict with AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY,
+                             AWS_SESSION_TOKEN (from BYOC STS resolution).
+        """
+        self.workspace_dir = Path(workspace_dir)
+        self.aws_credentials = aws_credentials or {}
+
+    def _get_env(self) -> dict[str, str]:
+        """Build environment variables for terraform subprocess."""
+        env = os.environ.copy()
+        # Inject BYOC AWS credentials if provided
+        if self.aws_credentials:
+            if "AWS_ACCESS_KEY_ID" in self.aws_credentials:
+                env["AWS_ACCESS_KEY_ID"] = self.aws_credentials["AWS_ACCESS_KEY_ID"]
+            if "AWS_SECRET_ACCESS_KEY" in self.aws_credentials:
+                env["AWS_SECRET_ACCESS_KEY"] = self.aws_credentials["AWS_SECRET_ACCESS_KEY"]
+            if "AWS_SESSION_TOKEN" in self.aws_credentials:
+                env["AWS_SESSION_TOKEN"] = self.aws_credentials["AWS_SESSION_TOKEN"]
+            if "AWS_DEFAULT_REGION" in self.aws_credentials:
+                env["AWS_DEFAULT_REGION"] = self.aws_credentials["AWS_DEFAULT_REGION"]
+        return env
+
+    def init(self) -> dict[str, Any]:
+        """Run terraform init in the workspace."""
+        try:
+            result = subprocess.run(
+                ["terraform", "init", "-input=false", "-no-color"],
+                capture_output=True, text=True, timeout=120,
+                cwd=str(self.workspace_dir),
+                env=self._get_env(),
+            )
+            return {
+                "success": result.returncode == 0,
+                "output": result.stdout,
+                "error": result.stderr if result.returncode != 0 else None,
+            }
+        except subprocess.TimeoutExpired:
+            return {"success": False, "output": "", "error": "Terraform init timed out (120s)"}
+        except Exception as e:
+            return {"success": False, "output": "", "error": str(e)}
+
+    def plan(self) -> dict[str, Any]:
+        """Run terraform plan and return the result."""
+        try:
+            result = subprocess.run(
+                ["terraform", "plan", "-input=false", "-no-color"],
+                capture_output=True, text=True, timeout=180,
+                cwd=str(self.workspace_dir),
+                env=self._get_env(),
+            )
+            return {
+                "success": result.returncode == 0,
+                "output": result.stdout,
+                "error": result.stderr if result.returncode != 0 else None,
+                "has_changes": "No changes." not in result.stdout,
+            }
+        except subprocess.TimeoutExpired:
+            return {"success": False, "output": "", "error": "Terraform plan timed out (180s)"}
+        except Exception as e:
+            return {"success": False, "output": "", "error": str(e)}
+
+    async def plan_stream(self) -> AsyncGenerator[str, None]:
+        """Run terraform plan and stream output as SSE events."""
+        async for line in self._stream_command(
+            ["terraform", "plan", "-input=false", "-no-color"]
+        ):
+            yield line
+
+    def apply(self) -> dict[str, Any]:
+        """Run terraform apply (auto-approve) and return the result."""
+        try:
+            result = subprocess.run(
+                ["terraform", "apply", "-auto-approve", "-input=false", "-no-color"],
+                capture_output=True, text=True, timeout=600,
+                cwd=str(self.workspace_dir),
+                env=self._get_env(),
+            )
+            return {
+                "success": result.returncode == 0,
+                "output": result.stdout,
+                "error": result.stderr if result.returncode != 0 else None,
+            }
+        except subprocess.TimeoutExpired:
+            return {"success": False, "output": "", "error": "Terraform apply timed out (600s)"}
+        except Exception as e:
+            return {"success": False, "output": "", "error": str(e)}
+
+    async def apply_stream(self) -> AsyncGenerator[str, None]:
+        """Run terraform apply and stream output as SSE events."""
+        async for line in self._stream_command(
+            ["terraform", "apply", "-auto-approve", "-input=false", "-no-color"]
+        ):
+            yield line
+
+    def destroy(self) -> dict[str, Any]:
+        """Run terraform destroy (auto-approve) and return the result."""
+        try:
+            result = subprocess.run(
+                ["terraform", "destroy", "-auto-approve", "-input=false", "-no-color"],
+                capture_output=True, text=True, timeout=600,
+                cwd=str(self.workspace_dir),
+                env=self._get_env(),
+            )
+            return {
+                "success": result.returncode == 0,
+                "output": result.stdout,
+                "error": result.stderr if result.returncode != 0 else None,
+            }
+        except subprocess.TimeoutExpired:
+            return {"success": False, "output": "", "error": "Terraform destroy timed out (600s)"}
+        except Exception as e:
+            return {"success": False, "output": "", "error": str(e)}
+
+    async def destroy_stream(self) -> AsyncGenerator[str, None]:
+        """Run terraform destroy and stream output as SSE events."""
+        async for line in self._stream_command(
+            ["terraform", "destroy", "-auto-approve", "-input=false", "-no-color"]
+        ):
+            yield line
+
+    def get_state_resources(self) -> list[str]:
+        """Parse terraform.tfstate and return list of managed resource names."""
+        state_path = self.workspace_dir / "terraform.tfstate"
+        if not state_path.exists():
+            return []
+        try:
+            state = json.loads(state_path.read_text(encoding="utf-8"))
+            resources = []
+            for res in state.get("resources", []):
+                if res.get("mode") == "managed":
+                    name = f"{res.get('module', '')}.{res['type']}.{res['name']}".lstrip(".")
+                    resources.append(name)
+            return resources
+        except Exception:
+            return []
+
+    async def _stream_command(self, command: list[str]) -> AsyncGenerator[str, None]:
+        """Execute a command and yield SSE-formatted lines."""
+        process = await asyncio.create_subprocess_exec(
+            *command,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.STDOUT,
+            cwd=str(self.workspace_dir),
+            env=self._get_env(),
+        )
+
+        assert process.stdout is not None
+        while True:
+            line = await process.stdout.readline()
+            if not line:
+                break
+            text = line.decode("utf-8", errors="replace").rstrip()
+            yield f"data: {json.dumps({'line': text})}\n\n"
+
+        return_code = await process.wait()
+        yield f"data: {json.dumps({'done': True, 'exit_code': return_code})}\n\n"
+
+
+def create_workspace(deployment_id: str) -> str:
+    """
+    Create a new workspace directory for a deployment by copying TERRAFORM_ROOT.
+
+    Returns the absolute path to the new workspace.
+    """
+    workspaces_dir = TERRAFORM_ROOT.parent / "terraform_workspaces"
+    workspaces_dir.mkdir(exist_ok=True)
+
+    workspace_path = workspaces_dir / deployment_id
+    if workspace_path.exists():
+        # Workspace already exists — reuse it
+        return str(workspace_path)
+
+    # Copy all terraform files to the new workspace
+    shutil.copytree(
+        str(TERRAFORM_ROOT),
+        str(workspace_path),
+        ignore=shutil.ignore_patterns("__pycache__", "*.pyc", ".terraform"),
+    )
+
+    logger.info(f"Created terraform workspace: {workspace_path}")
+    return str(workspace_path)
+
+
+def write_tfvars(workspace_dir: str, config: dict[str, Any]) -> str:
+    """
+    Write a terraform.tfvars file into the workspace from a config dict.
+
+    Returns the path to the written file.
+    """
+    lines: list[str] = [
+        f'aws_region = "{config.get("aws_region", "ap-south-1")}"',
+        "",
+        f'enable_vpc        = {str(config.get("enable_vpc", False)).lower()}',
+        f'enable_ec2        = {str(config.get("enable_ec2", False)).lower()}',
+        f'enable_s3         = {str(config.get("enable_s3", False)).lower()}',
+        f'enable_iam        = {str(config.get("enable_iam", False)).lower()}',
+        f'enable_cloudwatch = {str(config.get("enable_cloudwatch", False)).lower()}',
+        f'enable_dynamodb   = {str(config.get("enable_dynamodb", False)).lower()}',
+        "",
+        f'vpc_cidr      = "{config.get("vpc_cidr", "10.0.0.0/16")}"',
+        f'instance_type = "{config.get("instance_type", "t2.micro")}"',
+        f'instance_name = "{config.get("instance_name", "main-instance")}"',
+        f'ami_id        = "{config.get("ami_id", "")}"',
+        f'bucket_name   = "{config.get("bucket_name", "")}"',
+        f'dynamodb_table_name = "{config.get("dynamodb_table_name", "")}"',
+        f'role_name     = "{config.get("role_name", "app-role")}"',
+        f'alarm_email   = "{config.get("alarm_email", "")}"',
+        "",
+        f'budget_limit = "{config.get("budget_limit", "1")}"',
+        f'budget_email = "{config.get("budget_email", "")}"',
+        "",
+        "tags = {",
+    ]
+    for key, value in config.get("tags", {}).items():
+        lines.append(f'  {key} = "{value}"')
+    lines.append("}")
+    lines.append("")
+    lines.append(f'dynamodb_hash_key = "{config.get("dynamodb_hash_key", "id")}"')
+    lines.append(f'dynamodb_hash_key_type = "{config.get("dynamodb_hash_key_type", "S")}"')
+    lines.append(f'dynamodb_read_capacity = {config.get("dynamodb_read_capacity", 5)}')
+    lines.append(f'dynamodb_write_capacity = {config.get("dynamodb_write_capacity", 5)}')
+    lines.append(f'dynamodb_enable_pitr = {str(config.get("dynamodb_enable_pitr", False)).lower()}')
+    lines.append("")
+
+    tfvars_path = Path(workspace_dir) / "terraform.tfvars"
+    tfvars_path.write_text("\n".join(lines), encoding="utf-8")
+    logger.info(f"Wrote terraform.tfvars to {tfvars_path}")
+    return str(tfvars_path)

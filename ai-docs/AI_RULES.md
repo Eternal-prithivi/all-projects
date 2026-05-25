@@ -57,6 +57,7 @@
 - **No paid services** unless explicitly approved by the user
 - **Avoid** Redis (use MongoDB or in-memory caching), paid monitoring (use logs), paid email services (use Gmail SMTP)
 - **Avoid** S3 Event Notifications → SNS/SQS (requires public endpoint + costs). Use on-demand sync instead.
+- **Terraform provisioning**: Default budget $1/month, all templates use free-tier resources. Policy engine blocks non-free-tier instance types.
 
 ## ❌ What NOT to Do
 
@@ -112,14 +113,14 @@
 - Collection getters: `get_users_collection()`, `get_files_collection()`, `get_secure_files_collection()`
 - Celery tasks MUST create their OWN MongoClient inside the task (fork safety)
 - Database name: `CloudResourceOptimizationDB`
-- **Active collections:** `users`, `files`, `secure_files`, `ml_predictions`, `ml_workload_descriptions`, `admin_actions`, `activity_log`, `vm_assignments`, `vm_metrics`, `cost_data`, `ml_feedback_snapshots`, `storage_lifecycle_reports`, `budgets`, `byoc_credentials`
+- **Active collections:** `users`, `files`, `secure_files`, `ml_predictions`, `ml_workload_descriptions`, `admin_actions`, `activity_log`, `vm_assignments`, `vm_metrics`, `cost_data`, `ml_feedback_snapshots`, `storage_lifecycle_reports`, `budgets`, `byoc_credentials`, `provision_deployments`
 
 ### Celery Tasks
 - Tasks defined in `app/storage/tasks.py` and `app/storage/tiering_tasks.py`
 - Celery app config in `app/celery_worker.py`
 - Tasks must create their own boto3 and MongoClient instances (no sharing across forks)
 - Tasks must be idempotent
-- Beat schedule: nightly at 00:00 UTC
+- Beat schedule: nightly at 00:00 UTC (storage), plus daily drift check at 06:00 UTC (provisioning)
 - After task completes: call `POST /ws/notify/{user_id}` to push WebSocket update
 
 ### Multi-Cloud Storage

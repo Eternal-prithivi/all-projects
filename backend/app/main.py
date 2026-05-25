@@ -44,6 +44,7 @@ from app.billing import routes_billing
 from app.payments import routes_payments
 from app.byoc import routes_byoc
 from app.ml import routes_feedback
+from app.provision import routes_provision
 from app.database.mongo_client import mongodb_client
 from app.utils.config import settings
 import os
@@ -159,6 +160,7 @@ app.include_router(routes_billing.router, prefix="/api", tags=["Billing"])
 app.include_router(routes_payments.router, prefix="/api/payments", tags=["Payments"])
 app.include_router(routes_byoc.router, prefix="/api/byoc", tags=["BYOC"])
 app.include_router(routes_feedback.router, prefix="/api/ml", tags=["ML Feedback"])
+app.include_router(routes_provision.router, prefix="/api/provision", tags=["Provisioning"])
 
 @app.get("/", tags=["Root"])
 def read_root():
@@ -192,3 +194,14 @@ def health_check():
             gcp_ok = os.path.exists(gcp_path)
 
     return {"mongo_connected": mongo_ok, "gcp_credentials_present": gcp_ok}
+
+
+@app.on_event("startup")
+def check_terraform_on_startup():
+    """Log a warning at startup if Terraform CLI is not installed."""
+    from app.provision.terraform_runner import check_terraform_installed, get_terraform_version
+    if check_terraform_installed():
+        version = get_terraform_version()
+        print(f"\u2705 Terraform CLI detected: v{version}")
+    else:
+        print("\u26a0\ufe0f  Terraform CLI not found — /api/provision endpoints will return 503")

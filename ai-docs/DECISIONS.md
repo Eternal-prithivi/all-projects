@@ -25,6 +25,7 @@
 | Deploying to production? | Not yet — restrict CORS first, rotate `.env` credentials | DEC-006 |
 | Renaming "Zenith" or changing branding? | DON'T — 2FA issuer, API title, sidebar all use "Zenith"/"ZenithApp" | DEC-010 |
 | Working on SecurityPage.jsx? | It intentionally uses inline `fetch()` — do NOT refactor to `api.js` unless user asks | DEC-018 |
+| Adding/modifying provisioning? | Terraform modules in `backend/terraform/`, API in `app/provision/`, BYOC credentials for AWS auth | DEC-019 |
 
 ---
 
@@ -181,3 +182,15 @@
 - **Decision**: Leave SecurityPage.jsx using its own inline API pattern. Do NOT refactor it to use `api.js` unless the user explicitly requests it as a task. The risk of breaking 2FA flows, WebSocket handling, and secure file gating is high.
 - **Consequences**: When modifying SecurityPage.jsx, follow the existing inline pattern. When creating NEW pages, always use `api.js` + `AuthContext`. Any agent that sees raw `fetch()` in SecurityPage should not treat it as a bug — it is intentional.
 - **DO NOT**: Silently refactor SecurityPage.jsx to use `api.js` as part of any other task.
+
+---
+
+### [DEC-019] Terraform Infrastructure Provisioning Integration
+- **Date**: 2026-05-25
+- **Status**: ✅ Implemented (Phase 11)
+- **Context**: The standalone `aws-provision-using-terraform` project provides 7 Terraform modules (VPC, EC2, S3, IAM, CloudWatch, Billing, DynamoDB), a dual policy engine (YAML + OPA), drift detection, and cost estimation. User decided to integrate this into Zenith as a native feature.
+- **Decision**: **Backend merge + Zenith-native React frontend.** Terraform module files copied into `backend/terraform/`. New `app/provision/` module wraps Terraform CLI as subprocess calls. BYOC credentials are injected as environment variables for terraform commands. Each deployment gets its own workspace directory (`backend/terraform_workspaces/{id}/`). MongoDB `provision_deployments` collection stores deployment state. Daily drift checks via Celery Beat at 06:00 UTC.
+- **Key files**: `app/provision/routes_provision.py` (10 endpoints at `/api/provision`), `terraform_runner.py` (CLI wrapper), `policy_checker.py` (YAML + OPA), `cost_estimator.py` (Infracost + built-in table), `drift_detector.py`, `tasks.py` (Celery Beat), `ProvisionPage.jsx` (4-step wizard).
+- **Dependencies**: Terraform CLI (checked on server startup — returns 503 if missing). Infracost CLI (optional — falls back to built-in lookup table). OPA CLI (optional — YAML rules run regardless).
+- **Consequences**: The original `aws-provision-using-terraform` project remains standalone. The Terraform files inside Zenith are a copy, not a submodule. Policy rules can be independently updated. The provisioning page is at `/dashboard/provision`.
+- **DO NOT**: Run `terraform apply` without a prior successful policy check. Do NOT store AWS credentials in MongoDB — they're resolved per-request via BYOC and passed as env vars.

@@ -76,6 +76,11 @@ class MongoDB:
             self._create_index_if_missing("ml_workload_descriptions", [("feedback_score", -1)])
             self._create_index_if_missing("ml_retraining_runs", [("trained_at", -1)])
             self._create_index_if_missing("storage_lifecycle_reports", [("ran_at", -1)])
+
+            # Phase 11: Terraform provisioning deployments
+            self._create_index_if_missing("provision_deployments", [("user_id", 1), ("created_at", -1)])
+            self._create_index_if_missing("provision_deployments", [("user_id", 1), ("status", 1)])
+            self._create_index_if_missing("provision_deployments", [("deployment_name", 1)], unique=True)
         except Exception as e:
             logger.warning(f"Failed to ensure MongoDB indexes: {e}")
 

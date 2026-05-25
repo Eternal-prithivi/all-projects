@@ -39,9 +39,24 @@ What was completed:
 
 ## 🔴 Active Task
 
-**Onboarding tour implementation + AI docs cleanup**
+**Phase 11: Terraform Infrastructure Provisioning Integration**
 
 Status: **COMPLETE**
+
+**What was completed (Antigravity Opus — 2026-05-25):**
+- ✅ Copied 28 Terraform files from standalone `aws-provision-using-terraform` project into `backend/terraform/`
+- ✅ 7 AWS modules: VPC, EC2, S3, IAM, CloudWatch, Billing, DynamoDB
+- ✅ Dual policy engine: 12 YAML security rules + OPA Rego integration
+- ✅ Created `backend/app/provision/` module (7 Python files, 10 API endpoints)
+- ✅ Terraform CLI wrapper with BYOC credential injection + workspace isolation
+- ✅ Cost estimator with Infracost integration + built-in free-tier lookup fallback
+- ✅ Drift detector — daily Celery Beat at 06:00 UTC + on-demand button
+- ✅ `ProvisionPage.jsx` — 4-step wizard (choose → configure → review → deploy)
+- ✅ Glassmorphic CSS matching Zenith design system
+- ✅ Sidebar nav item with cloud-deploy icon
+- ✅ MongoDB `provision_deployments` collection with 3 indexes
+- ✅ AI docs updated: AI_RULES (DEC-019 checklist + collections + beat schedule), DECISIONS (DEC-019), SCRATCHPAD
+- ✅ Frontend build passes (2.2s), backend 18/18 tests pass
 
 **What was completed this session (Antigravity — onboarding tour + docs cleanup):**
 - ✅ Implemented guided onboarding tour using `react-joyride` with 7 steps
