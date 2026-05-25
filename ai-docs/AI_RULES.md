@@ -208,6 +208,17 @@ npm run lint                    # ESLint check — target: 0 errors
 npm run build                   # Vite production build — must pass
 ```
 
+### ❌ Failure Instructions (mandatory)
+
+| Gate fails | What to do |
+|------------|-----------|
+| `pytest` fails | Fix the failing test(s) **before ending the session**. Do NOT mark the task complete. Do NOT leave broken tests. |
+| `npm run build` fails | Fix the build error **before ending the session**. Do NOT mark the task complete. |
+| `npm run lint` has errors | Fix all lint **errors** before ending the session. Warnings are acceptable if pre-existing. |
+| Cannot fix in current session | Write the exact failure message in `SCRATCHPAD.md` → Resume State. Mark task as `Partial` in `AUDIT_LOG.md`. Tell the user explicitly. |
+
+> ⚠️ **A task is NOT done until all quality gates pass.** "It works locally" is not a quality gate.
+
 ### Checklist Before Every Session End
 - [ ] No `.env` files committed
 - [ ] No `console.log` debug statements left in production code (backend has some — legacy)
