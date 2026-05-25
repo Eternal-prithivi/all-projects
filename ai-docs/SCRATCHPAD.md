@@ -48,8 +48,10 @@ If 5 or more entries have passed since the last audit (or no audit has ever been
 | Frontend build | ✅ Passes (~2s, `npm run build`) |
 | Frontend lint | ✅ 0 errors / 28 warnings (all pre-existing) |
 | Dev server ports | Backend `:8000`, Frontend `:5173` |
-| Last verified feature | Onboarding tour — shows once only, all 7 steps work |
-| Last verified fix | Tour welcome modal no longer re-pops on navigation |
+| CORS | ✅ DynamicCORSMiddleware — restricted to localhost + Vercel + rajverse.me |
+| Rate limiting | ✅ slowapi — login 5/min, register 3/min |
+| `.env` in git history | ✅ Removed from all 71 commits, force-pushed to stage |
+| Last verified feature | Production blocker fixes (2026-05-25) |
 
 **To re-verify:** `cd backend && source .venv/bin/activate && python -m pytest -q` then `cd frontend && npm run build`
 
@@ -57,18 +59,15 @@ If 5 or more entries have passed since the last audit (or no audit has ever been
 
 ## 🔄 Current Resume State
 
-**Last completed task:** Onboarding tour implementation + AI docs cleanup + staleness audit.
+**Last completed task:** Production blocker fixes (2026-05-25).
 
 **Status:** COMPLETE — no active task in progress.
 
 **What was done (Antigravity, 2026-05-25):**
-1. Implemented guided onboarding tour (`react-joyride`, 7 steps): sidebar nav → global search → cost card → storage → VMs → quick actions → help center.
-2. Created `OnboardingTour.jsx` with custom Zenith glassmorphism tooltips, welcome modal, localStorage tracking.
-3. Created `onboarding.css` matching design system (gold accent, glass cards, progress dots, animations).
-4. Added "Restart Tour" button to Settings > Preferences.
-5. Deleted 2 redundant AI docs (AGENT_SESSION_TEMPLATE, AI_SYSTEM_PROMPT). ai-docs now 8 files.
-6. Full staleness audit: rewrote AI_CONTEXT.md (7 modules → 25 route files reality), updated AI_RULES, DECISIONS (5 "Planned" → "Implemented"), AI_MASTER critical warnings.
-7. Fixed login button bug, completed Copilot code audit, rewrote PROFESSIONAL_IMPROVEMENTS.md.
+1. **CORS** — already fixed before this session. `DynamicCORSMiddleware` in `main.py` restricts to localhost, Vercel preview patterns, and rajverse.me. Removed stale "do not change CORS" anti-task from PROGRESS.md.
+2. **Rate limiting** — already in place. `slowapi` installed, limiter wired to `main.py` state, login `5/minute`, register `3/minute`.
+3. **`.env` git history** — ran `git filter-branch` across all 71 commits on all branches. `backend/.env` removed from history. `git gc --prune=now` run. Force-pushed stage to GitHub.
+4. **Dashboard stats** — already reading real MongoDB data (vm_assignments, files, secure_files, vm_metrics). Sparkline is synthetic but derived from real monthly_costs value from backend. No demo mode needed — it was always real.
 
 **Verification:** Frontend build passes (~2s), lint 0 errors / 28 warnings, backend 34/34 tests.
 

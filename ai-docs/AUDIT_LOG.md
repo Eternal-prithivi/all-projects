@@ -230,3 +230,17 @@ Changes:
 Outcome: Done
 Notes: [DRIFT AUDIT] — First formal drift audit. All 22 reported gaps verified against live files. 12 confirmed real and fixed. 10 dismissed (already covered, cosmetic, or low-impact). Next drift audit due after 5 more sessions (count from this entry).
 ---
+
+---
+SESSION_ID: 20260525-180900
+Date: 2026-05-25
+Agent: Antigravity
+Task: Production blocker fixes — CORS, rate limiting, .env git history, dashboard demo mode check
+Changes:
+  - git history (all branches) — removed backend/.env from all 71 commits via filter-branch
+  - force-pushed stage branch to GitHub (+ 111bada → 823fec5)
+  - ai-docs/PROGRESS.md — removed stale CORS anti-task, marked CORS + .env + dashboard stats as fixed
+  - ai-docs/SCRATCHPAD.md — updated Last Known Good State and Resume State
+Outcome: Done
+Notes: CORS was already fixed (DynamicCORSMiddleware). Rate limiting was already in place (slowapi 0.1.9). Dashboard reads real MongoDB data — no demo toggle needed. Only blocker that needed action was .env in git history — now purged. ⚠️ IMPORTANT: All .env credentials must still be rotated before making repo public (MongoDB, CloudAMQP, Gmail SMTP, AWS, JWT secret — all exposed in original commit).
+---

@@ -11,7 +11,6 @@
 
 - **Do NOT** refactor `SecurityPage.jsx` API calls to use `api.js` — intentional inline pattern
 - **Do NOT** delete stub files in `backend/app/aws/`, `providers/`, `queue/`, `errors/` — planned architecture
-- **Do NOT** change CORS from `allow_origins=["*"]` without explicit user request
 - **Do NOT** run `npm audit fix --force` — breaks existing dependencies
 - **Do NOT** change branding from "Zenith" / "ZenithApp" without asking
 - **Do NOT** use Redux, Zustand, or any state library — Context only
@@ -406,10 +405,10 @@ Reference: 97-page project report (Chapter 4–6). Last cross-check: 2026-05-24.
 | Issue | Impact | Fix Needed |
 |-------|--------|------------|
 | StoragePage historical auth bypass | Previously hardcoded "tanjiro" | ✅ Fixed: now uses real AuthContext |
-| Dashboard stats hardcoded | Always shows same numbers | Connect to real data |
+| Dashboard stats hardcoded | Always shows same numbers | ✅ Fixed — dashboard reads real MongoDB data (files, vm_assignments, vm_metrics, secure_files) |
 | Sidebar links to /dashboard/costs and /dashboard/compute are dead | 404 errors | Create routes + pages |
-| `CORS allow_origins=["*"]` | Security risk in production | Restrict origins |
-| `.env` committed to Git in first commit | Credential exposure | Rotate all credentials before prod |
+| ~~`CORS allow_origins=["*"]`~~ | ~~Security risk in production~~ | ✅ Fixed — DynamicCORSMiddleware restricts to localhost + Vercel patterns + rajverse.me |
+| ~~`.env` committed to Git in first commit~~ | ~~Credential exposure~~ | ✅ Fixed — removed from all 71 commits via git filter-branch + force-pushed stage |
 | 39 empty stub files | Scaffolded but never implemented | Build or clean up |
 | ~~Admin can delete/ban/demote themselves~~ | ~~Accidental lockout~~ | ✅ Fixed: self-protection guards added |
 | ~~Admin delete_user AttributeError on hard delete~~ | ~~500 error~~ | ✅ Fixed: getattr for both result types |
