@@ -13,6 +13,7 @@
 #   - Import this directly from routes — always go through optimizer.py
 # =============================================================================
 
+"""
 - Rule expert (30%) + Random Forest (35%) + XGBoost expert (35%)
 - weighted confidence voting over hot/warm/cold tiers
 

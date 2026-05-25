@@ -11,7 +11,7 @@
 #   - Remove the confidence threshold — low-confidence descriptions fall back to GENERAL
 #   - Add synchronous spaCy loads inside request handlers — model loads at startup only
 # =============================================================================
-
+"""
 → contextual weighting → negation handling → cluster scoring → confidence boost.
 """
 

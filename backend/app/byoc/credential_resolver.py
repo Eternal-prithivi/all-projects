@@ -10,7 +10,7 @@
 #   - Cache credentials in memory without TTL — they may be revoked
 #   - Fall back to platform creds silently if BYOC is configured but invalid
 # =============================================================================
-
+"""
 or the user's own BYOC credentials for each operation.
 """
 
