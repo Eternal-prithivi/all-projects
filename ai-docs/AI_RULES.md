@@ -172,6 +172,26 @@
 
 ---
 
+## 💬 Task Completion Response Format (Token Efficiency Rule)
+
+After completing ANY task, provide exactly this — nothing more unless asked:
+
+```
+✅ Changed:  [one line — what file/feature was changed]
+📌 Why:      [one line — reason for the change]
+🧪 Test:     [one line — what to run or click to verify it works]
+```
+
+**Do NOT** write:
+- Paragraph summaries of what you did
+- Lists of every file you touched
+- Explanations of how the code works
+- "Let me know if you have any questions"
+
+> The user will ask follow-up questions if they need more. Unsolicited explanation wastes tokens.
+
+---
+
 ## ✅ Quality Gates
 
 ### Backend
