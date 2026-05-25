@@ -19,10 +19,12 @@
 | Adding a new npm package? | Must be free-tier, zero cost — check before installing | DEC-006 |
 | Changing background tasks? | Celery + CloudAMQP (RabbitMQ) — no Redis queue | DEC-007 |
 | Adding a new frontend page? | Use `api.js` (axios) + `AuthContext` — never raw `fetch()` | DEC-012 |
+| **Adding a new backend route?** | Match existing module pattern: router in `routes_*.py`, Pydantic model, `get_current_user()` dependency. Add route to AI_CONTEXT_BACKEND.md Routes table at session end. | DEC-001 |
 | Changing storage tiering logic? | Five-factor priority scoring in `tiering_tasks.py` — don't simplify | DEC-009 |
 | Structural backend changes? | Controller → Service → DB pattern — match existing modules | DEC-001 |
 | Deploying to production? | Not yet — restrict CORS first, rotate `.env` credentials | DEC-006 |
 | Renaming "Zenith" or changing branding? | DON'T — 2FA issuer, API title, sidebar all use "Zenith"/"ZenithApp" | DEC-010 |
+| Working on SecurityPage.jsx? | It intentionally uses inline `fetch()` — do NOT refactor to `api.js` unless user asks | DEC-018 |
 
 ---
 
@@ -39,8 +41,8 @@
 - **Date**: 2025-08-11
 - **Status**: Accepted
 - **Context**: Cloud resource metadata varies across providers — needs flexible schema.
-- **Decision**: MongoDB Atlas with pymongo. Database name: `CloudResourceOptimizationDB`. Three collections: `users`, `files`, `secure_files`. No ORM — direct collection access through `database/mongo_client.py`.
-- **Consequences**: No SQL migrations. All DB access must go through collection getter functions. `MongoDB` singleton class pattern at module level.
+- **Decision**: MongoDB Atlas with pymongo. Database name: `CloudResourceOptimizationDB`. **14 active collections** (expanded from original 3 as modules were built): `users`, `files`, `secure_files`, `ml_predictions`, `ml_workload_descriptions`, `admin_actions`, `activity_log`, `vm_assignments`, `vm_metrics`, `cost_data`, `ml_feedback_snapshots`, `storage_lifecycle_reports`, `budgets`, `byoc_credentials`. No ORM — direct collection access through `database/mongo_client.py`.
+- **Consequences**: No SQL migrations. All DB access must go through collection getter functions. `MongoDB` singleton class pattern at module level. See `AI_RULES.md` → Database section for the full active collection list.
 
 ---
 
@@ -170,3 +172,12 @@
 - **Status**: ✅ Implemented (Phase 8, 2026-05-24)
 - **Decision**: Outcome evaluation (7–30 day window), data quality filtering (feedback_score ≥ 0.5), guarded retraining (requires +1% absolute or +2% relative gain to deploy), Celery Beat weekly Sunday 03:30 UTC. Manual trigger: `POST /api/ml/feedback/retrain`. Candidate artifacts staged under `ml/artifacts/candidates/` before deployment. Implemented in `ml/feedback.py`, `ml/retraining.py`, `ml/tasks_feedback.py`.
 
+---
+
+### [DEC-018] SecurityPage.jsx Intentional Pattern Deviation
+- **Date**: 2026-05-25
+- **Status**: Accepted (known, intentional)
+- **Context**: SecurityPage.jsx was built before the centralized `api.js` + `AuthContext` pattern was established. It has its own inline `fetch()` functions and handles auth tokens directly.
+- **Decision**: Leave SecurityPage.jsx using its own inline API pattern. Do NOT refactor it to use `api.js` unless the user explicitly requests it as a task. The risk of breaking 2FA flows, WebSocket handling, and secure file gating is high.
+- **Consequences**: When modifying SecurityPage.jsx, follow the existing inline pattern. When creating NEW pages, always use `api.js` + `AuthContext`. Any agent that sees raw `fetch()` in SecurityPage should not treat it as a bug — it is intentional.
+- **DO NOT**: Silently refactor SecurityPage.jsx to use `api.js` as part of any other task.

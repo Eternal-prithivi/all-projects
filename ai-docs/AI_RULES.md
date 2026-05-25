@@ -76,6 +76,8 @@
 | ❌ No committing `backend/.env` | It contains cloud credentials — NEVER commit |
 | ❌ No deviating from the project report architecture | The 97-page report is the source of truth for missing modules |
 | ❌ No implementing ML/VM/Cost modules without checking report first | Report sections §4.1-§4.5 describe exact algorithms, inputs, outputs |
+| ❌ No installing new `pip` or `npm` packages without telling the user | State the package name and reason BEFORE installing — user must approve paid or heavy dependencies |
+| ❌ Never assume a service is running or a package is installed | Always verify: check venv is active, backend is up, Celery is running, etc. before writing code that depends on them |
 
 ## 🧭 Product-Readiness Definitions
 

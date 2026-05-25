@@ -215,3 +215,18 @@ Changes:
 Outcome: Done
 Notes: AUDIT_LOG was 651 lines / 40KB — first archive performed. Live log now ~200 lines. All 47 file headers verified (frontend build passes). Drift detection triggers every 5 sessions via AUDIT_LOG entry count check.
 ---
+
+---
+SESSION_ID: 20260525-164200
+Date: 2026-05-25
+Agent: Antigravity [DRIFT AUDIT]
+Task: Initial drift audit + 12-gap documentation fix pass
+Changes:
+  - ai-docs/AI_RULES.md — added silent pip/npm install rule + never-assume-services rule + quality gate failure table
+  - ai-docs/AI_MASTER.md — Step 2 fallback for missing resume notes, session-end context file update rule, .env warning moved to #1 in Critical Warnings
+  - ai-docs/DECISIONS.md — DEC-002 corrected (3→14 collections), DEC-018 added (SecurityPage deviation), Before You Code got new backend route row
+  - ai-docs/DESIGN_SYSTEM.md — Section 6 heading fixed (Pending→Implemented), spacing/timing token values documented, Section 7 light theme added
+  - ai-docs/AUDIT_LOG.md — this entry (first tagged [DRIFT AUDIT] entry, establishes the count baseline)
+Outcome: Done
+Notes: [DRIFT AUDIT] — First formal drift audit. All 22 reported gaps verified against live files. 12 confirmed real and fixed. 10 dismissed (already covered, cosmetic, or low-impact). Next drift audit due after 5 more sessions (count from this entry).
+---

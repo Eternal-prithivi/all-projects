@@ -26,6 +26,7 @@ Full-stack task touching both                   →  read both
 ### Step 2 — Check Active Task
 - Open `PROGRESS.md` → find `## 🔴 Active Task`
 - If there is one → resume it using notes in `SCRATCHPAD.md`
+  - **If SCRATCHPAD has no resume notes for that task:** re-read the task description in PROGRESS.md, check which files it mentioned, then ask the user: *"I see an active task but no resume notes. Should I start fresh or do you want to describe where to pick up?"*
 - If none → ask the user what to work on next
 
 ### Step 3 — Mandatory Onboarding Confirmation (before touching ANY code)
@@ -207,16 +208,18 @@ Done when: Skeleton shows while data loads, build passes, no new lint errors
 - `PROGRESS.md` — update task status and what was done
 - `AUDIT_LOG.md` — append a new entry (SESSION_ID format: YYYYMMDD-HHMMSS)
 - `SCRATCHPAD.md` — update Last Known Good State + clear or write resume state
+- **If new backend routes were added this session** → update the API Routes table in `ai-docs/AI_CONTEXT_BACKEND.md`
+- **If new frontend pages or components were added this session** → update the Pages/Components sections in `ai-docs/AI_CONTEXT_FRONTEND.md`
 
 
 ---
 
 ## ⚠️ Critical Warnings
 
-1. **The app is branded "Zenith"** — FastAPI title is `"Zenith API"`, sidebar says `"Zenith"`, 2FA issuer is `"ZenithApp"`. Do NOT change branding without asking.
-2. **Empty stub files still exist** — `aws/`, `providers/`, `queue/`, `errors/`, and several others. Do NOT delete them — they represent planned architecture. See `AI_CONTEXT_BACKEND.md` for the full stub list.
-3. **SecurityPage.jsx has its own inline API functions** — it does NOT use `api.js`. This is a known pattern deviation. See `AI_CONTEXT_FRONTEND.md`.
-4. **Credentials in `backend/.env` must be kept secret** — never expose or commit. The `.env` was committed in the first git commit — rotate before making repo public.
+1. ❌ **`backend/.env` contains live cloud credentials — NEVER commit it.** It was already committed in the first git push — rotate all credentials before making the repo public.
+2. **The app is branded "Zenith"** — FastAPI title is `"Zenith API"`, sidebar says `"Zenith"`, 2FA issuer is `"ZenithApp"`. Do NOT change branding without asking.
+3. **Empty stub files still exist** — `aws/`, `providers/`, `queue/`, `errors/`, and several others. Do NOT delete them — they represent planned architecture. See `AI_CONTEXT_BACKEND.md` for the full stub list.
+4. **SecurityPage.jsx has its own inline API functions** — it does NOT use `api.js`. This is a known pattern deviation. See `AI_CONTEXT_FRONTEND.md`.
 5. **`CORS allow_origins=["*"]`** in `main.py` — restrict before any public deployment.
 6. **Venv is at `backend/.venv/`** — NOT `venv/` at the project root. Use `backend/.venv/bin/python` and `backend/.venv/bin/pytest`.
 7. **`routes_auth.py` is mounted twice** (`/api/auth` and `/auth`) in `main.py` — legacy duplicate, the `/auth` alias can be removed if needed.

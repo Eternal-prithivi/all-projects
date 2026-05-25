@@ -32,6 +32,25 @@ All colors, spacing, and shadows are defined in `frontend/src/index.css` as `--v
 ### Radii
 - `--radius-sm` (6px), `--radius-md` (10px), `--radius-lg` (14px).
 
+### Spacing Tokens (from `index.css` `:root`)
+| Token | Value | Use |
+|-------|-------|-----|
+| `--space-xs` | `0.25rem` (4px) | Tight gaps, icon padding |
+| `--space-sm` | `0.5rem` (8px) | Small internal padding |
+| `--space-md` | `1rem` (16px) | Standard padding |
+| `--space-lg` | `1.5rem` (24px) | Card padding, section gaps |
+| `--space-xl` | `2rem` (32px) | Large section padding |
+| `--space-2xl` | `3rem` (48px) | Hero spacing |
+
+### Timing Tokens (from `index.css` `:root`)
+| Token | Value | Use |
+|-------|-------|-----|
+| `--duration-fast` | `150ms` | Micro-interactions (button presses) |
+| `--duration-normal` | `250ms` | Standard transitions (hover, fade) |
+| `--duration-slow` | `400ms` | Page-level animations (fade-in-up) |
+| `--ease-out` | `cubic-bezier(0.25, 0.8, 0.25, 1)` | Standard smooth deceleration |
+| `--ease-spring` | `cubic-bezier(0.34, 1.56, 0.64, 1)` | Spring overshoot (card lifts) |
+
 ---
 
 ## 3. UI Component Standards
@@ -130,7 +149,7 @@ Files that have been upgraded to the Zenith Design System:
 
 ---
 
-## 6. Mission Control Layout (Phase 2.5 — Pending)
+## 6. Mission Control Layout (✅ Implemented — 2026-05-24)
 
 > **STATUS:** ✅ Implemented (2026-05-24). All components, CSS, and layout are live.
 
@@ -171,3 +190,16 @@ Files that have been upgraded to the Zenith Design System:
 - Time-aware tone kicker: morning operations / cloud command active / evening optimization / night watch online
 - Font: Outfit, responsive hero-scale, weight 800, gold gradient text
 - Subtitle: friendly date format with cloud overview context
+
+---
+
+## 7. Light Theme
+
+> `frontend/src/styles/theme-light.css` exists but is **NOT the default** — Zenith is a dark-first product.
+
+- Light theme is opt-in via a class or CSS custom property override.
+- When styling for light theme, override `--bg-base`, `--bg-card`, `--text-primary` etc. to lighter equivalents.
+- The gold accent (`--gold-primary: #d4af37`) works on both themes — do not change it.
+- **Do NOT** add light-theme-specific styles inline in component CSS. Use `theme-light.css` overrides only.
+- If light theme is not explicitly requested, assume dark theme is active.
+- Current status: `theme-light.css` exists as a stub — not wired to any toggle yet.
