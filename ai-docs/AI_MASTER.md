@@ -51,15 +51,47 @@ Conflicts found: [Any conflict between the task and the docs — or write "None 
 
 ## 🔄 Session End Protocol (Required Before Stopping)
 
-Every session MUST end with:
+Every session MUST end with ALL of the following — in this order:
+
 ```
-[ ] PROGRESS.md updated — task status, what was done, what's next
-[ ] AUDIT_LOG.md appended — new entry with SESSION_ID + summary
-[ ] SCRATCHPAD.md updated — resume instructions OR cleared if task complete
-[ ] Quality gates passed (lint + tests if applicable)
+[ ] 1. Quality gates passed (lint + tests if applicable)
+[ ] 2. PROGRESS.md updated — task status, what was done, what's next
+[ ] 3. AUDIT_LOG.md appended — new entry with SESSION_ID + summary
+[ ] 4. SCRATCHPAD.md updated — resume instructions OR cleared if task complete
+[ ] 5. Git commit + push to stage branch
 ```
 
----
+### Step 5 — Git Commit & Push (exact commands)
+
+```bash
+# From project root
+git add ai-docs/ backend/ frontend/src/ docs/ render.yaml PROFESSIONAL_IMPROVEMENTS.md
+
+# Verify no .env or secrets staged
+git diff --cached --name-only | grep -E "\.env|secret|zenith-backend" && echo "⛔ STOP — sensitive file staged" || echo "✅ Safe to commit"
+
+# Commit with a descriptive message
+git commit -m "feat/fix/docs: [short description of what was done]
+
+- [bullet 1: main change]
+- [bullet 2: files changed]
+- [bullet 3: outcome/test result]"
+
+# Push to stage branch
+git push origin stage
+```
+
+### Commit message rules
+- Prefix: `feat:` (new feature), `fix:` (bug fix), `docs:` (docs only), `chore:` (cleanup)
+- First line: max 72 characters
+- Body: bullet list of what changed and why
+- **NEVER** include `.env`, `node_modules/`, `zenith-backend.env`, or `*.backup` in the commit
+
+### If push fails
+- Check `git remote -v` — remote should be `https://github.com/Eternal-prithivi/all-projects.git`
+- If auth fails: user needs to re-authenticate GitHub credentials locally
+- Do NOT force-push — always use `git push origin stage` (no `--force`)
+
 
 ## 🏗 Project Identity
 | Field         | Value                                                              |
