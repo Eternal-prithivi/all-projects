@@ -105,7 +105,7 @@ export default function ProvisionPage() {
 
   const checkTerraformStatus = async () => {
     try {
-      const res = await api.get('/api/provision/status');
+      const res = await api.get('/provision/status');
       setTerraformOk(res.data.terraform_installed);
     } catch {
       setTerraformOk(false);
@@ -114,7 +114,7 @@ export default function ProvisionPage() {
 
   const loadDeployments = async () => {
     try {
-      const res = await api.get('/api/provision/deployments');
+      const res = await api.get('/provision/deployments');
       setDeployments(res.data.deployments || []);
     } catch {
       // Silent — deployments section just won't show
@@ -176,8 +176,8 @@ export default function ProvisionPage() {
     setError(null);
     try {
       const [policyRes, costRes] = await Promise.all([
-        api.post('/api/provision/policy-check', config),
-        api.post('/api/provision/estimate', config),
+        api.post('/provision/policy-check', config),
+        api.post('/provision/estimate', config),
       ]);
       setPolicyResult(policyRes.data);
       setCostEstimate(costRes.data);
@@ -194,7 +194,7 @@ export default function ProvisionPage() {
     setError(null);
     setPlanOutput('');
     try {
-      const res = await api.post('/api/provision/plan', config);
+      const res = await api.post('/provision/plan', config);
       setPlanOutput(res.data.plan_output || '');
       setDeploymentId(res.data.deployment_id);
       setPolicyResult(res.data.policy_check);
@@ -215,7 +215,7 @@ export default function ProvisionPage() {
     setLoading(true);
     setError(null);
     try {
-      const res = await api.post(`/api/provision/apply/${deploymentId}`);
+      const res = await api.post(`/provision/apply/${deploymentId}`);
       if (res.data.success) {
         setPlanOutput(prev => prev + '\n\n✅ Apply complete! ' + res.data.resources_count + ' resources created.');
         loadDeployments();
@@ -235,7 +235,7 @@ export default function ProvisionPage() {
     if (!window.confirm('Are you sure you want to destroy this deployment? This cannot be undone.')) return;
     setLoading(true);
     try {
-      await api.post(`/api/provision/destroy/${depId}`);
+      await api.post(`/provision/destroy/${depId}`);
       loadDeployments();
     } catch (err) {
       setError(err.response?.data?.detail || 'Destroy failed');
@@ -248,7 +248,7 @@ export default function ProvisionPage() {
   const runDriftCheck = async (depId) => {
     setLoading(true);
     try {
-      await api.post(`/api/provision/deployments/${depId}/drift`);
+      await api.post(`/provision/deployments/${depId}/drift`);
       loadDeployments();
     } catch (err) {
       setError(err.response?.data?.detail || 'Drift check failed');
