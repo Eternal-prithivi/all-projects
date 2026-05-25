@@ -1,3 +1,18 @@
+# =============================================================================
+# MODULE: routes_security.py  (449 lines)
+# PURPOSE: 2FA-gated secure file vault — upload (with sensitive scan + encryption
+#          choice flow), list, download (presigned or decrypt), delete
+# READS FROM:  secure_files collection, AWS S3 (SECURE_S3_BUCKET + REPLICA)
+# WRITES TO:   secure_files collection, AWS S3 (SECURE_S3_BUCKET + REPLICA)
+# DEPENDS ON:  auth_utils.require_2fa() (NOT get_current_user — 2FA required)
+#              encryption_handler.py (AES-256 client-side), boto3 (SSE server-side)
+# MOUNTED AT:  /api/security → upload-secure, list-secure, choose-encryption,
+#              download/{filename}, decrypt-download, delete/{filename}
+# DO NOT:
+#   - Swap require_2fa() for get_current_user() — this vault needs 2FA verified
+#   - Change the two-step upload flow (scan → await choice → encrypt → S3)
+#   - Use the same S3 bucket as regular storage (SECURE_S3_BUCKET_NAME is separate)
+# =============================================================================
 import boto3
 import re
 import io

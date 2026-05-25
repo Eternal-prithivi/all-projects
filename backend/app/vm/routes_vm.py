@@ -1,4 +1,17 @@
-# backend/app/vm/routes_vm.py
+# =============================================================================
+# MODULE: routes_vm.py  (984 lines)
+# PURPOSE: VM lifecycle — request/release VMs, NLP workload classification,
+#          five-cluster assignment, metrics, migration, transfer
+# READS FROM:  vm_assignments, vm_metrics, users collections
+# WRITES TO:   vm_assignments, vm_metrics, ml_workload_descriptions collections
+# DEPENDS ON:  auth_utils.get_current_user(), nlp_workload.py, manager.py
+# MOUNTED AT:  /api/vm → request, release, clusters, assignment, analyze-workload,
+#              migrate, transfer, my-assignment
+# DO NOT:
+#   - Change the five cluster types: General/Storage/Memory/Performance/AI-ML
+#   - Bypass the NLP classifier for cluster assignment
+#   - Delete vm_assignments without updating vm_metrics records
+# =============================================================================
 
 from fastapi import APIRouter, HTTPException, Depends, Body
 from typing import List, Dict, Any, Optional
@@ -7,13 +20,14 @@ from google.cloud import compute_v1
 from app.vm.manager import (
     list_vms, create_vm, start_vm, stop_vm, delete_vm, get_vm_details,
     assign_vm_to_user, migrate_user, release_vm_assignment, 
-    get_user_assignment, get_cluster_health, _get_instance_client
+    get_user_assignment, get_cluster_health, _get_instance_client, CLUSTER_VMS
 )
 from app.vm.models import (
     VMRequestModel, VMAssignmentResponse, VMTransferRequest,
     VMMetricsResponse, ClusterType, MigrationRecommendation, VMStatus
 )
 from app.vm.migration_recommender import MigrationRecommender
+from app.vm.workload_analyzer import WorkloadAnalyzer
 from app.vm.metrics_collector import VMMetricsCollector
 from app.utils.config import settings
 from app.database.mongo_client import get_database
@@ -65,7 +79,10 @@ def invalidate_cluster_health_cache():
 # --- Pydantic Models for Request/Response ---
 
 class VMCreateRequest(BaseModel):
-    cluster_type: str = Field(..., description="Type of cluster to provision from: 'performance' or 'storage'")
+    cluster_type: str = Field(
+        ...,
+        description="Cluster to provision from: general, storage, memory, performance, or ai_ml",
+    )
     # vm_name: Optional[str] = Field(None, description="Optional: A specific name for the VM. If not provided, one will be generated.")
     # machine_type: Optional[str] = Field(None, description="Optional: Machine type for the VM (e.g., 'e2-micro'). Overrides cluster default if provided.")
     # disk_size_gb: Optional[int] = Field(None, description="Optional: Disk size in GB. Overrides cluster default if provided.")
@@ -90,25 +107,44 @@ class OperationStatusResponse(BaseModel):
 # --- Helper to get cluster counts and determine next action ---
 async def _get_cluster_vm_counts():
     all_vms = list_vms()
-    performance_vms = [vm for vm in all_vms if vm.get('labels', {}).get('cluster_type') == 'performance']
-    storage_vms = [vm for vm in all_vms if vm.get('labels', {}).get('cluster_type') == 'storage']
+    counts = {}
+    active_statuses = {"RUNNING", "PROVISIONING", "STAGING"}
 
-    # Filter for RUNNING/PROVISIONING/STAGING VMs to count towards limits
-    running_performance_vms = [vm for vm in performance_vms if vm['status'] in ['RUNNING', 'PROVISIONING', 'STAGING']]
-    running_storage_vms = [vm for vm in storage_vms if vm['status'] in ['RUNNING', 'PROVISIONING', 'STAGING']]
-
-    return {
-        "performance": {
-            "current_count": len(running_performance_vms),
-            "max_vms": settings.PERFORMANCE_CLUSTER_MAX_VMS,
-            "available_vms": [vm for vm in performance_vms if vm['status'] == 'TERMINATED'] # Ready to be started
-        },
-        "storage": {
-            "current_count": len(running_storage_vms),
-            "max_vms": settings.STORAGE_CLUSTER_MAX_VMS,
-            "available_vms": [vm for vm in storage_vms if vm['status'] == 'TERMINATED'] # Ready to be started
+    for cluster_type in CLUSTER_VMS:
+        cluster_name = cluster_type.value
+        cluster_vms = [
+            vm for vm in all_vms
+            if vm.get("labels", {}).get("cluster_type") == cluster_name
+            or vm.get("name") in CLUSTER_VMS[cluster_type]
+        ]
+        running_vms = [vm for vm in cluster_vms if vm.get("status") in active_statuses]
+        counts[cluster_name] = {
+            "current_count": len(running_vms),
+            "max_vms": _cluster_max_vms(cluster_type),
+            "available_vms": [vm for vm in cluster_vms if vm.get("status") in {"TERMINATED", "STOPPED"}],
         }
-    }
+
+    return counts
+
+
+def _cluster_max_vms(cluster_type: ClusterType) -> int:
+    if cluster_type == ClusterType.STORAGE:
+        return settings.STORAGE_CLUSTER_MAX_VMS
+    return settings.PERFORMANCE_CLUSTER_MAX_VMS
+
+
+def _cluster_machine_type(cluster_type: ClusterType) -> str:
+    if cluster_type == ClusterType.STORAGE:
+        return settings.STORAGE_VM_MACHINE_TYPE
+    return settings.PERFORMANCE_VM_MACHINE_TYPE
+
+
+def _cluster_disk_size_gb(cluster_type: ClusterType) -> int:
+    if cluster_type == ClusterType.STORAGE:
+        return settings.STORAGE_VM_DISK_SIZE_GB
+    if cluster_type == ClusterType.MEMORY:
+        return max(20, settings.STORAGE_VM_DISK_SIZE_GB)
+    return 10
 
 
 # --- API Endpoints ---
@@ -119,20 +155,20 @@ async def get_vm_cluster_status() -> Dict[str, Any]:
     Returns the current status of VM clusters including counts and available slots.
     """
     cluster_counts = await _get_cluster_vm_counts()
+    clusters = {
+        cluster_name: {
+            "running_vms": data["current_count"],
+            "max_vms": data["max_vms"],
+            "available_for_start": len(data["available_vms"]),
+            "can_provision_new": data["current_count"] < data["max_vms"],
+        }
+        for cluster_name, data in cluster_counts.items()
+    }
     return {
         "message": "VM Cluster Status",
-        "performance_cluster": {
-            "running_vms": cluster_counts['performance']['current_count'],
-            "max_vms": cluster_counts['performance']['max_vms'],
-            "available_for_start": len(cluster_counts['performance']['available_vms']),
-            "can_provision_new": cluster_counts['performance']['current_count'] < cluster_counts['performance']['max_vms']
-        },
-        "storage_cluster": {
-            "running_vms": cluster_counts['storage']['current_count'],
-            "max_vms": cluster_counts['storage']['max_vms'],
-            "available_for_start": len(cluster_counts['storage']['available_vms']),
-            "can_provision_new": cluster_counts['storage']['current_count'] < cluster_counts['storage']['max_vms']
-        },
+        "clusters": clusters,
+        "performance_cluster": clusters.get("performance", {}),
+        "storage_cluster": clusters.get("storage", {}),
         "all_vms_in_zone": list_vms()
     }
 
@@ -141,28 +177,31 @@ async def provision_or_assign_vm(request: VMCreateRequest) -> OperationStatusRes
     """
     Provisions a new VM from a cluster or assigns/starts an existing one.
     """
-    cluster_type = request.cluster_type.lower()
-    if cluster_type not in ["performance", "storage"]:
-        raise HTTPException(status_code=400, detail="Invalid cluster_type. Must be 'performance' or 'storage'.")
+    cluster_name = request.cluster_type.lower().replace("-", "_")
+    try:
+        cluster_type = ClusterType(cluster_name)
+    except ValueError:
+        allowed = ", ".join(cluster.value for cluster in CLUSTER_VMS)
+        raise HTTPException(status_code=400, detail=f"Invalid cluster_type. Must be one of: {allowed}.")
 
-    cluster_status = (await _get_cluster_vm_counts())[cluster_type]
+    cluster_status = (await _get_cluster_vm_counts())[cluster_type.value]
 
     # 1. Check for terminated VMs in the cluster that can be started
     if cluster_status['available_for_start'] > 0:
         vm_to_start = cluster_status['available_vms'][0] # Pick the first available
-        logger.info(f"Starting existing VM: {vm_to_start['name']} for {cluster_type} cluster")
+        logger.info(f"Starting existing VM: {vm_to_start['name']} for {cluster_type.value} cluster")
         result = start_vm(vm_to_start['name'])
         return OperationStatusResponse(name=vm_to_start['name'], status="STARTING_EXISTING", details=result['details'])
 
     # 2. If no terminated VMs, try to provision a new one if limits allow
     if cluster_status['current_count'] < cluster_status['max_vms']:
-        machine_type = settings.PERFORMANCE_VM_MACHINE_TYPE if cluster_type == "performance" else settings.STORAGE_VM_MACHINE_TYPE
-        disk_size = settings.STORAGE_VM_DISK_SIZE_GB if cluster_type == "storage" else 10 # Default disk for performance VMs
+        machine_type = _cluster_machine_type(cluster_type)
+        disk_size = _cluster_disk_size_gb(cluster_type)
 
-        new_vm_name = f"{cluster_type}-vm-{cluster_status['current_count'] + 1}" # Simple naming scheme
-        labels = {"cluster_type": cluster_type}
+        new_vm_name = f"{cluster_type.value}-vm-{cluster_status['current_count'] + 1}"
+        labels = {"cluster_type": cluster_type.value}
 
-        logger.info(f"Provisioning new VM: {new_vm_name} for {cluster_type} cluster")
+        logger.info(f"Provisioning new VM: {new_vm_name} for {cluster_type.value} cluster")
         result = create_vm(
             name=new_vm_name,
             machine_type=machine_type,
@@ -174,7 +213,7 @@ async def provision_or_assign_vm(request: VMCreateRequest) -> OperationStatusRes
     else:
         raise HTTPException(
             status_code=409,
-            detail=f"No available VMs and cluster '{cluster_type}' has reached its maximum capacity of {cluster_status['max_vms']} running instances."
+            detail=f"No available VMs and cluster '{cluster_type.value}' has reached its maximum capacity of {cluster_status['max_vms']} running instances."
         )
 
 @router.get("/list", response_model=VMListResponse, summary="List all VMs")
@@ -232,6 +271,54 @@ async def get_single_vm_details(vm_name: str) -> VMResponse:
 
 # --- New Advanced VM Management Endpoints ---
 
+
+class WorkloadAnalyzeBody(BaseModel):
+    workload_description: str = Field(..., min_length=1, description="Natural language workload description")
+    follow_up_answers: Optional[Dict[str, str]] = Field(
+        default=None,
+        description="Optional guided answers merged into the description before NLP",
+    )
+
+
+@router.post("/analyze-workload", summary="Analyze workload description (NLP)")
+async def analyze_workload_description(
+    body: WorkloadAnalyzeBody,
+    current_user: User = Depends(get_current_user),
+) -> Dict[str, Any]:
+    """
+    Preview NLP workload classification without provisioning a VM.
+    Uses report §4.1 pipeline (TextBlob + spaCy + tech dictionaries).
+    Includes readiness score, missing signals, and follow-up question prompts.
+    """
+    from app.vm.workload_guidance import (
+        assess_workload_readiness,
+        build_follow_up_questions,
+        merge_follow_up_answers,
+    )
+
+    effective_description = merge_follow_up_answers(
+        body.workload_description,
+        body.follow_up_answers,
+    )
+    cluster, confidence, details = WorkloadAnalyzer.analyze(effective_description)
+    readiness = assess_workload_readiness(effective_description)
+    follow_up_questions = build_follow_up_questions(
+        readiness.get("missing_signals", []),
+        body.follow_up_answers,
+    )
+    return {
+        "recommended_cluster": cluster.value,
+        "confidence": confidence,
+        "classifier_version": details.get("classifier_version", "unknown"),
+        "report_cluster": details.get("report_cluster"),
+        "auto_assign_eligible": details.get("auto_assign_eligible", confidence >= 85),
+        "readiness": readiness,
+        "follow_up_questions": follow_up_questions,
+        "effective_description": effective_description,
+        "analysis": details,
+    }
+
+
 @router.post("/request", response_model=VMAssignmentResponse, summary="Request VM Assignment")
 async def request_vm_assignment(
     request: VMRequestModel,
@@ -242,9 +329,15 @@ async def request_vm_assignment(
     Automatically selects optimal VM using least-connections load balancing.
     """
     try:
+        from app.vm.workload_guidance import merge_follow_up_answers
+
+        effective_workload = merge_follow_up_answers(
+            request.workload_description or "",
+            request.follow_up_answers,
+        )
         vm_name, vm_ip, ssh_command, cluster_type, assigned_at, expires_at = assign_vm_to_user(
             user_id=current_user.username,
-            workload_description=request.workload_description,
+            workload_description=effective_workload,
             cluster_preference=request.cluster_preference,
             priority_level=request.priority_level
         )
@@ -290,6 +383,19 @@ async def migrate_vm(
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Migration failed: {str(e)}")
+
+
+# Backwards-compatible alias for older frontends that call `/transfer`
+@router.post("/transfer", response_model=dict, summary="Transfer VM (alias)")
+async def transfer_vm_alias(
+    request: VMTransferRequest,
+    current_user: User = Depends(get_current_user)
+) -> Dict[str, Any]:
+    """
+    Compatibility wrapper for `/transfer` used by some frontend pages.
+    Delegates to the canonical migrate_vm endpoint.
+    """
+    return await migrate_vm(request, current_user)
 
 
 @router.get("/my-assignment", summary="Get My VM Assignment")
@@ -889,4 +995,3 @@ async def get_ssh_instructions(
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get instructions: {str(e)}")
-

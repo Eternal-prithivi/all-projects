@@ -20,7 +20,7 @@ const EncryptionChoiceModal = ({ file, onClose, onChoose }) => {
       uppercase: /[A-Z]/.test(pwd),
       lowercase: /[a-z]/.test(pwd),
       number: /[0-9]/.test(pwd),
-      special: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(pwd),
+      special: /[!@#$%^&*()_+\-=\\{};':"\\|,.<>?]/.test(pwd),
     };
 
     // Calculate strength

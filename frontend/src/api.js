@@ -1,3 +1,20 @@
+// =============================================================================
+// MODULE: api.js  (400 lines)
+// PURPOSE: Central Axios client + all named API function exports used across the frontend
+//   - apiClient: Axios instance with base URL + Authorization interceptor (auto-attaches token)
+//   - Named exports for every API call: listFiles, getDownloadUrl, deleteFile, uploadFile,
+//     syncAwsBucket, getCurrentUser, status2FA, enable2FA, finalize2FA, verify2FA, disable2FA,
+//     listSecureFiles, deleteSecureFile, uploadSecureFile, chooseEncryption, decryptAndDownload, etc.
+// BASE URL: http://localhost:8000 (dev) | https://zenith-backend-707i.onrender.com (prod)
+// USED BY: Every page component — import { functionName } from '../api'
+// EXCEPTIONS:
+//   - VMClusterPage.jsx uses raw fetch() directly — intentional, does NOT use this file's apiClient
+//   - SecurityPage.jsx imports named functions from here (NOT apiClient directly)
+// DO NOT:
+//   - Add a second Axios instance — one apiClient is the standard
+//   - Hardcode the base URL inside individual functions — use the top-level constant
+//   - Import apiClient in VMClusterPage — it uses its own fetch() pattern
+// =============================================================================
 import axios from "axios";
 
 // Determine API base URL based on environment
@@ -56,6 +73,33 @@ export const loginUser = async (credentials) => {
   }
 };
 
+export const requestPasswordReset = async (identifier, method = "email") => {
+  try {
+    const response = await apiClient.post("/auth/forgot-password", {
+      identifier,
+      method,
+    });
+    return response.data;
+  } catch (error) {
+    throw error.response?.data || error;
+  }
+};
+
+export const resetPasswordWithToken = async ({ newPassword, method, token, otp, identifier }) => {
+  try {
+    const response = await apiClient.post("/auth/reset-password", {
+      new_password: newPassword,
+      method,
+      token: token || null,
+      otp: otp || null,
+      identifier: identifier || null,
+    });
+    return response.data;
+  } catch (error) {
+    throw error.response?.data || error;
+  }
+};
+
 // Current user
 export const getCurrentUser = async (token) => {
   try {
@@ -70,9 +114,11 @@ export const getCurrentUser = async (token) => {
 
 // ---------------- STORAGE ----------------
 
-export const uploadFile = async (file, token) => {
+export const uploadFile = async (file, csp, storageClass, token) => {
   const formData = new FormData();
   formData.append("file", file);
+  formData.append("csp", csp);
+  formData.append("storage_class", storageClass);
 
   try {
     const response = await apiClient.post("/storage/upload", formData, {
@@ -100,7 +146,7 @@ export const listFiles = async (token) => {
 
 export const getDownloadUrl = async (filename, token) => {
   try {
-    const response = await apiClient.get(`/storage/download/${filename}`, {
+    const response = await apiClient.get(`/storage/download/${encodeURIComponent(filename)}`, {
       headers: { Authorization: `Bearer ${token}` },
     });
     return response.data;
@@ -111,9 +157,22 @@ export const getDownloadUrl = async (filename, token) => {
 
 export const deleteFile = async (filename, token) => {
   try {
-    await apiClient.delete(`/storage/delete/${filename}`, {
+    await apiClient.delete(`/storage/delete/${encodeURIComponent(filename)}`, {
       headers: { Authorization: `Bearer ${token}` },
     });
+  } catch (error) {
+    throw error.response?.data || error;
+  }
+};
+
+export const syncAwsBucket = async (token) => {
+  try {
+    const response = await apiClient.post(
+      "/storage/sync/aws",
+      {},
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    return response.data;
   } catch (error) {
     throw error.response?.data || error;
   }
@@ -269,7 +328,7 @@ export const decryptAndDownload = async (filename, password, token) => {
         const text = await error.response.data.text();
         const errorData = JSON.parse(text);
         throw errorData;
-      } catch (parseError) {
+      } catch {
         throw { detail: "Decryption failed" };
       }
     }

@@ -1,3 +1,17 @@
+# =============================================================================
+# MODULE: main.py  (180 lines)
+# PURPOSE: FastAPI app entry point — all routers mounted here, CORS, middleware
+# IMPORTANT ROUTER NOTES:
+#   - routes_auth.py is mounted TWICE: /api/auth AND /auth (legacy alias)
+#   - Admin routes have NO prefix — they mount directly (admin/dashboard, audit-logs)
+#   - CORS: allow_origins=["*"] — RESTRICT before public deployment
+# ENTRY POINT: uvicorn app.main:app --reload → http://localhost:8000
+# API DOCS: http://localhost:8000/docs (Swagger auto-generated)
+# DO NOT:
+#   - Add new routers without checking for prefix conflicts
+#   - Remove the /auth legacy alias until frontend is updated to /api/auth only
+#   - Change CORS to restrict without testing all frontend API calls still work
+# =============================================================================
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -6,6 +20,7 @@ from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from app.auth import routes_auth
+from app.auth import routes_password_reset
 from app.dashboard import routes_dashboard
 from app.users import routes_users
 from app.users import routes_profile
@@ -27,6 +42,8 @@ from app.pricing import routes_pricing
 from app.budgets import routes_budgets
 from app.billing import routes_billing
 from app.payments import routes_payments
+from app.byoc import routes_byoc
+from app.ml import routes_feedback
 from app.database.mongo_client import mongodb_client
 from app.utils.config import settings
 import os
@@ -116,6 +133,7 @@ app.add_middleware(DynamicCORSMiddleware)
 # Include all API routers with the /api prefix
 
 app.include_router(routes_auth.router, prefix="/api/auth")
+app.include_router(routes_password_reset.router, prefix="/api/auth")
 app.include_router(routes_users.router, prefix="/api/users")
 app.include_router(routes_profile.router, prefix="/api")
 app.include_router(routes_settings.router, prefix="/api")
@@ -139,6 +157,8 @@ app.include_router(routes_admin_cleanup.router, prefix="/api", tags=["Admin"])  
 app.include_router(routes_admin.router)
 app.include_router(routes_billing.router, prefix="/api", tags=["Billing"])
 app.include_router(routes_payments.router, prefix="/api/payments", tags=["Payments"])
+app.include_router(routes_byoc.router, prefix="/api/byoc", tags=["BYOC"])
+app.include_router(routes_feedback.router, prefix="/api/ml", tags=["ML Feedback"])
 
 @app.get("/", tags=["Root"])
 def read_root():

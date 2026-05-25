@@ -28,6 +28,60 @@ s3_client_regular = boto3.client(
     config=s3_config_v4
 )
 
+def list_objects_aws(
+    *,
+    bucket_name: str,
+    prefix: str,
+    access_key_id: str,
+    secret_access_key: str,
+    session_token: str | None = None,
+    region_name: str | None = None,
+    max_keys: int = 1000,
+) -> list[dict]:
+    """
+    List objects for a given prefix in S3.
+
+    Returns a list of dicts: {object_key, size_bytes, last_modified}
+    """
+    client = boto3.client(
+        "s3",
+        aws_access_key_id=access_key_id,
+        aws_secret_access_key=secret_access_key,
+        aws_session_token=session_token,
+        region_name=region_name or settings.PRIMARY_S3_REGION,
+        config=s3_config_v4,
+    )
+
+    results: list[dict] = []
+    continuation_token: str | None = None
+
+    while True:
+        kwargs: dict = {"Bucket": bucket_name, "Prefix": prefix, "MaxKeys": max_keys}
+        if continuation_token:
+            kwargs["ContinuationToken"] = continuation_token
+
+        resp = client.list_objects_v2(**kwargs)
+        for obj in resp.get("Contents", []) or []:
+            results.append(
+                {
+                    "object_key": obj.get("Key", ""),
+                    "size_bytes": int(obj.get("Size", 0) or 0),
+                    "last_modified": obj.get("LastModified"),
+                    "storage_class": obj.get("StorageClass"),
+                }
+            )
+
+        if not resp.get("IsTruncated"):
+            break
+
+        continuation_token = resp.get("NextContinuationToken")
+
+        # Hard-stop at max_keys per page * 10 pages to avoid runaway sync cost.
+        if len(results) >= (max_keys * 10):
+            break
+
+    return results
+
 def delete_from_aws(object_key: str):
     """Deletes an object from the configured AWS S3 bucket."""
     # Use the centralized s3_client_regular

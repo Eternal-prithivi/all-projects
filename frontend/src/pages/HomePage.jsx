@@ -1,12 +1,11 @@
 import React from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import Footer from '../components/layout/Footer.jsx';
 import '../styles/home.css';
 
 function HomePage() {
   const { user } = useAuth();
-  const navigate = useNavigate();
 
   return (
     <div className="landing-page">
@@ -148,22 +147,37 @@ function HomePage() {
       <section id="pricing" className="pricing-section">
         <div className="section-header">
           <h2 className="section-title">Simple, transparent pricing</h2>
-          <p className="section-subtitle">Pay only for what you use. We consolidate your cloud bills and help you save.</p>
+          <p className="section-subtitle">Start free, upgrade when you're ready. All plans include multi-cloud management.</p>
         </div>
         <div className="pricing-grid">
           <div className="pricing-card">
-            <h3 className="pricing-tier">Starter</h3>
+            <h3 className="pricing-tier">Free</h3>
             <div className="pricing-price">
-              <span className="price-currency">$</span>
-              <span className="price-amount">9</span>
+              <span className="price-currency">₹</span>
+              <span className="price-amount">0</span>
               <span className="price-period">/month</span>
             </div>
             <ul className="pricing-features">
-              <li>✓ Up to 10 VMs</li>
-              <li>✓ 500GB Storage</li>
-              <li>✓ Basic Analytics</li>
-              <li>✓ Consolidated billing</li>
-              <li>✓ Email Support</li>
+              <li>✓ 2 VMs (demo mode)</li>
+              <li>✓ 10 GB storage</li>
+              <li>✓ Basic monitoring</li>
+              <li>✓ Community support</li>
+            </ul>
+            <Link to="/register" className="pricing-btn">Get Started Free</Link>
+          </div>
+          <div className="pricing-card">
+            <h3 className="pricing-tier">Basic</h3>
+            <div className="pricing-price">
+              <span className="price-currency">₹</span>
+              <span className="price-amount">499</span>
+              <span className="price-period">/month</span>
+            </div>
+            <ul className="pricing-features">
+              <li>✓ 5 VMs</li>
+              <li>✓ 50 GB storage</li>
+              <li>✓ Real-time monitoring</li>
+              <li>✓ Email support</li>
+              <li>✓ Real cloud resources</li>
             </ul>
             <Link to="/register" className="pricing-btn">Get Started</Link>
           </div>
@@ -171,42 +185,37 @@ function HomePage() {
             <div className="pricing-badge">Most Popular</div>
             <h3 className="pricing-tier">Professional</h3>
             <div className="pricing-price">
-              <span className="price-currency">$</span>
-              <span className="price-amount">29</span>
+              <span className="price-currency">₹</span>
+              <span className="price-amount">1,499</span>
               <span className="price-period">/month</span>
             </div>
             <ul className="pricing-features">
-              <li>✓ Up to 50 VMs</li>
-              <li>✓ 5TB Storage</li>
-              <li>✓ Advanced Analytics</li>
-              <li>✓ AI Recommendations</li>
-              <li>✓ Unified cloud billing</li>
-              <li>✓ Priority Support</li>
+              <li>✓ 15 VMs</li>
+              <li>✓ 200 GB storage</li>
+              <li>✓ AI recommendations</li>
+              <li>✓ Priority support</li>
+              <li>✓ Cost analytics</li>
+              <li>✓ API access</li>
             </ul>
             <Link to="/register" className="pricing-btn">Get Started</Link>
           </div>
           <div className="pricing-card">
             <h3 className="pricing-tier">Enterprise</h3>
             <div className="pricing-price">
-              <span className="price-currency">$</span>
-              <span className="price-amount">99</span>
+              <span className="price-currency">₹</span>
+              <span className="price-amount">4,999</span>
               <span className="price-period">/month</span>
             </div>
             <ul className="pricing-features">
               <li>✓ Unlimited VMs</li>
-              <li>✓ Unlimited Storage</li>
-              <li>✓ Custom Analytics</li>
-              <li>✓ Multi-cloud billing consolidation</li>
-              <li>✓ Dedicated Support</li>
-              <li>✓ SLA Guarantee</li>
+              <li>✓ 1 TB storage</li>
+              <li>✓ Predictive analytics</li>
+              <li>✓ 24/7 phone support</li>
+              <li>✓ Dedicated manager</li>
+              <li>✓ SLA guarantee</li>
             </ul>
             <Link to="/register" className="pricing-btn">Contact Sales</Link>
           </div>
-        </div>
-        <div className="section-header" style={{ marginTop: '60px' }}>
-          <p className="section-subtitle">
-            💡 We consolidate bills from AWS, GCP, and Azure. You only pay our platform fee plus your actual cloud usage costs.
-          </p>
         </div>
       </section>
 

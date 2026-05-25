@@ -1,15 +1,29 @@
 import React from 'react';
 
-function StatCard({ title, value, icon, trend, trendValue, subtitle, action, type }) {
+/**
+ * Bento-grid compatible stat card.
+ * 
+ * @param {string} title - Card title (uppercase label)
+ * @param {string|number} value - Main display value
+ * @param {React.ReactNode} icon - Icon element
+ * @param {string} trend - 'up' or 'down'
+ * @param {string} trendValue - e.g. "+12.5%"
+ * @param {string} subtitle - Secondary text below value
+ * @param {React.ReactNode} action - Action button element
+ * @param {string} type - Card type for color coding ('costs', 'vms', 'storage', 'security')
+ * @param {string} size - Bento grid size ('lg', 'md', 'sm')
+ * @param {React.ReactNode} children - Content below the header (charts, rings, etc.)
+ */
+function StatCard({ title, value, icon, trend, trendValue, subtitle, action, type, size = 'md', children }) {
   return (
-    <div className="stat-card" data-type={type}>
+    <div className={`bento-card size-${size}`} data-type={type}>
       <div className="stat-card-header">
         <div className="stat-icon">{icon}</div>
+        <h3 className="card-title">{title}</h3>
         {action && <div className="card-action">{action}</div>}
       </div>
       <div className="card-content">
-        <h3 className="card-title">{title}</h3>
-        <p className="card-value">{value}</p>
+        {value !== undefined && <p className="card-value">{value}</p>}
         {subtitle && <p className="card-subtitle">{subtitle}</p>}
         {trend && trendValue && (
           <p className={`card-trend ${trend}`}>
@@ -17,6 +31,12 @@ function StatCard({ title, value, icon, trend, trendValue, subtitle, action, typ
           </p>
         )}
       </div>
+      {/* Chart/Ring/Custom content area */}
+      {children && (
+        <div className="card-chart-area">
+          {children}
+        </div>
+      )}
     </div>
   );
 }

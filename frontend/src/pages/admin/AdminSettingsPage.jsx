@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useState, useEffect } from 'react';
 import api from '../../api';
 import { toast } from 'react-toastify';
 import '../../styles/admin-pages.css';
@@ -13,11 +13,8 @@ const AdminSettingsPage = () => {
   const [settings, setSettings] = useState(null);
   const [statistics, setStatistics] = useState(null);
 
-  useEffect(() => {
-    fetchSettings();
-  }, []);
-
-  const fetchSettings = async () => {
+  const fetchSettings = useCallback(async () => {
+    setLoading(true);
     try {
       const response = await api.get('/admin/settings');
       setSettings(response.data.settings);
@@ -28,7 +25,11 @@ const AdminSettingsPage = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    fetchSettings();
+  }, [fetchSettings]);
 
   const handleToggle = (key) => {
     setSettings({ ...settings, [key]: !settings[key] });

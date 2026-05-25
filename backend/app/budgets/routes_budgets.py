@@ -1,3 +1,15 @@
+# =============================================================================
+# MODULE: budgets/routes_budgets.py  (354 lines)
+# PURPOSE: Budget management — create/update/delete monthly budgets per service,
+#          alert thresholds (email/SMS when cost % of budget is exceeded)
+# READS FROM:  budgets, cost_data collections
+# WRITES TO:   budgets collection
+# DEPENDS ON:  utils/sms_notifications.py, contact/email_service.py (for alerts)
+# MOUNTED AT:  /api/budgets → list, create, update/{id}, delete/{id}, check-alerts
+# DO NOT:
+#   - Remove the threshold check on cost ingestion — it fires real SMS/email alerts
+#   - Allow negative budget values — validate > 0 before saving
+# =============================================================================
 from fastapi import APIRouter, HTTPException, Depends, status
 from typing import List
 from datetime import datetime, timedelta

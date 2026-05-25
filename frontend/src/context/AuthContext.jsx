@@ -1,3 +1,17 @@
+// =============================================================================
+// CONTEXT: AuthContext.jsx  (84 lines)
+// PURPOSE: JWT auth state — the backbone of every protected page
+//   - Provides: isAuthenticated, user, token, login(), logout()
+//   - token: stored in localStorage (key: "token")
+//   - login(token): saves token, fetches user from /api/users/me, sets state
+//   - logout(): clears localStorage token, resets state, redirects to /login
+// USED BY: Every dashboard page via: const { token, user } = useAuth()
+//          ProtectedRoute.jsx uses isAuthenticated to guard routes
+// DO NOT:
+//   - Store token in sessionStorage or cookies — localStorage is intentional
+//   - Add extra fields to AuthContext without updating every page that destructures it
+//   - Call getCurrentUser() from pages directly — let AuthContext manage it
+// =============================================================================
 import React, { createContext, useState, useContext, useEffect, useRef } from 'react';
 import { getCurrentUser } from '../api'; // Import the API function
 

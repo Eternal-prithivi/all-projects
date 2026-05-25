@@ -20,8 +20,8 @@ function Footer() {
           <div className="footer-links-grid">
             <div className="footer-link-column">
               <h4>Product</h4>
-              <Link to="/#features">Features</Link>
-              <Link to="/dashboard/pricing">Pricing</Link>
+              <Link to="/features">Features</Link>
+              <Link to="/#pricing">Pricing</Link>
               <Link to="/dashboard">Dashboard</Link>
             </div>
             <div className="footer-link-column">
@@ -41,13 +41,13 @@ function Footer() {
           <div className="footer-social-section">
             <h4>Follow Us</h4>
             <div className="footer-social">
-              <a href="https://twitter.com" target="_blank" rel="noopener noreferrer" aria-label="Twitter">
+              <a href="https://x.com/a_prithiviraj" target="_blank" rel="noopener noreferrer" aria-label="Twitter">
                 <FaTwitter />
               </a>
-              <a href="https://github.com" target="_blank" rel="noopener noreferrer" aria-label="GitHub">
+              <a href="https://github.com/a-prithiviraj" target="_blank" rel="noopener noreferrer" aria-label="GitHub">
                 <FaGithub />
               </a>
-              <a href="https://linkedin.com" target="_blank" rel="noopener noreferrer" aria-label="LinkedIn">
+              <a href="https://linkedin.com/in/a-prithiviraj" target="_blank" rel="noopener noreferrer" aria-label="LinkedIn">
                 <FaLinkedin />
               </a>
             </div>

@@ -1,3 +1,14 @@
+# =============================================================================
+# MODULE: config.py  (79 lines)
+# PURPOSE: Pydantic Settings — reads ALL env vars from backend/.env
+#          Exposes a single 'settings' singleton used everywhere: from app.utils.config import settings
+# ENV FILE: backend/.env (never commit — contains real credentials)
+# USED BY: Every module that needs config — aws keys, mongo URI, secret key, etc.
+# DO NOT:
+#   - Instantiate Settings() more than once — use the shared 'settings' singleton
+#   - Add defaults for security-sensitive fields (SECRET_KEY, AWS keys, etc.)
+#   - Rename existing field names — every import uses the same attribute names
+# =============================================================================
 # backend/app/utils/config.py
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -36,7 +47,7 @@ class Settings(BaseSettings):
     CELERY_BROKER_URL: str # Moved here for grouping, was mixed before
 
     # --- GCP Credentials ---
-    GCP_SERVICE_ACCOUNT_JSON_PATH: str
+    GCP_SERVICE_ACCOUNT_JSON_PATH: str = ""  # Leave empty if no GCP key file (DEMO_MODE bypasses real calls)
     GCP_BUCKET_NAME: str
     GCP_PROJECT_ID: str
     GCP_ZONE: str = "us-central1-a" # Free tier zone + a specific sub-zone

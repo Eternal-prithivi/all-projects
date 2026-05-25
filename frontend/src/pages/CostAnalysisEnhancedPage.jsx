@@ -1,7 +1,27 @@
+// =============================================================================
+// PAGE: CostAnalysisEnhancedPage.jsx  (716 lines)
+// ROUTE: /dashboard/cost-enhanced
+// PURPOSE: Advanced cost analytics — interactive time-range charts, per-service breakdown,
+//          Z-score anomaly detection highlights, decay-weighted forecast graph, CSV export
+// API: Uses apiClient → /api/cost/cost-data, /api/cost/anomalies, /api/cost/forecast, /api/cost/export/csv
+// CONTEXTS: PreferencesContext (currencySymbol for all displayed values)
+// DO NOT:
+//   - Hardcode "$" — always use PreferencesContext.currencySymbol
+//   - Remove the anomaly highlight layer — it's a key differentiator from basic cost page
+//   - Change CSV export format — ops team depends on the column order
+// =============================================================================
 import React, { useState, useEffect } from 'react';
 import { apiClient } from '../api.js';
 import { useNotifications } from "../hooks/useNotifications";
 import { useNavigate } from 'react-router-dom';
+import {
+  IconAlert,
+  IconActivity,
+  IconBarChart,
+  IconDownload,
+  IconDollarSign,
+  IconLightbulb,
+} from '../components/dashboard/Icons.jsx';
 import '../styles/costanalysis.css';
 
 const ProviderLogo = ({ provider }) => {
@@ -16,6 +36,7 @@ const ProviderLogo = ({ provider }) => {
 
 const CostAnalysisEnhancedPage = () => {
   const navigate = useNavigate();
+  const notifications = useNotifications();
   
   // Core state
   const [selectedProvider, setSelectedProvider] = useState('aws');
@@ -81,12 +102,13 @@ const CostAnalysisEnhancedPage = () => {
       case 'ytd':
         start = new Date(today.getFullYear(), 0, 1);
         break;
-      case 'lastMonth':
+      case 'lastMonth': {
         start = new Date(today.getFullYear(), today.getMonth() - 1, 1);
         const endOfLastMonth = new Date(today.getFullYear(), today.getMonth(), 0);
         setEndDate(endOfLastMonth.toISOString().split('T')[0]);
         setStartDate(start.toISOString().split('T')[0]);
         return;
+      }
       default:
         return;
     }
@@ -262,7 +284,7 @@ const CostAnalysisEnhancedPage = () => {
       await apiClient.delete(`/budgets/${budgetId}`);
       notifications.success('Budget deleted');
       fetchBudgets();
-    } catch (error) {
+    } catch (_error) {
       notifications.error('Failed to delete budget');
     }
   };
@@ -273,7 +295,7 @@ const CostAnalysisEnhancedPage = () => {
       return;
     }
     try {
-      const response = await apiClient.post(`/budgets/test-sms?phone_number=${encodeURIComponent(budgetForm.phone_number)}&budget_name=Test Alert`);
+      await apiClient.post(`/budgets/test-sms?phone_number=${encodeURIComponent(budgetForm.phone_number)}&budget_name=Test Alert`);
       notifications.success(`SMS sent successfully to ${budgetForm.phone_number}`);
     } catch (error) {
       notifications.error(error.response?.data?.detail || 'Failed to send test SMS');
@@ -336,7 +358,7 @@ const CostAnalysisEnhancedPage = () => {
       notifications.success('Anomaly acknowledged');
       fetchAnomalies();
       fetchAnomalySummary();
-    } catch (error) {
+    } catch (_error) {
       notifications.error('Failed to acknowledge anomaly');
     }
   };
@@ -361,7 +383,7 @@ const CostAnalysisEnhancedPage = () => {
       link.click();
       link.remove();
       notifications.success(`Report exported as ${format.toUpperCase()}`);
-    } catch (error) {
+    } catch (_error) {
       notifications.error('Failed to export report');
     }
   };
@@ -375,11 +397,13 @@ const CostAnalysisEnhancedPage = () => {
           <p>Monitor and optimize your multi-cloud spending</p>
         </div>
         <div className="header-buttons">
-          <button className="simulator-button" onClick={() => navigate('/dashboard/simulator')}>
-            💰 Cost Simulator
+          <button className="simulator-button" type="button" onClick={() => navigate('/dashboard/simulator')}>
+            <IconDollarSign aria-hidden="true" />
+            Cost Simulator
           </button>
-          <button className="optimization-button" onClick={() => navigate('/dashboard/optimization')}>
-            💡 Optimization Tips
+          <button className="optimization-button" type="button" onClick={() => navigate('/dashboard/optimization')}>
+            <IconLightbulb aria-hidden="true" />
+            Optimization Tips
           </button>
         </div>
       </div>
@@ -387,12 +411,12 @@ const CostAnalysisEnhancedPage = () => {
       {/* Anomaly Alerts Banner */}
       {anomalySummary && anomalySummary.total_unacknowledged > 0 && (
         <div className="anomaly-banner">
-          <span className="anomaly-icon">⚠️</span>
+          <span className="anomaly-icon"><IconAlert aria-hidden="true" /></span>
           <span>
             <strong>{anomalySummary.total_unacknowledged} cost anomal{anomalySummary.total_unacknowledged === 1 ? 'y' : 'ies'} detected!</strong>
             {anomalySummary.by_severity.critical > 0 && ` (${anomalySummary.by_severity.critical} critical)`}
           </span>
-          <button onClick={() => setShowAnomalies(!showAnomalies)} className="anomaly-toggle-btn">
+          <button type="button" onClick={() => setShowAnomalies(!showAnomalies)} className="anomaly-toggle-btn">
             {showAnomalies ? 'Hide' : 'View'} Details
           </button>
         </div>
@@ -417,7 +441,7 @@ const CostAnalysisEnhancedPage = () => {
                     <p><strong>Cost:</strong> ${anomaly.cost.toFixed(2)} (Expected: ${anomaly.expected_cost.toFixed(2)})</p>
                     <p><strong>Deviation:</strong> {anomaly.deviation_percentage.toFixed(1)}%</p>
                   </div>
-                  <button onClick={() => acknowledgeAnomaly(anomaly.id)} className="acknowledge-btn">
+                  <button type="button" onClick={() => acknowledgeAnomaly(anomaly.id)} className="acknowledge-btn">
                     Acknowledge
                   </button>
                 </div>
@@ -431,7 +455,7 @@ const CostAnalysisEnhancedPage = () => {
       <div className="budgets-section">
         <div className="section-header">
           <h3>Budget Alerts</h3>
-          <button onClick={() => setShowBudgetForm(!showBudgetForm)} className="create-budget-btn">
+          <button type="button" onClick={() => setShowBudgetForm(!showBudgetForm)} className="create-budget-btn">
             {showBudgetForm ? 'Cancel' : '+ Create Budget'}
           </button>
         </div>
@@ -485,7 +509,7 @@ const CostAnalysisEnhancedPage = () => {
             <div className="budget-form-actions">
               <button type="submit" className="submit-budget-btn">Create Budget</button>
               {budgetForm.phone_number && (
-                <button type="button" onClick={testSMS} className="test-sms-btn">📱 Test SMS</button>
+                <button type="button" onClick={testSMS} className="test-sms-btn">Test SMS</button>
               )}
             </div>
           </form>
@@ -496,7 +520,14 @@ const CostAnalysisEnhancedPage = () => {
             <div key={budgetStatus.budget.id} className={`budget-card ${budgetStatus.is_exceeded ? 'exceeded' : budgetStatus.is_near_limit ? 'warning' : ''}`}>
               <div className="budget-header">
                 <h4>{budgetStatus.budget.name}</h4>
-                <button onClick={() => deleteBudget(budgetStatus.budget.id)} className="delete-budget-btn">×</button>
+                <button
+                  type="button"
+                  onClick={() => deleteBudget(budgetStatus.budget.id)}
+                  className="delete-budget-btn"
+                  aria-label={`Delete budget ${budgetStatus.budget.name}`}
+                >
+                  ×
+                </button>
               </div>
               <div className="budget-info">
                 <p className="budget-amount">${budgetStatus.budget.current_spend.toFixed(2)} / ${budgetStatus.budget.amount.toFixed(2)}</p>
@@ -518,11 +549,11 @@ const CostAnalysisEnhancedPage = () => {
 
       {/* Date Presets */}
       <div className="date-presets">
-        <button onClick={() => applyDatePreset('last7days')}>Last 7 Days</button>
-        <button onClick={() => applyDatePreset('last30days')}>Last 30 Days</button>
-        <button onClick={() => applyDatePreset('last90days')}>Last 90 Days</button>
-        <button onClick={() => applyDatePreset('lastMonth')}>Last Month</button>
-        <button onClick={() => applyDatePreset('ytd')}>Year to Date</button>
+        <button type="button" onClick={() => applyDatePreset('last7days')}>Last 7 Days</button>
+        <button type="button" onClick={() => applyDatePreset('last30days')}>Last 30 Days</button>
+        <button type="button" onClick={() => applyDatePreset('last90days')}>Last 90 Days</button>
+        <button type="button" onClick={() => applyDatePreset('lastMonth')}>Last Month</button>
+        <button type="button" onClick={() => applyDatePreset('ytd')}>Year to Date</button>
       </div>
 
       {/* Filters */}
@@ -562,24 +593,28 @@ const CostAnalysisEnhancedPage = () => {
           </select>
         </div>
 
-        <button onClick={fetchCostData} disabled={loading} className="fetch-button">
+        <button type="button" onClick={fetchCostData} disabled={loading} className="fetch-button">
           {loading ? 'Loading...' : 'Fetch Data'}
         </button>
       </div>
 
       {/* Action Buttons */}
       <div className="action-buttons">
-        <button onClick={fetchForecast} className="forecast-btn">
-          📈 View Forecast
+        <button type="button" onClick={fetchForecast} className="forecast-btn">
+          <IconBarChart aria-hidden="true" />
+          View Forecast
         </button>
-        <button onClick={fetchDemoForecast} className="forecast-btn" title="Test ML model with synthetic data">
-          🤖 Demo ML
+        <button type="button" onClick={fetchDemoForecast} className="forecast-btn" title="Test ML model with synthetic data">
+          <IconActivity aria-hidden="true" />
+          Demo ML
         </button>
-        <button onClick={() => exportReport('csv')} disabled={!costData} className="export-btn">
-          📥 Export CSV
+        <button type="button" onClick={() => exportReport('csv')} disabled={!costData} className="export-btn">
+          <IconDownload aria-hidden="true" />
+          Export CSV
         </button>
-        <button onClick={() => exportReport('json')} disabled={!costData} className="export-btn">
-          📥 Export JSON
+        <button type="button" onClick={() => exportReport('json')} disabled={!costData} className="export-btn">
+          <IconDownload aria-hidden="true" />
+          Export JSON
         </button>
       </div>
 
@@ -588,7 +623,7 @@ const CostAnalysisEnhancedPage = () => {
         <div className="forecast-panel">
           <div className="forecast-header">
             <h3>Cost Forecast - Next 30 Days</h3>
-            <button onClick={() => setShowForecast(false)} className="close-btn">×</button>
+            <button type="button" onClick={() => setShowForecast(false)} className="close-btn" aria-label="Close forecast panel">×</button>
           </div>
           <div className="forecast-summary">
             <div className="forecast-card">
@@ -623,7 +658,7 @@ const CostAnalysisEnhancedPage = () => {
           </div>
 
           <div className="summary-card">
-            <span className="summary-icon">📊</span>
+            <span className="summary-icon"><IconBarChart aria-hidden="true" /></span>
             <div className="summary-content">
               <h3>Daily Average</h3>
               <p className="cost-value">

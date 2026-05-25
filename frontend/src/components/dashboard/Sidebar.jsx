@@ -1,47 +1,90 @@
+// =============================================================================
+// COMPONENT: Sidebar.jsx  (80 lines)
+// PURPOSE: Left navigation rail for all dashboard pages
+//   - Collapsed: 56px icon-only rail | Expanded: 220px with labels (hover or toggle)
+//   - Mobile: transforms to bottom tab bar (CSS media query handles this)
+//   - Links: Dashboard, Cost Analysis, Storage, VM Cluster, Security (+ admin if role=admin)
+//   - data-tour="sidebar-nav" — onboarding tour step 1 targets this
+// USED BY: DashboardLayout.jsx
+// DO NOT:
+//   - Change nav link paths without updating GlobalSearch.jsx route map
+//   - Remove data-tour="sidebar-nav" attribute — breaks onboarding tour step 1
+//   - Add inline widths — collapsed/expanded is controlled via CSS class toggle
+// =============================================================================
 import React from 'react';
 import { NavLink, Link } from 'react-router-dom';
-// Corrected import from our new local file
 import { IconDashboard, IconBarChart, IconHardDrive, IconServer, IconShield } from './Icons.jsx';
 import { FaQuestionCircle } from 'react-icons/fa';
 import '../../styles/sidebar.css';
 
 function Sidebar({ user }) {
   const userInitial = user && user.username ? user.username.charAt(0).toUpperCase() : '?';
-  const username = user ? user.username : 'Loading...';
+
+  const navItems = [
+    { to: '/dashboard', icon: <IconDashboard className="rail-icon" />, label: 'Overview', end: true },
+    { to: '/dashboard/storage', icon: <IconHardDrive className="rail-icon" />, label: 'Storage' },
+    { to: '/dashboard/vmcluster', icon: <IconServer className="rail-icon" />, label: 'VM Cluster' },
+    { to: '/dashboard/security', icon: <IconShield className="rail-icon" />, label: 'Security' },
+    { to: '/dashboard/costs', icon: <IconBarChart className="rail-icon" />, label: 'Cost Analysis' },
+    { to: '/dashboard/billing', icon: (
+      <svg className="rail-icon" width="20" height="20" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+        <path d="M4 4a2 2 0 00-2 2v1h16V6a2 2 0 00-2-2H4z"/>
+        <path fillRule="evenodd" d="M18 9H2v5a2 2 0 002 2h12a2 2 0 002-2V9zM4 13a1 1 0 011-1h1a1 1 0 110 2H5a1 1 0 01-1-1zm5-1a1 1 0 100 2h1a1 1 0 100-2H9z" clipRule="evenodd"/>
+      </svg>
+    ), label: 'Billing' },
+  ];
 
   return (
-    <aside className="sidebar" role="navigation" aria-label="Main navigation">
-      <div className="sidebar-header">
-        <Link to="/" style={{ textDecoration: 'none', color: 'inherit' }} aria-label="Go to homepage">
-          <h3>Zenith</h3>
+    <aside className="nav-rail" role="navigation" aria-label="Main navigation">
+      {/* Logo mark */}
+      <div className="rail-logo" data-tour="sidebar-logo">
+        <Link to="/" aria-label="Go to homepage">
+          <span className="rail-logo-mark">Z</span>
         </Link>
       </div>
-      <nav className="sidebar-nav">
+
+      {/* Navigation items */}
+      <nav className="rail-nav" data-tour="sidebar-nav">
         <ul role="menu">
-          <li role="none"><NavLink to="/dashboard" end role="menuitem" aria-label="Dashboard overview"><IconDashboard className="sidebar-icon" aria-hidden="true" />Overview</NavLink></li>
-          <li role="none"><NavLink to="/dashboard/storage" role="menuitem" aria-label="Storage management"><IconHardDrive className="sidebar-icon" aria-hidden="true" />Storage</NavLink></li>
-          <li role="none"><NavLink to="/dashboard/vmcluster" role="menuitem" aria-label="VM cluster management"><IconServer className="sidebar-icon" aria-hidden="true" />VM Cluster</NavLink></li>
-          <li role="none"><NavLink to="/dashboard/security" role="menuitem" aria-label="Security settings"><IconShield className="sidebar-icon" aria-hidden="true" />Security</NavLink></li>
-          <li role="none"><NavLink to="/dashboard/costs" role="menuitem" aria-label="Cost analysis"><IconBarChart className="sidebar-icon" aria-hidden="true" />Cost Analysis</NavLink></li>
-          <li role="none"><NavLink to="/dashboard/billing" role="menuitem" aria-label="Billing information">
-            <svg className="sidebar-icon" width="20" height="20" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-              <path d="M4 4a2 2 0 00-2 2v1h16V6a2 2 0 00-2-2H4z"/>
-              <path fillRule="evenodd" d="M18 9H2v5a2 2 0 002 2h12a2 2 0 002-2V9zM4 13a1 1 0 011-1h1a1 1 0 110 2H5a1 1 0 01-1-1zm5-1a1 1 0 100 2h1a1 1 0 100-2H9z" clipRule="evenodd"/>
-            </svg>
-            Billing
-          </NavLink></li>
-          <li role="none"><NavLink to="/help" role="menuitem" aria-label="Help center">
-            <FaQuestionCircle className="sidebar-icon" aria-hidden="true" />
-            Help Center
-          </NavLink></li>
+          {navItems.map((item) => (
+            <li key={item.to} role="none">
+              <NavLink
+                to={item.to}
+                end={item.end}
+                role="menuitem"
+                aria-label={item.label}
+                className={({ isActive }) => `rail-link ${isActive ? 'active' : ''}`}
+              >
+                <span className="rail-link-icon">{item.icon}</span>
+                <span className="rail-link-label">{item.label}</span>
+              </NavLink>
+            </li>
+          ))}
         </ul>
       </nav>
-      <div className="user-profile" role="complementary" aria-label="User information">
-        <div className="user-avatar" aria-hidden="true">{userInitial}</div>
-        <div className="user-info">
-          <h4>{username}</h4>
-          <p>User</p>
-        </div>
+
+      {/* Bottom section */}
+      <div className="rail-bottom">
+        <NavLink
+          to="/help"
+          className={({ isActive }) => `rail-link ${isActive ? 'active' : ''}`}
+          aria-label="Help Center"
+          data-tour="sidebar-help"
+        >
+          <span className="rail-link-icon"><FaQuestionCircle className="rail-icon" /></span>
+          <span className="rail-link-label">Help</span>
+        </NavLink>
+
+        <NavLink
+          to="/dashboard/settings"
+          className={({ isActive }) => `rail-link rail-link-user ${isActive ? 'active' : ''}`}
+          aria-label="Settings"
+        >
+          <span className="rail-avatar">{userInitial}</span>
+          <span className="rail-link-label">
+            {user?.username || 'User'}
+          </span>
+        </NavLink>
       </div>
     </aside>
   );

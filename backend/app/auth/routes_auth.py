@@ -1,3 +1,17 @@
+# =============================================================================
+# MODULE: routes_auth.py  (126 lines)
+# PURPOSE: Registration + login — bcrypt password hash, JWT token creation,
+#          2FA flag reset on login, session tracking, activity log
+# READS FROM:  users collection, sessions collection
+# WRITES TO:   users, sessions, activity_log collections
+# DEPENDS ON:  auth_utils (get_password_hash, verify_password, mark_2fa_unverified)
+#              slowapi rate limiter (3/min register, 5/min login)
+# MOUNTED AT:  /api/auth (and legacy /auth alias) → /register, /token
+# DO NOT:
+#   - Remove mark_2fa_unverified() call on login — 2FA re-verify required per session
+#   - Remove rate limiter decorators — prevents brute force attacks
+#   - Apply registration password strength rules to the login endpoint
+# =============================================================================
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordRequestForm
 from pymongo.collection import Collection
@@ -81,50 +95,46 @@ def login_for_access_token_route(
     # This ensures the user must provide a new 2FA code to access protected
     # resources during this new session.
     mark_2fa_unverified(user_in_db.username)
-    
+
+    from app.utils.session_utils import get_client_ip, parse_user_agent
+    from uuid import uuid4
+
+    client_ip = get_client_ip(request)
+    device_label = parse_user_agent(request.headers.get("user-agent"))
+
     try:
-        # Create session entry
         DB = get_database()
         sessions_collection = DB["sessions"]
-        from uuid import uuid4
-        
+
+        sessions_collection.update_many(
+            {"username": user_in_db.username},
+            {"$set": {"is_current": False}},
+        )
+
         session_id = str(uuid4())
         sessions_collection.insert_one({
             "_id": session_id,
             "username": user_in_db.username,
-            "device": "Unknown Device",  # TODO: Parse User-Agent header
-            "location": "Unknown Location",  # TODO: GeoIP lookup
-            "ip_address": "0.0.0.0",  # TODO: Extract from request
+            "device": device_label,
+            "location": "Local network",
+            "ip_address": client_ip,
             "created_at": datetime.utcnow(),
             "last_active": datetime.utcnow(),
-            "is_current": True
+            "is_current": True,
         })
-        
-        # Log activity
+
         activity_collection = DB["activity_log"]
         activity_collection.insert_one({
             "username": user_in_db.username,
             "action": "Successful Login",
-            "description": "User logged in successfully",
+            "description": f"Signed in from {device_label}",
             "timestamp": datetime.utcnow(),
-            "ip": "0.0.0.0"  # TODO: Extract from request
+            "ip": client_ip,
         })
-        
+
         access_token = create_access_token(data={"sub": user_in_db.username})
         logger.info(f"User '{form_data.username}' logged in successfully")
         return Token(access_token=access_token, token_type="bearer")
     except Exception as e:
         logger.error(f"Login error for '{form_data.username}': {str(e)}")
         raise ErrorResponses.internal_error("Login failed. Please try again.")
-    # Log activity
-    activity_collection = DB["activity_log"]
-    activity_collection.insert_one({
-        "username": user_in_db.username,
-        "action": "Successful Login",
-        "description": "User logged in successfully",
-        "timestamp": datetime.utcnow(),
-        "ip": "0.0.0.0"  # TODO: Extract from request
-    })
-    
-    access_token = create_access_token(data={"sub": user_in_db.username})
-    return Token(access_token=access_token, token_type="bearer")

@@ -29,7 +29,7 @@ def upload_to_aws(file: UploadFile, username: str, filename: str, storage_class:
 
     s3_client.upload_fileobj(
         file.file, 
-        settings.S3_BUCKET_NAME, 
+        settings.REGULAR_S3_BUCKET_NAME, 
         object_key,
         ExtraArgs={'StorageClass': api_storage_class}
     )

@@ -1,7 +1,16 @@
-"""
-Consolidated Billing Routes - Simple Version
-Manages invoices and billing without real payment integration
-"""
+# =============================================================================
+# MODULE: billing/routes_billing.py  (386 lines)
+# PURPOSE: Internal billing system — generate invoices from cost_data, list billing history,
+#          download invoice PDF, mark invoices paid (mock — no real payment gateway here)
+# NOTE: This is the internal billing layer. Stripe payments are in routes_payments.py
+# READS FROM:  invoices, cost_data collections
+# WRITES TO:   invoices collection
+# MOUNTED AT:  /api/billing → invoices, generate, download/{id}, mark-paid
+# DO NOT:
+#   - Confuse this with routes_payments.py — billing is for invoices, payments is Stripe checkout
+#   - Delete invoices — mark them void/paid instead to preserve audit trail
+# =============================================================================
+
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from typing import Optional, Dict, List, Any

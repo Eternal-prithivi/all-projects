@@ -31,6 +31,7 @@ const ProviderLogo = ({ provider }) => {
 
 const CostAnalysisPage = () => {
   const navigate = useNavigate();
+  const notifications = useNotifications();
   // State management
   const [selectedProvider, setSelectedProvider] = useState('aws');
   const [startDate, setStartDate] = useState('');

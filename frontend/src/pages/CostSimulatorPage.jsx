@@ -1,7 +1,27 @@
+// =============================================================================
+// PAGE: CostSimulatorPage.jsx  (636 lines)
+// ROUTE: /dashboard/cost-simulator
+// PURPOSE: What-if cost modeling — user selects workload params, gets projected monthly
+//          cost across AWS/GCP/Azure tiers with savings comparison breakdown
+// API: Uses apiClient → /api/cost/simulate (POST with workload params)
+// CONTEXTS: PreferencesContext (currencySymbol for all cost displays)
+// DO NOT:
+//   - Hardcode AWS pricing here — pricing is calculated server-side via cost/manager.py
+//   - Use the simulator output as billing data — it's a read-only projection tool
+//   - Remove the provider comparison table — it's the main value prop of this page
+// =============================================================================
 import React, { useState, useEffect } from 'react';
 import { apiClient } from '../api.js';
 import { toast } from 'react-toastify';
 import { useNavigate } from 'react-router-dom';
+import {
+  IconChevronLeft,
+  IconDatabase,
+  IconDollarSign,
+  IconHardDrive,
+  IconServer,
+  IconTarget,
+} from '../components/dashboard/Icons.jsx';
 import '../styles/costsimulator.css';
 
 const ProviderLogo = ({ provider }) => {
@@ -206,7 +226,11 @@ const CostSimulatorPage = () => {
     return (
       <div className="cost-simulator-container">
         <div className="simulator-header">
-          <h1>💰 Cost Simulator</h1>
+          <span className="page-kicker">Pricing Workbench</span>
+          <h1>
+            <span className="heading-icon"><IconDollarSign aria-hidden="true" /></span>
+            Cost Simulator
+          </h1>
           <p>Loading pricing data...</p>
         </div>
       </div>
@@ -223,15 +247,21 @@ const CostSimulatorPage = () => {
       <div className="simulator-header">
         <button 
           className="back-button"
+          type="button"
           onClick={() => navigate('/dashboard/costs')}
         >
-          ← Back to Cost Analysis
+          <IconChevronLeft aria-hidden="true" />
+          Back to Cost Analysis
         </button>
         <div>
-          <h1>💰 Cost Simulator</h1>
+          <span className="page-kicker">Pricing Workbench</span>
+          <h1>
+            <span className="heading-icon"><IconDollarSign aria-hidden="true" /></span>
+            Cost Simulator
+          </h1>
           <p>Compare cloud pricing across AWS, GCP, and Azure</p>
           {lastUpdated && (
-            <small style={{color: '#999', fontSize: '0.9rem'}}>
+            <small className="pricing-updated">
               Pricing last updated: {new Date(lastUpdated).toLocaleDateString()}
             </small>
           )}
@@ -242,21 +272,30 @@ const CostSimulatorPage = () => {
       <div className="service-selector">
         <button 
           className={`service-btn ${serviceType === 'storage' ? 'active' : ''}`}
+          type="button"
+          aria-pressed={serviceType === 'storage'}
           onClick={() => setServiceType('storage')}
         >
-          📦 Storage
+          <IconHardDrive aria-hidden="true" />
+          Storage
         </button>
         <button 
           className={`service-btn ${serviceType === 'compute' ? 'active' : ''}`}
+          type="button"
+          aria-pressed={serviceType === 'compute'}
           onClick={() => setServiceType('compute')}
         >
-          🖥️ Compute
+          <IconServer aria-hidden="true" />
+          Compute
         </button>
         <button 
           className={`service-btn ${serviceType === 'database' ? 'active' : ''}`}
+          type="button"
+          aria-pressed={serviceType === 'database'}
           onClick={() => setServiceType('database')}
         >
-          🗄️ Database
+          <IconDatabase aria-hidden="true" />
+          Database
         </button>
       </div>
 
@@ -470,7 +509,7 @@ const CostSimulatorPage = () => {
                 <span>1k IOPS</span>
                 <span>80k IOPS</span>
               </div>
-              <small style={{color: '#999', fontSize: '0.85rem'}}>
+              <small className="config-note">
                 Note: AWS charges for IOPS, GCP/Azure include baseline IOPS
               </small>
             </div>
@@ -486,7 +525,10 @@ const CostSimulatorPage = () => {
             className={`price-card ${cheapestProvider === provider ? 'cheapest' : ''}`}
           >
             {cheapestProvider === provider && (
-              <div className="best-value-badge">✨ Best Value</div>
+              <div className="best-value-badge">
+                <IconTarget aria-hidden="true" />
+                Best Value
+              </div>
             )}
             
             <div className="card-header">
@@ -556,7 +598,7 @@ const CostSimulatorPage = () => {
                   </div>
                   {breakdown[provider].iops === 0 && provider !== 'aws' && (
                     <div className="included-badge">
-                      ✓ IOPS included in base price
+                      IOPS included in base price
                     </div>
                   )}
                 </>
@@ -590,7 +632,7 @@ const CostSimulatorPage = () => {
 
       {/* Pricing Notes */}
       <div className="pricing-notes">
-        <h3>📌 Pricing Notes</h3>
+        <h3>Pricing Notes</h3>
         <ul>
           <li>Prices are approximate and based on standard regions (US East/Central)</li>
           <li>Includes data transfer, API requests, and IOPS charges</li>

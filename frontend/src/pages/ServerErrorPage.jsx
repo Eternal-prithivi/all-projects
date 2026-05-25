@@ -1,10 +1,8 @@
 import React from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import '../styles/error-pages.css';
 
 const ServerErrorPage = () => {
-  const navigate = useNavigate();
-
   const handleRefresh = () => {
     window.location.reload();
   };

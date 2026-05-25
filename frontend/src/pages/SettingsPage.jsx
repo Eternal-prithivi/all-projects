@@ -1,9 +1,28 @@
-import React, { useState, useEffect } from 'react';
+// =============================================================================
+// PAGE: SettingsPage.jsx  (830 lines)
+// ROUTE: /dashboard/settings
+// PURPOSE: User preferences — theme (dark/light/auto), currency, timezone, date format,
+//          BYOC (Bring Your Own Cloud) AWS credential management, notification toggles,
+//          language, session management, and "Restart Tour" button
+// API: Uses apiClient from api.js — saves preferences to /api/settings, BYOC to /api/byoc/*
+// CONTEXTS: ThemeContext (theme switching), PreferencesContext (currency/timezone/date),
+//           AuthContext (current user)
+// BACKEND: /api/settings → preferences, /api/byoc → connect/test/disconnect
+// DO NOT:
+//   - Bypass ThemeContext for theme changes — it syncs to DB and applies CSS class to <html>
+//   - Add inline style overrides for theme — use CSS variables from index.css
+//   - Remove the "Restart Tour" button from Preferences section (localStorage: zenith_onboarding_complete)
+// =============================================================================
+import React, { useMemo, useState, useEffect } from 'react';
 import { useNotifications } from "../hooks/useNotifications";
 import { useTheme } from "../context/ThemeContext";
 import { usePreferences } from "../context/PreferencesContext";
 import { apiClient } from '../api';
 import LoadingSpinner from '../components/LoadingSpinner';
+import {
+  getValidationErrorMessage,
+  validateByocConnectionForm,
+} from '../utils/formValidation';
 import '../styles/settings.css';
 
 const SettingsPage = () => {
@@ -45,6 +64,17 @@ const SettingsPage = () => {
   const [awsForm, setAwsForm] = useState({ access_key_id: '', secret_access_key: '', bucket_name: '', region: 'ap-south-1', role_arn: '' });
   const [gcpForm, setGcpForm] = useState({ service_account_json: '', gcp_bucket_name: '' });
   const [azureForm, setAzureForm] = useState({ account_name: '', account_key: '', container_name: '' });
+
+  const byocValidation = useMemo(
+    () => validateByocConnectionForm({
+      csp: byocActiveCSP,
+      method: byocMethod,
+      awsForm,
+      gcpForm,
+      azureForm,
+    }),
+    [byocActiveCSP, byocMethod, awsForm, gcpForm, azureForm]
+  );
 
   useEffect(() => {
     fetchSettings();
@@ -113,6 +143,11 @@ const SettingsPage = () => {
   };
 
   const handleByocTest = async () => {
+    if (!byocValidation.isValid) {
+      setByocTestResult({ success: false, message: getValidationErrorMessage(byocValidation.errors) });
+      return;
+    }
+
     setByocTesting(true);
     setByocTestResult(null);
     try {
@@ -132,6 +167,11 @@ const SettingsPage = () => {
   };
 
   const handleByocConnect = async () => {
+    if (!byocValidation.isValid) {
+      setByocTestResult({ success: false, message: getValidationErrorMessage(byocValidation.errors) });
+      return;
+    }
+
     setByocConnecting(true);
     try {
       let payload = { csp: byocActiveCSP, connection_method: byocMethod };
@@ -441,17 +481,26 @@ const SettingsPage = () => {
                         <div className="byoc-field">
                           <label>Access Key ID</label>
                           <input type="text" placeholder="AKIA..." value={awsForm.access_key_id}
-                            onChange={(e) => setAwsForm({...awsForm, access_key_id: e.target.value})} />
+                            onChange={(e) => setAwsForm({...awsForm, access_key_id: e.target.value})}
+                            aria-invalid={!!byocValidation.errors.access_key_id}
+                            aria-describedby={byocValidation.errors.access_key_id ? 'byoc-aws-access-key-error' : undefined} />
+                          {byocValidation.errors.access_key_id && <p id="byoc-aws-access-key-error" className="form-field-error">{byocValidation.errors.access_key_id}</p>}
                         </div>
                         <div className="byoc-field">
                           <label>Secret Access Key</label>
                           <input type="password" placeholder="Your secret key" value={awsForm.secret_access_key}
-                            onChange={(e) => setAwsForm({...awsForm, secret_access_key: e.target.value})} />
+                            onChange={(e) => setAwsForm({...awsForm, secret_access_key: e.target.value})}
+                            aria-invalid={!!byocValidation.errors.secret_access_key}
+                            aria-describedby={byocValidation.errors.secret_access_key ? 'byoc-aws-secret-key-error' : undefined} />
+                          {byocValidation.errors.secret_access_key && <p id="byoc-aws-secret-key-error" className="form-field-error">{byocValidation.errors.secret_access_key}</p>}
                         </div>
                         <div className="byoc-field">
                           <label>S3 Bucket Name</label>
                           <input type="text" placeholder="my-company-bucket" value={awsForm.bucket_name}
-                            onChange={(e) => setAwsForm({...awsForm, bucket_name: e.target.value})} />
+                            onChange={(e) => setAwsForm({...awsForm, bucket_name: e.target.value})}
+                            aria-invalid={!!byocValidation.errors.bucket_name}
+                            aria-describedby={byocValidation.errors.bucket_name ? 'byoc-aws-bucket-error' : undefined} />
+                          {byocValidation.errors.bucket_name && <p id="byoc-aws-bucket-error" className="form-field-error">{byocValidation.errors.bucket_name}</p>}
                         </div>
                         <div className="byoc-field">
                           <label>Region</label>
@@ -479,7 +528,10 @@ const SettingsPage = () => {
                         <div className="byoc-field">
                           <label>Role ARN</label>
                           <input type="text" placeholder="arn:aws:iam::123456789012:role/ZenithBYOC" value={awsForm.role_arn}
-                            onChange={(e) => setAwsForm({...awsForm, role_arn: e.target.value})} />
+                            onChange={(e) => setAwsForm({...awsForm, role_arn: e.target.value})}
+                            aria-invalid={!!byocValidation.errors.role_arn}
+                            aria-describedby={byocValidation.errors.role_arn ? 'byoc-aws-role-error' : undefined} />
+                          {byocValidation.errors.role_arn && <p id="byoc-aws-role-error" className="form-field-error">{byocValidation.errors.role_arn}</p>}
                         </div>
                         <div className="byoc-field">
                           <label>S3 Bucket Name</label>
@@ -505,12 +557,18 @@ const SettingsPage = () => {
                           <label>Service Account JSON</label>
                           <textarea placeholder='Paste your service account JSON key here...' rows="6"
                             value={gcpForm.service_account_json}
-                            onChange={(e) => setGcpForm({...gcpForm, service_account_json: e.target.value})} />
+                            onChange={(e) => setGcpForm({...gcpForm, service_account_json: e.target.value})}
+                            aria-invalid={!!byocValidation.errors.service_account_json}
+                            aria-describedby={byocValidation.errors.service_account_json ? 'byoc-gcp-json-error' : undefined} />
+                          {byocValidation.errors.service_account_json && <p id="byoc-gcp-json-error" className="form-field-error">{byocValidation.errors.service_account_json}</p>}
                         </div>
                         <div className="byoc-field">
                           <label>GCP Bucket Name</label>
                           <input type="text" placeholder="my-company-bucket" value={gcpForm.gcp_bucket_name}
-                            onChange={(e) => setGcpForm({...gcpForm, gcp_bucket_name: e.target.value})} />
+                            onChange={(e) => setGcpForm({...gcpForm, gcp_bucket_name: e.target.value})}
+                            aria-invalid={!!byocValidation.errors.gcp_bucket_name}
+                            aria-describedby={byocValidation.errors.gcp_bucket_name ? 'byoc-gcp-bucket-error' : undefined} />
+                          {byocValidation.errors.gcp_bucket_name && <p id="byoc-gcp-bucket-error" className="form-field-error">{byocValidation.errors.gcp_bucket_name}</p>}
                         </div>
                       </div>
                     )}
@@ -520,17 +578,26 @@ const SettingsPage = () => {
                         <div className="byoc-field">
                           <label>Storage Account Name</label>
                           <input type="text" placeholder="mystorageaccount" value={azureForm.account_name}
-                            onChange={(e) => setAzureForm({...azureForm, account_name: e.target.value})} />
+                            onChange={(e) => setAzureForm({...azureForm, account_name: e.target.value})}
+                            aria-invalid={!!byocValidation.errors.account_name}
+                            aria-describedby={byocValidation.errors.account_name ? 'byoc-azure-account-error' : undefined} />
+                          {byocValidation.errors.account_name && <p id="byoc-azure-account-error" className="form-field-error">{byocValidation.errors.account_name}</p>}
                         </div>
                         <div className="byoc-field">
                           <label>Storage Account Key</label>
                           <input type="password" placeholder="Your account key" value={azureForm.account_key}
-                            onChange={(e) => setAzureForm({...azureForm, account_key: e.target.value})} />
+                            onChange={(e) => setAzureForm({...azureForm, account_key: e.target.value})}
+                            aria-invalid={!!byocValidation.errors.account_key}
+                            aria-describedby={byocValidation.errors.account_key ? 'byoc-azure-key-error' : undefined} />
+                          {byocValidation.errors.account_key && <p id="byoc-azure-key-error" className="form-field-error">{byocValidation.errors.account_key}</p>}
                         </div>
                         <div className="byoc-field">
                           <label>Container Name</label>
                           <input type="text" placeholder="my-container" value={azureForm.container_name}
-                            onChange={(e) => setAzureForm({...azureForm, container_name: e.target.value})} />
+                            onChange={(e) => setAzureForm({...azureForm, container_name: e.target.value})}
+                            aria-invalid={!!byocValidation.errors.container_name}
+                            aria-describedby={byocValidation.errors.container_name ? 'byoc-azure-container-error' : undefined} />
+                          {byocValidation.errors.container_name && <p id="byoc-azure-container-error" className="form-field-error">{byocValidation.errors.container_name}</p>}
                         </div>
                       </div>
                     )}
@@ -545,10 +612,10 @@ const SettingsPage = () => {
                     {/* Action Buttons */}
                     <div className="byoc-actions">
                       <button className="btn-secondary" onClick={() => { setByocActiveCSP(null); setByocTestResult(null); }}>Cancel</button>
-                      <button className="btn-test" onClick={handleByocTest} disabled={byocTesting}>
+                      <button className="btn-test" onClick={handleByocTest} disabled={byocTesting || !byocValidation.isValid}>
                         {byocTesting ? '⏳ Testing...' : '🔍 Test Connection'}
                       </button>
-                      <button className="btn-connect-save" onClick={handleByocConnect} disabled={byocConnecting}>
+                      <button className="btn-connect-save" onClick={handleByocConnect} disabled={byocConnecting || !byocValidation.isValid}>
                         {byocConnecting ? '⏳ Connecting...' : '🔗 Connect & Save'}
                       </button>
                     </div>
@@ -677,6 +744,25 @@ const SettingsPage = () => {
           <button className="btn-save" onClick={handleSavePreferences}>
             Save Preferences
           </button>
+          <div className="setting-item-full" style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+            <div>
+              <label>Onboarding Tour</label>
+              <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: '4px 0 0' }}>
+                Restart the guided walkthrough of Zenith's key features
+              </p>
+            </div>
+            <button
+              className="btn-save"
+              style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--text-secondary)', border: '1px solid rgba(255,255,255,0.08)' }}
+              onClick={() => {
+                localStorage.removeItem('zenith_onboarding_complete');
+                localStorage.removeItem('zenith_onboarding_dismissed');
+                notifications.success('Tour will start on your next dashboard visit');
+              }}
+            >
+              Restart Tour
+            </button>
+          </div>
         </div>
 
         {/* Billing & Plan — Honest free tier display */}

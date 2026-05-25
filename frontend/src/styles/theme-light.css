@@ -432,6 +432,71 @@
   box-shadow: var(--shadow-elevated);
 }
 
+/* VM cluster — workload guidance panel */
+[data-theme="light"] .workload-guidance {
+  background: var(--bg-card);
+  border-color: var(--border-default);
+  box-shadow: var(--shadow-card);
+}
+
+[data-theme="light"] .workload-guidance--active:hover {
+  border-color: var(--gold-border);
+  box-shadow: var(--shadow-gold);
+}
+
+[data-theme="light"] .readiness-bar {
+  background: var(--border-subtle);
+}
+
+[data-theme="light"] .signal-chip--ok {
+  background: rgba(22, 163, 74, 0.1);
+  color: var(--success);
+  border-color: rgba(22, 163, 74, 0.25);
+}
+
+[data-theme="light"] .signal-chip--missing {
+  background: rgba(220, 38, 38, 0.06);
+  color: var(--danger);
+  border-color: rgba(220, 38, 38, 0.3);
+}
+
+[data-theme="light"] .keyword-tag {
+  background: var(--gold-glow);
+  color: var(--gold-dark);
+  border-color: var(--gold-border);
+}
+
+[data-theme="light"] .preview-badge {
+  background: rgba(22, 163, 74, 0.1);
+  color: var(--success);
+  border-color: rgba(22, 163, 74, 0.2);
+}
+
+[data-theme="light"] .vm-container .form-group input,
+[data-theme="light"] .vm-container .form-group textarea,
+[data-theme="light"] .vm-container .form-group select {
+  background: var(--bg-input);
+  border-color: var(--border-default);
+  color: var(--text-primary);
+}
+
+[data-theme="light"] .vm-container .form-group input:focus,
+[data-theme="light"] .vm-container .form-group textarea:focus,
+[data-theme="light"] .vm-container .form-group select:focus {
+  border-color: var(--gold-primary);
+  box-shadow: 0 0 0 2px var(--gold-glow);
+}
+
+[data-theme="light"] .vm-container .btn-cancel {
+  border-color: var(--border-default);
+  color: var(--text-secondary);
+}
+
+[data-theme="light"] .vm-container .btn-cancel:hover {
+  background: var(--bg-input);
+  color: var(--text-primary);
+}
+
 /* ============================================
    FORM ELEMENTS GLOBAL
    ============================================ */

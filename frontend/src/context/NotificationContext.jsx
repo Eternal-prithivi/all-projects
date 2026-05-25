@@ -1,3 +1,15 @@
+// =============================================================================
+// CONTEXT: NotificationContext.jsx  (95 lines)
+// PURPOSE: Real-time notification state — WebSocket connection to /ws/status
+//   - Provides: notifications[], addNotification(), markRead(), unreadCount
+//   - WebSocket URL: ws://localhost:8000/ws/status?token={token} (dev)
+//   - On "job_complete" message: refreshes relevant page data via context callbacks
+// USED BY: NotificationBell.jsx (display), SecurityPage.jsx (file job completion)
+// DO NOT:
+//   - Open additional WebSocket connections in individual pages — use this context
+//   - Store notifications in localStorage — they're session-only in-memory state
+//   - Change the "job_complete" message format without updating SecurityPage.jsx ws handler
+// =============================================================================
 import React, { createContext, useContext, useState, useCallback } from 'react';
 
 const NotificationContext = createContext();

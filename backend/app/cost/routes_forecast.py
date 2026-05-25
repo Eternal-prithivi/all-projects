@@ -1,57 +1,14 @@
-from fastapi import APIRouter, HTTPException, Depends
-from typing import List, Dict
+from fastapi import APIRouter, HTTPException
+from typing import Dict
 import numpy as np
 from datetime import datetime, timedelta
-from sklearn.linear_model import LinearRegression
 import logging
 
-from app.auth.auth_utils import get_current_user
 from app.cost.manager import get_aws_cost_and_usage, get_gcp_billing_data, get_azure_billing_data
+from app.cost.forecasting import extract_daily_costs, forecast_costs
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
-
-def extract_daily_costs(cost_data: dict) -> List[float]:
-    """Extract daily cost values from API response"""
-    results = cost_data.get("data", {}).get("ResultsByTime", [])
-    costs = []
-    for item in results:
-        amount = float(item.get("Total", {}).get("UnblendedCost", {}).get("Amount", 0))
-        costs.append(amount)
-    return costs
-
-def forecast_costs(historical_costs: List[float], days_ahead: int = 30) -> Dict:
-    """Use linear regression to forecast future costs"""
-    if len(historical_costs) < 7:
-        raise ValueError("Need at least 7 days of historical data for forecasting")
-    
-    # Prepare training data
-    X = np.array(range(len(historical_costs))).reshape(-1, 1)
-    y = np.array(historical_costs)
-    
-    # Train model
-    model = LinearRegression()
-    model.fit(X, y)
-    
-    # Make predictions
-    future_X = np.array(range(len(historical_costs), len(historical_costs) + days_ahead)).reshape(-1, 1)
-    predictions = model.predict(future_X)
-    
-    # Calculate confidence metrics
-    historical_std = np.std(historical_costs)
-    recent_avg = np.mean(historical_costs[-7:]) if len(historical_costs) >= 7 else np.mean(historical_costs)
-    
-    return {
-        "forecasted_costs": [max(0, float(p)) for p in predictions],  # Ensure non-negative
-        "average_daily_cost": float(recent_avg),
-        "total_forecast": float(max(0, sum(predictions))),
-        "confidence_interval": {
-            "lower": float(max(0, sum(predictions) - 1.96 * historical_std * np.sqrt(days_ahead))),
-            "upper": float(sum(predictions) + 1.96 * historical_std * np.sqrt(days_ahead))
-        },
-        "trend": "increasing" if model.coef_[0] > 0 else "decreasing",
-        "daily_change_rate": float(model.coef_[0])
-    }
 
 @router.get("/forecast/{provider}")
 async def get_cost_forecast(
@@ -116,6 +73,7 @@ async def get_cost_forecast(
                 "forecast_start_date": end_date.strftime("%Y-%m-%d"),
                 "forecast_end_date": (end_date + timedelta(days=days_ahead)).strftime("%Y-%m-%d"),
                 "historical_days_used": len(historical_costs),
+                "model_type": "average_baseline",
                 "note": "Limited historical data available. Using simple average-based forecast."
             }
         

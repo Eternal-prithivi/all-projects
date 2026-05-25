@@ -1,3 +1,18 @@
+# =============================================================================
+# MODULE: routes_2fa.py  (172 lines)
+# PURPOSE: TOTP-based Two-Factor Authentication management
+#   - Enable: generates pyotp secret + QR code (base64 PNG)
+#   - Finalize: verifies first TOTP code → sets 2fa_enabled=True
+#   - Verify: verifies TOTP code per session → sets 2fa_verified=True
+#   - Disable: turns off 2FA, clears secret
+# READS/WRITES: users collection (2fa_enabled, 2fa_verified, 2fa_secret fields)
+# ISSUER: "ZenithApp" (used in QR code — do NOT rename, breaks existing TOTP apps)
+# MOUNTED AT: /api/2fa → enable, finalize, verify, status, disable
+# DO NOT:
+#   - Change the pyotp issuer "ZenithApp" — breaks all existing authenticator setups
+#   - Return the raw TOTP secret in any response after setup — QR code only
+#   - Skip the finalize step — 2FA must be verified before being marked enabled
+# =============================================================================
 import pyotp
 import qrcode
 import io

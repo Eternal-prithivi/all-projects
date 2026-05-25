@@ -1,3 +1,16 @@
+# =============================================================================
+# MODULE: dashboard/routes_dashboard.py  (220 lines)
+# PURPOSE: Mission Control data — aggregate stats for the main dashboard bento-grid
+#   - /stats → total_cost, total_files, vm_count, active_alerts, recent_activity
+#   - /cost-trend → last 30 days cost_data aggregated by day (sparkline data)
+# READS FROM:  cost_data, files, vm_assignments, budgets, activity_log collections
+# MOUNTED AT:  /api/dashboard → stats, cost-trend
+# CALLED BY:   DashboardPage.jsx on mount via apiClient
+# DO NOT:
+#   - Add heavy aggregation pipelines here — keep queries fast (dashboard loads on every login)
+#   - Remove cost-trend endpoint — DashboardPage.jsx sparkline depends on it
+#   - Add write operations to this router — dashboard is read-only
+# =============================================================================
 from fastapi import APIRouter, Depends, HTTPException
 from app.users.routes_users import get_current_user
 from app.database.mongo_client import get_database

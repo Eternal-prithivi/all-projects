@@ -14,12 +14,15 @@ from enum import Enum
 class ClusterType(str, Enum):
     GENERAL = "general"
     STORAGE = "storage"
+    MEMORY = "memory"
+    PERFORMANCE = "performance"
+    AI_ML = "ai_ml"
     
     @classmethod
     def _missing_(cls, value):
         """Handle case-insensitive enum values"""
         if isinstance(value, str):
-            value = value.lower()
+            value = value.lower().replace("-", "_").replace("/", "_").replace(" ", "_")
             for member in cls:
                 if member.value == value:
                     return member
@@ -54,6 +57,10 @@ class VMRequestModel(BaseModel):
     workload_description: Optional[str] = Field(
         None,
         description="Description of workload (e.g., 'web app with database'). System will recommend cluster."
+    )
+    follow_up_answers: Optional[Dict[str, str]] = Field(
+        default=None,
+        description="Guided answers merged into workload description before NLP analysis",
     )
     cluster_preference: Optional[ClusterType] = Field(
         None,

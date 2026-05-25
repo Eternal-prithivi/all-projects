@@ -1,0 +1,205 @@
+# AI_CONTEXT_FRONTEND.md — Frontend Architecture & Source Map
+
+> Read this for any frontend, UI, CSS, component, or routing task.
+> **Last Updated: 2026-05-25** — fully audited against live codebase.
+
+---
+
+## 🏗 Project Overview (Brief)
+
+**Zenith** — React 19 + Vite 7 frontend, glassmorphic Mission Control dashboard.
+60+ pages, 4 React Contexts, Recharts, React Router DOM v6, Zenith design system.
+
+For backend context → read `AI_CONTEXT_BACKEND.md`
+
+---
+
+## 📁 Frontend Structure (`frontend/src/`)
+
+### Contexts (4 total — no Redux/Zustand)
+
+| File | Purpose |
+|------|---------|
+| `AuthContext.jsx` | ★ JWT token in localStorage, `isAuthenticated`, `user`, `token`, `login()`, `logout()` |
+| `ThemeContext.jsx` | Dark/Light/Auto theme switching — saves to DB, applies CSS class to `<html>` |
+| `PreferencesContext.jsx` | Currency symbol, date format, timezone — feeds dashboard number/date display |
+| `NotificationContext.jsx` | Real-time WebSocket notifications — bell badge count, toast on new events |
+
+### Pages — Public (no auth required)
+
+| Route | Page File |
+|-------|----------|
+| `/` | `HomePage.jsx` — landing / marketing |
+| `/login` | `LoginPage.jsx` |
+| `/register` | `RegisterPage.jsx` |
+| `/forgot-password` | `ForgotPasswordPage.jsx` |
+| `/reset-password` | `ResetPasswordPage.jsx` |
+| `/contact` | `ContactPage.jsx` |
+| `/about` | `AboutPage.jsx` |
+| `/features` | `FeaturesPage.jsx` |
+| `/help` | `HelpCenterPage.jsx` — 26 FAQs, search, 6 categories |
+| `/legal/terms` | `TermsOfServicePage.jsx` |
+| `/legal/privacy` | `PrivacyPolicyPage.jsx` |
+| `/access-denied` | `AccessDeniedPage.jsx` |
+| `/500` | `ServerErrorPage.jsx` |
+| `/503` | `ServiceUnavailablePage.jsx` |
+| `*` | `NotFoundPage.jsx` — animated 404 with particles |
+
+### Pages — Dashboard (`/dashboard/*`, protected by `<ProtectedRoute>`)
+
+| Route | Page File | Notes |
+|-------|----------|----|
+| `/dashboard` | `DashboardPage.jsx` | Bento grid, Mission Control layout, greeting |
+| `/dashboard/costs` | `CostAnalysisPage.jsx` | |
+| `/dashboard/simulator` | `CostSimulatorPage.jsx` | |
+| `/dashboard/optimization` | `CostOptimizationPage.jsx` | |
+| `/dashboard/billing` | `BillingPage.jsx` | |
+| `/dashboard/pricing` | `PricingPage.jsx` | |
+| `/dashboard/storage` | `StoragePage.jsx` | Uses `AuthContext` — tanjiro mock removed ✅ |
+| `/dashboard/vmcluster` | `VMClusterPage.jsx` | |
+| `/dashboard/security` | `SecurityPage.jsx` | ⚠️ Uses own inline `fetch()` — intentional, do NOT refactor |
+| `/dashboard/security-settings` | `SecuritySettingsPage.jsx` | |
+| `/dashboard/profile` | `ProfilePage.jsx` | |
+| `/dashboard/settings` | `SettingsPage.jsx` | Includes "Restart Tour" in Preferences |
+
+### Pages — Admin (`/admin/*`, role-guarded)
+
+| Route | Page File |
+|-------|----------|
+| `/admin` | `AdminDashboardPage.jsx` |
+| `/admin/users` | `AdminUsersPage.jsx` |
+| `/admin/analytics` | `AdminAnalyticsPage.jsx` |
+| `/admin/payments` | `AdminPaymentsPage.jsx` |
+| `/admin/system` | `AdminSystemPage.jsx` |
+| `/admin/settings` | `AdminSettingsPage.jsx` |
+| `/admin/test` | `AdminTestPage.jsx` |
+
+---
+
+## 🧩 Key Components
+
+| File | Purpose |
+|------|---------|
+| `dashboard/DashboardLayout.jsx` | Root dashboard layout — Sidebar + Header + `<Outlet>` + OnboardingTour |
+| `dashboard/Sidebar.jsx` | 56px icon rail, hover-expands to 220px, mobile bottom tab bar |
+| `dashboard/Header.jsx` | Top bar — search trigger (⌘K), notifications bell, profile dropdown |
+| `dashboard/StatCard.jsx` | Bento-grid card — sizes: `lg` (2×2), `md` (1×1), `sm` |
+| `dashboard/SparklineChart.jsx` | Recharts AreaChart wrapper — gold gradient |
+| `dashboard/ProgressRing.jsx` | SVG ring — `percentage`, `color`, `size` props |
+| `OnboardingTour.jsx` | 7-step guided tour (react-joyride v3) — shows once per user |
+| `admin/AdminLayout.jsx` | Admin panel layout — AdminHeader + AdminSidebar + `<Outlet>` |
+| `ProtectedRoute.jsx` | Auth guard — redirects to `/login` if not authenticated |
+| `ErrorBoundary.jsx` | React error boundary |
+| `GlobalSearch.jsx` | Cmd+K search modal |
+| `KeyboardShortcuts.jsx` | `?` keyboard shortcuts modal |
+| `QuickActions.jsx` | Floating quick action buttons |
+| `Breadcrumbs.jsx` | Route-aware breadcrumbs |
+| `LoadingSpinner.jsx`, `Skeletons.jsx`, `LazyLoadFallback.jsx` | Loading states |
+| `NotificationBell.jsx` | Header bell with unread badge |
+| `EmptyState.jsx` | Reusable empty state with icon + message |
+
+---
+
+## 🎨 Styling System
+
+- All CSS lives in `frontend/src/styles/` — **one file per page/component**
+- Design tokens in `frontend/src/index.css` — never hardcode colors or spacing
+- Full token reference → `DESIGN_SYSTEM.md`
+
+### Key tokens to always use:
+```css
+--bg-base           /* deep space black background */
+--bg-card           /* frosted glass card background */
+--gold-primary      /* #d4af37 — main accent */
+--text-primary      /* near-white text */
+--text-secondary    /* grey text */
+--border-default    /* rgba(255,255,255,0.08) */
+--radius-lg         /* 14px */
+--shadow-gold       /* gold glow on hover */
+```
+
+### CSS file upgrade status:
+✅ Upgraded: `index.css`, `dashboard.css`, `dashboard-enhanced.css`, `sidebar.css`, `auth.css`, `login.css`, `home.css`, `storage.css`, `profile.css`, `vmcluster.css`, `global-search.css`, `onboarding.css`
+⚠️ Needs audit: `settings.css` (partial), `billing.css`, `costanalysis.css` (partial), `security-settings.css`
+
+---
+
+## 🛠 Frontend Tech Stack
+
+| Layer | Technology |
+|-------|-----------|
+| Framework | React 19.1.1 |
+| Build | Vite 7 |
+| Routing | React Router DOM v6 (`createBrowserRouter`) |
+| HTTP | Axios via `frontend/src/api.js` (interceptors + auth header) |
+| HTTP exception | `SecurityPage.jsx` only — uses raw `fetch()`, intentional |
+| Notifications | React Toastify + custom WS via `NotificationContext` |
+| Charts | Recharts (sparklines, area charts) |
+| Icons | React Icons (`react-icons/fa`) + custom SVG `Icons.jsx` |
+| State | React Context only (4 contexts) — no Redux/Zustand |
+| Language | JavaScript (JSX) — **NOT TypeScript** |
+| Onboarding | react-joyride v3 (`{ Joyride }` named export) |
+
+---
+
+## 🔗 Routing Setup
+
+All routes defined in `frontend/src/main.jsx` via `createBrowserRouter`:
+
+```
+Public routes → no wrapper
+  /login, /register, /forgot-password, /reset-password
+  /, /contact, /about, /features, /help
+  /legal/terms, /legal/privacy
+  /access-denied, /500, /503, *
+
+Dashboard routes → <ProtectedRoute> → <DashboardLayout>
+  /dashboard → DashboardPage
+  /dashboard/costs, /simulator, /optimization, /billing, /pricing
+  /dashboard/storage, /vmcluster, /security, /security-settings
+  /dashboard/profile, /settings
+
+Admin routes → <ProtectedRoute> → <AdminLayout> (role-guarded)
+  /admin, /admin/users, /analytics, /payments, /system, /settings, /test
+```
+
+---
+
+## 🔑 Key Frontend Patterns
+
+### Page → api.js → AuthContext (standard pattern)
+```jsx
+import { useAuth } from '../context/AuthContext.jsx';
+import { apiClient } from '../api.js';
+
+function MyPage() {
+  const { token, user } = useAuth();
+  const response = await apiClient.get('/some/endpoint');
+}
+```
+`api.js` automatically adds `Authorization: Bearer <token>` header via interceptor.
+
+### SecurityPage Exception
+`SecurityPage.jsx` uses its own inline `fetch()` with manual auth headers.
+This is intentional — **do not refactor it** unless user explicitly requests.
+
+### New Page Checklist
+1. Create `frontend/src/pages/MyNewPage.jsx`
+2. Create `frontend/src/styles/mynewpage.css`
+3. Import CSS in the page file
+4. Add route to `frontend/src/main.jsx`
+5. Use `AuthContext` + `api.js` for all HTTP calls
+6. Use Zenith design tokens from `index.css` — never hardcode colors
+7. Add `data-tour` attributes if the page should be included in onboarding
+
+---
+
+## ⚠️ Known Frontend Issues
+
+| Issue | Location | Status |
+|-------|----------|--------|
+| `SecurityPage.jsx` inline `fetch()` | `pages/SecurityPage.jsx` | Intentional — do NOT change |
+| `settings.css` partially upgraded | `styles/settings.css` | Rest needs audit |
+| `billing.css` not audited | `styles/billing.css` | May have old hardcoded colors |
+| `costanalysis.css` partially upgraded | `styles/costanalysis.css` | Deeper table/report styling needs work |
+| Lint warnings (28) | Various | All pre-existing, not caused by recent changes |

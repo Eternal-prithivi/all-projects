@@ -1,9 +1,37 @@
+// =============================================================================
+// PAGE: VMClusterPage.jsx  (1238 lines)
+// ROUTE: /dashboard/vmcluster
+// PURPOSE: VM lifecycle management — NLP workload analysis, VM request (cluster assignment),
+//          release, transfer/migration, real-time metrics, cluster health dashboard,
+//          migration recommendations, SSH key download
+// API: Uses raw fetch() via local helpers (not api.js) — intentional pattern for VM page
+//      Hits /api/vm/* endpoints directly with Authorization header
+// STATE: allAssignments, clusterHealth, recommendations, vmMetrics (all sessionStorage cached)
+//        Modals: showRequestModal, showTransferModal, showConfigModal
+// BACKEND: /api/vm/* — request, release, clusters, assignment, analyze-workload,
+//          migrate, transfer, my-assignments, metrics, config
+// DO NOT:
+//   - Change the five cluster types: GENERAL, STORAGE, MEMORY, PERFORMANCE, AI_ML
+//   - Bypass NLP workload analysis before VM request — it drives cluster assignment
+//   - Remove sessionStorage caching (cache_vm_*) — prevents flicker on re-navigation
+//   - Change raw fetch() to api.js — intentional VM-page API pattern
+// =============================================================================
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useNotifications } from "../hooks/useNotifications";
 import { useAuth } from "../context/AuthContext.jsx";
 import LoadingSpinner from "../components/LoadingSpinner.jsx";
 import EmptyState from "../components/EmptyState.jsx";
 import { VMClusterSkeleton } from "../components/Skeletons.jsx";
+import WorkloadGuidancePanel from "../components/vm/WorkloadGuidancePanel.jsx";
+import {
+  IconArrowRightLeft,
+  IconClipboardList,
+  IconDownload,
+  IconHardDrive,
+  IconPlus,
+  IconServer,
+  IconTrash,
+} from "../components/dashboard/Icons.jsx";
 import "../styles/vmcluster.css";
 
 // API Functions
@@ -20,6 +48,16 @@ const handleApiResponse = async (response) => {
   return contentType?.includes("application/json") ? response.json() : {};
 };
 
+const analyzeWorkload = (data, token) =>
+  fetch(`${API_BASE_URL}/analyze-workload`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(data),
+  }).then(handleApiResponse);
+
 const requestVMAssignment = (data, token) =>
   fetch(`${API_BASE_URL}/request`, {
     method: "POST",
@@ -30,19 +68,8 @@ const requestVMAssignment = (data, token) =>
     body: JSON.stringify(data),
   }).then(handleApiResponse);
 
-const getMyAssignment = (token) =>
-  fetch(`${API_BASE_URL}/my-assignment`, {
-    headers: { Authorization: `Bearer ${token}` },
-  }).then(handleApiResponse);
-
 const getAllMyAssignments = (token) =>
   fetch(`${API_BASE_URL}/my-assignments`, {
-    headers: { Authorization: `Bearer ${token}` },
-  }).then(handleApiResponse);
-
-const releaseVM = (token) =>
-  fetch(`${API_BASE_URL}/release`, {
-    method: "POST",
     headers: { Authorization: `Bearer ${token}` },
   }).then(handleApiResponse);
 
@@ -74,7 +101,7 @@ const getRecommendations = (token, minScore = 50) =>
 function VMClusterPage() {
   const { token } = useAuth();
   const notifications = useNotifications();
-  const [currentAssignment, setCurrentAssignment] = useState(() => {
+  const [, setCurrentAssignment] = useState(() => {
     try { const d = JSON.parse(sessionStorage.getItem('cache_vm_assignments')); return d?.[0] || null; } catch { return null; }
   });
   const [allAssignments, setAllAssignments] = useState(() => {
@@ -96,6 +123,10 @@ function VMClusterPage() {
   // Request VM Modal
   const [showRequestModal, setShowRequestModal] = useState(false);
   const [workloadDescription, setWorkloadDescription] = useState("");
+  const [followUpAnswers, setFollowUpAnswers] = useState({});
+  const [workloadAnalysis, setWorkloadAnalysis] = useState(null);
+  const [isAnalyzingWorkload, setIsAnalyzingWorkload] = useState(false);
+  const analyzeDebounceRef = useRef(null);
   const [clusterPreference, setClusterPreference] = useState("");
   const [priorityLevel, setPriorityLevel] = useState(1);
   const [isRequesting, setIsRequesting] = useState(false);
@@ -222,6 +253,74 @@ function VMClusterPage() {
     return () => clearInterval(metricsInterval);
   }, [token, allAssignments, fetchVMMetrics]);
 
+  const resetRequestModalState = useCallback(() => {
+    setWorkloadDescription("");
+    setFollowUpAnswers({});
+    setWorkloadAnalysis(null);
+    setIsAnalyzingWorkload(false);
+    setClusterPreference("");
+    setPriorityLevel(1);
+  }, []);
+
+  const runWorkloadAnalysis = useCallback(async () => {
+    const trimmed = workloadDescription.trim();
+    if (!token || !trimmed || trimmed.length < 3) {
+      setWorkloadAnalysis(null);
+      return;
+    }
+    setIsAnalyzingWorkload(true);
+    try {
+      const result = await analyzeWorkload(
+        {
+          workload_description: trimmed,
+          follow_up_answers: Object.keys(followUpAnswers).length ? followUpAnswers : null,
+        },
+        token
+      );
+      setWorkloadAnalysis(result);
+    } catch (error) {
+      console.error("Workload analysis failed:", error);
+    } finally {
+      setIsAnalyzingWorkload(false);
+    }
+  }, [token, workloadDescription, followUpAnswers]);
+
+  useEffect(() => {
+    if (!showRequestModal) return undefined;
+
+    if (analyzeDebounceRef.current) {
+      clearTimeout(analyzeDebounceRef.current);
+    }
+
+    const trimmed = workloadDescription.trim();
+    if (trimmed.length < 3) {
+      setWorkloadAnalysis(null);
+      return undefined;
+    }
+
+    analyzeDebounceRef.current = setTimeout(() => {
+      runWorkloadAnalysis();
+    }, 500);
+
+    return () => {
+      if (analyzeDebounceRef.current) {
+        clearTimeout(analyzeDebounceRef.current);
+      }
+    };
+  }, [showRequestModal, workloadDescription, followUpAnswers, runWorkloadAnalysis]);
+
+  const handleFollowUpChange = (questionId, value) => {
+    setFollowUpAnswers((prev) => {
+      const next = { ...prev };
+      if (!value) {
+        delete next[questionId];
+      } else {
+        next[questionId] = value;
+      }
+      return next;
+    });
+  };
+
   const handleRequestVM = async () => {
     if (!workloadDescription.trim()) {
       notifications.error("Please describe your workload");
@@ -232,14 +331,14 @@ function VMClusterPage() {
     try {
       const data = {
         workload_description: workloadDescription,
+        follow_up_answers: Object.keys(followUpAnswers).length ? followUpAnswers : null,
         cluster_preference: clusterPreference || null,
         priority_level: priorityLevel,
       };
       const result = await requestVMAssignment(data, token);
       notifications.success(`VM Assigned: ${result.vm_name}`);
       setShowRequestModal(false);
-      setWorkloadDescription("");
-      setClusterPreference("");
+      resetRequestModalState();
       
       await Promise.all([fetchAssignment(), fetchClusterHealth(), fetchVMMetrics()]);
     } catch (error) {
@@ -340,7 +439,7 @@ function VMClusterPage() {
       
       // Show instructions in a modal (you can style this better)
       const instructionsText = `
-🔐 SSH Connection Instructions
+SSH Connection Instructions
 
 VM: ${instructions.vm_name}
 IP: ${instructions.vm_ip}
@@ -355,8 +454,8 @@ ${step.step}. ${step.title}
 
 Troubleshooting:
 ${instructions.troubleshooting.map((item) => `
-• ${item.issue}
-  → ${item.solution}
+- ${item.issue}
+  ${item.solution}
 `).join("\n")}
       `.trim();
 
@@ -366,7 +465,7 @@ ${instructions.troubleshooting.map((item) => `
     }
   };
 
-  const handleVMClick = async (vmName, clusterType) => {
+  const handleVMClick = async (vmName) => {
     try {
       // Fetch comprehensive VM configuration
       const response = await fetch(`${API_BASE_URL}/config/${vmName}`, {
@@ -387,9 +486,9 @@ ${instructions.troubleshooting.map((item) => `
   };
 
   const getCPUColor = (cpuUsage) => {
-    if (cpuUsage > 70) return "#dc3545";
-    if (cpuUsage > 50) return "#ffc107";
-    return "#28a745";
+    if (cpuUsage > 70) return "var(--danger)";
+    if (cpuUsage > 50) return "var(--warning)";
+    return "var(--success)";
   };
 
   if (isLoading) {
@@ -537,11 +636,13 @@ ${instructions.troubleshooting.map((item) => `
             <h3>Your Active VM Assignments ({allAssignments.length})</h3>
             <button
               className="btn-request"
+              type="button"
               onClick={() => setShowRequestModal(true)}
               title="Request another VM"
               aria-label="Request another virtual machine"
             >
-              + Request Another VM
+              <IconPlus aria-hidden="true" />
+              Request Another VM
             </button>
           </div>
           
@@ -553,6 +654,7 @@ ${instructions.troubleshooting.map((item) => `
                   <div className="assignment-actions">
                     <button
                       className="btn-transfer"
+                      type="button"
                       onClick={() => {
                         setCurrentAssignment(assignment);
                         setShowTransferModal(true);
@@ -560,14 +662,17 @@ ${instructions.troubleshooting.map((item) => `
                       title="Migrate this VM"
                       aria-label={`Migrate VM ${assignment.vm_name}`}
                     >
+                      <IconArrowRightLeft aria-hidden="true" />
                       Migrate
                     </button>
                     <button 
                       className="btn-release" 
+                      type="button"
                       onClick={() => handleReleaseVM(assignment.assignment_id, assignment.vm_name)}
                       title="Release this VM"
                       aria-label={`Release VM ${assignment.vm_name}`}
                     >
+                      <IconTrash aria-hidden="true" />
                       Release
                     </button>
                   </div>
@@ -596,23 +701,23 @@ ${instructions.troubleshooting.map((item) => `
                   <div className="detail-row ssh-key-download">
                     <button 
                       className="btn-download-key"
+                      type="button"
                       onClick={() => handleDownloadSSHKey(assignment.assignment_id)}
                       title="Download SSH private key to connect to this VM"
                       aria-label={`Download SSH key for ${assignment.vm_name}`}
                     >
-                      <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
-                        <path d="M8 12l-4-4h3V0h2v8h3l-4 4z"/>
-                        <path d="M14 14H2v-2h12v2z"/>
-                      </svg>
+                      <IconDownload aria-hidden="true" />
                       Download SSH Key
                     </button>
                     <button 
                       className="btn-ssh-instructions"
+                      type="button"
                       onClick={() => handleViewSSHInstructions(assignment.assignment_id)}
                       title="View detailed connection instructions"
                       aria-label={`View SSH instructions for ${assignment.vm_name}`}
                     >
-                      📋 Instructions
+                      <IconClipboardList aria-hidden="true" />
+                      Instructions
                     </button>
                   </div>
                   <div className="detail-row">
@@ -693,7 +798,7 @@ ${instructions.troubleshooting.map((item) => `
         </div>
       ) : (
         <EmptyState
-          icon="🖥️"
+          icon={<IconServer aria-hidden="true" />}
           title="No Active VM Assignment"
           message="Request a VM to get started with your workload. Choose from General or Storage clusters based on your needs."
           actionLabel="Request VM"
@@ -860,8 +965,14 @@ ${instructions.troubleshooting.map((item) => `
 
       {/* Request VM Modal */}
       {showRequestModal && (
-        <div className="modal-overlay" onClick={() => setShowRequestModal(false)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+        <div
+          className="modal-overlay"
+          onClick={() => {
+            setShowRequestModal(false);
+            resetRequestModalState();
+          }}
+        >
+          <div className="modal-content modal-content--wide" onClick={(e) => e.stopPropagation()}>
             <h3>Request VM Assignment</h3>
             <div className="modal-form">
               <div className="form-group">
@@ -873,6 +984,12 @@ ${instructions.troubleshooting.map((item) => `
                   rows="4"
                 />
               </div>
+              <WorkloadGuidancePanel
+                analysis={workloadAnalysis}
+                isAnalyzing={isAnalyzingWorkload}
+                followUpAnswers={followUpAnswers}
+                onFollowUpChange={handleFollowUpChange}
+              />
               <div className="form-group">
                 <label>Cluster Preference (Optional)</label>
                 <select
@@ -899,12 +1016,17 @@ ${instructions.troubleshooting.map((item) => `
             <div className="modal-actions">
               <button
                 className="btn-cancel"
-                onClick={() => setShowRequestModal(false)}
+                type="button"
+                onClick={() => {
+                  setShowRequestModal(false);
+                  resetRequestModalState();
+                }}
               >
                 Cancel
               </button>
               <button
                 className="btn-confirm"
+                type="button"
                 onClick={handleRequestVM}
                 disabled={isRequesting}
               >
@@ -941,12 +1063,14 @@ ${instructions.troubleshooting.map((item) => `
             <div className="modal-actions">
               <button
                 className="btn-cancel"
+                type="button"
                 onClick={() => setShowTransferModal(false)}
               >
                 Cancel
               </button>
               <button
                 className="btn-confirm"
+                type="button"
                 onClick={handleTransferVM}
                 disabled={isTransferring}
               >
@@ -1029,7 +1153,7 @@ ${instructions.troubleshooting.map((item) => `
                 </div>
                 {selectedVMConfig.disks?.map((disk, index) => (
                   <div key={index} className="disk-detail">
-                    <span className="disk-icon">💾</span>
+                    <span className="disk-icon"><IconHardDrive aria-hidden="true" /></span>
                     <span className="disk-name">{disk.name}</span>
                     <span className="disk-size">{disk.size_gb} GB</span>
                     {disk.boot && <span className="boot-badge">BOOT</span>}
@@ -1116,6 +1240,7 @@ ${instructions.troubleshooting.map((item) => `
             <div className="modal-actions">
               <button
                 className="btn-cancel"
+                type="button"
                 onClick={() => setShowConfigModal(false)}
               >
                 Close

@@ -11,6 +11,10 @@ GREEN_UL='\033[4;32m'
 RED_UL='\033[4;31m'
 
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+BACKEND_DIR="$PROJECT_ROOT/backend"
+FRONTEND_DIR="$PROJECT_ROOT/frontend"
+VENV_DIR="$PROJECT_ROOT/venv"
+UVICORN_BIN="$VENV_DIR/bin/uvicorn"
 LOG_DIR="$PROJECT_ROOT/logs"
 mkdir -p "$LOG_DIR"
 BACKEND_LOG="$LOG_DIR/backend.log"
@@ -27,15 +31,24 @@ tail_with_prefix() {
     done &
 }
 
+stop_pid() {
+    local pid="${1:-}"
+    if [ -n "$pid" ]; then
+        kill "$pid" 2>/dev/null || true
+    fi
+}
+
 cleanup() {
+    local status=$?
+    trap - SIGINT SIGTERM EXIT
     echo -e "\n${RED}🛑 Shutting down frontend and backend...${NC}"
-    pkill -P $$
+    pkill -P $$ 2>/dev/null || true
     echo -e "${YELLOW}Stopping Backend API...${NC}"
-    kill $BACKEND_PID 2>/dev/null
+    stop_pid "$BACKEND_PID"
     echo -e "${YELLOW}Stopping Frontend...${NC}"
-    kill $FRONTEND_PID 2>/dev/null
+    stop_pid "$FRONTEND_PID"
     echo -e "${GREEN_UL}✅ Frontend and Backend stopped${NC}"
-    exit 0
+    exit "$status"
 }
 trap cleanup SIGINT SIGTERM EXIT
 
@@ -45,10 +58,20 @@ echo -e "${CYAN}╚════════════════════�
 echo ""
 echo -e "${CYAN}🚀 Starting frontend and backend...${NC}"
 
+if [ ! -x "$UVICORN_BIN" ]; then
+    echo -e "${RED_UL}❌ Missing executable: $UVICORN_BIN${NC}"
+    echo -e "${YELLOW}Run: $PROJECT_ROOT/venv/bin/python -m pip install -r $BACKEND_DIR/requirements.txt${NC}"
+    exit 1
+fi
+if ! command -v npm > /dev/null 2>&1; then
+    echo -e "${RED_UL}❌ npm not found. Install Node.js before starting the frontend.${NC}"
+    exit 1
+fi
+
 # Start Backend API
-cd "$PROJECT_ROOT/backend"
+cd "$BACKEND_DIR"
 echo -e "${GREEN}[1/2] Starting Backend API (port 8000)...${NC}"
-uvicorn app.main:app --reload > "$BACKEND_LOG" 2>&1 &
+"$UVICORN_BIN" app.main:app --reload > "$BACKEND_LOG" 2>&1 &
 BACKEND_PID=$!
 sleep 2
 if ps -p $BACKEND_PID > /dev/null; then
@@ -59,9 +82,9 @@ else
 fi
 
 # Start Frontend
-cd "$PROJECT_ROOT/frontend"
+cd "$FRONTEND_DIR"
 echo -e "${GREEN}[2/2] Starting Frontend (port 5173)...${NC}"
-npm run dev > "$FRONTEND_LOG" 2>&1 &
+npm run dev -- --port 5173 --strictPort > "$FRONTEND_LOG" 2>&1 &
 FRONTEND_PID=$!
 sleep 3
 if ps -p $FRONTEND_PID > /dev/null; then

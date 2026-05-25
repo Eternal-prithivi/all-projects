@@ -56,6 +56,7 @@ Payment integration documentation
 Technical overviews and architecture
 
 - **PROJECT_HANDOFF.md** - Project handoff documentation
+- **DEMO_RUNBOOK.md** - Final demo flow and screenshot checklist
 - **COMPLETE_TECHNICAL_BREAKDOWN.md** - Complete technical breakdown
 - **PROJECT_SUMMARY_AND_ROADMAP.md** - Project summary and roadmap
 - **EXECUTIVE_SUMMARY.md** - Executive summary for stakeholders

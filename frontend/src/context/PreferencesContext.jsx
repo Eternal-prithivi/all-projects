@@ -1,3 +1,15 @@
+// =============================================================================
+// CONTEXT: PreferencesContext.jsx  (184 lines)
+// PURPOSE: User display preferences — currency, timezone, date format, language
+//   - Loads from /api/settings on login (synced to MongoDB)
+//   - Provides: currency, currencySymbol, timezone, dateFormat, language, setPreference()
+//   - currencySymbol is derived from the currency code (USD→$, EUR→€, GBP→£, INR→₹)
+// USED BY: DashboardPage.jsx (cost display), CostAnalysisPage.jsx, BillingPage.jsx
+// DO NOT:
+//   - Hardcode "$" in any page — always use PreferencesContext.currencySymbol
+//   - Add theme to this context — theme lives in ThemeContext.jsx
+//   - Rename exported fields — every consuming page destructures exact field names
+// =============================================================================
 import React, { createContext, useState, useContext, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from './AuthContext';
 import { apiClient } from '../api';

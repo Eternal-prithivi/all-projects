@@ -9,11 +9,18 @@
 ### Step 1 — Read These Files in Order
 All files are in the `ai-docs/` folder:
 ```
-1. ai-docs/AI_MASTER.md        ← you are here
-2. ai-docs/AI_CONTEXT.md       ← full architecture + tech stack + every module
-3. ai-docs/AI_RULES.md         ← constraints + what not to do
-4. ai-docs/PROGRESS.md         ← current task + what's done + backlog + RECOVERY ROADMAP
-5. ai-docs/SCRATCHPAD.md       ← mid-task resume state (if any)
+1. ai-docs/AI_MASTER.md        ← you are here (includes project summary + context routing)
+2. ai-docs/AI_RULES.md         ← constraints + what not to do (resource limits + zero-cost rules)
+3. ai-docs/PROGRESS.md         ← current task + standing anti-tasks + backlog
+4. ai-docs/SCRATCHPAD.md       ← Last Known Good State + mid-task resume state
+5. ai-docs/DECISIONS.md        ← WHY architecture is the way it is (Before You Code checklist at top)
+```
+
+### Step 1b — Pick Your Context File (based on task type)
+```
+Frontend, UI, CSS, components, pages, routing  →  ai-docs/AI_CONTEXT_FRONTEND.md
+Backend, API routes, database, Celery, ML, auth →  ai-docs/AI_CONTEXT_BACKEND.md
+Full-stack task touching both                   →  read both
 ```
 
 ### Step 2 — Check Active Task
@@ -21,8 +28,24 @@ All files are in the `ai-docs/` folder:
 - If there is one → resume it using notes in `SCRATCHPAD.md`
 - If none → ask the user what to work on next
 
-### Step 3 — Confirm Before Starting
-Say: _"Loaded context. Current task: [task]. Ready to proceed."_
+### Step 3 — Mandatory Onboarding Confirmation (before touching ANY code)
+
+**Output this exact block before writing or editing a single file:**
+
+```
+📋 CONTEXT LOADED
+─────────────────────────────────────────
+Phase:           [Current project phase from AI_MASTER.md]
+Last completed:  [Last completed task from PROGRESS.md]
+Active task:     [What you're about to work on]
+Active constraint: [One relevant rule from AI_RULES.md that applies to this task]
+Conflicts found: [Any conflict between the task and the docs — or write "None detected"]
+─────────────────────────────────────────
+```
+
+> This is not optional. If an agent skips this block, context was not loaded correctly.
+> The user can reject any work done by an agent that skipped this step.
+
 
 ---
 
@@ -47,31 +70,41 @@ Every session MUST end with:
 | Cloud Targets | AWS (primary), GCP, Azure — multi-cloud storage + compute          |
 | Database      | MongoDB Atlas (`CloudResourceOptimizationDB`)                      |
 | Task Queue    | Celery + CloudAMQP (RabbitMQ)                                     |
-| Phase         | **PHASE 3 COMPLETE** — Settings functional (theme, preferences, billing). Next: Phase 4 (Platform Features). |
+| Phase         | **PHASE 10 COMPLETE** — Report-aligned VM taxonomy, decay-weighted cost forecast, ML feedback loop, benchmark script, frontend UI polish, and final handoff. |
 | Budget        | **ZERO-COST** — Student project. Free-tier only. See `AI_RULES.md` for details. |
 | Reference Doc | `Major Project latest22- Report-5.pdf` (97-page report describes full intended system) |
-| Last Updated  | 2026-05-24                                                        |
+| Last Updated  | 2026-05-25                                                        |
+
+### Quick Tech Facts
+- **Frontend:** React 19 + Vite 7, 60+ pages, glassmorphic Mission Control dashboard
+- **Backend:** FastAPI + Python, 25 route files, 16 routers, Celery background tasks
+- **Database:** MongoDB Atlas (`CloudResourceOptimizationDB`), 14 collections
+- **Auth:** JWT (HS256), bcrypt, 2FA TOTP (issuer: `ZenithApp`)
+- **ML:** RF+XGBoost storage ensemble, NLP VM workload classifier, guarded self-retraining
+- **Queue:** Celery + CloudAMQP (RabbitMQ)
+- **Cloud:** AWS S3 (primary), GCP Cloud Storage, Azure Blob Storage
+- Venv at `backend/.venv/` — NOT project root
+- Language: Python 3.x backend, JavaScript (JSX) frontend — NOT TypeScript
+- Tests: 34 backend (`python -m pytest -q`), lint: 0 errors
+- CORS: `allow_origins=["*"]` — restrict before public deployment
 
 ---
 
 ## 🚨 CRITICAL: Project Recovery Context
 
-**What happened:** The developer's laptop was repaired, causing data loss. The current codebase is INCOMPLETE compared to what the project report describes. A full gap analysis was performed on 2026-05-23. Recovery Phase 1 & 2 are complete.
+**What happened:** The developer's laptop was repaired, causing data loss. The codebase was incomplete compared to the project report. A full gap analysis was performed on 2026-05-23, and recovery work has rebuilt the major report modules through Phase 9.
 
-**Recovery approach:** Get existing features running first (Done), then rebuild missing modules one by one to match the report. Phase 1 (UI Polish), Phase 2 (Backend/BYOC), Phase 2.5 (Mission Control Dashboard), and Phase 3 (Settings Functionality) are all complete. See `PROGRESS.md` for full roadmap.
+**Recovery approach:** Get existing features running first (Done), then rebuild missing modules one by one to match the report. Phases 1-9 are core complete. See `PROGRESS.md` for the current roadmap and remaining hardening work.
 
 ### What WORKS (exists in code):
-- Auth (JWT + 2FA), BYOC (Bring Your Own Cloud via IAM/STS), Multi-cloud storage (AWS/GCP/Azure), Rule-based tier optimizer, Celery tiering tasks, Secure file vault, WebSocket notifications, Frontend (Home/Login/Register/Dashboard/Storage/Security/Settings/404 pages). API is fully verified (25/25 endpoints passing).
+- Auth (JWT + 2FA), BYOC (Bring Your Own Cloud via IAM/STS), Multi-cloud storage (AWS/GCP/Azure), ensemble storage tiering, Celery tiering/feedback/security tasks, secure file vault, WebSocket notifications, VM workload NLP classification, five-cluster VM assignment, cost analysis/forecast/anomaly APIs, dashboard/settings/profile/security UX, and benchmark validation scripts.
 
-### What's MISSING (described in report, no code exists):
-- **`app/vm/` module** — VM cluster management, NLP-based assignment, auto-scaling
-- **`app/cost/` module** — Cost analysis, cost breakdown by CSP
-- **ML Ensemble Pipeline** — Random Forest + XGBoost ensemble (89.3% accuracy target)
-- **NLP Classification** — TextBlob + spaCy workload description parsing
-- **Feedback-Driven Retraining** — Continuous learning loop with outcome evaluation
-- **Redis cache layer** — Not in requirements or code
-- **Database indexes** — `ensure_indexes()` function missing
-- **Session management + activity logging** — Described in report but not implemented
+### Remaining Report Gaps / Hardening:
+- Optional real model artifact retraining/hot-swap after enough feedback data exists.
+- Larger benchmark datasets from real cloud/user telemetry instead of mostly synthetic validation.
+- Final demo runbook, screenshots, and end-to-end handoff verification.
+- Redis cache layer remains optional; current Celery broker is CloudAMQP, not Redis.
+- Production security hardening remains: rotate exposed/stale credentials and restrict CORS before public deployment.
 
 ### What's BROKEN (needs fixing before running):
 - ~~Python venv has NO packages installed (only pip)~~ (Fixed)
@@ -87,41 +120,71 @@ All AI context files live in the **`ai-docs/`** folder at the project root:
 
 | File                       | Purpose                            |
 |----------------------------|------------------------------------| 
-| `ai-docs/AI_MASTER.md`             | This file — startup protocol       |
-| `ai-docs/AI_CONTEXT.md`            | Architecture, tech stack, folder map, every module's purpose |
-| `ai-docs/AI_RULES.md`              | Hard constraints + code standards  |
-| `ai-docs/AI_SYSTEM_PROMPT.md`      | Quality prompt for AI sessions     |
-| `ai-docs/PROGRESS.md`              | Task tracker — what's done/next + RECOVERY ROADMAP |
-| `ai-docs/SCRATCHPAD.md`            | Mid-task resume state              |
-| `ai-docs/AUDIT_LOG.md`             | Per-session activity log           |
-| `ai-docs/AGENT_SESSION_TEMPLATE.md`| Template for AUDIT_LOG entries     |
-| `ai-docs/DECISIONS.md`             | Architecture decisions log         |
-| `ai-docs/DESIGN_SYSTEM.md`         | Styling rules, design tokens, Mission Control layout specs (bento grid, nav rail, charts) |
+| `ai-docs/AI_MASTER.md`             | This file — startup protocol + project summary + context routing |
+| `ai-docs/AI_CONTEXT_FRONTEND.md`   | Frontend: pages, components, contexts, routing, CSS system |
+| `ai-docs/AI_CONTEXT_BACKEND.md`    | Backend: routes, modules, MongoDB, ML, Celery, env vars |
+| `ai-docs/AI_RULES.md`              | Hard constraints + code standards + resource limits |
+| `ai-docs/PROGRESS.md`              | Task tracker — standing anti-tasks + active task + backlog |
+| `ai-docs/SCRATCHPAD.md`            | Last Known Good State + mid-task resume state |
+| `ai-docs/AUDIT_LOG.md`             | Per-session activity log (append-only, immutable) |
+| `ai-docs/DECISIONS.md`             | Architecture decisions — Before You Code checklist at top |
+| `ai-docs/DESIGN_SYSTEM.md`         | Styling rules, design tokens, Mission Control layout — read before any UI work |
 | `Major Project latest22- Report-5.pdf` | Full project report (97 pages) — stays in project root |
 
 ---
 
-## 🤖 How to Start a New AI Chat
+## 🤖 How to Start a New AI Session
 
 Paste this at the start of every new AI session:
 
 ```
 Continue CloudResourceOptimizationPlatform (Zenith) — IMPLEMENTATION MODE.
-Read ai-docs/AI_MASTER.md and follow the startup protocol.
-Current task: [describe task or say "check ai-docs/PROGRESS.md"].
-Follow ai-docs/AI_RULES.md at all times.
-Reference: The 97-page project report describes the full intended system. ai-docs/PROGRESS.md has the roadmap.
+
+Read ai-docs/AI_MASTER.md and follow the startup protocol exactly.
+Also read ai-docs/PROGRESS.md and ai-docs/SCRATCHPAD.md.
+
+Current task: [describe task here]
+─── OR ─── check ai-docs/PROGRESS.md and ai-docs/SCRATCHPAD.md and resume from where the last agent left off.
+
+Based on the task above, decide the following before starting:
+- If the task involves any frontend, UI, CSS, or components → read ai-docs/DESIGN_SYSTEM.md first.
+- If the task involves any architectural, structural, or module-level changes → read ai-docs/DECISIONS.md first.
+- If the task is to resume or continue from a previous session → treat ai-docs/SCRATCHPAD.md as your primary starting point.
+
+Follow ai-docs/AI_RULES.md at all times. Do not skip the session-end protocol.
 ```
+
+### ⚠️ Always scope your task (takes 30 seconds, saves 40% tokens):
+
+Add these 3 lines to any task you describe:
+```
+Scope: [which pages/files are in scope — e.g. "DashboardPage and DashboardLayout only"]
+Do NOT touch: [files explicitly out of scope — e.g. "SecurityPage.jsx, any ML files"]
+Done when: [clear finish line — e.g. "build passes, feature works, no new lint errors"]
+```
+
+**Example of a well-scoped task:**
+```
+Current task: Add a loading skeleton to the VM Cluster page
+Scope: VMClusterPage.jsx and vmcluster.css only
+Do NOT touch: StoragePage.jsx, SecurityPage.jsx, any backend files
+Done when: Skeleton shows while data loads, build passes, no new lint errors
+```
+
+### What the agent MUST do at session end (non-negotiable):
+- `PROGRESS.md` — update task status and what was done
+- `AUDIT_LOG.md` — append a new entry (SESSION_ID format: YYYYMMDD-HHMMSS)
+- `SCRATCHPAD.md` — update Last Known Good State + clear or write resume state
+
 
 ---
 
 ## ⚠️ Critical Warnings
 
-1. **The app is branded "Zenith"** — the FastAPI title is `"Zenith API"`, sidebar says `"Zenith"`, 2FA issuer is `"ZenithApp"`. Do NOT change branding without asking.
-2. **MAJOR MODULES ARE MISSING** — `app/vm/`, `app/cost/`, ML ensemble pipeline, NLP classification — these must be REBUILT to match the project report.
-3. **Many backend modules are empty stubs** — `aws/`, `ml/`, `providers/`, `queue/`, `errors/`, plus several more. See AI_CONTEXT.md and PROGRESS.md for full list.
-4. **StoragePage.jsx and SecurityPage.jsx have their own inline API functions** — they do NOT use the centralized `api.js`. This is a known pattern deviation. See AI_CONTEXT.md.
-5. **Credentials in `backend/.env` are STALE** — old accounts terminated. New credentials must be created for all services. NEVER expose credentials.
-6. **The `.env` was committed to Git** in the first commit — if the repo is public, old credentials were exposed. Must be rotated.
-7. **The report's `main.py` shows `routes_vm`, `routes_cost`, `routes_ml`** — these modules never existed in Git. They must be built from scratch based on the report.
-
+1. **The app is branded "Zenith"** — FastAPI title is `"Zenith API"`, sidebar says `"Zenith"`, 2FA issuer is `"ZenithApp"`. Do NOT change branding without asking.
+2. **Empty stub files still exist** — `aws/`, `providers/`, `queue/`, `errors/`, and several others. Do NOT delete them — they represent planned architecture. See `AI_CONTEXT_BACKEND.md` for the full stub list.
+3. **SecurityPage.jsx has its own inline API functions** — it does NOT use `api.js`. This is a known pattern deviation. See `AI_CONTEXT_FRONTEND.md`.
+4. **Credentials in `backend/.env` must be kept secret** — never expose or commit. The `.env` was committed in the first git commit — rotate before making repo public.
+5. **`CORS allow_origins=["*"]`** in `main.py` — restrict before any public deployment.
+6. **Venv is at `backend/.venv/`** — NOT `venv/` at the project root. Use `backend/.venv/bin/python` and `backend/.venv/bin/pytest`.
+7. **`routes_auth.py` is mounted twice** (`/api/auth` and `/auth`) in `main.py` — legacy duplicate, the `/auth` alias can be removed if needed.

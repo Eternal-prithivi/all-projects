@@ -1,4 +1,18 @@
-from passlib.context import CryptContext
+# =============================================================================
+# MODULE: auth_utils.py  (104 lines)
+# PURPOSE: Core auth dependencies used by EVERY route in the backend
+#   - get_password_hash() / verify_password()  — bcrypt wrappers
+#   - get_current_user()  — decodes JWT → returns UserInDB (use for normal routes)
+#   - require_2fa()       — same as above + enforces 2FA verified flag
+#   - mark_2fa_unverified() — called on every login to reset 2FA session state
+# USED BY: Almost every route file in the project via Depends(get_current_user)
+#          Security endpoints use Depends(require_2fa) instead
+# DO NOT:
+#   - Add bcrypt work factor changes without testing performance impact
+#   - Change the JWT payload format (sub: username) — all routes decode this
+#   - Remove the 2fa_verified flag check from require_2fa() — breaks vault security
+# =============================================================================
+import bcrypt
 from datetime import datetime, timedelta
 from typing import Optional
 from fastapi import Depends, HTTPException, status
@@ -9,13 +23,12 @@ from app.users.user_model import UserInDB
 from app.utils.config import settings
 from fastapi import WebSocket, status, Query
 # --- existing password functions ---
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    return pwd_context.verify(plain_password, hashed_password)
+    return bcrypt.checkpw(plain_password.encode('utf-8'), hashed_password.encode('utf-8'))
 
 def get_password_hash(password: str) -> str:
-    return pwd_context.hash(password)
+    return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
 
 # --- JWT authentication ---
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/auth/token")

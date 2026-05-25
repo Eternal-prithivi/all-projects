@@ -4,7 +4,6 @@ import api from "../../api";
 export default function Enable2FA() {
   // Initial state is null, so "Enable 2FA" button shows first
   const [qrCode, setQrCode] = useState(null);
-  const [secret, setSecret] = useState(null);
   const [code, setCode] = useState("");
   const [verified, setVerified] = useState(false);
 
@@ -16,7 +15,6 @@ export default function Enable2FA() {
       // TEMPORARY: Log the full response data to the browser console
       console.log("Backend response for enable-2fa:", res.data);
       setQrCode(res.data.qr_code);
-      setSecret(res.data.secret);
       // TEMPORARY: Log the qrCode state immediately after setting it
       console.log("qrCode state after setQrCode:", res.data.qr_code);
     } catch (error) {

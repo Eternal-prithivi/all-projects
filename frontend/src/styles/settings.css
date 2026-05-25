@@ -793,6 +793,20 @@ input:disabled + .toggle-slider {
   box-shadow: 0 0 0 3px var(--gold-glow);
 }
 
+.byoc-field input[aria-invalid="true"],
+.byoc-field select[aria-invalid="true"],
+.byoc-field textarea[aria-invalid="true"] {
+  border-color: rgba(239, 68, 68, 0.8);
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.12);
+}
+
+.form-field-error {
+  margin: 0.35rem 0 0;
+  color: #f87171;
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+
 .byoc-field textarea {
   resize: vertical;
   min-height: 100px;

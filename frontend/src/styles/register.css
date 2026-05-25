@@ -1,5 +1,5 @@
 /* --- 1. Import Fonts & Define "Space Black & Gold" Palette --- */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+/* Fonts loaded via index.html preconnect */
 
 :root {
   /* Palette: Space Black & Gold */
@@ -171,4 +171,19 @@ body {
 .navigation-link a:hover {
   text-decoration: underline;
   color: var(--accent-secondary);
+}
+
+/* --- Form Help Text --- */
+.form-help {
+  display: block;
+  margin-top: 0.5rem;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  opacity: 0.7;
+  transition: opacity 0.3s ease;
+}
+
+.input-group:focus-within .form-help {
+  opacity: 1;
+  color: var(--accent-primary);
 }

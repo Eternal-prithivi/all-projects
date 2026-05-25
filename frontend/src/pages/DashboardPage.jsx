@@ -1,4 +1,19 @@
-import React, { useState, useEffect, useMemo } from "react";
+// =============================================================================
+// PAGE: DashboardPage.jsx  (384 lines)
+// ROUTE: /dashboard (default landing after login)
+// PURPOSE: Mission Control bento-grid overview — live stats cards, cost sparkline,
+//          storage breakdown, quick actions panel, greeting banner
+// API: Uses apiClient from api.js → /api/dashboard/stats, /api/dashboard/cost-trend
+// CONTEXTS: AuthContext (user greeting), PreferencesContext (currency/date format)
+// LAYOUT: Rendered inside DashboardLayout.jsx (which handles Sidebar + Header + OnboardingTour)
+//         Uses bento-grid CSS layout — lg (2×2), md (1×1), sm card sizes
+// TOUR: Key bento cards have data-tour attributes for react-joyride onboarding steps
+// DO NOT:
+//   - Remove data-tour attributes (data-tour="cost-card", "storage-card", etc.) — breaks onboarding
+//   - Hardcode currency symbols — use PreferencesContext.currencySymbol
+//   - Add full page layout here — Sidebar/Header are in DashboardLayout.jsx
+// =============================================================================
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useAuth } from "../context/AuthContext.jsx";
 import { usePreferences } from "../context/PreferencesContext.jsx";
 import { getDashboardStats, apiClient } from "../api.js";
@@ -12,6 +27,11 @@ import {
   IconServer,
   IconHardDrive,
   IconShieldCheck,
+  IconRefresh,
+  IconUploadCloud,
+  IconBarChart,
+  IconActivity,
+  IconAlert,
 } from "../components/dashboard/Icons.jsx";
 import { useNavigate } from 'react-router-dom';
 import { useNotifications } from "../hooks/useNotifications.js";
@@ -23,10 +43,10 @@ import '../styles/dashboard-enhanced.css';
 
 const getGreeting = () => {
   const hour = new Date().getHours();
-  if (hour < 12) return { text: "Good morning", emoji: "☀️" };
-  if (hour < 17) return { text: "Good afternoon", emoji: "🌤️" };
-  if (hour < 21) return { text: "Good evening", emoji: "🌅" };
-  return { text: "Good night", emoji: "🌙" };
+  if (hour < 12) return { text: "Good morning", tone: "Morning operations" };
+  if (hour < 17) return { text: "Good afternoon", tone: "Cloud command active" };
+  if (hour < 21) return { text: "Good evening", tone: "Evening optimization" };
+  return { text: "Good night", tone: "Night watch online" };
 };
 
 // getFormattedDate is now handled by PreferencesContext.formatDateFriendly()
@@ -54,7 +74,7 @@ function DashboardPage() {
   const navigate = useNavigate();
   const notifications = useNotifications();
   const [stats, setStats] = useState(null);
-  const [budgets, setBudgets] = useState([]);
+  const [, setBudgets] = useState([]);
   const [recentActivity, setRecentActivity] = useState([]);
   const [costTrend, setCostTrend] = useState('up');
   const [vmHealth, setVmHealth] = useState({ healthy: 0, warning: 0, critical: 0 });
@@ -75,19 +95,15 @@ function DashboardPage() {
   const sparklineData = useMemo(() => {
     if (!stats) return [];
     return generateCostTrend(stats.monthly_costs);
-  }, [stats?.monthly_costs]);
+  }, [stats]);
 
   // Storage percentage (mock: 82% as shown in design)
   const storagePercentage = useMemo(() => {
     if (!stats) return 0;
     return Math.min(Math.round((stats.storage_used_tb / 5) * 100), 100); // 5TB assumed max
-  }, [stats?.storage_used_tb]);
+  }, [stats]);
 
-  useEffect(() => {
-    fetchDashboardData();
-  }, [token]);
-
-  const fetchDashboardData = async () => {
+  const fetchDashboardData = useCallback(async () => {
     if (!token) return;
     
     setIsLoading(true);
@@ -104,14 +120,14 @@ function DashboardPage() {
       try {
         const budgetResponse = await apiClient.get('/budgets/status');
         setBudgets(budgetResponse.data.slice(0, 3));
-      } catch (err) {
+      } catch (_err) {
         console.log('Budgets not available');
       }
 
       try {
         const activityResponse = await apiClient.get('/dashboard/recent-activity?limit=6');
         setRecentActivity(activityResponse.data || []);
-      } catch (err) {
+      } catch (_err) {
         console.log('Activity data not available');
         setRecentActivity([]);
       }
@@ -124,7 +140,11 @@ function DashboardPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [token, notifications]);
+
+  useEffect(() => {
+    fetchDashboardData();
+  }, [fetchDashboardData]);
 
   const refreshCosts = async () => {
     setIsRefreshingCosts(true);
@@ -156,11 +176,11 @@ function DashboardPage() {
 
   const getActivityIcon = (type) => {
     switch(type) {
-      case 'vm': return '🖥️';
-      case 'storage': return '💾';
-      case 'cost': return '💰';
-      case 'security': return '🔒';
-      default: return '📋';
+      case 'vm': return <IconServer />;
+      case 'storage': return <IconHardDrive />;
+      case 'cost': return <IconDollarSign />;
+      case 'security': return <IconShieldCheck />;
+      default: return <IconActivity />;
     }
   };
 
@@ -171,7 +191,7 @@ function DashboardPage() {
   if (error) {
     return (
       <EmptyState
-        icon="⚠️"
+        icon={<IconAlert aria-hidden="true" />}
         title="Unable to Load Dashboard"
         message={error}
         actionLabel="Retry"
@@ -191,16 +211,19 @@ function DashboardPage() {
       {/* ============ GREETING ============ */}
       <div className="mc-greeting">
         <div className="mc-greeting-text">
+          <span className="mc-kicker">
+            <span className="mc-kicker-dot"></span>
+            {greeting.tone}
+          </span>
           <h2>
             {greeting.text}, {user.username}
-            <span className="greeting-emoji">{greeting.emoji}</span>
           </h2>
           <p className="greeting-date">{formattedDate} — Here's your cloud overview</p>
         </div>
       </div>
 
       {/* ============ BENTO GRID ============ */}
-      <div className="bento-grid">
+      <div className="bento-grid" data-tour="bento-grid">
         {/* --- Cost Overview (Large, 2-col, 2-row) --- */}
         <StatCard
           title="Cost Overview"
@@ -210,14 +233,18 @@ function DashboardPage() {
           size="lg"
           trend={costTrend}
           trendValue="+12.5%"
+          data-tour="card-costs"
           action={
             <button 
               className="refresh-costs-btn" 
+              type="button"
               onClick={refreshCosts}
               disabled={isRefreshingCosts}
+              aria-label="Refresh cost data from AWS"
               title="Refresh cost data from AWS"
             >
-              {isRefreshingCosts ? '🔄' : '↻'} Refresh
+              <IconRefresh className={isRefreshingCosts ? 'refresh-icon is-spinning' : 'refresh-icon'} />
+              Refresh
             </button>
           }
           subtitle={lastCostUpdate ? `Updated: ${lastCostUpdate}` : '7-day spending trend'}
@@ -268,7 +295,7 @@ function DashboardPage() {
               <span className="ring-label">Critical</span>
             </div>
           </div>
-          <button className="view-details-btn" onClick={() => navigate('/dashboard/vmcluster')}>
+          <button className="view-details-btn" type="button" onClick={() => navigate('/dashboard/vmcluster')}>
             View VM Cluster →
           </button>
         </StatCard>
@@ -303,7 +330,7 @@ function DashboardPage() {
           value={animatedAlerts}
           subtitle={stats.security_alerts > 0 ? "Needs attention" : "All clear"}
         >
-          <button className="view-details-btn" onClick={() => navigate('/dashboard/security')}>
+          <button className="view-details-btn" type="button" onClick={() => navigate('/dashboard/security')}>
             View Security →
           </button>
         </StatCard>
@@ -312,23 +339,23 @@ function DashboardPage() {
       {/* ============ QUICK ACTIONS + ACTIVITY ============ */}
       <div className="mc-bottom-row">
         {/* Quick Actions */}
-        <div className="bento-card mc-quick-actions">
+        <div className="bento-card mc-quick-actions" data-tour="quick-actions">
           <h3 className="card-title">Quick Actions</h3>
           <div className="quick-actions-grid">
             <button className="action-btn" type="button" onClick={() => navigate('/dashboard/vmcluster')}>
-              <span className="action-icon">🖥️</span>
+              <span className="action-icon"><IconServer /></span>
               <span className="action-text">Manage VMs</span>
             </button>
             <button className="action-btn" type="button" onClick={() => navigate('/dashboard/storage')}>
-              <span className="action-icon">📁</span>
+              <span className="action-icon"><IconUploadCloud /></span>
               <span className="action-text">Upload Files</span>
             </button>
             <button className="action-btn" type="button" onClick={() => navigate('/dashboard/costs')}>
-              <span className="action-icon">📊</span>
+              <span className="action-icon"><IconBarChart /></span>
               <span className="action-text">Cost Analysis</span>
             </button>
             <button className="action-btn" type="button" onClick={() => navigate('/dashboard/security')}>
-              <span className="action-icon">🔒</span>
+              <span className="action-icon"><IconShieldCheck /></span>
               <span className="action-text">Security</span>
             </button>
           </div>

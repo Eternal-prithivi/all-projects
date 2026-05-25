@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useState, useEffect } from 'react';
 import api from '../../api';
 import { toast } from 'react-toastify';
 import '../../styles/admin-pages.css';
@@ -8,21 +8,21 @@ const AdminSystemPage = () => {
   const [systemHealth, setSystemHealth] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    fetchSystemHealth();
-  }, []);
-
-  const fetchSystemHealth = async () => {
+  const fetchSystemHealth = useCallback(async () => {
     setLoading(true);
     try {
       const res = await api.get('/admin/system-health');
       setSystemHealth(res.data);
-    } catch (error) {
+    } catch {
       toast.error('Failed to load system health');
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    fetchSystemHealth();
+  }, [fetchSystemHealth]);
 
   const formatDate = (dateString) => {
     return new Date(dateString).toLocaleString();
@@ -36,6 +36,9 @@ const AdminSystemPage = () => {
       </div>
     );
   }
+
+  const databaseHealth = systemHealth?.database ?? { healthy: false, size_mb: 0, collections: 0 };
+  const collections = systemHealth?.collections ?? { users: 0, vm_assignments: 0, files: 0, payments: 0 };
 
   return (
     <div className="admin-system-page">
@@ -52,18 +55,18 @@ const AdminSystemPage = () => {
             <h2>Database Status</h2>
           </div>
           <div className="card-body">
-            <div className={`health-status ${systemHealth.database.healthy ? 'healthy' : 'unhealthy'}`}>
-              {systemHealth.database.healthy ? <FaCheckCircle /> : <FaExclamationTriangle />}
-              <span>{systemHealth.database.healthy ? 'Healthy' : 'Unhealthy'}</span>
+            <div className={`health-status ${databaseHealth.healthy ? 'healthy' : 'unhealthy'}`}>
+              {databaseHealth.healthy ? <FaCheckCircle /> : <FaExclamationTriangle />}
+              <span>{databaseHealth.healthy ? 'Healthy' : 'Unhealthy'}</span>
             </div>
             <div className="health-details">
               <div className="detail-row">
                 <span>Database Size:</span>
-                <strong>{systemHealth.database.size_mb} MB</strong>
+                <strong>{databaseHealth.size_mb} MB</strong>
               </div>
               <div className="detail-row">
                 <span>Collections:</span>
-                <strong>{systemHealth.database.collections}</strong>
+                <strong>{databaseHealth.collections}</strong>
               </div>
             </div>
           </div>
@@ -79,19 +82,19 @@ const AdminSystemPage = () => {
             <div className="collections-list">
               <div className="collection-item">
                 <span>Users</span>
-                <strong>{systemHealth.collections.users}</strong>
+                <strong>{collections.users}</strong>
               </div>
               <div className="collection-item">
                 <span>VM Assignments</span>
-                <strong>{systemHealth.collections.vm_assignments}</strong>
+                <strong>{collections.vm_assignments}</strong>
               </div>
               <div className="collection-item">
                 <span>Files</span>
-                <strong>{systemHealth.collections.files}</strong>
+                <strong>{collections.files}</strong>
               </div>
               <div className="collection-item">
                 <span>Payments</span>
-                <strong>{systemHealth.collections.payments}</strong>
+                <strong>{collections.payments}</strong>
               </div>
             </div>
           </div>
@@ -100,7 +103,7 @@ const AdminSystemPage = () => {
 
       <div className="admin-card">
         <div className="card-footer">
-          <p className="text-muted">Last checked: {formatDate(systemHealth.timestamp)}</p>
+          <p className="text-muted">Last checked: {formatDate(systemHealth?.timestamp)}</p>
           <button onClick={fetchSystemHealth} className="btn-primary">
             Refresh Status
           </button>

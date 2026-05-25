@@ -1,3 +1,16 @@
+# =============================================================================
+# MODULE: routes_payments.py  (579 lines)
+# PURPOSE: Stripe payment integration — subscription plans, checkout session creation,
+#          webhook event handling, subscription status checks
+# READS FROM:  users collection (subscription_tier field)
+# WRITES TO:   users collection (subscription_tier, stripe_customer_id)
+# DEPENDS ON:  Stripe SDK, settings.STRIPE_SECRET_KEY, settings.STRIPE_WEBHOOK_SECRET
+# MOUNTED AT:  /api/payments → create-checkout, webhook, status, cancel
+# DO NOT:
+#   - Log or store raw Stripe webhook payloads — they contain sensitive card data
+#   - Change plan IDs without updating the Stripe dashboard price IDs too
+#   - Skip webhook signature verification — it prevents replay attacks
+# =============================================================================
 # backend/app/payments/routes_payments.py
 
 from fastapi import APIRouter, HTTPException, Depends, Request

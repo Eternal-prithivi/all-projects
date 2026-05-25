@@ -1,17 +1,4 @@
-/* src/styles/storage.css */
-:root {
-  --primary-gold: #d4af37;
-  --hover-gold: #c8a430;
-  --dark-bg: #121212;
-  --content-bg: #1a1a1a;
-  --border-color: #2a2a2a;
-  --text-primary: #e0e0e0;
-  --text-secondary: #a3a3a3;
-  --danger-red: #dc3545;
-  --primary-blue: #007bff;
-  --success-green: #28a745;
-  --warning-yellow: #ffc107;
-}
+/* src/styles/storage.css — Zenith Design System */
 
 .storage-container {
   padding: 2rem;
@@ -36,12 +23,15 @@
 }
 
 .upload-section {
-  background: var(--content-bg);
-  border: 1px solid var(--border-color);
-  border-radius: 12px;
+  background: var(--bg-card);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
   padding: 2.5rem;
   margin-bottom: 3rem;
-  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.2);
+  transition: border-color var(--duration-normal) var(--ease-out);
 }
 
 .upload-title {
@@ -92,8 +82,9 @@
   align-items: center;
   gap: 1.5rem;
   padding: 1.25rem 1.5rem;
-  background: #111;
-  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
 }
 
 .preference-group label {
@@ -104,16 +95,23 @@
 }
 
 .preference-group select {
-  background: #2a2a2a;
+  background: var(--bg-input);
   color: var(--text-primary);
-  border: 2px solid #444;
+  border: 1px solid var(--border-default);
   padding: 10px 14px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   font-family: "Inter", sans-serif;
-  transition: border-color 0.3s ease;
+  transition: border-color var(--duration-normal) var(--ease-out),
+              box-shadow var(--duration-normal) var(--ease-out);
   min-width: 180px;
   font-size: 0.95rem;
   cursor: pointer;
+}
+
+.preference-group select:focus {
+  outline: none;
+  border-color: var(--gold-primary);
+  box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.15);
 }
 
 /* --- Color-coded styles for preference dropdowns --- */
@@ -187,10 +185,18 @@ select.intent-archival {
   margin-top: 2rem;
 }
 
+.list-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
 .list-title {
   font-size: 1.75rem;
   font-weight: 600;
-  margin-bottom: 2rem;
+  margin-bottom: 0;
   color: #fff;
   border-bottom: 1px solid var(--border-color);
   padding-bottom: 1rem;
@@ -214,14 +220,15 @@ select.intent-archival {
 
 .file-table td {
   padding: 1.25rem 1.5rem;
-  background: var(--content-bg);
-  border: 1px solid var(--border-color);
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
   vertical-align: middle;
   font-size: 0.95rem;
+  transition: background var(--duration-fast) var(--ease-out);
 }
 
 .file-table .date-col {
-  color: #888;
+  color: var(--text-muted);
   font-size: 0.9rem;
 }
 
@@ -231,8 +238,9 @@ select.intent-archival {
 .file-table tr td:last-child {
   border-radius: 0 8px 8px 0;
 }
-.file-table tbody tr:hover {
-  background-color: #2a2a2a;
+.file-table tbody tr:hover td {
+  background: var(--bg-card-hover);
+  border-color: var(--border-default);
 }
 
 .action-btn {
@@ -300,12 +308,14 @@ select.intent-archival {
 }
 
 .modal-content {
-  background: var(--content-bg);
+  background: var(--bg-card);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
   padding: 2.5rem;
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   text-align: center;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
-  border: 1px solid var(--border-color);
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.5);
+  border: 1px solid var(--border-default);
   animation: slideIn 0.4s ease;
   max-width: 550px;
   width: 90%;
@@ -332,10 +342,10 @@ select.intent-archival {
 }
 
 .recommendation-box {
-  background: #111;
-  border: 1px solid var(--border-color);
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--border-default);
   padding: 1.75rem;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   margin: 1.5rem 0;
 }
 
@@ -361,6 +371,58 @@ select.intent-archival {
   width: 28px;
   height: 28px;
   object-fit: contain;
+}
+
+.ensemble-box {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  padding: 1rem;
+  margin: 1rem 0 0;
+}
+
+.ensemble-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  color: var(--text-secondary);
+  font-size: 0.88rem;
+  margin-bottom: 0.9rem;
+}
+
+.ensemble-summary strong {
+  color: var(--primary-gold);
+  font-size: 1.1rem;
+}
+
+.expert-votes {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.expert-vote {
+  min-width: 0;
+  background: rgba(0, 0, 0, 0.24);
+  border: 1px solid var(--border-default);
+  border-radius: 8px;
+  padding: 0.75rem;
+  display: grid;
+  gap: 0.25rem;
+}
+
+.expert-vote span,
+.expert-vote small {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  overflow-wrap: anywhere;
+}
+
+.expert-vote strong {
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  text-transform: capitalize;
 }
 
 .modal-buttons {
@@ -437,11 +499,11 @@ select.intent-archival {
 
 .override-select {
   width: 100%;
-  background: #2a2a2a;
+  background: var(--bg-input);
   color: var(--text-primary);
-  border: 2px solid #444;
+  border: 1px solid var(--border-default);
   padding: 10px 12px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   font-family: 'Inter', sans-serif;
 }
 
@@ -452,10 +514,12 @@ select.intent-archival {
   gap: 1.5rem;
   margin: 2rem 0;
   padding: 2rem;
-  background: var(--content-bg);
-  border-radius: 12px;
-  border: 1px solid var(--border-color);
-  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
+  background: var(--bg-card);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-default);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.2);
 }
 
 .storage-process-info .process-step {
@@ -470,12 +534,13 @@ select.intent-archival {
   width: 48px;
   height: 48px;
   min-width: 48px;
-  border-radius: 50%;
+  border-radius: var(--radius-md);
   display: flex;
   align-items: center;
   justify-content: center;
   position: relative;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  box-shadow: var(--shadow-card);
+  border: 1px solid var(--border-default);
 }
 
 .storage-process-info .process-icon svg {
@@ -485,34 +550,34 @@ select.intent-archival {
 }
 
 .storage-process-info .process-icon.analyze {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
+  background: rgba(59, 130, 246, 0.12);
+  color: var(--info);
 }
 
 .storage-process-info .process-icon.recommend {
-  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-  color: white;
+  background: rgba(212, 175, 55, 0.12);
+  color: var(--gold-primary);
 }
 
 .storage-process-info .process-icon.tier {
-  background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
-  color: white;
+  background: rgba(245, 158, 11, 0.12);
+  color: var(--warning);
   animation: tier-pulse 2s ease-in-out infinite;
 }
 
 .storage-process-info .process-icon.save {
-  background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
-  color: white;
+  background: rgba(34, 197, 94, 0.12);
+  color: var(--success);
 }
 
 @keyframes tier-pulse {
   0%, 100% {
     transform: scale(1);
-    box-shadow: 0 4px 12px rgba(0, 242, 254, 0.3);
+    box-shadow: 0 4px 12px rgba(245, 158, 11, 0.16);
   }
   50% {
-    transform: scale(1.05);
-    box-shadow: 0 6px 20px rgba(0, 242, 254, 0.5);
+    transform: scale(1.04);
+    box-shadow: 0 6px 20px rgba(245, 158, 11, 0.26);
   }
 }
 
@@ -524,7 +589,7 @@ select.intent-archival {
 }
 
 .storage-process-info .process-text strong {
-  color: #fff;
+  color: var(--text-primary);
   font-size: 1rem;
   font-weight: 600;
   line-height: 1.3;
@@ -601,5 +666,9 @@ select.intent-archival {
 
   .recommendation-title {
     font-size: 1.5rem;
+  }
+
+  .expert-votes {
+    grid-template-columns: 1fr;
   }
 }

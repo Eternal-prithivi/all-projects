@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiClient } from '../api';
 import { toast } from 'react-toastify';
+import { PageSkeleton } from '../components/Skeletons.jsx';
 import '../styles/pricing.css';
 
 const PricingPage = () => {
@@ -116,7 +117,7 @@ const PricingPage = () => {
     return (
       <div className="pricing-page">
         <div className="pricing-container">
-          <div className="loading-spinner">Loading pricing plans...</div>
+          <PageSkeleton />
         </div>
       </div>
     );

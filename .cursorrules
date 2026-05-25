@@ -1,0 +1,106 @@
+# Cloud Resource Optimization - AI Continuity & Development Rules
+
+## ⚡ CRITICAL: Read First
+
+Before doing ANYTHING in this project, read:
+1. `AI_MASTER.md` — mandatory startup flow
+2. `AI_CONTEXT.md` — architecture and tech stack
+3. `PROGRESS.md` — current task status
+
+Do not write any code until you have finished reading all files listed in AI_MASTER.md's startup flow.
+
+---
+
+## Continuity Requirements (Mandatory)
+
+- **Use repo-owned docs**: `PROGRESS.md`, `AUDIT_LOG.md`, `SCRATCHPAD.md`
+- **Update after EVERY task**: These three files must be updated before finishing any work
+- **SESSION_ID required**: Every audit log entry must include a unique `SESSION_ID`
+- **Mid-task resume**: If stopping mid-task, write exact resume instructions into `SCRATCHPAD.md`
+- **No manual state tracking**: All state lives in these three files, not chat history
+
+---
+
+## Development Rules
+
+### Frontend Code Style (JavaScript / JSX — NOT TypeScript)
+- Use functional React components only
+- Use async/await, not callbacks
+- Use const/let, avoid var
+- Use explicit imports
+
+### Backend Code Style (Python 3.x)
+- Type hints on all function signatures
+- Use async def for route handlers
+- Use Pydantic models for validation
+- Use pydantic_settings for config
+
+### Project Structure
+- `frontend/src/` — React app (pages, components, context, hooks, styles)
+- `backend/app/` — FastAPI app (auth, users, storage, security, database, etc.)
+- `devops/` — Docker, Terraform, CI/CD configs
+- `docs/` — Project documentation
+
+### Testing
+- Backend: pytest (from `backend/` directory)
+- Frontend: ESLint (`npm run lint`)
+- Write tests for new features and fixes
+
+---
+
+## Quality Gates (Required Before Finishing)
+
+**Every session must:**
+- [ ] Run `cd backend && pytest` — all backend tests pass
+- [ ] Run `cd frontend && npm run lint` — no ESLint errors
+- [ ] Update `PROGRESS.md` — current status documented
+- [ ] Update `AUDIT_LOG.md` — session entry with SESSION_ID appended
+- [ ] Clear `SCRATCHPAD.md` — no active task (or write resume state)
+
+**If quality gates fail:**
+- Fix the issue
+- Re-run checks
+- Document failures if unable to fix
+
+---
+
+## What NOT to Do
+
+- ❌ Do not make broad refactors unless explicitly requested
+- ❌ Do not bypass abstractions by hardcoding into implementation
+- ❌ Do not use destructive git operations without permission
+- ❌ Do not store plaintext credentials
+- ❌ Do not leave TODO markers without tracking them in PROGRESS.md
+
+---
+
+## Architecture to Preserve
+
+- Monorepo: frontend/ + backend/ — never merge
+- FastAPI only — no Flask/Django
+- MongoDB Atlas — no SQL database
+- Celery + CloudAMQP for async tasks
+- JWT stateless auth (HS256)
+- Multi-cloud: AWS S3 + GCP Cloud Storage + Azure Blob Storage
+- 2FA (pyotp TOTP) required for security endpoints
+- Product name: "Zenith" — do not change branding
+- See DECISIONS.md for full rationale
+
+---
+
+## Reference Commands
+
+### Backend
+- Run server: `cd backend && uvicorn app.main:app --reload`
+- Run tests: `cd backend && pytest`
+- Run celery: `cd backend && celery -A app.celery_worker worker --loglevel=info`
+- Main entry: `backend/app/main.py`
+
+### Frontend
+- Run dev: `cd frontend && npm run dev`
+- Lint: `cd frontend && npm run lint`
+- Main entry: `frontend/src/main.jsx`
+
+---
+
+**Last updated**: 2026-05-13

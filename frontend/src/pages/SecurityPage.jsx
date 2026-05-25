@@ -1,3 +1,18 @@
+// =============================================================================
+// PAGE: SecurityPage.jsx  (745 lines)
+// ROUTE: /dashboard/security
+// PURPOSE: 2FA management (enable/disable/verify) + secure file vault
+//          (upload with auto sensitive-scan, two-step encryption choice, download, delete)
+// API: Uses functions from ../api.js (status2FA, enable2FA, finalize2FA, verify2FA,
+//      disable2FA, listSecureFiles, deleteSecureFile, uploadSecureFile, chooseEncryption,
+//      decryptAndDownload) — NOT raw fetch() — imports from api.js named exports
+// STATE: twoFAStatus, secureFiles (cached in sessionStorage), encryption/decryption modals
+// BACKEND: /api/2fa/*, /api/security/* (require_2fa guard — 2FA must be verified)
+// DO NOT:
+//   - Refactor API calls to use apiClient — these named exports from api.js are intentional
+//   - Remove sessionStorage caching (cache_2faStatus, cache_secureFiles) — prevents flicker
+//   - Skip the two-step upload flow (scan → choice modal → encrypt → S3)
+// =============================================================================
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useNotifications } from "../hooks/useNotifications";
 import EncryptionChoiceModal from "../components/EncryptionChoiceModal";

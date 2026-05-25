@@ -13,6 +13,12 @@ RED_UL='\033[4;31m'
 
 # Get absolute path to project root
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+BACKEND_DIR="$PROJECT_ROOT/backend"
+FRONTEND_DIR="$PROJECT_ROOT/frontend"
+VENV_DIR="$PROJECT_ROOT/venv"
+PYTHON_BIN="$VENV_DIR/bin/python"
+UVICORN_BIN="$VENV_DIR/bin/uvicorn"
+CELERY_BIN="$VENV_DIR/bin/celery"
 
 # Log file paths
 LOG_DIR="$PROJECT_ROOT/logs"
@@ -48,32 +54,58 @@ tail_with_prefix() {
     done &
 }
 
+stop_pid() {
+    local pid="${1:-}"
+    if [ -n "$pid" ]; then
+        kill "$pid" 2>/dev/null || true
+    fi
+}
+
+ensure_executable() {
+    local executable_path="$1"
+    local install_hint="$2"
+    if [ ! -x "$executable_path" ]; then
+        echo -e "${RED}❌ Missing executable: $executable_path${NC}"
+        echo -e "${YELLOW}$install_hint${NC}"
+        exit 1
+    fi
+}
+
+get_celery_broker_url() {
+    cd "$BACKEND_DIR" && "$PYTHON_BIN" - <<'PY'
+from app.utils.config import settings
+print(settings.CELERY_BROKER_URL)
+PY
+}
+
 # Cleanup function
 cleanup() {
+    local status=$?
+    trap - SIGINT SIGTERM EXIT
     echo -e "\n${RED}🛑 Shutting down all services...${NC}"
     
     # Kill all child processes
-    pkill -P $$
+    pkill -P $$ 2>/dev/null || true
     
     # Stop specific services
     echo -e "${YELLOW}Stopping Backend API...${NC}"
-    kill $BACKEND_PID 2>/dev/null
+    stop_pid "$BACKEND_PID"
     
     echo -e "${YELLOW}Stopping Celery Worker...${NC}"
-    kill $WORKER_PID 2>/dev/null
+    stop_pid "$WORKER_PID"
     
     echo -e "${YELLOW}Stopping Celery Beat...${NC}"
-    kill $BEAT_PID 2>/dev/null
+    stop_pid "$BEAT_PID"
     
     echo -e "${YELLOW}Stopping Frontend...${NC}"
-    kill $FRONTEND_PID 2>/dev/null
+    stop_pid "$FRONTEND_PID"
     
     # Stop Redis if it was started by this script
     # echo -e "${YELLOW}Stopping Redis...${NC}"
     # brew services stop redis
     
     echo -e "${GREEN}✅ All services stopped${NC}"
-    exit 0
+    exit "$status"
 }
 
 # Trap Ctrl+C and other termination signals
@@ -84,20 +116,35 @@ echo -e "${CYAN}║   Cloud Resource Optimization Platform - Start All        �
 echo -e "${CYAN}╚════════════════════════════════════════════════════════════╝${NC}"
 echo ""
 
-# Check if Redis is running
-echo -e "${BLUE}🔍 Checking Redis status...${NC}"
-if ! redis-cli ping > /dev/null 2>&1; then
-    echo -e "${YELLOW}⚠️  Redis not running. Starting Redis...${NC}"
-    brew services start redis
-    sleep 2
-    if redis-cli ping > /dev/null 2>&1; then
-        echo -e "${GREEN}✅ Redis started successfully${NC}"
+ensure_executable "$PYTHON_BIN" "Create the virtual environment first, then install backend requirements."
+ensure_executable "$UVICORN_BIN" "Run: $PYTHON_BIN -m pip install -r $BACKEND_DIR/requirements.txt"
+ensure_executable "$CELERY_BIN" "Run: $PYTHON_BIN -m pip install -r $BACKEND_DIR/requirements.txt"
+if ! command -v npm > /dev/null 2>&1; then
+    echo -e "${RED}❌ npm not found. Install Node.js before starting the frontend.${NC}"
+    exit 1
+fi
+
+if ! BROKER_URL="$(get_celery_broker_url)"; then
+    echo -e "${RED}❌ Could not read Celery broker settings from backend configuration.${NC}"
+    exit 1
+fi
+if [[ "$BROKER_URL" == redis://* || "$BROKER_URL" == rediss://* ]]; then
+    echo -e "${BLUE}🔍 Redis broker detected. Checking Redis status...${NC}"
+    if ! redis-cli ping > /dev/null 2>&1; then
+        echo -e "${YELLOW}⚠️  Redis not running. Starting Redis...${NC}"
+        brew services start redis
+        sleep 2
+        if redis-cli ping > /dev/null 2>&1; then
+            echo -e "${GREEN}✅ Redis started successfully${NC}"
+        else
+            echo -e "${RED}❌ Failed to start Redis. Please check your installation.${NC}"
+            exit 1
+        fi
     else
-        echo -e "${RED}❌ Failed to start Redis. Please check your installation.${NC}"
-        exit 1
+        echo -e "${GREEN}✅ Redis is already running${NC}"
     fi
 else
-    echo -e "${GREEN}✅ Redis is already running${NC}"
+    echo -e "${GREEN}✅ External Celery broker configured; skipping Redis check${NC}"
 fi
 
 echo ""
@@ -106,8 +153,8 @@ echo ""
 
 # Start Backend API
 echo -e "${GREEN}[1/4] Starting Backend API (port 8000)...${NC}"
-cd "$PROJECT_ROOT/backend"
-uvicorn app.main:app --reload > "$BACKEND_LOG" 2>&1 &
+cd "$BACKEND_DIR"
+"$UVICORN_BIN" app.main:app --reload > "$BACKEND_LOG" 2>&1 &
 BACKEND_PID=$!
 sleep 2
 
@@ -121,7 +168,7 @@ fi
 
 # Start Celery Worker
 echo -e "${GREEN}[2/4] Starting Celery Worker...${NC}"
-celery -A app.celery_worker worker --loglevel=info > "$CELERY_WORKER_LOG" 2>&1 &
+"$CELERY_BIN" -A app.celery_worker worker --loglevel=info > "$CELERY_WORKER_LOG" 2>&1 &
 WORKER_PID=$!
 sleep 2
 
@@ -135,7 +182,7 @@ fi
 
 # Start Celery Beat
 echo -e "${GREEN}[3/4] Starting Celery Beat (Scheduler)...${NC}"
-celery -A app.celery_worker beat --loglevel=info > "$CELERY_BEAT_LOG" 2>&1 &
+"$CELERY_BIN" -A app.celery_worker beat --loglevel=info > "$CELERY_BEAT_LOG" 2>&1 &
 BEAT_PID=$!
 sleep 2
 
@@ -149,8 +196,8 @@ fi
 
 # Start Frontend
 echo -e "${GREEN}[4/4] Starting Frontend (port 5173)...${NC}"
-cd "$PROJECT_ROOT/frontend"
-npm run dev > "$FRONTEND_LOG" 2>&1 &
+cd "$FRONTEND_DIR"
+npm run dev -- --port 5173 --strictPort > "$FRONTEND_LOG" 2>&1 &
 FRONTEND_PID=$!
 sleep 3
 

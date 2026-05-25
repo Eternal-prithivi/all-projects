@@ -11,24 +11,24 @@
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  color: #888;
+  color: var(--text-muted);
   text-decoration: none;
-  transition: color 0.3s ease;
+  transition: color var(--duration-normal) var(--ease-out);
   cursor: pointer;
 }
 
 .breadcrumb-item:hover {
-  color: #f4c542;
+  color: var(--gold-primary);
 }
 
 .breadcrumb-item.active {
-  color: #fff;
+  color: var(--text-primary);
   font-weight: 500;
   cursor: default;
 }
 
 .breadcrumb-separator {
-  color: #444;
+  color: var(--border-strong);
   user-select: none;
 }
 

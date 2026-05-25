@@ -7,28 +7,114 @@
 }
 
 .billing-header {
-  margin-bottom: 32px;
+  margin-bottom: 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
+.billing-heading-copy {
+  max-width: 760px;
+}
+
+.billing-kicker {
+  display: inline-flex;
+  margin-bottom: 10px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgba(212, 175, 55, 0.12);
+  color: #f4e5a3;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
 }
 
 .billing-header h1 {
-  font-size: 32px;
-  font-weight: 700;
-  margin-bottom: 8px;
+  font-size: clamp(2rem, 3vw, 3.1rem);
+  font-weight: 800;
+  margin: 0 0 10px;
   color: #fff;
 }
 
 .billing-header p {
-  color: rgba(255, 255, 255, 0.6);
+  color: rgba(255, 255, 255, 0.72);
   font-size: 16px;
+  line-height: 1.7;
+  margin: 0;
+}
+
+.billing-overview-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.billing-overview-card {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.03));
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 18px;
+  padding: 20px;
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.18);
+}
+
+.billing-overview-card.accent {
+  border-color: rgba(212, 175, 55, 0.25);
+  background: linear-gradient(135deg, rgba(212, 175, 55, 0.12), rgba(102, 126, 234, 0.08));
+}
+
+.billing-overview-label {
+  display: block;
+  color: rgba(255, 255, 255, 0.58);
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  margin-bottom: 10px;
+}
+
+.billing-overview-value {
+  display: block;
+  color: #fff;
+  font-size: 1.6rem;
+  font-weight: 800;
+  margin-bottom: 8px;
+}
+
+.billing-overview-detail {
+  color: rgba(255, 255, 255, 0.68);
+  font-size: 0.95rem;
+}
+
+.btn-upgrade-plan-header {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 12px 18px;
+  border: 1px solid rgba(212, 175, 55, 0.28);
+  border-radius: 999px;
+  background: linear-gradient(135deg, rgba(212, 175, 55, 0.18), rgba(102, 126, 234, 0.16));
+  color: #fff;
+  font-weight: 700;
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.16);
+}
+
+.btn-upgrade-plan-header:hover {
+  transform: translateY(-1px);
+  border-color: rgba(212, 175, 55, 0.4);
 }
 
 /* Section Styles */
 .billing-section {
-  background: rgba(255, 255, 255, 0.03);
+  background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 12px;
+  border-radius: 18px;
   padding: 24px;
   margin-bottom: 24px;
+  box-shadow: 0 14px 32px rgba(0, 0, 0, 0.16);
 }
 
 .section-header {

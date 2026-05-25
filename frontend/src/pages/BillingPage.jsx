@@ -1,3 +1,16 @@
+// =============================================================================
+// PAGE: BillingPage.jsx  (617 lines)
+// ROUTE: /dashboard/billing
+// PURPOSE: Invoice management + subscription status — list invoices, download PDF,
+//          view current plan, upgrade via Stripe checkout, cancel subscription
+// API: Uses apiClient → /api/billing/invoices, /api/payments/create-checkout,
+//      /api/payments/status, /api/payments/cancel
+// NOTE: Billing (invoices) ≠ Payments (Stripe). Both APIs used here — don't conflate them.
+// DO NOT:
+//   - Add Stripe keys or secrets in frontend — checkout session is created on the backend
+//   - Show invoice totals in hardcoded "$" — use PreferencesContext.currencySymbol
+//   - Remove subscription tier display — it drives feature gating in BYOC and other pages
+// =============================================================================
 import React, { useState, useEffect } from 'react';
 import { apiClient } from '../api';
 import { toast } from 'react-toastify';
@@ -230,23 +243,49 @@ function BillingPage() {
   const nextBillingAmount = calculateNextBillingAmount();
   const billBreakdown = calculateTotalBill();
   const statusBadge = getStatusBadge(subscription?.status);
+  const currentPlanName = getPlanDisplayName(subscription?.plan_id || 'free');
   const now = new Date();
   const endDate = subscription?.current_period_end ? new Date(subscription.current_period_end) : null;
   const daysRemaining = endDate ? Math.ceil((endDate - now) / (1000 * 60 * 60 * 24)) : 0;
+  const billingOverview = [
+    { label: 'Current plan', value: currentPlanName, detail: subscription?.billing_cycle || 'Monthly' },
+    { label: 'Next subscription', value: formatCurrency(nextBillingAmount), detail: subscription?.plan_id === 'free' ? 'No charge due' : 'Plan renewal' },
+    { label: 'This month total', value: formatCurrency(Math.round(billBreakdown.totalINR)), detail: 'Cloud + plan cost' },
+  ];
 
   return (
     <div className="billing-page">
       <div className="billing-header">
-        <h1>Billing & Payments</h1>
-        <p>Manage your subscription and view consolidated billing</p>
+        <div className="billing-heading-copy">
+          <span className="billing-kicker">Finance center</span>
+          <h1>Billing & Payments</h1>
+          <p>Manage your subscription, cloud spend, and renewal timing in one place.</p>
+        </div>
         {subscription?.plan_id !== 'free' && (
           <button 
             className="btn-upgrade-plan-header"
             onClick={() => navigate('/dashboard/pricing')}
           >
-            💎 View All Plans
+            View All Plans
           </button>
         )}
+      </div>
+
+      <div className="billing-overview-grid">
+        {billingOverview.map((item) => (
+          <div key={item.label} className="billing-overview-card">
+            <span className="billing-overview-label">{item.label}</span>
+            <strong className="billing-overview-value">{item.value}</strong>
+            <span className="billing-overview-detail">{item.detail}</span>
+          </div>
+        ))}
+        <div className="billing-overview-card accent">
+          <span className="billing-overview-label">Days remaining</span>
+          <strong className="billing-overview-value">{daysRemaining > 0 ? daysRemaining : '—'}</strong>
+          <span className="billing-overview-detail">
+            {daysRemaining > 0 ? 'Until current period ends' : 'Current period ended'}
+          </span>
+        </div>
       </div>
 
       {/* Current Subscription */}

@@ -1,3 +1,14 @@
+# =============================================================================
+# MODULE: routes_cost.py  (187 lines)
+# PURPOSE: Cost analytics — historical cost data query, per-service breakdown,
+#          CSV export, Z-score anomaly detection, decay-weighted linear regression forecast
+# READS FROM:  cost_data collection
+# DEPENDS ON:  forecasting.py (linear regression), tasks_anomaly.py (Celery Z-score alerts)
+# MOUNTED AT:  /api/cost → cost-data, export/csv, anomalies, forecast
+# DO NOT:
+#   - Change the decay-weighted forecast formula — it's documented in the project report §5.3
+#   - Remove the anomaly Z-score threshold without updating AI_RULES.md
+# =============================================================================
 # backend/app/cost/routes_cost.py
 
 from fastapi import APIRouter, HTTPException, Depends, Query
@@ -41,7 +52,7 @@ async def get_aws_costs(
     # current_user: User = Depends(get_current_active_user), # Uncomment when auth is ready
     start_date: str = Query(..., description="Start date for the report (YYYY-MM-DD). Max 13 months ago for DAILY."),
     end_date: str = Query(..., description="End date for the report (YYYY-MM-DD). Must be after start_date."),
-    granularity: str = Query("DAILY", regex="^(DAILY|MONTHLY)$", description="Granularity of the data (DAILY or MONTHLY)."),
+    granularity: str = Query("DAILY", pattern="^(DAILY|MONTHLY)$", description="Granularity of the data (DAILY or MONTHLY)."),
     group_by_dimension: Optional[List[str]] = Query(None, description="Dimensions to group by (e.g., SERVICE, AZ, REGION)."),
     group_by_tag: Optional[List[str]] = Query(None, description="Tags to group by (e.g., CostCenter).")
 ) -> Dict[str, Any]:

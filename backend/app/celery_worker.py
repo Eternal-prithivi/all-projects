@@ -13,7 +13,9 @@ celery_app = Celery(
         "app.vm.tasks",  # VM management tasks
         "app.pricing.tasks",  # Pricing update tasks
         "app.cost.tasks_anomaly",  # Cost anomaly detection
-        "app.budgets.tasks"  # Budget monitoring and alerts
+        "app.budgets.tasks",  # Budget monitoring and alerts
+        "app.security.tasks_alerts",  # Security alert pipeline (email + SMS)
+        "app.ml.tasks_feedback",  # Phase 8 feedback evaluation/retraining readiness
     ] 
 )
 
@@ -60,6 +62,24 @@ celery_app.conf.beat_schedule = {
     'check-budget-alerts-daily': {
         'task': 'check_budget_alerts',
         'schedule': crontab(hour=9, minute=0),  # Every day at 9 AM UTC
+    },
+
+    # Security alerts (email + SMS)
+    'check-security-alerts-daily': {
+        'task': 'check_security_alerts',
+        'schedule': crontab(hour=8, minute=0),  # Every day at 8 AM UTC
+    },
+
+    # Phase 8 ML feedback/retraining readiness
+    'evaluate-ml-feedback-daily': {
+        'task': 'evaluate_ml_feedback',
+        'schedule': crontab(hour=3, minute=0),  # Every day at 3 AM UTC
+    },
+
+    # Guarded self-retraining from evaluated user feedback
+    'retrain-ml-models-from-feedback-weekly': {
+        'task': 'retrain_ml_models_from_feedback',
+        'schedule': crontab(day_of_week=0, hour=3, minute=30),  # Sunday 3:30 AM UTC
     },
 }
 

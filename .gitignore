@@ -66,3 +66,6 @@ temp/
 logs/
 *.log
 celerybeat-schedule*
+zenith-backend.env
+backend/.env.backup-local
+.DS_Store

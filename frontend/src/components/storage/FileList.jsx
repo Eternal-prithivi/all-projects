@@ -21,7 +21,7 @@ function FileList({ files, onFileDeleted }) {
     try {
       const data = await getDownloadUrl(filename, token);
       window.open(data.download_url, '_blank');
-    } catch (error) {
+    } catch {
       alert('Could not get download link.');
     }
   };
@@ -31,7 +31,7 @@ function FileList({ files, onFileDeleted }) {
       try {
         await deleteFile(filename, token);
         onFileDeleted();
-      } catch (error) {
+      } catch {
         alert('Could not delete file.');
       }
     }

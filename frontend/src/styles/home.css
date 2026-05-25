@@ -1,5 +1,5 @@
 /* Marketing Landing Page */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+/* Fonts loaded via index.html preconnect */
 
 * {
   margin: 0;
@@ -12,7 +12,8 @@ body {
 }
 
 .landing-page {
-  background: #0a0a0a;
+  background: var(--bg-base);
+  background-image: radial-gradient(circle at 50% 0%, rgba(212, 175, 55, 0.04) 0%, transparent 50%);
   color: #fff;
   min-height: 100vh;
 }
@@ -24,9 +25,10 @@ body {
   left: 0;
   right: 0;
   z-index: 1000;
-  background: rgba(10, 10, 10, 0.95);
-  backdrop-filter: blur(10px);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(3, 3, 3, 0.85);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-bottom: 1px solid var(--border-subtle);
 }
 
 .nav-container {
@@ -41,7 +43,7 @@ body {
 .nav-logo h2 {
   font-size: 28px;
   font-weight: 700;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #ffd700, #d4af37);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -81,14 +83,15 @@ body {
 .btn-nav-signup {
   padding: 10px 24px;
   border-radius: 8px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: #fff !important;
+  background: linear-gradient(135deg, #ffd700, #d4af37);
+  color: #000 !important;
+  font-weight: 600;
   transition: all 0.3s ease;
 }
 
 .btn-nav-signup:hover {
   transform: translateY(-2px);
-  box-shadow: 0 10px 30px rgba(102, 126, 234, 0.4);
+  box-shadow: 0 10px 30px rgba(212, 175, 55, 0.4);
 }
 
 /* Hero Section */
@@ -110,7 +113,7 @@ body {
 }
 
 .gradient-text {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #ffd700, #d4af37, #b8860b);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -132,8 +135,8 @@ body {
 .btn-hero-primary {
   padding: 16px 32px;
   border-radius: 12px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: #fff;
+  background: linear-gradient(135deg, #ffd700, #d4af37);
+  color: #000;
   text-decoration: none;
   font-size: 16px;
   font-weight: 600;
@@ -143,7 +146,7 @@ body {
 
 .btn-hero-primary:hover {
   transform: translateY(-2px);
-  box-shadow: 0 12px 40px rgba(102, 126, 234, 0.5);
+  box-shadow: 0 12px 40px rgba(212, 175, 55, 0.5);
 }
 
 .btn-hero-secondary {
@@ -176,15 +179,22 @@ body {
 
 .floating-card {
   position: absolute;
-  background: rgba(255, 255, 255, 0.05);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--bg-card);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--border-default);
   border-radius: 16px;
   padding: 24px;
   display: flex;
   align-items: center;
   gap: 16px;
   animation: float 6s ease-in-out infinite;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  transition: border-color var(--duration-normal) var(--ease-out);
+}
+
+.floating-card:hover {
+  border-color: var(--gold-border);
 }
 
 .card-1 {
@@ -258,17 +268,21 @@ body {
 }
 
 .feature-item {
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--bg-card);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--border-default);
   border-radius: 16px;
   padding: 32px;
-  transition: all 0.3s ease;
+  transition: all var(--duration-normal) var(--ease-spring);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.2);
 }
 
 .feature-item:hover {
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--bg-card-hover);
   transform: translateY(-4px);
-  border-color: rgba(102, 126, 234, 0.5);
+  border-color: var(--gold-border);
+  box-shadow: var(--shadow-gold);
 }
 
 .feature-icon {
@@ -290,7 +304,9 @@ body {
 /* Benefits Section */
 .benefits-section {
   padding: 120px 40px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #1a1500 0%, #2a2000 50%, #1a1500 100%);
+  border-top: 1px solid rgba(212, 175, 55, 0.2);
+  border-bottom: 1px solid rgba(212, 175, 55, 0.2);
 }
 
 .benefits-content {
@@ -310,7 +326,10 @@ body {
   font-size: 64px;
   font-weight: 800;
   margin-bottom: 12px;
-  color: #fff;
+  background: linear-gradient(135deg, #ffd700, #d4af37);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
 .benefit-text {
@@ -327,36 +346,39 @@ body {
   max-width: 1200px;
   margin: 0 auto;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
   gap: 32px;
 }
 
 .pricing-card {
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--bg-card);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--border-default);
   border-radius: 20px;
   padding: 40px;
   position: relative;
-  transition: all 0.3s ease;
+  transition: all var(--duration-normal) var(--ease-spring);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.2);
 }
 
 .pricing-card:hover {
   transform: translateY(-8px);
-  border-color: rgba(102, 126, 234, 0.5);
-  box-shadow: 0 20px 60px rgba(102, 126, 234, 0.2);
+  border-color: var(--gold-border);
+  box-shadow: var(--shadow-gold-lg);
 }
 
 .pricing-card.featured {
-  background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
-  border-color: rgba(102, 126, 234, 0.5);
+  background: linear-gradient(135deg, rgba(212, 175, 55, 0.08) 0%, rgba(184, 134, 11, 0.08) 100%);
+  border-color: rgba(212, 175, 55, 0.5);
 }
 
 .pricing-badge {
   position: absolute;
   top: -12px;
   right: 40px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: #fff;
+  background: linear-gradient(135deg, #ffd700, #d4af37);
+  color: #000;
   padding: 6px 16px;
   border-radius: 20px;
   font-size: 12px;
@@ -371,6 +393,7 @@ body {
 .pricing-price {
   display: flex;
   align-items: baseline;
+  flex-wrap: wrap;
   margin-bottom: 32px;
 }
 
@@ -380,13 +403,13 @@ body {
 }
 
 .price-amount {
-  font-size: 64px;
+  font-size: 48px;
   font-weight: 800;
   margin: 0 8px;
 }
 
 .price-period {
-  font-size: 18px;
+  font-size: 16px;
   color: rgba(255, 255, 255, 0.6);
 }
 
@@ -415,7 +438,8 @@ body {
 }
 
 .pricing-btn:hover {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #ffd700, #d4af37);
+  color: #000;
   transform: translateY(-2px);
 }
 
@@ -441,8 +465,8 @@ body {
 .btn-cta {
   padding: 20px 48px;
   border-radius: 12px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: #fff;
+  background: linear-gradient(135deg, #ffd700, #d4af37);
+  color: #000;
   text-decoration: none;
   font-size: 18px;
   font-weight: 600;
@@ -452,7 +476,7 @@ body {
 
 .btn-cta:hover {
   transform: translateY(-4px);
-  box-shadow: 0 16px 50px rgba(102, 126, 234, 0.5);
+  box-shadow: 0 16px 50px rgba(212, 175, 55, 0.5);
 }
 
 /* Footer */

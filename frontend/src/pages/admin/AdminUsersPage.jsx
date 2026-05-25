@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useState, useEffect } from 'react';
 import api from '../../api';
 import { toast } from 'react-toastify';
 import '../../styles/admin-pages.css';
@@ -13,26 +13,25 @@ const AdminUsersPage = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [pagination, setPagination] = useState({ skip: 0, limit: 20, total: 0 });
 
-  useEffect(() => {
-    fetchUsers();
-  }, [pagination.skip]);
-
-  const fetchUsers = async () => {
+  const fetchUsers = useCallback(async () => {
     setLoading(true);
     try {
       const res = await api.get(`/admin/users?skip=${pagination.skip}&limit=${pagination.limit}&search=${searchTerm}`);
       setUsers(res.data.users);
       setPagination(prev => ({ ...prev, total: res.data.total }));
-    } catch (error) {
+    } catch {
       toast.error('Failed to load users');
     } finally {
       setLoading(false);
     }
-  };
+  }, [pagination.skip, pagination.limit, searchTerm]);
+
+  useEffect(() => {
+    fetchUsers();
+  }, [fetchUsers]);
 
   const handleSearch = () => {
     setPagination(prev => ({ ...prev, skip: 0 }));
-    fetchUsers();
   };
 
   const handleStatusUpdate = async (username, newStatus) => {
@@ -44,8 +43,8 @@ const AdminUsersPage = () => {
       await api.put(`/admin/users/${username}/status?status=${newStatus}`);
       toast.success(`User ${username} ${newStatus}d successfully`);
       fetchUsers();
-    } catch (error) {
-      toast.error(`Failed to update user status: ${error.response?.data?.detail || 'Unknown error'}`);
+    } catch (_error) {
+      toast.error(`Failed to update user status: ${_error.response?.data?.detail || 'Unknown error'}`);
     }
   };
 
@@ -56,7 +55,7 @@ const AdminUsersPage = () => {
   const getStatusIcon = (status) => {
     switch(status) {
       case 'active': return <FaCheck />;
-      case 'suspended': return <FClock />;
+      case 'suspended': return <FaClock />;
       case 'banned': return <FaBan />;
       default: return null;
     }

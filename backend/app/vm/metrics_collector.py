@@ -17,13 +17,23 @@ logger = setup_logger(__name__)
 
 
 class VMMetricsCollector:
-    """Collects and aggregates VM metrics from GCP"""
+    """Collects and aggregates VM metrics from GCP or simulated demo data."""
     
-    def __init__(self):
+    def __init__(self, project_id: Optional[str] = None, zone: Optional[str] = None):
+        self.project_id = project_id or settings.GCP_PROJECT_ID
+        self.zone = zone or settings.GCP_ZONE
+        self.credentials_path = None
+        self.credentials = None
+        self.compute_client = None
+        self.monitoring_client = None
+
         # Resolve GCP credentials path
         gcp_key_setting = getattr(settings, 'GCP_SERVICE_ACCOUNT_JSON_PATH', None)
         if not gcp_key_setting:
-            raise ValueError("GCP_SERVICE_ACCOUNT_JSON_PATH not configured")
+            if settings.USE_REAL_METRICS:
+                raise ValueError("GCP_SERVICE_ACCOUNT_JSON_PATH not configured")
+            logger.info("GCP service account not configured; using simulated VM metrics")
+            return
         
         if os.path.isabs(gcp_key_setting):
             self.credentials_path = gcp_key_setting
@@ -32,18 +42,23 @@ class VMMetricsCollector:
             project_root = os.path.dirname(base_dir)
             self.credentials_path = os.path.join(project_root, 'backend', gcp_key_setting)
         
-        # Initialize clients
-        self.credentials = service_account.Credentials.from_service_account_file(
-            self.credentials_path
-        )
-        self.compute_client = compute_v1.InstancesClient(credentials=self.credentials)
-        self.monitoring_client = monitoring_v3.MetricServiceClient(credentials=self.credentials)
-        
-        self.project_id = settings.GCP_PROJECT_ID
-        self.zone = settings.GCP_ZONE
+        try:
+            # Initialize clients
+            self.credentials = service_account.Credentials.from_service_account_file(
+                self.credentials_path
+            )
+            self.compute_client = compute_v1.InstancesClient(credentials=self.credentials)
+            self.monitoring_client = monitoring_v3.MetricServiceClient(credentials=self.credentials)
+        except Exception as e:
+            if settings.USE_REAL_METRICS:
+                raise
+            logger.warning(f"Could not initialize GCP metric clients; using simulated metrics: {e}")
     
     def get_vm_status(self, vm_name: str) -> Optional[VMStatus]:
         """Get current VM status from GCP"""
+        if self.compute_client is None:
+            return VMStatus.RUNNING if not settings.USE_REAL_METRICS else None
+
         try:
             request = compute_v1.GetInstanceRequest(
                 project=self.project_id,
@@ -58,6 +73,9 @@ class VMMetricsCollector:
     
     def get_vm_ip(self, vm_name: str) -> Optional[str]:
         """Get VM external IP address"""
+        if self.compute_client is None:
+            return None
+
         try:
             request = compute_v1.GetInstanceRequest(
                 project=self.project_id,

@@ -1,0 +1,384 @@
+/* ═══════════════════════════════════════════════════════════════
+   OnboardingTour — Zenith Design System
+   Glassmorphism tooltips with gold accent, matching dashboard aesthetic.
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ─── Welcome Overlay ─── */
+
+.tour-welcome-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10001;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  animation: tourFadeIn 0.4s ease-out;
+}
+
+.tour-welcome-card {
+  position: relative;
+  max-width: 420px;
+  width: 90%;
+  padding: 40px 36px 32px;
+  background: rgba(15, 15, 25, 0.92);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(212, 175, 55, 0.25);
+  border-radius: var(--radius-lg, 14px);
+  box-shadow:
+    0 24px 80px rgba(0, 0, 0, 0.5),
+    0 0 60px rgba(212, 175, 55, 0.08);
+  text-align: center;
+  overflow: hidden;
+  animation: tourSlideUp 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.tour-welcome-glow {
+  position: absolute;
+  top: -60px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 200px;
+  height: 200px;
+  background: radial-gradient(circle, rgba(212, 175, 55, 0.15) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+.tour-welcome-icon {
+  width: 64px;
+  height: 64px;
+  margin: 0 auto 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, rgba(212, 175, 55, 0.2) 0%, rgba(212, 175, 55, 0.05) 100%);
+  border: 1px solid rgba(212, 175, 55, 0.3);
+  border-radius: 16px;
+  animation: tourIconPulse 2s ease-in-out infinite;
+}
+
+.tour-welcome-icon span {
+  font-family: 'Outfit', sans-serif;
+  font-size: 28px;
+  font-weight: 800;
+  background: linear-gradient(135deg, #ffd700, #d4af37);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.tour-welcome-card h2 {
+  font-family: 'Outfit', sans-serif;
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--text-primary, #f0f0f5);
+  margin: 0 0 12px;
+  background: linear-gradient(135deg, #ffffff 0%, #d4af37 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.tour-welcome-card > p {
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--text-secondary, #a0a0b0);
+  margin: 0 0 28px;
+}
+
+.tour-welcome-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.tour-welcome-hint {
+  font-size: 11px;
+  color: var(--text-muted, #666);
+  margin-top: 16px !important;
+  margin-bottom: 0 !important;
+}
+
+/* ─── Tour Tooltip ─── */
+
+.zenith-tour-tooltip {
+  max-width: 380px;
+  width: 100%;
+  background: rgba(15, 15, 25, 0.95);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(212, 175, 55, 0.2);
+  border-radius: var(--radius-lg, 14px);
+  box-shadow:
+    0 16px 48px rgba(0, 0, 0, 0.4),
+    0 0 40px rgba(212, 175, 55, 0.06);
+  padding: 24px;
+  color: var(--text-primary, #f0f0f5);
+  animation: tourFadeIn 0.3s ease-out;
+}
+
+.tour-close-btn {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  color: var(--text-muted, #666);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  padding: 0;
+  line-height: 1;
+}
+
+.tour-close-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--text-primary, #f0f0f5);
+}
+
+.tour-tooltip-content h3 {
+  font-family: 'Outfit', sans-serif;
+  font-size: 17px;
+  font-weight: 700;
+  margin: 0 0 8px;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tour-tooltip-content h3::before {
+  content: '';
+  display: inline-block;
+  width: 3px;
+  height: 18px;
+  background: linear-gradient(180deg, #ffd700, #d4af37);
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.tour-tooltip-content p {
+  font-size: 13.5px;
+  line-height: 1.65;
+  color: var(--text-secondary, #a0a0b0);
+  margin: 0 0 4px;
+}
+
+.tour-tooltip-content p:last-child {
+  margin-bottom: 0;
+}
+
+.tour-tooltip-content strong {
+  color: var(--gold-primary, #d4af37);
+  font-weight: 600;
+}
+
+.tour-tooltip-content kbd {
+  display: inline-block;
+  padding: 2px 6px;
+  font-family: 'Inter', monospace;
+  font-size: 11px;
+  color: var(--text-secondary, #a0a0b0);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  margin: 0 2px;
+}
+
+.tour-step-final {
+  margin-top: 12px !important;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  color: var(--gold-primary, #d4af37) !important;
+  font-weight: 500;
+}
+
+/* ─── Tooltip Footer ─── */
+
+.tour-tooltip-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+/* Progress dots */
+.tour-progress {
+  display: flex;
+  gap: 6px;
+}
+
+.tour-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.15);
+  transition: all 0.3s ease;
+}
+
+.tour-dot.active {
+  width: 20px;
+  border-radius: 3px;
+  background: linear-gradient(90deg, #ffd700, #d4af37);
+  box-shadow: 0 0 8px rgba(212, 175, 55, 0.4);
+}
+
+.tour-dot.completed {
+  background: rgba(212, 175, 55, 0.5);
+}
+
+/* Tour buttons */
+.tour-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.tour-btn {
+  padding: 8px 18px;
+  border-radius: 8px;
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  border: none;
+  transition: all 0.2s ease;
+}
+
+.tour-btn-next {
+  background: linear-gradient(135deg, #d4af37 0%, #b8942e 100%);
+  color: #0a0a14;
+  box-shadow: 0 2px 12px rgba(212, 175, 55, 0.3);
+}
+
+.tour-btn-next:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 20px rgba(212, 175, 55, 0.45);
+}
+
+.tour-btn-back {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-secondary, #a0a0b0);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.tour-btn-back:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-primary, #f0f0f5);
+}
+
+.tour-btn-skip {
+  background: transparent;
+  color: var(--text-muted, #666);
+  padding: 8px 12px;
+}
+
+.tour-btn-skip:hover {
+  color: var(--text-secondary, #a0a0b0);
+}
+
+/* Step counter */
+.tour-step-counter {
+  position: absolute;
+  top: 10px;
+  right: 16px;
+  font-size: 11px;
+  color: var(--text-muted, #555);
+  font-family: 'Inter', sans-serif;
+  font-weight: 500;
+  letter-spacing: 0.5px;
+}
+
+/* ─── Override react-joyride internals ─── */
+
+/* Spotlight glow */
+.__floater.__floater--open {
+  filter: drop-shadow(0 0 20px rgba(212, 175, 55, 0.1));
+}
+
+/* Override the default beacon */
+.react-joyride__beacon {
+  background-color: rgba(212, 175, 55, 0.3) !important;
+  border: 2px solid var(--gold-primary, #d4af37) !important;
+}
+
+.react-joyride__beacon span {
+  background-color: var(--gold-primary, #d4af37) !important;
+}
+
+/* Override spotlight border */
+.react-joyride__spotlight {
+  border: 2px solid rgba(212, 175, 55, 0.3) !important;
+  box-shadow:
+    0 0 30px rgba(212, 175, 55, 0.1),
+    inset 0 0 30px rgba(212, 175, 55, 0.05) !important;
+}
+
+/* ─── Animations ─── */
+
+@keyframes tourFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes tourSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes tourIconPulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(212, 175, 55, 0.2);
+  }
+  50% {
+    box-shadow: 0 0 0 12px rgba(212, 175, 55, 0);
+  }
+}
+
+/* ─── Responsive ─── */
+
+@media (max-width: 480px) {
+  .zenith-tour-tooltip {
+    max-width: 300px;
+    padding: 18px;
+  }
+
+  .tour-welcome-card {
+    padding: 28px 24px 24px;
+  }
+
+  .tour-tooltip-footer {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .tour-progress {
+    order: 2;
+  }
+
+  .tour-actions {
+    order: 1;
+    width: 100%;
+    justify-content: flex-end;
+  }
+}

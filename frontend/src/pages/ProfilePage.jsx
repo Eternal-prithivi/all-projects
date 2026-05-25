@@ -1,8 +1,32 @@
-import React, { useState, useEffect } from 'react';
+// =============================================================================
+// PAGE: ProfilePage.jsx  (513 lines)
+// ROUTE: /dashboard/profile
+// PURPOSE: User profile management — display name, bio, avatar upload, change password,
+//          view active sessions, revoke sessions, view activity log, delete account
+// API: Uses apiClient → /api/profile/me, /api/profile/update, /api/profile/change-password,
+//      /api/profile/sessions, /api/profile/activity-log, /api/profile/delete-account, /api/profile/avatar
+// CONTEXTS: AuthContext (current user), useNotifications hook
+// DO NOT:
+//   - Show raw hashed_password in any field — backend strips it but double-check
+//   - Allow deleting the current session from sessions list — that logs the user out immediately
+//   - Skip password confirmation on delete-account — it's a destructive action
+// =============================================================================
+import React, { useMemo, useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNotifications } from "../hooks/useNotifications";
 import { apiClient } from '../api';
 import LoadingSpinner from '../components/LoadingSpinner';
+import {
+  IconClock,
+  IconDollarSign,
+  IconHardDrive,
+  IconServer,
+} from '../components/dashboard/Icons.jsx';
+import {
+  getValidationErrorMessage,
+  validateProfileForm,
+  validateRecoveryContactsForm,
+} from '../utils/formValidation';
 import '../styles/profile.css';
 
 const ProfilePage = () => {
@@ -21,10 +45,31 @@ const ProfilePage = () => {
     email: '',
     full_name: '',
     phone: '',
+    recovery_phone: '',
+    recovery_email: '',
     company: '',
     role: 'Admin',
     profile_picture: null,
   });
+
+  const profileValidation = useMemo(
+    () => validateProfileForm({
+      username: formData.username,
+      email: formData.email,
+      fullName: formData.full_name,
+      company: formData.company,
+    }),
+    [formData]
+  );
+
+  const recoveryValidation = useMemo(
+    () => validateRecoveryContactsForm({
+      recoveryEmail: formData.recovery_email,
+      phone: formData.phone,
+      recoveryPhone: formData.recovery_phone,
+    }),
+    [formData]
+  );
 
   useEffect(() => {
     fetchProfileData();
@@ -43,6 +88,8 @@ const ProfilePage = () => {
         email: profileData.email || '',
         full_name: profileData.full_name || '',
         phone: profileData.phone || '',
+        recovery_phone: profileData.recovery_phone || '',
+        recovery_email: profileData.recovery_email || '',
         company: profileData.company || '',
         role: profileData.role || 'Admin',
         profile_picture: profileData.profile_picture || null,
@@ -67,16 +114,25 @@ const ProfilePage = () => {
     });
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e, fieldsOnly = null, validationResult = profileValidation) => {
     e.preventDefault();
+
+    if (!validationResult.isValid) {
+      notifications.error(getValidationErrorMessage(validationResult.errors));
+      return;
+    }
+
+    const payload = fieldsOnly || {
+      username: formData.username,
+      email: formData.email,
+      full_name: formData.full_name,
+      phone: formData.phone,
+      recovery_phone: formData.recovery_phone,
+      recovery_email: formData.recovery_email,
+      company: formData.company,
+    };
     try {
-      await apiClient.put('/profile/me', {
-        username: formData.username,
-        email: formData.email,
-        full_name: formData.full_name,
-        phone: formData.phone,
-        company: formData.company
-      });
+      await apiClient.put('/profile/me', payload);
       
       notifications.success('Profile updated successfully!');
       setIsEditing(false);
@@ -135,7 +191,7 @@ const ProfilePage = () => {
 
   const handleDeleteAccount = async () => {
     const confirmed = window.confirm(
-      '⚠️ WARNING: This will permanently delete your account and all associated data including VMs, files, and settings. This action cannot be undone. Are you absolutely sure?'
+      'WARNING: This will permanently delete your account and all associated data including VMs, files, and settings. This action cannot be undone. Are you absolutely sure?'
     );
     
     if (!confirmed) return;
@@ -221,7 +277,7 @@ const ProfilePage = () => {
             )}
           </div>
           
-          <form onSubmit={handleSubmit}>
+          <form onSubmit={(e) => handleSubmit(e, null, profileValidation)}>
             <div className="form-grid">
               <div className="form-group">
                 <label>Username</label>
@@ -232,7 +288,12 @@ const ProfilePage = () => {
                   onChange={handleChange}
                   disabled={!isEditing}
                   className="form-input"
+                  aria-invalid={isEditing && !!profileValidation.errors.username}
+                  aria-describedby={isEditing && profileValidation.errors.username ? 'profile-username-error' : undefined}
                 />
+                {isEditing && profileValidation.errors.username && (
+                  <p id="profile-username-error" className="form-field-error">{profileValidation.errors.username}</p>
+                )}
               </div>
 
               <div className="form-group">
@@ -244,7 +305,12 @@ const ProfilePage = () => {
                   onChange={handleChange}
                   disabled={!isEditing}
                   className="form-input"
+                  aria-invalid={isEditing && !!profileValidation.errors.email}
+                  aria-describedby={isEditing && profileValidation.errors.email ? 'profile-email-error' : undefined}
                 />
+                {isEditing && profileValidation.errors.email && (
+                  <p id="profile-email-error" className="form-field-error">{profileValidation.errors.email}</p>
+                )}
               </div>
 
               <div className="form-group">
@@ -257,20 +323,12 @@ const ProfilePage = () => {
                   disabled={!isEditing}
                   className="form-input"
                   placeholder="Enter your full name"
+                  aria-invalid={isEditing && !!profileValidation.errors.full_name}
+                  aria-describedby={isEditing && profileValidation.errors.full_name ? 'profile-full-name-error' : undefined}
                 />
-              </div>
-
-              <div className="form-group">
-                <label>Phone Number</label>
-                <input
-                  type="tel"
-                  name="phone"
-                  value={formData.phone}
-                  onChange={handleChange}
-                  disabled={!isEditing}
-                  className="form-input"
-                  placeholder="+1 (555) 000-0000"
-                />
+                {isEditing && profileValidation.errors.full_name && (
+                  <p id="profile-full-name-error" className="form-field-error">{profileValidation.errors.full_name}</p>
+                )}
               </div>
 
               <div className="form-group">
@@ -283,7 +341,12 @@ const ProfilePage = () => {
                   disabled={!isEditing}
                   className="form-input"
                   placeholder="Your company name"
+                  aria-invalid={isEditing && !!profileValidation.errors.company}
+                  aria-describedby={isEditing && profileValidation.errors.company ? 'profile-company-error' : undefined}
                 />
+                {isEditing && profileValidation.errors.company && (
+                  <p id="profile-company-error" className="form-field-error">{profileValidation.errors.company}</p>
+                )}
               </div>
 
               <div className="form-group">
@@ -300,8 +363,104 @@ const ProfilePage = () => {
 
             {isEditing && (
               <div className="form-actions">
-                <button type="submit" className="btn-save">
+                <button type="submit" className="btn-save" disabled={!profileValidation.isValid}>
                   Save Changes
+                </button>
+                <button type="button" className="btn-cancel" onClick={handleCancel}>
+                  Cancel
+                </button>
+              </div>
+            )}
+          </form>
+        </div>
+
+        <div className="profile-card">
+          <div className="card-header">
+            <h3>Password recovery</h3>
+            {!isEditing && (
+              <button className="btn-edit" onClick={() => setIsEditing(true)} type="button">
+                Edit
+              </button>
+            )}
+          </div>
+          <p className="hint-text recovery-intro">
+            These contacts are used only for forgot-password. The reset link is sent to your recovery email when set;
+            SMS codes go to your mobile (or alternate mobile). Use the same email or username on the forgot-password page.
+          </p>
+          <form
+            onSubmit={(e) =>
+              handleSubmit(e, {
+                phone: formData.phone,
+                recovery_phone: formData.recovery_phone,
+                recovery_email: formData.recovery_email,
+              }, recoveryValidation)
+            }
+          >
+            {isEditing && recoveryValidation.errors.form && (
+              <p className="form-field-error form-field-error--block">{recoveryValidation.errors.form}</p>
+            )}
+            <div className="form-grid">
+              <div className="form-group form-group-full">
+                <label>Recovery email (forgot password)</label>
+                <input
+                  type="email"
+                  name="recovery_email"
+                  value={formData.recovery_email}
+                  onChange={handleChange}
+                  disabled={!isEditing}
+                  className="form-input"
+                  placeholder="alternate@example.com"
+                  aria-invalid={isEditing && !!recoveryValidation.errors.recovery_email}
+                  aria-describedby={isEditing && recoveryValidation.errors.recovery_email ? 'profile-recovery-email-error' : undefined}
+                />
+                {isEditing && recoveryValidation.errors.recovery_email && (
+                  <p id="profile-recovery-email-error" className="form-field-error">{recoveryValidation.errors.recovery_email}</p>
+                )}
+                <p className="hint-text">If set, reset links are sent here only—not your login email.</p>
+              </div>
+
+              <div className="form-group">
+                <label>Mobile number (SMS reset)</label>
+                <input
+                  type="tel"
+                  name="phone"
+                  value={formData.phone}
+                  onChange={handleChange}
+                  disabled={!isEditing}
+                  className="form-input"
+                  placeholder="+919876543210"
+                  aria-invalid={isEditing && !!recoveryValidation.errors.phone}
+                  aria-describedby={isEditing && recoveryValidation.errors.phone ? 'profile-phone-error' : undefined}
+                />
+                {isEditing && recoveryValidation.errors.phone && (
+                  <p id="profile-phone-error" className="form-field-error">{recoveryValidation.errors.phone}</p>
+                )}
+              </div>
+
+              <div className="form-group">
+                <label>Alternate mobile (optional)</label>
+                <input
+                  type="tel"
+                  name="recovery_phone"
+                  value={formData.recovery_phone}
+                  onChange={handleChange}
+                  disabled={!isEditing}
+                  className="form-input"
+                  placeholder="+919876543211"
+                  aria-invalid={isEditing && !!recoveryValidation.errors.recovery_phone}
+                  aria-describedby={isEditing && recoveryValidation.errors.recovery_phone ? 'profile-recovery-phone-error' : undefined}
+                />
+                {isEditing && recoveryValidation.errors.recovery_phone && (
+                  <p id="profile-recovery-phone-error" className="form-field-error">{recoveryValidation.errors.recovery_phone}</p>
+                )}
+                <p className="hint-text">Used if primary mobile is empty. Include country code (+91, +1, …).</p>
+              </div>
+            </div>
+
+            {isEditing && (
+              <div className="form-actions">
+                <button type="submit" className="btn-save" disabled={!recoveryValidation.isValid}>
+                  Save recovery contacts
                 </button>
                 <button type="button" className="btn-cancel" onClick={handleCancel}>
                   Cancel
@@ -316,28 +475,28 @@ const ProfilePage = () => {
           <h3>Account Statistics</h3>
           <div className="stats-grid">
             <div className="stat-item">
-              <div className="stat-icon">🖥️</div>
+              <div className="stat-icon"><IconServer aria-hidden="true" /></div>
               <div className="stat-details">
                 <div className="stat-value">{stats.total_vms_created}</div>
                 <div className="stat-label">Total VMs Created</div>
               </div>
             </div>
             <div className="stat-item">
-              <div className="stat-icon">💾</div>
+              <div className="stat-icon"><IconHardDrive aria-hidden="true" /></div>
               <div className="stat-details">
                 <div className="stat-value">{stats.storage_used_tb.toFixed(2)} TB</div>
                 <div className="stat-label">Storage Used</div>
               </div>
             </div>
             <div className="stat-item">
-              <div className="stat-icon">💰</div>
+              <div className="stat-icon"><IconDollarSign aria-hidden="true" /></div>
               <div className="stat-details">
                 <div className="stat-value">${stats.total_spend.toFixed(2)}</div>
                 <div className="stat-label">Total Spend</div>
               </div>
             </div>
             <div className="stat-item">
-              <div className="stat-icon">📅</div>
+              <div className="stat-icon"><IconClock aria-hidden="true" /></div>
               <div className="stat-details">
                 <div className="stat-value">{stats.member_since}</div>
                 <div className="stat-label">Member Since</div>

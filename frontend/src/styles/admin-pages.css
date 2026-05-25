@@ -7,6 +7,11 @@
   align-items: flex-start;
   flex-wrap: wrap;
   gap: 1rem;
+  padding: 1.1rem 1.25rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 18px;
+  background: linear-gradient(135deg, rgba(24, 24, 36, 0.92), rgba(18, 20, 30, 0.84));
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.18);
 }
 
 .admin-page-header h1 {
@@ -18,7 +23,7 @@
 
 .admin-page-header p {
   margin: 0;
-  color: #888;
+  color: rgba(255, 255, 255, 0.68);
   font-size: 1rem;
 }
 
@@ -81,7 +86,7 @@
   align-items: center;
   justify-content: center;
   min-height: 400px;
-  color: #888;
+  color: rgba(255, 255, 255, 0.68);
 }
 
 .admin-loading .spinner {
@@ -107,9 +112,9 @@
 }
 
 .admin-stat-card {
-  background: #1a1a1a;
-  border: 1px solid #2a2a2a;
-  border-radius: 12px;
+  background: linear-gradient(180deg, rgba(28, 29, 40, 0.94), rgba(20, 21, 31, 0.92));
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 18px;
   padding: 1.5rem;
   display: flex;
   align-items: center;
@@ -151,7 +156,7 @@
 
 .admin-stat-card:hover {
   transform: translateY(-4px);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 18px 32px rgba(0, 0, 0, 0.28);
   border-color: var(--accent-color);
 }
 
@@ -184,7 +189,7 @@
 
 .admin-stat-card .stat-content p {
   margin: 0 0 0.75rem 0;
-  color: #888;
+  color: rgba(255, 255, 255, 0.68);
   font-size: 0.95rem;
 }
 
@@ -202,15 +207,41 @@
 }
 
 .stat-detail {
-  color: #666;
+  color: rgba(255, 255, 255, 0.58);
   font-size: 0.85rem;
+}
+
+.empty-state-copy {
+  color: rgba(255, 255, 255, 0.68);
+  margin: 0;
+}
+
+.admin-quick-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.admin-quick-actions .btn-primary {
+  width: 100%;
+  text-align: center;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+@media (max-width: 640px) {
+  .admin-quick-actions {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* Stat Cards for Admin Settings/Payments Pages */
 .stat-card {
-  background: linear-gradient(135deg, #1e1e2e 0%, #2a2a3e 100%);
+  background: linear-gradient(135deg, rgba(30, 30, 46, 0.96) 0%, rgba(42, 42, 62, 0.92) 100%);
   border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 12px;
+  border-radius: 18px;
   padding: 1.5rem;
   display: flex;
   align-items: center;
@@ -220,8 +251,8 @@
 
 .stat-card:hover {
   transform: translateY(-2px);
-  border-color: rgba(255, 215, 0, 0.3);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+  border-color: rgba(212, 175, 55, 0.3);
+  box-shadow: 0 16px 30px rgba(0, 0, 0, 0.24);
 }
 
 .stat-card .stat-icon {
@@ -242,7 +273,7 @@
 
 .stat-card .stat-label {
   margin: 0 0 0.5rem 0;
-  color: #b0b0b0;
+  color: rgba(255, 255, 255, 0.68);
   font-size: 0.9rem;
   font-weight: 500;
   text-transform: uppercase;

@@ -184,6 +184,100 @@ Reply to this email to respond to {submission['name']}
         except Exception as e:
             logger.error(f"Failed to send email notification: {str(e)}")
             return False
+
+    def send_password_reset(
+        self,
+        *,
+        to_email: str,
+        username: str,
+        reset_link: str,
+        expires_hours: int = 1,
+    ) -> bool:
+        """Send password reset link email."""
+        if not self.sender_email or not self.sender_password:
+            logger.warning("Email credentials not configured, skipping password reset email")
+            return False
+
+        try:
+            msg = MIMEMultipart("alternative")
+            msg["Subject"] = "Reset your Zenith password"
+            msg["From"] = self.sender_email
+            msg["To"] = to_email
+
+            html_body = f"""
+            <html>
+              <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 560px;">
+                <h2 style="color: #b8860b;">Zenith — Password reset</h2>
+                <p>Hello {username},</p>
+                <p>We received a request to reset your password. Click the button below to choose a new password.
+                   This link expires in <strong>{expires_hours} hour(s)</strong>.</p>
+                <p style="margin: 24px 0;">
+                  <a href="{reset_link}"
+                     style="background: #d4af37; color: #111; padding: 12px 24px; text-decoration: none;
+                            border-radius: 8px; font-weight: bold;">Reset password</a>
+                </p>
+                <p style="font-size: 12px; color: #666;">Or copy this link:<br>{reset_link}</p>
+                <p style="font-size: 12px; color: #666;">If you did not request this, you can ignore this email.</p>
+              </body>
+            </html>
+            """
+            msg.attach(MIMEText(html_body, "html"))
+
+            with smtplib.SMTP(self.smtp_server, self.smtp_port) as server:
+                server.starttls()
+                server.login(self.sender_email, self.sender_password)
+                server.send_message(msg)
+
+            logger.info(f"Password reset email sent to {to_email}")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to send password reset email: {str(e)}")
+            return False
+
+    def send_security_alert(self, *, to_email: str, username: str, unencrypted_sensitive_count: int) -> bool:
+        """
+        Send a security alert email to a user.
+
+        This uses the existing Gmail SMTP configuration to keep the platform zero-cost.
+        """
+        if not self.sender_email or not self.sender_password:
+            logger.warning("Email credentials not configured, skipping security alert email")
+            return False
+
+        try:
+            subject = "Zenith Security Alert: Sensitive files need encryption"
+            msg = MIMEMultipart("alternative")
+            msg["Subject"] = subject
+            msg["From"] = self.sender_email
+            msg["To"] = to_email
+
+            html_body = f"""
+            <html>
+              <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+                <h2>Zenith Security Alert</h2>
+                <p>Hello {username},</p>
+                <p>
+                  We detected <strong>{unencrypted_sensitive_count}</strong> sensitive file(s) that are not encrypted yet.
+                  Please open the <strong>Security</strong> page and complete encryption to protect your data.
+                </p>
+                <p style="color: #666; font-size: 12px;">
+                  If you recently encrypted your files, this alert may resolve after the next refresh.
+                </p>
+              </body>
+            </html>
+            """
+            msg.attach(MIMEText(html_body, "html"))
+
+            with smtplib.SMTP(self.smtp_server, self.smtp_port) as server:
+                server.starttls()
+                server.login(self.sender_email, self.sender_password)
+                server.send_message(msg)
+
+            logger.info(f"Security alert email sent to {to_email} for user {username}")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to send security alert email: {str(e)}")
+            return False
     
     def send_auto_reply(self, submission: Dict) -> bool:
         """

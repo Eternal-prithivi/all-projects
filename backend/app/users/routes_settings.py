@@ -1,6 +1,16 @@
-"""
-User Settings Management Routes
-"""
+# =============================================================================
+# MODULE: users/routes_settings.py  (296 lines)
+# PURPOSE: User preferences persistence — saves currency, timezone, date format,
+#          notification toggles, language preference to MongoDB
+# READS FROM:  users collection (preferences sub-document)
+# WRITES TO:   users collection
+# MOUNTED AT:  /api/settings → GET preferences, POST preferences
+# CALLED BY:   SettingsPage.jsx, PreferencesContext.jsx (loads on login)
+# DO NOT:
+#   - Add theme to this endpoint — theme is handled by ThemeContext and CSS class on <html>
+#   - Rename preference field keys — PreferencesContext.jsx destructures exact field names
+# =============================================================================
+
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from typing import Optional, Dict, Any

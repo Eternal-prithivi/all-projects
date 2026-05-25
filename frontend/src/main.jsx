@@ -1,3 +1,18 @@
+// =============================================================================
+// MODULE: main.jsx  (entry point)
+// PURPOSE: React app bootstrap — defines ALL routes via createBrowserRouter,
+//          wraps providers (AuthContext, ThemeContext, PreferencesContext, NotificationContext)
+// ROUTES:
+//   /                → LandingPage
+//   /login /register → Auth pages
+//   /dashboard/*     → DashboardLayout (ProtectedRoute) + all page children
+//   /admin/*         → AdminDashboardPage (admin role required)
+// LAZY LOADING: All dashboard pages are lazy-loaded for performance (React.lazy + Suspense)
+// DO NOT:
+//   - Add routes without wrapping in ProtectedRoute (if auth required)
+//   - Change provider order — AuthContext must wrap PreferencesContext (it depends on token)
+//   - Import heavy components eagerly here — use React.lazy for all page-level components
+// =============================================================================
 import React, { lazy, Suspense } from "react";
 import ReactDOM from "react-dom/client";
 import { createBrowserRouter, RouterProvider } from "react-router-dom";
@@ -14,6 +29,8 @@ import "./index.css";
 import HomePage from "./pages/HomePage.jsx";
 import LoginPage from "./pages/LoginPage.jsx";
 import RegisterPage from "./pages/RegisterPage.jsx";
+import ForgotPasswordPage from "./pages/ForgotPasswordPage.jsx";
+import ResetPasswordPage from "./pages/ResetPasswordPage.jsx";
 
 // Lazy load: All other pages (loaded on-demand)
 const DashboardLayout = lazy(() => import("./components/dashboard/DashboardLayout.jsx"));
@@ -31,12 +48,14 @@ const BillingPage = lazy(() => import("./pages/BillingPage.jsx"));
 const PricingPage = lazy(() => import("./pages/PricingPage.jsx"));
 const ContactPage = lazy(() => import("./pages/ContactPage.jsx"));
 const AboutPage = lazy(() => import("./pages/AboutPage.jsx"));
+const FeaturesPage = lazy(() => import("./pages/FeaturesPage.jsx"));
 const HelpCenterPage = lazy(() => import("./pages/HelpCenterPage.jsx"));
 const TermsOfServicePage = lazy(() => import("./pages/TermsOfServicePage.jsx"));
 const PrivacyPolicyPage = lazy(() => import("./pages/PrivacyPolicyPage.jsx"));
 const AccessDeniedPage = lazy(() => import("./pages/AccessDeniedPage.jsx"));
 const NotFoundPage = lazy(() => import("./pages/NotFoundPage.jsx"));
 const ServerErrorPage = lazy(() => import("./pages/ServerErrorPage.jsx"));
+const ServiceUnavailablePage = lazy(() => import("./pages/ServiceUnavailablePage.jsx"));
 
 // Admin pages (lazy loaded - only for admins)
 const AdminLayout = lazy(() => import("./components/admin/AdminLayout.jsx"));
@@ -57,10 +76,13 @@ const router = createBrowserRouter([
       { index: true, element: <HomePage /> },
       { path: "/login", element: <LoginPage /> },
       { path: "/register", element: <RegisterPage /> },
+      { path: "/forgot-password", element: <ForgotPasswordPage /> },
+      { path: "/reset-password", element: <ResetPasswordPage /> },
       
       // --- Public Routes (lazy loaded) ---
       { path: "/contact", element: <Suspense fallback={<LazyLoadFallback />}><ContactPage /></Suspense> },
       { path: "/about", element: <Suspense fallback={<LazyLoadFallback />}><AboutPage /></Suspense> },
+      { path: "/features", element: <Suspense fallback={<LazyLoadFallback />}><FeaturesPage /></Suspense> },
       { path: "/access-denied", element: <Suspense fallback={<LazyLoadFallback />}><AccessDeniedPage /></Suspense> },
       { path: "/help", element: <Suspense fallback={<LazyLoadFallback />}><HelpCenterPage /></Suspense> },
       { path: "/legal/terms", element: <Suspense fallback={<LazyLoadFallback />}><TermsOfServicePage /></Suspense> },
@@ -106,6 +128,7 @@ const router = createBrowserRouter([
 
       // --- Error Routes (lazy loaded) ---
       { path: "/500", element: <Suspense fallback={<LazyLoadFallback />}><ServerErrorPage /></Suspense> },
+      { path: "/503", element: <Suspense fallback={<LazyLoadFallback />}><ServiceUnavailablePage /></Suspense> },
       { path: "*", element: <Suspense fallback={<LazyLoadFallback />}><NotFoundPage /></Suspense> },
     ],
   },

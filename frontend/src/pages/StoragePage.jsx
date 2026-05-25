@@ -1,72 +1,43 @@
+// =============================================================================
+// PAGE: StoragePage.jsx  (564 lines)
+// ROUTE: /dashboard/storage
+// PURPOSE: Standard (non-secure) multi-cloud file management — ML-guided placement
+//          (analyze → recommendation modal → confirm), upload to AWS/GCP/Azure,
+//          list files, download (access tracked), delete, Glacier restore, AWS sync
+// API: Uses api.js (listFiles, getDownloadUrl, deleteFile, uploadFile, syncAwsBucket)
+//      + local apiClient wrappers for analyzeFile and initiateGlacierRestore
+// STATE: files, recommendation, modals for delete/restore/recommendation
+// BACKEND: /api/storage/* — analyze, upload, files, download, delete, sync/aws, restore-aws
+// DO NOT:
+//   - Skip the analyze → recommendation modal → confirm flow (ML prediction must be logged)
+//   - Hardcode CSP — always read from file.csp or recommendation.recommendation.csp
+//   - Remove access tracking in download (feeds access_frequency_score for ML tiering)
+// =============================================================================
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useNotifications } from "../hooks/useNotifications";
 import { TableSkeleton } from "../components/Skeletons.jsx";
+import { useAuth } from "../context/AuthContext.jsx";
+import {
+  listFiles,
+  getDownloadUrl,
+  deleteFile,
+  uploadFile as uploadFileToCSP,
+  syncAwsBucket,
+} from "../api";
 import "../styles/storage.css"; // We use the external stylesheet
 
-// --- MOCKED DEPENDENCIES for a self-contained component ---
-const useAuth = () => ({
-  token: localStorage.getItem("authToken"),
-  user: { username: "tanjiro" },
-});
-
-// --- API FUNCTIONS ---
-const API_BASE_URL = import.meta.env.DEV 
-  ? 'http://localhost:8000/api'
-  : 'https://zenith-backend-707i.onrender.com/api';
-const handleApiResponse = async (response) => {
-  if (!response.ok) {
-    // --- MODIFIED: Ensure error details from FastAPI are caught ---
-    const errorBody = await response.json();
-    throw new Error(errorBody.detail || `API error: ${response.status}`);
-  }
-  if (response.status === 204) return { success: true };
-  const contentType = response.headers.get("content-type");
-  return contentType?.includes("application/json") ? response.json() : {};
+// --- API FUNCTIONS (Missing from api.js) ---
+import { apiClient } from "../api";
+const analyzeFile = async (data, token) => {
+  const response = await apiClient.post("/storage/analyze", data);
+  return response.data;
 };
-const listFiles = (token) =>
-  fetch(`${API_BASE_URL}/storage/files`, {
-    headers: { Authorization: `Bearer ${token}` },
-  }).then(handleApiResponse);
-const getDownloadUrl = (filename, token) =>
-  fetch(`${API_BASE_URL}/storage/download/${filename}`, {
-    headers: { Authorization: `Bearer ${token}` },
-  }).then(handleApiResponse);
-const deleteFile = (filename, token) =>
-  fetch(`${API_BASE_URL}/storage/delete/${filename}`, {
-    method: "DELETE",
-    headers: { Authorization: `Bearer ${token}` },
-  }).then(handleApiResponse);
-const analyzeFile = (data, token) =>
-  fetch(`${API_BASE_URL}/storage/analyze`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify(data),
-  }).then(handleApiResponse);
-const uploadFileToCSP = (file, csp, storageClass, token) => {
+const initiateGlacierRestore = async (filename, tier, days, token) => {
   const formData = new FormData();
-  formData.append("file", file);
-  formData.append("csp", csp);
-  formData.append("storage_class", storageClass);
-  return fetch(`${API_BASE_URL}/storage/upload`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${token}` },
-    body: formData,
-  }).then(handleApiResponse);
-};
-
-// --- NEW API FUNCTION: To initiate Glacier restore ---
-const initiateGlacierRestore = (filename, tier, days, token) => {
-  const formData = new FormData(); // FastAPI expects form-urlencoded for Form parameters
   formData.append("tier", tier);
   formData.append("days", days);
-  return fetch(`${API_BASE_URL}/storage/restore-aws/${filename}`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${token}` },
-    body: formData, // FormData automatically sets 'Content-Type: multipart/form-data'
-  }).then(handleApiResponse);
+  const response = await apiClient.post(`/storage/restore-aws/${encodeURIComponent(filename)}`, formData);
+  return response.data;
 };
 
 
@@ -80,14 +51,30 @@ const CspIcon = ({ csp }) => {
   return <img src={icons[csp]} alt={`${csp} logo`} className="csp-icon" />;
 };
 
+const formatPercent = (value) => `${Math.round((Number(value) || 0) * 100)}%`;
+
+const formatExpertName = (expert) => {
+  const labels = {
+    rule: "Rules",
+    random_forest: "Random Forest",
+    xgboost: "XGBoost",
+  };
+  return labels[expert] || expert;
+};
+
 // --- MAIN STORAGE PAGE COMPONENT ---
 
 function StoragePage() {
   const { token } = useAuth();
-  const notifications = useNotifications();
+  const {
+    error: notifyError,
+    success: notifySuccess,
+    info: notifyInfo,
+  } = useNotifications();
   const [selectedFile, setSelectedFile] = useState(null);
   const [files, setFiles] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isSyncing, setIsSyncing] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const fileInputRef = useRef(null);
@@ -115,11 +102,26 @@ function StoragePage() {
       const fileList = await listFiles(token);
       setFiles(fileList);
     } catch (error) {
-      notifications.error(error.message || "Failed to fetch files.");
+      notifyError(error.message || "Failed to fetch files.");
     } finally {
       setIsLoading(false);
     }
-  }, [token]);
+  }, [token, notifyError]);
+
+  const handleSyncWithBucket = async () => {
+    if (!token) return;
+    setIsSyncing(true);
+    try {
+      const result = await syncAwsBucket(token);
+      const scanned = result.scanned_prefix ? `prefix '${result.scanned_prefix}'` : "the whole bucket";
+      notifySuccess(`Sync complete. Added ${result.inserted} new file(s) from AWS after scanning ${scanned}.`);
+      await fetchFiles();
+    } catch (error) {
+      notifyError(error.detail || error.message || "Sync failed.");
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
   useEffect(() => {
     fetchFiles();
@@ -144,7 +146,7 @@ function StoragePage() {
       setRecommendation(result);
       setShowRecommendationModal(true);
     } catch (error) {
-      notifications.error(error.message || "Analysis failed.");
+      notifyError(error.message || "Analysis failed.");
     } finally {
       setIsAnalyzing(false);
     }
@@ -165,14 +167,14 @@ function StoragePage() {
 
     try {
       await uploadFileToCSP(selectedFile, finalCsp, storageClass, token);
-      notifications.success(
+      notifySuccess(
         `'${selectedFile.name}' uploaded successfully to ${finalCsp}!`
       );
       setSelectedFile(null);
       if (fileInputRef.current) fileInputRef.current.value = "";
       await fetchFiles();
     } catch (error) {
-      notifications.error(error.message || `Upload to ${finalCsp} failed.`);
+      notifyError(error.message || `Upload to ${finalCsp} failed.`);
     } finally {
       setIsUploading(false);
     }
@@ -187,10 +189,10 @@ function StoragePage() {
     if (!fileToDelete) return;
     try {
       await deleteFile(fileToDelete, token);
-      notifications.success(`'${fileToDelete}' deleted successfully.`);
+      notifySuccess(`'${fileToDelete}' deleted successfully.`);
       await fetchFiles();
     } catch (error) {
-      notifications.error(error.message || "Failed to delete file.");
+      notifyError(error.message || "Failed to delete file.");
     } finally {
       setShowDeleteModal(false);
       setFileToDelete(null);
@@ -207,12 +209,12 @@ function StoragePage() {
       if (error.message.includes("is in GLACIER storage") && error.message.includes("412")) {
         setFileToRestore(filename);
         setShowRestoreModal(true); // Open the restore modal
-        notifications.info("This file is in Glacier. It needs to be restored before download.");
+        notifyInfo("This file is in Glacier. It needs to be restored before download.");
       } else if (error.message.includes("is currently being restored") && error.message.includes("409")) {
-        notifications.info(error.message); // Inform user it's already restoring
+        notifyInfo(error.message); // Inform user it's already restoring
       }
       else {
-        notifications.error(error.message || "Could not get download link.");
+        notifyError(error.message || "Could not get download link.");
       }
     }
   };
@@ -230,13 +232,13 @@ function StoragePage() {
     setIsRestoring(true);
     try {
       const result = await initiateGlacierRestore(fileToRestore, restoreTier, restoreDays, token);
-      notifications.success(result.message || `'${fileToRestore}' restore initiated.`);
+      notifySuccess(result.message || `'${fileToRestore}' restore initiated.`);
       setShowRestoreModal(false);
       setFileToRestore(null);
       // Re-fetch files to potentially update their status in the UI
       await fetchFiles();
     } catch (error) {
-      notifications.error(error.message || `Failed to initiate restore for '${fileToRestore}'.`);
+      notifyError(error.message || `Failed to initiate restore for '${fileToRestore}'.`);
     } finally {
       setIsRestoring(false);
     }
@@ -348,7 +350,17 @@ function StoragePage() {
       </div>
 
       <div className="list-section">
-        <h3 className="list-title">Your Files</h3>
+        <div className="list-header">
+          <h3 className="list-title">Your Files</h3>
+          <button
+            type="button"
+            className="action-btn"
+            onClick={handleSyncWithBucket}
+            disabled={isSyncing}
+          >
+            {isSyncing ? "Syncing..." : "Sync with Bucket (AWS)"}
+          </button>
+        </div>
         {isLoading ? (
           <TableSkeleton rows={5} columns={5} />
         ) : (
@@ -453,6 +465,24 @@ function StoragePage() {
                 {recommendation.recommendation.service_name}
               </p>
             </div>
+
+            {recommendation.expert_votes?.length > 0 && (
+              <div className="ensemble-box">
+                <div className="ensemble-summary">
+                  <span>Ensemble confidence</span>
+                  <strong>{formatPercent(recommendation.ensemble_confidence)}</strong>
+                </div>
+                <div className="expert-votes">
+                  {recommendation.expert_votes.map((vote) => (
+                    <div className="expert-vote" key={vote.expert}>
+                      <span>{formatExpertName(vote.expert)}</span>
+                      <strong>{vote.predicted_tier}</strong>
+                      <small>{formatPercent(vote.confidence)}</small>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <div className="override-section">
               <label>Or, manually select a different provider:</label>

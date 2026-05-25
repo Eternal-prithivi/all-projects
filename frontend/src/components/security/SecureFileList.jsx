@@ -26,7 +26,7 @@ function SecureFileList({ files, onFileDeleted }) {
     try {
       const data = await getSecureDownloadUrl(filename, token);
       window.open(data.download_url, "_blank");
-    } catch (error) {
+    } catch {
       alert("Could not get download link.");
     }
   };
@@ -40,8 +40,8 @@ function SecureFileList({ files, onFileDeleted }) {
       try {
         await deleteSecureFile(filename, token);
         await onFileDeleted(); 
-      } catch (error) {
-        setError(error.detail || "Could not delete file. Please try again.");
+      } catch (_error) {
+        alert(_error.detail || "Could not delete file. Please try again.");
       }
     }
   };

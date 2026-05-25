@@ -1,11 +1,10 @@
 import React from 'react';
-import { useLocation, Link, useNavigate } from 'react-router-dom';
+import { useLocation, Link } from 'react-router-dom';
 import '../styles/breadcrumbs.css';
 
 const Breadcrumbs = () => {
   const location = useLocation();
-  const navigate = useNavigate();
-  
+
   const pathnames = location.pathname.split('/').filter(x => x);
   
   const formatPathname = (name) => {

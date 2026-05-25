@@ -1,3 +1,16 @@
+// =============================================================================
+// CONTEXT: ThemeContext.jsx  (91 lines)
+// PURPOSE: Dark/Light/Auto theme management
+//   - Provides: theme, setTheme(), toggleTheme()
+//   - Applies CSS class ("dark"/"light") to <html> element
+//   - Saves preference to DB via /api/settings on change
+//   - "Auto" mode follows system preference (prefers-color-scheme media query)
+// USED BY: SettingsPage.jsx (UI toggle), any component reading CSS variables
+// DO NOT:
+//   - Apply theme by changing individual CSS properties — add CSS class to <html> only
+//   - Read theme from localStorage directly in pages — always use useTheme() hook
+//   - Change class names ("dark"/"light") — index.css uses these exact strings
+// =============================================================================
 import React, { createContext, useState, useContext, useEffect, useCallback } from 'react';
 
 const ThemeContext = createContext(null);

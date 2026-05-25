@@ -1,7 +1,17 @@
-"""
-Admin routes for platform management.
-Only accessible to users with admin role.
-"""
+# =============================================================================
+# MODULE: routes_admin.py  (989 lines)
+# PURPOSE: Admin-only user management — list/create/delete users, change roles,
+#          ban/unban, bulk operations, audit log query + CSV export
+# READS FROM:  users, admin_actions collections
+# WRITES TO:   users, admin_actions collections
+# DEPENDS ON:  auth_utils.get_current_user(), require_admin() role guard
+# MOUNTED AT:  (no prefix) → /admin/dashboard, /admin/users/*, /audit-logs
+# DO NOT:
+#   - Remove self-protection guards — admin cannot delete/ban/demote themselves
+#   - Change admin_actions log schema — audit log query/export depends on it
+#   - Add any endpoint without the require_admin() dependency
+# =============================================================================
+
 
 from fastapi import APIRouter, HTTPException, Depends
 from datetime import datetime, timedelta
@@ -10,6 +20,10 @@ from pydantic import BaseModel
 from ..database.mongo_client import get_database
 from ..auth.auth_utils import get_current_user
 from app.utils.logger import setup_logger
+from app.auth.auth_utils import get_password_hash
+from app.utils.audit_log import categorize_audit_action, dedupe_audit_entries
+from fastapi.responses import Response
+import io, csv
 
 logger = setup_logger(__name__)
 router = APIRouter(prefix="/api/admin", tags=["admin"])
@@ -60,6 +74,13 @@ async def verify_admin(current_user = Depends(get_current_user)):
     
     logger.debug(f"Admin access granted")
     return current_user
+
+
+def _get_admin_username(admin_user) -> str:
+    """Extract the admin's username from either a dict or UserInDB object."""
+    return getattr(admin_user, 'username', None) or (
+        admin_user.get('username') if isinstance(admin_user, dict) else None
+    )
 
 
 @router.get("/dashboard", response_model=AdminStats)
@@ -249,6 +270,10 @@ async def update_user_status(
     """
     if status not in ["active", "suspended", "banned"]:
         raise HTTPException(status_code=400, detail="Invalid status. Must be: active, suspended, or banned")
+
+    acting_admin = _get_admin_username(admin_user)
+    if username == acting_admin:
+        raise HTTPException(status_code=400, detail="Cannot change your own status through admin endpoints")
     
     try:
         result = DB["users"].update_one(
@@ -261,14 +286,14 @@ async def update_user_status(
         
         # Log the action
         DB["admin_actions"].insert_one({
-            "admin_username": admin_user["username"],
+            "admin_username": acting_admin,
             "action": "update_user_status",
             "target_user": username,
             "new_status": status,
             "timestamp": datetime.utcnow()
         })
         
-        logger.info(f"Admin action: {admin_user['username']} updated {username} status to {status}")
+        logger.info(f"Admin action: {acting_admin} updated {username} status to {status}")
         
         return {"success": True, "message": f"User {username} status updated to {status}"}
     
@@ -279,6 +304,301 @@ async def update_user_status(
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Failed to update user status: {str(e)}")
+
+
+# --- New admin user management endpoints (create / delete / role / bulk) ---
+
+
+class CreateUserPayload(BaseModel):
+    username: str
+    email: str
+    password: Optional[str] = None
+    role: Optional[str] = "user"
+    plan_id: Optional[str] = "free"
+
+
+@router.post("/users")
+async def create_user(
+    payload: CreateUserPayload,
+    admin_user = Depends(verify_admin)
+):
+    """Create a new user (admin only). Password will be hashed if provided."""
+    try:
+        # Check uniqueness
+        if DB["users"].find_one({"username": payload.username}):
+            raise HTTPException(status_code=400, detail="Username already exists")
+
+        if DB["users"].find_one({"email": payload.email}):
+            raise HTTPException(status_code=400, detail="Email already exists")
+
+        user_doc = {
+            "username": payload.username,
+            "email": payload.email,
+            "role": payload.role or "user",
+            "plan_id": payload.plan_id or "free",
+            "created_at": datetime.utcnow(),
+            "status": "active"
+        }
+
+        if payload.password:
+            user_doc["hashed_password"] = get_password_hash(payload.password)
+
+        DB["users"].insert_one(user_doc)
+
+        # Log admin action
+        DB["admin_actions"].insert_one({
+            "admin_username": getattr(admin_user, 'username', admin_user.get('username') if isinstance(admin_user, dict) else None),
+            "action": "create_user",
+            "target_user": payload.username,
+            "timestamp": datetime.utcnow()
+        })
+
+        return {"success": True, "message": f"User {payload.username} created"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Create user failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete("/users/{username}")
+async def delete_user(
+    username: str,
+    admin_user = Depends(verify_admin),
+    soft: bool = True
+):
+    """Delete (soft) a user. Soft delete sets status=deleted; hard delete removes document if soft=False."""
+    acting_admin = _get_admin_username(admin_user)
+    if username == acting_admin:
+        raise HTTPException(status_code=400, detail="Cannot delete your own account through admin endpoints")
+
+    try:
+        if soft:
+            result = DB["users"].update_one({"username": username}, {"$set": {"status": "deleted", "deleted_at": datetime.utcnow()}})
+        else:
+            result = DB["users"].delete_one({"username": username})
+
+        # UpdateResult has matched_count; DeleteResult has deleted_count — use getattr for both
+        matched = getattr(result, 'matched_count', 0)
+        deleted = getattr(result, 'deleted_count', 0)
+        if matched == 0 and deleted == 0:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        DB["admin_actions"].insert_one({
+            "admin_username": acting_admin,
+            "action": "delete_user",
+            "target_user": username,
+            "soft": soft,
+            "timestamp": datetime.utcnow()
+        })
+
+        return {"success": True, "message": f"User {username} {'soft-deleted' if soft else 'deleted'}"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Delete user failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+class RoleUpdatePayload(BaseModel):
+    role: str
+
+
+@router.put("/users/{username}/role")
+async def update_user_role(
+    username: str,
+    payload: RoleUpdatePayload,
+    admin_user = Depends(verify_admin)
+):
+    """Change a user's role."""
+    acting_admin = _get_admin_username(admin_user)
+    if username == acting_admin:
+        raise HTTPException(status_code=400, detail="Cannot change your own role through admin endpoints")
+
+    try:
+        if payload.role not in ["user", "admin", "moderator"]:
+            raise HTTPException(status_code=400, detail="Invalid role")
+
+        result = DB["users"].update_one({"username": username}, {"$set": {"role": payload.role, "updated_at": datetime.utcnow()}})
+        if result.matched_count == 0:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        DB["admin_actions"].insert_one({
+            "admin_username": acting_admin,
+            "action": "change_role",
+            "target_user": username,
+            "new_role": payload.role,
+            "timestamp": datetime.utcnow()
+        })
+
+        return {"success": True, "message": f"Role for {username} updated to {payload.role}"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Update role failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+class BulkUserActionItem(BaseModel):
+    username: str
+    action: str
+    value: Optional[str] = None
+
+
+class BulkUserActionRequest(BaseModel):
+    items: List[BulkUserActionItem]
+
+
+@router.post("/users/bulk")
+async def bulk_user_actions(
+    request: BulkUserActionRequest,
+    admin_user = Depends(verify_admin)
+):
+    """Perform bulk user actions: activate/suspend/ban/delete/set_role."""
+    acting_admin = _get_admin_username(admin_user)
+    results = []
+    try:
+        for item in request.items:
+            try:
+                # Prevent admin from modifying themselves in bulk operations
+                if item.username == acting_admin:
+                    results.append({"username": item.username, "action": item.action, "ok": False, "error": "Cannot modify your own account"})
+                    continue
+
+                if item.action in ["activate", "suspend", "ban"]:
+                    status = "active" if item.action == "activate" else ("suspended" if item.action == "suspend" else "banned")
+                    DB["users"].update_one({"username": item.username}, {"$set": {"status": status, "updated_at": datetime.utcnow()}})
+                    results.append({"username": item.username, "action": item.action, "ok": True})
+                elif item.action == "delete":
+                    DB["users"].update_one({"username": item.username}, {"$set": {"status": "deleted", "deleted_at": datetime.utcnow()}})
+                    results.append({"username": item.username, "action": "delete", "ok": True})
+                elif item.action == "set_role":
+                    if not item.value:
+                        raise ValueError("Missing role value")
+                    DB["users"].update_one({"username": item.username}, {"$set": {"role": item.value, "updated_at": datetime.utcnow()}})
+                    results.append({"username": item.username, "action": "set_role", "ok": True, "role": item.value})
+                else:
+                    results.append({"username": item.username, "action": item.action, "ok": False, "error": "unsupported action"})
+            except Exception as ie:
+                results.append({"username": item.username, "action": item.action, "ok": False, "error": str(ie)})
+
+        # Log bulk action
+        DB["admin_actions"].insert_one({
+            "admin_username": acting_admin,
+            "action": "bulk_user_actions",
+            "items": [i.model_dump() for i in request.items],
+            "timestamp": datetime.utcnow()
+        })
+
+        return {"results": results}
+    except Exception as e:
+        logger.error(f"Bulk user actions failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/audit-logs")
+async def get_audit_logs(
+    username: Optional[str] = None,
+    category: Optional[str] = None,
+    days: int = 30,
+    limit: int = 100,
+    skip: int = 0,
+    admin_user = Depends(verify_admin)
+):
+    """Query admin actions / audit events. Uses `admin_actions` collection by default."""
+    try:
+        query = {}
+        if username:
+            query["target_user"] = username
+        if days:
+            since = datetime.utcnow() - timedelta(days=days)
+            query["timestamp"] = {"$gte": since}
+
+        # Apply category filter in the MongoDB query when possible,
+        # so skip/limit paginate the correct result set.
+        if category:
+            from app.utils.audit_log import categorize_audit_action as _cat
+            # Pre-filter by known action keywords that map to each category
+            category_action_patterns = {
+                "auth": {"$regex": "login|session|sign.in", "$options": "i"},
+                "security": {"$regex": "password|2fa|security.alert|encrypt", "$options": "i"},
+                "account": {"$regex": "profile|account|api.key|billing", "$options": "i"},
+            }
+            if category in category_action_patterns:
+                query["action"] = category_action_patterns[category]
+
+        cursor = DB["admin_actions"].find(query).sort("timestamp", -1).skip(skip).limit(limit)
+        entries = list(cursor)
+
+        # Normalize, categorize, and clean _id for JSON safety
+        for e in entries:
+            e["category"] = categorize_audit_action(e.get("action", ""))
+            e["id"] = str(e.pop("_id", ""))
+            if isinstance(e.get("timestamp"), datetime):
+                e["timestamp"] = e["timestamp"].isoformat()
+
+        # Post-filter by category for the "other" bucket or edge cases
+        # not captured by the regex pre-filter
+        if category:
+            entries = [e for e in entries if e.get("category") == category]
+
+        # Dedupe similar entries
+        entries = dedupe_audit_entries(entries, window_minutes=30)
+
+        # Get total count for the filtered query (before skip/limit)
+        total_count = DB["admin_actions"].count_documents(query)
+
+        return {"total": total_count, "entries": entries}
+    except Exception as e:
+        logger.error(f"Audit logs query failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/audit-logs/export")
+async def export_audit_logs(
+    username: Optional[str] = None,
+    days: int = 30,
+    format: str = "csv",
+    admin_user = Depends(verify_admin)
+):
+    """Export audit logs as CSV (simple implementation)."""
+    try:
+        query = {}
+        if username:
+            query["target_user"] = username
+        if days:
+            since = datetime.utcnow() - timedelta(days=days)
+            query["timestamp"] = {"$gte": since}
+
+        cursor = DB["admin_actions"].find(query).sort("timestamp", -1)
+        rows = []
+        for e in cursor:
+            rows.append({
+                "timestamp": e.get("timestamp").isoformat() if isinstance(e.get("timestamp"), datetime) else str(e.get("timestamp")),
+                "admin_username": e.get("admin_username"),
+                "action": e.get("action"),
+                "target_user": e.get("target_user", ""),
+                "details": str(e.get("items", e.get("changes", "")))
+            })
+
+        if format.lower() != "csv":
+            raise HTTPException(status_code=400, detail="Only csv export supported")
+
+        output = io.StringIO()
+        writer = csv.DictWriter(output, fieldnames=["timestamp", "admin_username", "action", "target_user", "details"]) 
+        writer.writeheader()
+        for r in rows:
+            writer.writerow(r)
+
+        content = output.getvalue()
+        headers = {"Content-Disposition": f"attachment; filename=admin_audit_{datetime.utcnow().strftime('%Y%m%d')}.csv"}
+        return Response(content=content, media_type="text/csv", headers=headers)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Export audit logs failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/recent-activity")

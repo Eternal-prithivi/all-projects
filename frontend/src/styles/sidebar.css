@@ -1,169 +1,276 @@
-/* src/styles/sidebar.css — Polished Sidebar */
+/* sidebar.css — Mission Control Navigation Rail */
 
-.sidebar {
-  background: linear-gradient(180deg, #080808 0%, #000000 100%);
+/* ========================================
+   NAVIGATION RAIL — 56px collapsed, 220px expanded
+   ======================================== */
+.nav-rail {
+  width: 56px;
+  height: 100vh;
+  background: linear-gradient(180deg, #0a0a0a 0%, #050505 100%);
   border-right: 1px solid var(--border-subtle);
-  padding: 1.75rem 1.5rem;
   display: flex;
   flex-direction: column;
-  height: 100vh;
+  align-items: center;
+  padding: 0.75rem 0;
   position: sticky;
   top: 0;
-  overflow-y: auto;
-  overflow-x: hidden;
-}
-
-/* ========================================
-   LOGO / HEADER
-   ======================================== */
-.sidebar-header {
-  text-align: center;
-  margin-bottom: var(--space-2xl);
-  animation: fadeIn var(--duration-slow) var(--ease-out);
-}
-
-.sidebar-header h3 {
-  font-size: 1.85rem;
-  font-weight: 700;
-  background: linear-gradient(135deg, #ffd700, #d4af37);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  letter-spacing: -0.02em;
-}
-
-/* ========================================
-   NAVIGATION
-   ======================================== */
-.sidebar-nav {
-  flex-grow: 1;
-}
-
-.sidebar-nav ul {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-}
-
-/* Section divider labels */
-.sidebar-nav .nav-section-label {
-  font-size: 0.65rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: var(--text-muted);
-  padding: var(--space-lg) var(--space-md) var(--space-sm);
-  opacity: 0.6;
-}
-
-.sidebar-nav li a {
-  display: flex;
-  align-items: center;
-  gap: 0.85rem;
-  color: #888;
-  text-decoration: none;
-  font-size: 0.95rem;
-  font-weight: 500;
-  padding: 0.8rem 1.15rem;
-  border-radius: var(--radius-md);
-  margin-bottom: 3px;
-  position: relative;
-  transition: all var(--duration-normal) var(--ease-out);
+  z-index: 100;
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   overflow: hidden;
-}
-
-/* Hover gradient overlay */
-.sidebar-nav li a::before {
-  content: '';
-  position: absolute;
-  top: 0; left: 0; right: 0; bottom: 0;
-  background: linear-gradient(90deg, rgba(212, 175, 55, 0.08), transparent);
-  opacity: 0;
-  transition: opacity var(--duration-normal) var(--ease-out);
-  z-index: -1;
-}
-
-.sidebar-nav li a:hover {
-  color: var(--text-primary);
-  transform: translateX(3px);
-}
-
-.sidebar-nav li a:hover::before {
-  opacity: 1;
-}
-
-/* Active state */
-.sidebar-nav li a.active {
-  background: rgba(212, 175, 55, 0.07);
-  color: var(--gold-primary);
-  font-weight: 600;
-  box-shadow: inset 0 0 0 1px rgba(212, 175, 55, 0.15);
-}
-
-.sidebar-nav li a.active::after {
-  content: "";
-  position: absolute;
-  left: 0;
-  top: 50%;
-  transform: translateY(-50%);
-  height: 55%;
-  width: 3px;
-  background: var(--gold-primary);
-  border-radius: 0 3px 3px 0;
-  box-shadow: 0 0 12px rgba(212, 175, 55, 0.5);
-}
-
-.sidebar-icon {
-  font-size: 1.25rem;
   flex-shrink: 0;
-  transition: transform var(--duration-normal) var(--ease-spring);
 }
 
-.sidebar-nav li a:hover .sidebar-icon {
-  transform: scale(1.1);
+.nav-rail:hover {
+  width: 220px;
 }
 
 /* ========================================
-   USER PROFILE SECTION
+   LOGO
    ======================================== */
-.user-profile {
-  padding-top: var(--space-lg);
-  border-top: 1px solid var(--border-subtle);
+.rail-logo {
+  width: 100%;
+  padding: 0.5rem 0 1.25rem 0;
   display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  animation: fadeInUp var(--duration-slow) var(--ease-out) 200ms both;
+  justify-content: center;
 }
 
-.user-avatar {
-  width: 38px;
-  height: 38px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, var(--gold-primary), var(--gold-dark));
+.rail-logo a {
+  text-decoration: none;
+}
+
+.rail-logo-mark {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-weight: 600;
-  font-size: 1rem;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #ffd700, var(--gold-primary));
   color: #000;
+  font-family: "Outfit", "Inter", sans-serif;
+  font-size: 1.2rem;
+  font-weight: 800;
+  transition: transform var(--duration-normal) var(--ease-spring),
+              box-shadow var(--duration-normal) var(--ease-out);
+}
+
+.rail-logo-mark:hover {
+  transform: scale(1.08);
+  box-shadow: 0 4px 20px rgba(212, 175, 55, 0.3);
+}
+
+/* ========================================
+   NAVIGATION LINKS
+   ======================================== */
+.rail-nav {
+  flex: 1;
+  width: 100%;
+  padding: 0.5rem 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.rail-nav ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+}
+
+.rail-link {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 0.85rem 0;
+  margin: 0 0.5rem;
+  padding-left: calc((56px - 20px) / 2 - 0.5rem);
+  color: var(--text-muted);
+  text-decoration: none;
+  border-radius: var(--radius-sm);
+  transition: all var(--duration-normal) var(--ease-out);
+  position: relative;
+  white-space: nowrap;
+  min-height: 44px;
+}
+
+.rail-link:hover {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+/* Active state — gold accent bar */
+.rail-link.active {
+  color: var(--gold-primary);
+  background: rgba(212, 175, 55, 0.06);
+}
+
+.rail-link.active::before {
+  content: '';
+  position: absolute;
+  left: -0.5rem;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 20px;
+  background: var(--gold-primary);
+  border-radius: 0 3px 3px 0;
+  box-shadow: 0 0 8px rgba(212, 175, 55, 0.4);
+}
+
+/* ========================================
+   ICON & LABEL
+   ======================================== */
+.rail-link-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+}
+
+.rail-icon {
+  width: 20px;
+  height: 20px;
+}
+
+.rail-link-label {
+  font-size: 0.85rem;
+  font-weight: 500;
+  opacity: 0;
+  transform: translateX(-8px);
+  transition: opacity 0.25s ease, transform 0.25s ease;
+  pointer-events: none;
+}
+
+/* Show labels on rail hover */
+.nav-rail:hover .rail-link-label {
+  opacity: 1;
+  transform: translateX(0);
+  pointer-events: auto;
+}
+
+/* ========================================
+   BOTTOM SECTION (Help + User)
+   ======================================== */
+.rail-bottom {
+  width: 100%;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--border-subtle);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* User avatar in rail */
+.rail-avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--gold-primary), #b8860b);
+  color: #000;
+  font-size: 0.75rem;
+  font-weight: 700;
   flex-shrink: 0;
   transition: box-shadow var(--duration-normal) var(--ease-out);
 }
 
-.user-avatar:hover {
-  box-shadow: 0 0 12px rgba(212, 175, 55, 0.4);
+.rail-link-user:hover .rail-avatar {
+  box-shadow: 0 0 12px rgba(212, 175, 55, 0.3);
 }
 
-.user-info h4 {
-  color: var(--text-primary);
-  font-weight: 600;
-  font-size: 0.9rem;
-  margin: 0;
-  line-height: 1.3;
+.rail-link-user .rail-link-label {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
 }
 
-.user-info p {
-  color: var(--text-muted);
-  font-size: 0.75rem;
-  margin: 0;
+/* ========================================
+   MOBILE — Bottom Tab Bar
+   ======================================== */
+@media (max-width: 768px) {
+  .nav-rail {
+    width: 100%;
+    min-height: auto;
+    height: 56px;
+    flex-direction: row;
+    position: fixed;
+    bottom: 0;
+    top: auto;
+    left: 0;
+    right: 0;
+    border-right: none;
+    border-top: 1px solid var(--border-subtle);
+    padding: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+    z-index: 200;
+    background: rgba(5, 5, 5, 0.95);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+  }
+
+  .nav-rail:hover {
+    width: 100%;
+  }
+
+  .rail-logo {
+    display: none;
+  }
+
+  .rail-nav {
+    flex: 1;
+    padding: 0;
+  }
+
+  .rail-nav ul {
+    flex-direction: row;
+    justify-content: space-around;
+    align-items: center;
+    height: 56px;
+    gap: 0;
+  }
+
+  .rail-link {
+    flex-direction: column;
+    padding: 0.4rem;
+    margin: 0;
+    padding-left: 0;
+    gap: 0.2rem;
+    min-height: auto;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .rail-link.active::before {
+    display: none;
+  }
+
+  .rail-link.active::after {
+    content: '';
+    position: absolute;
+    top: -1px;
+    left: 25%;
+    right: 25%;
+    height: 2px;
+    background: var(--gold-primary);
+    border-radius: 0 0 2px 2px;
+  }
+
+  .rail-link-label {
+    opacity: 1;
+    transform: none;
+    font-size: 0.6rem;
+    pointer-events: auto;
+  }
+
+  .rail-bottom {
+    display: none;
+  }
 }

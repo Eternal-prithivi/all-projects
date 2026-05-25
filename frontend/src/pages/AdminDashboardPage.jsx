@@ -1,4 +1,16 @@
-import React, { useState, useEffect } from 'react';
+// =============================================================================
+// PAGE: AdminDashboardPage.jsx  (405 lines)
+// ROUTE: /admin/dashboard
+// PURPOSE: Platform admin panel — list all users, change roles, ban/unban, delete users,
+//          bulk operations, view audit log + export CSV, platform-wide stats
+// API: Uses api (default import) → /admin/dashboard, /admin/users, /audit-logs
+// GATE: Only accessible if user.role === "admin" (enforced by ProtectedRoute + require_admin in backend)
+// DO NOT:
+//   - Use apiClient here — this page uses the default api import (no prefix difference)
+//   - Remove the role check on render — always check user.role === "admin" before showing admin UI
+//   - Allow admin to delete/ban/demote themselves — backend guards this, keep frontend check too
+// =============================================================================
+import React, { useCallback, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../api';
 import { toast } from 'react-toastify';
@@ -20,11 +32,7 @@ const AdminDashboardPage = () => {
   const [selectedTab, setSelectedTab] = useState('overview');
   const [usersPagination, setUsersPagination] = useState({ skip: 0, limit: 10, total: 0 });
 
-  useEffect(() => {
-    fetchAdminData();
-  }, []);
-
-  const fetchAdminData = async () => {
+  const fetchAdminData = useCallback(async () => {
     setLoading(true);
     try {
       const [statsRes, usersRes, activityRes, healthRes] = await Promise.all([
@@ -39,9 +47,9 @@ const AdminDashboardPage = () => {
       setUsersPagination({ skip: 0, limit: 10, total: usersRes.data.total });
       setActivities(activityRes.data.activities);
       setSystemHealth(healthRes.data);
-    } catch (error) {
-      console.error('Admin data fetch error:', error);
-      if (error.response?.status === 403) {
+    } catch (_error) {
+      console.error('Admin data fetch error:', _error);
+      if (_error.response?.status === 403) {
         toast.error('Access denied. Admin privileges required.');
         navigate('/dashboard');
       } else {
@@ -50,7 +58,11 @@ const AdminDashboardPage = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [navigate]);
+
+  useEffect(() => {
+    fetchAdminData();
+  }, [fetchAdminData]);
 
   const handleUserStatusUpdate = async (username, newStatus) => {
     if (!window.confirm(`Are you sure you want to ${newStatus} user: ${username}?`)) {
@@ -63,8 +75,8 @@ const AdminDashboardPage = () => {
       // Refresh users list
       const usersRes = await api.get(`/admin/users?skip=${usersPagination.skip}&limit=${usersPagination.limit}`);
       setUsers(usersRes.data.users);
-    } catch (error) {
-      toast.error(`Failed to update user status: ${error.response?.data?.detail || 'Unknown error'}`);
+    } catch (_error) {
+      toast.error(`Failed to update user status: ${_error.response?.data?.detail || 'Unknown error'}`);
     }
   };
 
@@ -73,7 +85,7 @@ const AdminDashboardPage = () => {
       const usersRes = await api.get(`/admin/users?skip=0&limit=10&search=${searchTerm}`);
       setUsers(usersRes.data.users);
       setUsersPagination({ skip: 0, limit: 10, total: usersRes.data.total });
-    } catch (error) {
+    } catch {
       toast.error('Search failed');
     }
   };
@@ -83,7 +95,7 @@ const AdminDashboardPage = () => {
       const usersRes = await api.get(`/admin/users?skip=${newSkip}&limit=${usersPagination.limit}&search=${searchTerm}`);
       setUsers(usersRes.data.users);
       setUsersPagination({ ...usersPagination, skip: newSkip });
-    } catch (error) {
+    } catch {
       toast.error('Failed to load users');
     }
   };

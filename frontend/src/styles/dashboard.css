@@ -1,4 +1,4 @@
-/* src/styles/dashboard.css — Premium Dashboard Layout */
+/* src/styles/dashboard.css — Mission Control Layout */
 
 /* Accessibility: Skip to main content link */
 .skip-to-main {
@@ -20,20 +20,14 @@
 }
 
 /* ========================================
-   DASHBOARD PAGE LAYOUT
+   DASHBOARD PAGE LAYOUT — Rail + Content
    ======================================== */
 .dashboard-page {
   display: flex;
   min-height: 100vh;
   background-color: var(--bg-base);
   color: var(--text-primary);
-  font-family: "Inter", sans-serif;
-}
-
-.sidebar {
-  width: 280px;
-  flex-shrink: 0;
-  align-self: flex-start;
+  font-family: "Inter", "Outfit", sans-serif;
 }
 
 .dashboard-main {
@@ -41,19 +35,25 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  min-width: 0; /* Prevent flex overflow */
 }
 
 /* ========================================
-   HEADER — Premium Bar
+   HEADER — Glassmorphism Command Bar
    ======================================== */
 .dashboard-header {
-  padding: 0.85rem 2.5rem;
-  background-color: var(--bg-surface);
+  padding: 0.6rem 2rem;
+  background: rgba(3, 3, 3, 0.7);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
   border-bottom: 1px solid var(--border-subtle);
   display: flex;
   justify-content: space-between;
   align-items: center;
-  position: relative;
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  gap: 1rem;
 }
 
 /* Gold shimmer accent line at bottom of header */
@@ -74,27 +74,96 @@
   );
 }
 
-.header-title {
+/* Header Brand */
+.header-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.header-brand-text {
+  font-family: "Outfit", "Inter", sans-serif;
+  font-weight: 700;
   font-size: 1.1rem;
+  background: linear-gradient(135deg, #ffd700, var(--gold-primary));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.header-brand-badge {
+  font-size: 0.65rem;
   font-weight: 600;
-  color: var(--text-primary);
-  letter-spacing: -0.01em;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 0.15rem 0.5rem;
+  border-radius: var(--radius-full);
+  background: rgba(212, 175, 55, 0.1);
+  color: var(--gold-primary);
+  border: 1px solid var(--gold-border);
+}
+
+/* Header Search Trigger */
+.header-search-trigger {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.45rem 1rem;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-full);
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all var(--duration-normal) var(--ease-out);
+  min-width: 220px;
+  max-width: 400px;
+  flex: 1;
+}
+
+.header-search-trigger:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: var(--border-default);
+  color: var(--text-secondary);
+}
+
+.header-search-trigger svg {
+  flex-shrink: 0;
+  opacity: 0.5;
+}
+
+.header-search-trigger span {
+  flex: 1;
+  text-align: left;
+}
+
+.header-search-trigger kbd {
+  font-family: "Inter", sans-serif;
+  font-size: 0.7rem;
+  padding: 0.1rem 0.4rem;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-muted);
+  flex-shrink: 0;
 }
 
 .header-actions {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  gap: 0.5rem;
+  flex-shrink: 0;
 }
 
 .header-help-btn {
-  width: 34px;
-  height: 34px;
+  width: 30px;
+  height: 30px;
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid var(--border-subtle);
   color: var(--text-secondary);
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   font-weight: 600;
   cursor: pointer;
   transition: all var(--duration-normal) var(--ease-out);
@@ -114,7 +183,7 @@
    BREADCRUMBS
    ======================================== */
 .dashboard-breadcrumbs-wrapper {
-  padding: 0 2.5rem;
+  padding: 0 2rem;
   background-color: var(--bg-surface);
   border-bottom: 1px solid var(--border-subtle);
 }
@@ -123,90 +192,68 @@
    CONTENT AREA
    ======================================== */
 .dashboard-content {
-  padding: 2rem 2.5rem;
+  padding: 1.5rem 2rem;
   overflow-y: auto;
   flex-grow: 1;
   animation: fadeIn var(--duration-normal) var(--ease-out);
-}
-
-/* ========================================
-   WELCOME MESSAGE
-   ======================================== */
-.welcome-message h2 {
-  font-size: clamp(1.5rem, 3vw, 2.25rem);
-  letter-spacing: -0.02em;
-}
-
-.welcome-message p {
-  color: var(--text-muted);
-  margin-bottom: var(--space-xl);
-}
-
-.stats-grid {
-  display: grid;
-  gap: var(--space-lg);
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  background-image: radial-gradient(circle at 80% 10%, rgba(212, 175, 55, 0.03) 0%, transparent 40%);
 }
 
 /* ========================================
    RESPONSIVE
    ======================================== */
 @media (max-width: 1024px) {
-  .sidebar {
-    width: 240px;
-  }
-  
   .dashboard-content {
-    padding: 1.5rem 2rem;
+    padding: 1.25rem 1.5rem;
+  }
+
+  .header-search-trigger {
+    min-width: 160px;
   }
 }
 
 @media (max-width: 768px) {
   .dashboard-page {
     flex-direction: column;
+    padding-bottom: 56px; /* Space for mobile tab bar */
   }
-  
-  .sidebar {
-    width: 100%;
-    position: sticky;
-    top: 0;
-    z-index: 100;
-  }
-  
+
   .dashboard-header {
-    padding: 0.75rem 1.25rem;
-    flex-wrap: wrap;
-    gap: 0.75rem;
+    padding: 0.5rem 1rem;
   }
-  
-  .header-title {
-    font-size: 1rem;
+
+  .header-brand {
+    display: none; /* Logo is in the tab bar */
   }
-  
+
+  .header-search-trigger {
+    min-width: auto;
+    max-width: none;
+  }
+
+  .header-search-trigger kbd {
+    display: none;
+  }
+
   .dashboard-breadcrumbs-wrapper {
-    padding: 0 1.25rem;
+    padding: 0 1rem;
   }
-  
+
   .dashboard-content {
-    padding: 1.25rem;
-  }
-  
-  .stats-grid {
-    grid-template-columns: 1fr;
+    padding: 1rem;
   }
 }
 
 @media (max-width: 480px) {
   .dashboard-header {
-    padding: 0.6rem 1rem;
+    padding: 0.4rem 0.75rem;
   }
-  
+
   .dashboard-content {
-    padding: 1rem;
+    padding: 0.75rem;
   }
-  
+
   .header-actions {
-    width: 100%;
-    justify-content: flex-end;
+    gap: 0.25rem;
   }
 }

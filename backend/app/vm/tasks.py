@@ -8,13 +8,12 @@ Celery background tasks for VM management.
 
 from app.celery_worker import celery_app
 from app.vm.metrics_collector import VMMetricsCollector
-from app.vm.manager import release_vm_assignment, get_cluster_health
+from app.vm.manager import CLUSTER_VMS, release_vm_assignment, get_cluster_health
+from app.vm.models import ClusterType
 from app.database.mongo_client import get_database
-from app.utils.config import settings
 from app.utils.logger import setup_logger
 from datetime import datetime, timedelta
 import asyncio
-from typing import List
 
 logger = setup_logger(__name__)
 DB = get_database()
@@ -30,38 +29,36 @@ def collect_vm_metrics_task():
     """
     logger.info(f"Starting VM metrics collection")
     
-    collector = VMMetricsCollector(
-        project_id=settings.GCP_PROJECT_ID,
-        zone=settings.GCP_ZONE
-    )
+    collector = VMMetricsCollector()
     
-    # List of all VMs to monitor
-    all_vms = [
-        "general-vm-1", "general-vm-2",
-        "storage-vm-1", "storage-vm-2"
-    ]
+    all_vms = {
+        vm_name: cluster_type
+        for cluster_type, vm_names in CLUSTER_VMS.items()
+        for vm_name in vm_names
+    }
     
     collected_count = 0
     failed_count = 0
     
-    for vm_name in all_vms:
+    for vm_name, cluster_type in all_vms.items():
         try:
+            active_users = vm_assignments_collection.count_documents({
+                "vm_name": vm_name,
+                "status": {"$in": ["active", "ACTIVE"]},
+            })
+            last_started = datetime.utcnow() if active_users > 0 else None
+
             # Collect metrics asynchronously
-            metrics = asyncio.run(collector.collect_all_metrics(vm_name))
+            metrics = asyncio.run(collector.collect_all_metrics(
+                vm_name=vm_name,
+                cluster_type=cluster_type,
+                active_users=active_users,
+                last_started=last_started,
+            ))
             
             # Store in MongoDB
-            metrics_doc = {
-                "vm_name": metrics.vm_name,
-                "cpu_usage": metrics.cpu_usage,
-                "memory_usage": metrics.memory_usage,
-                "disk_io_mb": metrics.disk_io_mb,
-                "network_io_mb": metrics.network_io_mb,
-                "active_users": metrics.active_users,
-                "uptime_hours": metrics.uptime_hours,
-                "estimated_cost_usd": metrics.estimated_cost_usd,
-                "status": metrics.status.value,
-                "collected_at": datetime.utcnow()
-            }
+            metrics_doc = metrics.model_dump(mode="python")
+            metrics_doc["collected_at"] = datetime.utcnow()
             
             vm_metrics_collection.insert_one(metrics_doc)
             collected_count += 1
@@ -144,7 +141,7 @@ def cluster_health_check_task():
     
     alerts = []
     
-    for cluster_type in [ClusterType.GENERAL, ClusterType.STORAGE]:
+    for cluster_type in CLUSTER_VMS:
         try:
             health = asyncio.run(get_cluster_health(cluster_type))
             

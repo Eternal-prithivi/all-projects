@@ -1,6 +1,18 @@
-"""
-User Profile Management Routes
-"""
+# =============================================================================
+# MODULE: routes_profile.py  (534 lines)
+# PURPOSE: User profile CRUD — update display name/bio/avatar, change password,
+#          session management (list/revoke), activity log, account deletion
+# READS FROM:  users, sessions, activity_log collections
+# WRITES TO:   users, sessions, activity_log collections
+# DEPENDS ON:  auth_utils.get_current_user(), S3 for avatar uploads
+# MOUNTED AT:  /api/profile → me, update, change-password, sessions,
+#              activity-log, delete-account, avatar
+# DO NOT:
+#   - Allow password change without verifying the current password first
+#   - Delete the last session (current session) via revoke — guard against it
+#   - Return hashed_password in any profile response
+# =============================================================================
+
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from pydantic import BaseModel, EmailStr
 from typing import Optional, List
@@ -8,11 +20,12 @@ from datetime import datetime
 from ..users.routes_users import get_current_user
 from ..users.user_model import User
 from ..database.mongo_client import get_database
-from passlib.context import CryptContext
+from app.auth.auth_utils import verify_password, get_password_hash
+from app.auth.password_reset_service import normalize_phone_e164
+from app.utils.audit_log import categorize_audit_action
 
 router = APIRouter(prefix="/profile", tags=["Profile"])
 DB = get_database()
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
 class ProfileUpdate(BaseModel):
@@ -20,6 +33,8 @@ class ProfileUpdate(BaseModel):
     email: Optional[EmailStr] = None
     full_name: Optional[str] = None
     phone: Optional[str] = None
+    recovery_phone: Optional[str] = None
+    recovery_email: Optional[EmailStr] = None
     company: Optional[str] = None
 
 
@@ -28,6 +43,8 @@ class ProfileResponse(BaseModel):
     email: str
     full_name: Optional[str] = None
     phone: Optional[str] = None
+    recovery_phone: Optional[str] = None
+    recovery_email: Optional[str] = None
     company: Optional[str] = None
     role: str
     profile_picture: Optional[str] = None
@@ -60,6 +77,25 @@ class ActivityLogResponse(BaseModel):
     description: str
     timestamp: datetime
     ip: Optional[str] = None
+    category: str = "other"
+
+
+class ActivityLogPageResponse(BaseModel):
+    items: List[ActivityLogResponse]
+    total: int
+    limit: int
+    skip: int
+    has_more: bool
+    period_days: int
+
+
+class ActivitySummaryResponse(BaseModel):
+    period_days: int
+    total_events: int
+    sign_ins: int
+    security_events: int
+    account_events: int
+    recent: List[ActivityLogResponse]
 
 
 @router.put("/change-password")
@@ -75,20 +111,19 @@ async def change_password(
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
         
-        # Verify current password
-        if not pwd_context.verify(password_data.current_password, user.get("password", "")):
+        stored_hash = user.get("hashed_password") or user.get("password")
+        if not stored_hash or not verify_password(password_data.current_password, stored_hash):
             raise HTTPException(status_code=400, detail="Current password is incorrect")
-        
-        # Hash new password
-        hashed_password = pwd_context.hash(password_data.new_password)
-        
-        # Update password
+
+        new_hashed = get_password_hash(password_data.new_password)
+
         users_collection.update_one(
             {"username": current_user.username},
             {"$set": {
-                "password": hashed_password,
+                "hashed_password": new_hashed,
                 "updated_at": datetime.utcnow()
-            }}
+            },
+             "$unset": {"password": ""}}
         )
         
         # Log activity
@@ -122,6 +157,8 @@ async def get_profile(current_user: User = Depends(get_current_user)):
             email=user.get("email", "user@example.com"),
             full_name=user.get("full_name", ""),
             phone=user.get("phone", ""),
+            recovery_phone=user.get("recovery_phone", ""),
+            recovery_email=user.get("recovery_email", ""),
             company=user.get("company", ""),
             role=user.get("role", "Admin"),
             profile_picture=user.get("profile_picture"),
@@ -140,28 +177,51 @@ async def update_profile(
     try:
         users_collection = DB["users"]
         
-        # Build update data (only include non-None values)
-        update_data = {k: v for k, v in profile_data.model_dump().items() if v is not None}
-        
+        raw = profile_data.model_dump(exclude_unset=True)
+        update_data = {}
+        for key, value in raw.items():
+            if key in ("phone", "recovery_phone"):
+                if value is None or (isinstance(value, str) and not value.strip()):
+                    update_data[key] = ""
+                    continue
+                normalized = normalize_phone_e164(value.strip())
+                if not normalized:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Invalid {key.replace('_', ' ')}. Use international format, e.g. +919876543210",
+                    )
+                update_data[key] = normalized
+                continue
+            if key == "recovery_email" and isinstance(value, str) and not value.strip():
+                update_data[key] = ""
+                continue
+            if value is not None:
+                update_data[key] = value
+
         if not update_data:
             raise HTTPException(status_code=400, detail="No data to update")
         
-        # Check if username or email already exists (if being updated)
-        if "username" in update_data:
-            existing_user = users_collection.find_one({
-                "username": update_data["username"],
-                "username": {"$ne": current_user.username}
-            })
+        # Check uniqueness only when username/email actually change
+        if "username" in update_data and update_data["username"] != current_user.username:
+            existing_user = users_collection.find_one({"username": update_data["username"]})
             if existing_user:
                 raise HTTPException(status_code=400, detail="Username already taken")
-        
+
         if "email" in update_data:
             existing_email = users_collection.find_one({
                 "email": update_data["email"],
-                "username": {"$ne": current_user.username}
+                "username": {"$ne": current_user.username},
             })
             if existing_email:
                 raise HTTPException(status_code=400, detail="Email already in use")
+
+        if update_data.get("recovery_email"):
+            existing_recovery = users_collection.find_one({
+                "recovery_email": update_data["recovery_email"],
+                "username": {"$ne": current_user.username},
+            })
+            if existing_recovery:
+                raise HTTPException(status_code=400, detail="Recovery email already in use")
         
         # Update user profile
         update_data["updated_at"] = datetime.utcnow()
@@ -313,11 +373,23 @@ async def get_active_sessions(current_user: User = Depends(get_current_user)):
         # Map to response model
         session_list = []
         for session in sessions:
+            device = session.get("device") or "Web browser"
+            if device in ("Unknown Device", "Unknown"):
+                device = "Web browser"
+
+            location = session.get("location") or "Local network"
+            if location in ("Unknown Location", "Unknown"):
+                location = "Local network"
+
+            ip = session.get("ip_address") or session.get("ip") or "—"
+            if ip in ("0.0.0.0", "Unknown"):
+                ip = "—"
+
             session_list.append(SessionResponse(
                 id=str(session["_id"]),
-                device=session.get("device", "Unknown Device"),
-                location=session.get("location", "Unknown Location"),
-                ip=session.get("ip_address", "0.0.0.0"),
+                device=device,
+                location=location,
+                ip=ip,
                 last_active=session.get("last_active", session.get("created_at", datetime.utcnow())),
                 current=session.get("is_current", False)
             ))
@@ -334,13 +406,16 @@ async def terminate_session(
 ):
     """Terminate a specific session"""
     try:
-        from bson import ObjectId
-        
         sessions_collection = DB["sessions"]
-        
-        # Find the session
-        session = sessions_collection.find_one({"_id": ObjectId(session_id)})
-        
+
+        session = sessions_collection.find_one({"_id": session_id})
+        if not session:
+            from bson import ObjectId
+            try:
+                session = sessions_collection.find_one({"_id": ObjectId(session_id)})
+            except Exception:
+                session = None
+
         if not session:
             raise HTTPException(status_code=404, detail="Session not found")
         
@@ -353,7 +428,7 @@ async def terminate_session(
             raise HTTPException(status_code=400, detail="Cannot terminate current session. Please logout instead.")
         
         # Delete the session
-        sessions_collection.delete_one({"_id": ObjectId(session_id)})
+        sessions_collection.delete_one({"_id": session["_id"]})
         
         # Log activity
         activity_collection = DB["activity_log"]
@@ -372,32 +447,100 @@ async def terminate_session(
         raise HTTPException(status_code=500, detail=f"Failed to terminate session: {str(e)}")
 
 
-@router.get("/activity", response_model=List[ActivityLogResponse])
-async def get_activity_log(
-    limit: int = 10,
-    current_user: User = Depends(get_current_user)
+def _map_activity_doc(activity: dict) -> ActivityLogResponse:
+    action = activity.get("action", "Unknown Action")
+    return ActivityLogResponse(
+        action=action,
+        description=activity.get("description", ""),
+        timestamp=activity.get("timestamp", datetime.utcnow()),
+        ip=activity.get("ip"),
+        category=activity.get("category") or categorize_audit_action(action),
+    )
+
+
+@router.get("/activity/summary", response_model=ActivitySummaryResponse)
+async def get_activity_summary(
+    period_days: int = 30,
+    current_user: User = Depends(get_current_user),
 ):
-    """Get recent activity log for the current user"""
+    """
+    Compact summary for Security Settings — stats + last few notable events only.
+    """
+    from app.utils.audit_log import (
+        build_activity_query,
+        categorize_audit_action,
+        dedupe_audit_entries,
+    )
+
     try:
+        period_days = max(7, min(period_days, 90))
         activity_collection = DB["activity_log"]
-        
-        # Find recent activities for the user
-        activities = list(
-            activity_collection.find({"username": current_user.username})
-            .sort("timestamp", -1)
-            .limit(limit)
+        query = build_activity_query(current_user.username, days=period_days)
+
+        raw = list(activity_collection.find(query).sort("timestamp", -1).limit(200))
+        deduped = dedupe_audit_entries(raw, window_minutes=30)
+
+        sign_ins = sum(1 for e in deduped if categorize_audit_action(e.get("action", "")) == "auth")
+        security_events = sum(
+            1 for e in deduped if categorize_audit_action(e.get("action", "")) == "security"
         )
-        
-        # Map to response model
-        activity_list = []
-        for activity in activities:
-            activity_list.append(ActivityLogResponse(
-                action=activity.get("action", "Unknown Action"),
-                description=activity.get("description", ""),
-                timestamp=activity.get("timestamp", datetime.utcnow()),
-                ip=activity.get("ip")
-            ))
-        
-        return activity_list
+        account_events = sum(
+            1 for e in deduped if categorize_audit_action(e.get("action", "")) == "account"
+        )
+
+        recent_docs = deduped[:3]
+        return ActivitySummaryResponse(
+            period_days=period_days,
+            total_events=len(deduped),
+            sign_ins=sign_ins,
+            security_events=security_events,
+            account_events=account_events,
+            recent=[_map_activity_doc(a) for a in recent_docs],
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch activity summary: {str(e)}")
+
+
+@router.get("/activity", response_model=ActivityLogPageResponse)
+async def get_activity_log(
+    limit: int = 15,
+    skip: int = 0,
+    period_days: int = 30,
+    category: str = "all",
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Paginated security audit log (last 90 days max).
+    Use /activity/summary on settings pages; use this for full history views.
+    """
+    from app.utils.audit_log import (
+        build_activity_query,
+        dedupe_audit_entries,
+        filter_by_category,
+    )
+
+    try:
+        limit = max(5, min(limit, 50))
+        skip = max(0, skip)
+        period_days = max(7, min(period_days, 90))
+
+        activity_collection = DB["activity_log"]
+        query = build_activity_query(current_user.username, days=period_days)
+
+        raw = list(activity_collection.find(query).sort("timestamp", -1).limit(500))
+        deduped = dedupe_audit_entries(raw, window_minutes=30)
+        filtered = filter_by_category(deduped, category.lower())
+
+        total = len(filtered)
+        page_docs = filtered[skip : skip + limit]
+
+        return ActivityLogPageResponse(
+            items=[_map_activity_doc(a) for a in page_docs],
+            total=total,
+            limit=limit,
+            skip=skip,
+            has_more=(skip + limit) < total,
+            period_days=period_days,
+        )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch activity log: {str(e)}")

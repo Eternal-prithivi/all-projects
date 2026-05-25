@@ -1,4 +1,19 @@
+# =============================================================================
+# MODULE: optimizer.py  (115 lines)
+# PURPOSE: ML-based initial storage placement — the entry point for the analyze endpoint
+#   - get_initial_placement_recommendation() → calls storage_ensemble.py → returns tier + CSP
+#   - Takes user_priority ("balanced"/"cost"/"performance") and user_intent ("active"/"archival")
+#   - Returns: determined_tier, recommendation (csp + service_name), options_by_csp, expert_votes
+# CALLED BY: routes_storage.py → POST /api/storage/analyze
+# DEPENDS ON: ml/storage_ensemble.py (RF+XGBoost ensemble)
+# DO NOT:
+#   - Change the return dict shape — StoragePage.jsx parses options_by_csp[csp].service_name
+#   - Add hardcoded CSP overrides — let the ensemble decide based on input features
+#   - Call predict_storage_ensemble directly from routes — always go through this function
+# =============================================================================
 import re
+
+from app.ml.storage_ensemble import predict_storage_ensemble
 
 # This data structure remains the same
 STORAGE_TIERS_DATA = {
@@ -72,11 +87,23 @@ def get_initial_placement_recommendation(
     user_priority: str, user_intent: str, filename: str, file_size_mb: float
 ) -> dict:
     """
-    Runs the full analysis and returns the best recommendation, plus a full list
-    of options for the determined tier across all CSPs.
+    Runs the Phase 7 ensemble analysis and returns the best recommendation,
+    plus a full list of options for the determined tier across all CSPs.
     """
     score = calculate_initial_placement_score(user_priority, user_intent, filename, file_size_mb)
-    tier = classify_storage_tier(score)
+    rule_tier = classify_storage_tier(score)
+    file_type = get_file_type(filename)
+
+    ensemble = predict_storage_ensemble(
+        filename=filename,
+        file_size_mb=file_size_mb,
+        file_type=file_type,
+        user_priority=user_priority,
+        user_intent=user_intent,
+        rule_score=score,
+        rule_tier=rule_tier,
+    )
+    tier = ensemble["final_tier"]
     
     # Find the single best recommendation as before
     best_recommendation = select_best_csp_for_tier(tier, user_priority)
@@ -86,9 +113,16 @@ def get_initial_placement_recommendation(
     
     return {
         "analysis_score": score,
+        "rule_tier": rule_tier,
         "determined_tier": tier,
         "recommendation": best_recommendation,
+        "ensemble_confidence": ensemble["ensemble_confidence"],
+        "expert_votes": ensemble["expert_votes"],
+        "tier_scores": ensemble["tier_scores"],
+        "input_features": ensemble["input_features"],
+        "feature_vector": ensemble["feature_vector"],
+        "model_version": ensemble["model_version"],
+        "model_status": ensemble["model_status"],
         # --- NEW: Provide all options so the frontend can make smart overrides ---
         "options_by_csp": {opt['csp']: opt for opt in all_options_for_tier}
     }
-

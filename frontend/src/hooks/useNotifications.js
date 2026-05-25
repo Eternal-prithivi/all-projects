@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useMemo } from 'react';
 import {
   showLoadingNotification,
   updateToSuccess,
@@ -62,21 +62,25 @@ export const useNotifications = () => {
     updateToInfo(toastId, message, options);
   }, []);
 
-  return {
-    // Main function for API calls
-    executeWithNotification,
-    
-    // Loading notification controls
-    showLoading,
-    updateSuccess,
-    updateError,
-    updateInfo,
-    
-    // Quick notifications (no loading state)
-    success: notifySuccess,
-    error: notifyError,
-    info: notifyInfo,
-    warning: notifyWarning,
-  };
+  return useMemo(
+    () => ({
+      executeWithNotification,
+      showLoading,
+      updateSuccess,
+      updateError,
+      updateInfo,
+      success: notifySuccess,
+      error: notifyError,
+      info: notifyInfo,
+      warning: notifyWarning,
+    }),
+    [
+      executeWithNotification,
+      showLoading,
+      updateSuccess,
+      updateError,
+      updateInfo,
+    ]
+  );
 };
 

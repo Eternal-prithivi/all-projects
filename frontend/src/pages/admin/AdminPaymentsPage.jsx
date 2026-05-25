@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useState, useEffect } from 'react';
 import api from '../../api';
 import { toast } from 'react-toastify';
 import '../../styles/admin-pages.css';
@@ -13,11 +13,8 @@ const AdminPaymentsPage = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const paymentsPerPage = 20;
 
-  useEffect(() => {
-    fetchPayments();
-  }, [filter, currentPage]);
-
-  const fetchPayments = async () => {
+  const fetchPayments = useCallback(async () => {
+    setLoading(true);
     try {
       const skip = (currentPage - 1) * paymentsPerPage;
       const statusParam = filter === 'all' ? '' : `&status=${filter}`;
@@ -34,7 +31,11 @@ const AdminPaymentsPage = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [currentPage, filter]);
+
+  useEffect(() => {
+    fetchPayments();
+  }, [fetchPayments]);
 
   const handleExportCSV = () => {
     const exportData = preparePaymentsForExport(payments);

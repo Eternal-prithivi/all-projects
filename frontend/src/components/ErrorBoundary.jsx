@@ -12,20 +12,20 @@ class ErrorBoundary extends React.Component {
     };
   }
 
-  static getDerivedStateFromError(error) {
+  static getDerivedStateFromError(_error) {
     // Update state so the next render will show the fallback UI
     return { hasError: true };
   }
 
-  componentDidCatch(error, errorInfo) {
+  componentDidCatch(_error, errorInfo) {
     // Log error to console or error reporting service
-    console.error('Error caught by boundary:', error, errorInfo);
+    console.error('Error caught by boundary:', _error, errorInfo);
     
     // You can also log to an error reporting service like Sentry
     // logErrorToService(error, errorInfo);
     
     this.setState({
-      error,
+      error: _error,
       errorInfo,
     });
   }

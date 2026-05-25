@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import Footer from '../components/layout/Footer.jsx';
+import { getValidationErrorMessage, validateContactForm } from '../utils/formValidation.js';
 import '../styles/contact.css';
 
 function ContactPage() {
@@ -13,6 +14,10 @@ function ContactPage() {
     message: ''
   });
   const [loading, setLoading] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState({});
+
+  const validation = validateContactForm(formData);
+  const isSubmitDisabled = loading || !validation.isValid;
 
   const handleChange = (e) => {
     setFormData({
@@ -23,6 +28,14 @@ function ContactPage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    setFieldErrors(validation.errors);
+
+    if (!validation.isValid) {
+      toast.error(getValidationErrorMessage(validation.errors) || 'Please fix the highlighted fields.');
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -98,7 +111,14 @@ function ContactPage() {
                     onChange={handleChange}
                     placeholder="John Doe"
                     required
+                    aria-invalid={Boolean(fieldErrors.name)}
+                    aria-describedby={fieldErrors.name ? 'contact-name-error' : undefined}
                   />
+                  {fieldErrors.name && (
+                    <p className="form-field-error" id="contact-name-error" role="alert">
+                      {fieldErrors.name}
+                    </p>
+                  )}
                 </div>
 
                 <div className="form-group">
@@ -111,7 +131,14 @@ function ContactPage() {
                     onChange={handleChange}
                     placeholder="john@example.com"
                     required
+                    aria-invalid={Boolean(fieldErrors.email)}
+                    aria-describedby={fieldErrors.email ? 'contact-email-error' : undefined}
                   />
+                  {fieldErrors.email && (
+                    <p className="form-field-error" id="contact-email-error" role="alert">
+                      {fieldErrors.email}
+                    </p>
+                  )}
                 </div>
 
                 <div className="form-group">
@@ -122,6 +149,8 @@ function ContactPage() {
                     value={formData.subject}
                     onChange={handleChange}
                     required
+                    aria-invalid={Boolean(fieldErrors.subject)}
+                    aria-describedby={fieldErrors.subject ? 'contact-subject-error' : undefined}
                   >
                     <option value="general">General Inquiry</option>
                     <option value="support">Technical Support</option>
@@ -129,6 +158,11 @@ function ContactPage() {
                     <option value="feature">Feature Request</option>
                     <option value="bug">Report a Bug</option>
                   </select>
+                  {fieldErrors.subject && (
+                    <p className="form-field-error" id="contact-subject-error" role="alert">
+                      {fieldErrors.subject}
+                    </p>
+                  )}
                 </div>
 
                 <div className="form-group">
@@ -141,13 +175,20 @@ function ContactPage() {
                     placeholder="Tell us how we can help..."
                     rows="6"
                     required
+                    aria-invalid={Boolean(fieldErrors.message)}
+                    aria-describedby={fieldErrors.message ? 'contact-message-error' : undefined}
                   />
+                  {fieldErrors.message && (
+                    <p className="form-field-error" id="contact-message-error" role="alert">
+                      {fieldErrors.message}
+                    </p>
+                  )}
                 </div>
 
                 <button 
                   type="submit" 
                   className="submit-button"
-                  disabled={loading}
+                  disabled={isSubmitDisabled}
                 >
                   {loading ? 'Sending...' : 'Send Message'}
                 </button>

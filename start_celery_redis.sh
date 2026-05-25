@@ -10,6 +10,10 @@ GREEN_UL='\033[4;32m'
 RED_UL='\033[4;31m'
 
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+BACKEND_DIR="$PROJECT_ROOT/backend"
+VENV_DIR="$PROJECT_ROOT/venv"
+PYTHON_BIN="$VENV_DIR/bin/python"
+CELERY_BIN="$VENV_DIR/bin/celery"
 LOG_DIR="$PROJECT_ROOT/logs"
 mkdir -p "$LOG_DIR"
 CELERY_WORKER_LOG="$LOG_DIR/celery_worker.log"
@@ -36,45 +40,81 @@ tail_with_prefix() {
     done &
 }
 
+stop_pid() {
+    local pid="${1:-}"
+    if [ -n "$pid" ]; then
+        kill "$pid" 2>/dev/null || true
+    fi
+}
+
+get_celery_broker_url() {
+    cd "$BACKEND_DIR" && "$PYTHON_BIN" - <<'PY'
+from app.utils.config import settings
+print(settings.CELERY_BROKER_URL)
+PY
+}
+
 cleanup() {
-    echo -e "\n${RED}🛑 Shutting down Celery and Redis...${NC}"
-    pkill -P $$
+    local status=$?
+    trap - SIGINT SIGTERM EXIT
+    echo -e "\n${RED}🛑 Shutting down Celery services...${NC}"
+    pkill -P $$ 2>/dev/null || true
     echo -e "${YELLOW}Stopping Celery Worker...${NC}"
-    kill $WORKER_PID 2>/dev/null
+    stop_pid "$WORKER_PID"
     echo -e "${YELLOW}Stopping Celery Beat...${NC}"
-    kill $BEAT_PID 2>/dev/null
-    echo -e "${YELLOW}Stopping Redis (if started by script)...${NC}"
+    stop_pid "$BEAT_PID"
+    echo -e "${YELLOW}Leaving broker service running.${NC}"
     # Uncomment if you want to stop Redis started by this script
     # brew services stop redis
-    echo -e "${GREEN_UL}✅ Celery and Redis stopped${NC}"
-    exit 0
+    echo -e "${GREEN_UL}✅ Celery services stopped${NC}"
+    exit "$status"
 }
 trap cleanup SIGINT SIGTERM EXIT
 
 echo -e "${MAGENTA}╔════════════════════════════════════════════════════════════╗${NC}"
-echo -e "${MAGENTA}║   Cloud Resource Platform - Start Celery & Redis          ║${NC}"
+echo -e "${MAGENTA}║   Cloud Resource Platform - Start Celery Services         ║${NC}"
 echo -e "${MAGENTA}╚════════════════════════════════════════════════════════════╝${NC}"
 echo ""
-echo -e "${MAGENTA}🔍 Checking Redis status...${NC}"
-if ! redis-cli ping > /dev/null 2>&1; then
-    echo -e "${YELLOW}⚠️  Redis not running. Starting Redis...${NC}"
-    brew services start redis
-    sleep 2
-    if redis-cli ping > /dev/null 2>&1; then
-        echo -e "${GREEN_UL}✅ Redis started successfully${NC}"
+
+if [ ! -x "$PYTHON_BIN" ]; then
+    echo -e "${RED_UL}❌ Missing executable: $PYTHON_BIN${NC}"
+    echo -e "${YELLOW}Create the virtual environment first, then install backend requirements.${NC}"
+    exit 1
+fi
+if [ ! -x "$CELERY_BIN" ]; then
+    echo -e "${RED_UL}❌ Missing executable: $CELERY_BIN${NC}"
+    echo -e "${YELLOW}Run: $PYTHON_BIN -m pip install -r $BACKEND_DIR/requirements.txt${NC}"
+    exit 1
+fi
+
+if ! BROKER_URL="$(get_celery_broker_url)"; then
+    echo -e "${RED_UL}❌ Could not read Celery broker settings from backend configuration.${NC}"
+    exit 1
+fi
+if [[ "$BROKER_URL" == redis://* || "$BROKER_URL" == rediss://* ]]; then
+    echo -e "${MAGENTA}🔍 Redis broker detected. Checking Redis status...${NC}"
+    if ! redis-cli ping > /dev/null 2>&1; then
+        echo -e "${YELLOW}⚠️  Redis not running. Starting Redis...${NC}"
+        brew services start redis
+        sleep 2
+        if redis-cli ping > /dev/null 2>&1; then
+            echo -e "${GREEN_UL}✅ Redis started successfully${NC}"
+        else
+            echo -e "${RED_UL}❌ Failed to start Redis. Please check your installation.${NC}"
+            exit 1
+        fi
     else
-        echo -e "${RED_UL}❌ Failed to start Redis. Please check your installation.${NC}"
-        exit 1
+        echo -e "${GREEN_UL}✅ Redis is already running${NC}"
     fi
 else
-    echo -e "${GREEN_UL}✅ Redis is already running${NC}"
+    echo -e "${GREEN_UL}✅ External Celery broker configured; skipping Redis check${NC}"
 fi
 
 echo ""
 echo -e "${MAGENTA}🚀 Starting Celery Worker and Beat...${NC}"
-cd "$PROJECT_ROOT/backend"
+cd "$BACKEND_DIR"
 echo -e "${GREEN}[1/2] Starting Celery Worker...${NC}"
-celery -A app.celery_worker worker --loglevel=info > "$CELERY_WORKER_LOG" 2>&1 &
+"$CELERY_BIN" -A app.celery_worker worker --loglevel=info > "$CELERY_WORKER_LOG" 2>&1 &
 WORKER_PID=$!
 sleep 2
 if ps -p $WORKER_PID > /dev/null; then
@@ -85,7 +125,7 @@ else
 fi
 
 echo -e "${GREEN}[2/2] Starting Celery Beat (Scheduler)...${NC}"
-celery -A app.celery_worker beat --loglevel=info > "$CELERY_BEAT_LOG" 2>&1 &
+"$CELERY_BIN" -A app.celery_worker beat --loglevel=info > "$CELERY_BEAT_LOG" 2>&1 &
 BEAT_PID=$!
 sleep 2
 if ps -p $BEAT_PID > /dev/null; then
@@ -97,7 +137,7 @@ fi
 
 echo ""
 echo -e "${MAGENTA}╔════════════════════════════════════════════════════════════╗${NC}"
-echo -e "${MAGENTA}║   Celery & Redis Started Successfully! 🎉                 ║${NC}"
+echo -e "${MAGENTA}║   Celery Services Started Successfully! 🎉                ║${NC}"
 echo -e "${MAGENTA}╚════════════════════════════════════════════════════════════╝${NC}"
 echo ""
 echo -e "${MAGENTA}Log Files:    ${NC}$CELERY_WORKER_LOG, $CELERY_BEAT_LOG"

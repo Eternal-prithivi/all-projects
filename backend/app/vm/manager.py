@@ -1,3 +1,15 @@
+# =============================================================================
+# MODULE: vm/manager.py  (726 lines)
+# PURPOSE: GCP Compute Engine VM lifecycle — create/delete/start/stop VMs,
+#          five-cluster seed provisioning, SSH key injection, IP assignment
+# CLUSTERS: GENERAL, STORAGE, MEMORY, PERFORMANCE, AI_ML (3 VMs each = 15 total)
+# DEPENDS ON: google-cloud-compute library, GCP credentials (settings.GCP_*)
+#             Called exclusively by routes_vm.py
+# DO NOT:
+#   - Hardcode the five cluster names — they're constants used by routes_vm.py & NLP
+#   - Change SSH key injection format — vm/tasks.py depends on the stored key path
+#   - Call GCP APIs directly from routes — always go through manager.py functions
+# =============================================================================
 # backend/app/vm/manager.py
 
 import os
@@ -13,6 +25,10 @@ from app.vm.models import (
     VMAssignmentDB, VMMetricsDB, UserAssignmentResponse
 )
 from app.vm.workload_analyzer import WorkloadAnalyzer
+from app.ml.repository import (
+    build_workload_log_from_analysis,
+    log_workload_classification,
+)
 from app.vm.metrics_collector import VMMetricsCollector
 import uuid
 
@@ -48,10 +64,28 @@ else:
         logger.error(f"Failed to load GCP Service Account Key from {GCP_SA_KEY_FULL_PATH}: {str(e)}")
         credentials = None # Set to None if credentials fail to load
 
-# Initialize Compute Engine client
-instance_client = compute_v1.InstancesClient(credentials=credentials)
-image_client = compute_v1.ImagesClient(credentials=credentials)
-machine_type_client = compute_v1.MachineTypesClient(credentials=credentials)
+# Initialize Compute Engine clients lazily to avoid crashes when GCP credentials are missing
+_instance_client = None
+_image_client = None
+_machine_type_client = None
+
+def _get_instance_client():
+    global _instance_client
+    if _instance_client is None:
+        _instance_client = compute_v1.InstancesClient(credentials=credentials)
+    return _instance_client
+
+def _get_image_client():
+    global _image_client
+    if _image_client is None:
+        _image_client = compute_v1.ImagesClient(credentials=credentials)
+    return _image_client
+
+def _get_machine_type_client():
+    global _machine_type_client
+    if _machine_type_client is None:
+        _machine_type_client = compute_v1.MachineTypesClient(credentials=credentials)
+    return _machine_type_client
 
 
 # --- Helper to get default image (Debian 11) ---
@@ -64,7 +98,7 @@ def get_default_image_uri(project_id: str = "debian-cloud") -> str:
             project=project_id,
             image=image_name
         )
-        image = image_client.get(request=image_request)
+        image = _get_image_client().get(request=image_request)
         return image.self_link
     except Exception as e:
         logger.error(f"Error getting default image URI: {str(e)}. Falling back to hardcoded path.")
@@ -81,12 +115,49 @@ def _generate_instance_name(cluster_type: str) -> str:
 
 def list_vms() -> List[Dict[str, Any]]:
     """Lists all VM instances in the configured zone."""
-    request = compute_v1.ListInstancesRequest(
-        project=settings.GCP_PROJECT_ID,
-        zone=settings.GCP_ZONE,
-    )
-    instances = instance_client.list(request=request)
-
+    if credentials is None:
+        logger.debug("GCP not configured, returning empty VM list from DB fallback")
+        # Fallback: return VMs from MongoDB assignments
+        DB = get_database()
+        db_vms = []
+        for doc in DB["vm_assignments"].find({"status": {"$in": ["assigned", "active"]}}):
+            db_vms.append({
+                "name": doc.get("vm_name", "unknown"),
+                "status": doc.get("vm_status", "UNKNOWN"),
+                "labels": {"cluster_type": doc.get("cluster_type", "performance")},
+                "machine_type": doc.get("machine_type", "unknown"),
+                "zone": settings.GCP_ZONE if hasattr(settings, 'GCP_ZONE') else "us-central1-a",
+            })
+        return db_vms
+    
+    try:
+        request = compute_v1.ListInstancesRequest(
+            project=settings.GCP_PROJECT_ID,
+            zone=settings.GCP_ZONE,
+        )
+        instances = _get_instance_client().list(request=request)
+        
+        vm_list = []
+        for instance in instances:
+            vm_list.append({
+                "name": instance.name,
+                "status": instance.status,
+                "machine_type": instance.machine_type.split("/")[-1] if instance.machine_type else "unknown",
+                "zone": instance.zone.split("/")[-1] if instance.zone else "unknown",
+                "labels": dict(instance.labels) if instance.labels else {},
+                "creation_timestamp": instance.creation_timestamp,
+                "network_interfaces": [
+                    {
+                        "network_ip": ni.network_i_p,
+                        "external_ip": ni.access_configs[0].nat_i_p if ni.access_configs else None
+                    }
+                    for ni in (instance.network_interfaces or [])
+                ],
+            })
+        return vm_list
+    except Exception as e:
+        logger.error(f"Error listing VMs from GCP: {e}")
+        return []
 def create_vm(
     name: str,
     machine_type: str,
@@ -132,7 +203,7 @@ def create_vm(
     )
 
     logger.info(f"Creating VM '{name}' with machine type '{machine_type}' and disk size '{disk_size_gb}GB' in zone '{settings.GCP_ZONE}'")
-    operation = instance_client.insert(request=request)
+    operation = _get_instance_client().insert(request=request)
     operation.result() # Wait for the operation to complete
 
     # Fetch details of the created VM to get its IP
@@ -146,7 +217,7 @@ def start_vm(name: str) -> Dict[str, Any]:
         zone=settings.GCP_ZONE,
         instance=name,
     )
-    operation = instance_client.start(request=request)
+    operation = _get_instance_client().start(request=request)
     operation.result()
     vm_details = get_vm_details(name, settings.GCP_ZONE)
     return {"name": name, "status": "RUNNING", "details": vm_details}
@@ -158,7 +229,7 @@ def stop_vm(name: str) -> Dict[str, Any]:
         zone=settings.GCP_ZONE,
         instance=name,
     )
-    operation = instance_client.stop(request=request)
+    operation = _get_instance_client().stop(request=request)
     operation.result()
     vm_details = get_vm_details(name, settings.GCP_ZONE)
     return {"name": name, "status": "TERMINATED", "details": vm_details}
@@ -170,18 +241,29 @@ def delete_vm(name: str) -> Dict[str, Any]:
         zone=settings.GCP_ZONE,
         instance=name,
     )
-    operation = instance_client.delete(request=request)
+    operation = _get_instance_client().delete(request=request)
     operation.result()
     return {"name": name, "status": "DELETED"}
 
 def get_vm_details(name: str, zone: str) -> Dict[str, Any]:
     """Retrieves details for a specific VM instance."""
+    if credentials is None:
+        return {
+            "name": name,
+            "status": "UNKNOWN",
+            "machine_type": "unknown",
+            "zone": zone,
+            "external_ip": "N/A",
+            "creation_timestamp": None,
+            "labels": {}
+        }
+
     request = compute_v1.GetInstanceRequest(
         project=settings.GCP_PROJECT_ID,
         zone=zone,
         instance=name,
     )
-    instance = instance_client.get(request=request)
+    instance = _get_instance_client().get(request=request)
 
     external_ip = "N/A"
     if instance.network_interfaces and instance.network_interfaces[0].access_configs:
@@ -210,8 +292,38 @@ vm_metrics_collection = DB["vm_metrics"]
 # Cluster Configuration
 CLUSTER_VMS = {
     ClusterType.GENERAL: ["general-vm-1", "general-vm-2"],
-    ClusterType.STORAGE: ["storage-vm-1", "storage-vm-2"]
+    ClusterType.STORAGE: ["storage-vm-1", "storage-vm-2"],
+    ClusterType.MEMORY: ["memory-vm-1", "memory-vm-2"],
+    ClusterType.PERFORMANCE: ["performance-vm-1", "performance-vm-2"],
+    ClusterType.AI_ML: ["ai-ml-vm-1", "ai-ml-vm-2"],
 }
+
+
+def calculate_efficiency_score(metrics: Optional[Dict[str, Any]], active_users: int = 0) -> float:
+    """
+    Multi-factor VM resource score from the report's S_eff idea.
+    Combines CPU, memory, disk I/O, network I/O, and user density into a 0-100 score.
+    """
+    if not metrics:
+        return 0.0
+
+    cpu = float(metrics.get("cpu_usage", 0) or 0)
+    memory = float(metrics.get("memory_usage", 0) or 0)
+    disk_io = float(metrics.get("disk_io_read_mb", 0) or 0) + float(metrics.get("disk_io_write_mb", 0) or 0)
+    network_io = float(metrics.get("network_in_mb", 0) or 0) + float(metrics.get("network_out_mb", 0) or 0)
+    user_density = min(100.0, (active_users / 5) * 100)
+
+    disk_score = min(100.0, disk_io / 2.0)
+    network_score = min(100.0, network_io / 1.5)
+
+    score = (
+        cpu * 0.35
+        + memory * 0.25
+        + disk_score * 0.15
+        + network_score * 0.15
+        + user_density * 0.10
+    )
+    return round(max(0.0, min(100.0, score)), 2)
 
 def assign_vm_to_user(
     user_id: str,
@@ -236,7 +348,22 @@ def assign_vm_to_user(
             final_cluster = cluster_preference
     else:
         final_cluster = recommended_cluster
-    
+
+    user_overrode = bool(
+        cluster_preference and cluster_preference != recommended_cluster
+    )
+    log_workload_classification(
+        build_workload_log_from_analysis(
+            username=user_id,
+            workload_description=workload_description or "",
+            recommended_cluster=recommended_cluster.value,
+            final_cluster=final_cluster.value,
+            confidence=confidence,
+            analysis_details=analysis,
+            user_overrode=user_overrode,
+        )
+    )
+
     # Step 3: Find least loaded VM in cluster using least-connections algorithm
     cluster_vms = CLUSTER_VMS[final_cluster]
     vm_loads = []
@@ -267,7 +394,17 @@ def assign_vm_to_user(
     # Filter running VMs, sort by active users
     running_vms = [vm for vm in vm_loads if vm["status"] == "RUNNING"]
     
-    if not running_vms:
+    if not running_vms and credentials is None:
+        vm_to_start = cluster_vms[0]
+        logger.info(
+            f"GCP not configured. Assigning {user_id} to simulated {final_cluster.value} VM {vm_to_start}"
+        )
+        selected_vm = {
+            "vm_name": vm_to_start,
+            "vm_ip": "N/A",
+            "active_users": 0
+        }
+    elif not running_vms:
         # No running VMs, start the first VM in cluster
         vm_to_start = cluster_vms[0]
         logger.info(f"No running VMs in {final_cluster} cluster. Starting {vm_to_start}")
@@ -343,7 +480,7 @@ def migrate_user(
         for vm_name in cluster_vms:
             if vm_name == source_vm_name:
                 continue  # Skip source VM
-            
+
             active_count = vm_assignments_collection.count_documents({
                 "vm_name": vm_name,
                 "status": AssignmentStatus.ACTIVE.value
@@ -360,7 +497,14 @@ def migrate_user(
     
     # Step 3: Start target VM if stopped
     target_vm_details = get_vm_details(final_target_vm, settings.GCP_ZONE)
-    if target_vm_details["status"] != "RUNNING":
+    if credentials is None:
+        logger.info("GCP not configured. Performing simulated VM migration.")
+        target_vm_details = {
+            "name": final_target_vm,
+            "status": "UNKNOWN",
+            "external_ip": "N/A",
+        }
+    elif target_vm_details["status"] != "RUNNING":
         logger.info(f"Starting target VM {final_target_vm}")
         start_vm(final_target_vm)
         target_vm_details = get_vm_details(final_target_vm, settings.GCP_ZONE)
@@ -387,7 +531,7 @@ def migrate_user(
         "status": AssignmentStatus.ACTIVE.value
     })
     
-    if remaining_users == 0:
+    if remaining_users == 0 and credentials is not None:
         logger.info(f"No remaining users on {source_vm_name}. Stopping VM to save costs")
         stop_vm(source_vm_name)
         source_vm_stopped = True
@@ -447,7 +591,7 @@ def release_vm_assignment(user_id: str, assignment_id: Optional[str] = None) -> 
     })
     
     vm_stopped = False
-    if remaining_users == 0:
+    if remaining_users == 0 and credentials is not None:
         logger.info(f"No remaining users on {vm_name}. Stopping VM")
         stop_vm(vm_name)
         vm_stopped = True
@@ -503,25 +647,28 @@ def get_cluster_health(cluster_type: ClusterType) -> Dict[str, Any]:
     cluster_vms = CLUSTER_VMS[cluster_type]
     vm_health_data = []
     
-    # Batch fetch all VM statuses at once (single API call)
+    # Batch fetch all VM statuses at once (single API call) when GCP is configured.
     vm_statuses = {}
-    try:
-        logger.debug(f"Attempting batch fetch for cluster: {cluster_type.value}")
-        response = instance_client.list(
-            request=compute_v1.ListInstancesRequest(
-                project=settings.GCP_PROJECT_ID,
-                zone=settings.GCP_ZONE
+    if credentials is None:
+        logger.debug("GCP not configured; using stored VM metrics for cluster health")
+    else:
+        try:
+            logger.debug(f"Attempting batch fetch for cluster: {cluster_type.value}")
+            response = _get_instance_client().list(
+                request=compute_v1.ListInstancesRequest(
+                    project=settings.GCP_PROJECT_ID,
+                    zone=settings.GCP_ZONE
+                )
             )
-        )
-        
-        # Convert iterator to list
-        instances_list = list(response)
-        for instance in instances_list:
-            vm_statuses[instance.name] = instance.status
-        logger.info(f"Batch fetched {len(vm_statuses)} VM statuses")
-    except Exception as e:
-        logger.error(f"Error in batch VM fetch: {type(e).__name__}: {e}")
-        logger.info(f"Falling back to individual VM status checks")
+
+            # Convert iterator to list
+            instances_list = list(response)
+            for instance in instances_list:
+                vm_statuses[instance.name] = instance.status
+            logger.info(f"Batch fetched {len(vm_statuses)} VM statuses")
+        except Exception as e:
+            logger.error(f"Error in batch VM fetch: {type(e).__name__}: {e}")
+            logger.info(f"Falling back to individual VM status checks")
     
     for vm_name in cluster_vms:
         # Get latest metrics from MongoDB (fast, local)
@@ -539,6 +686,8 @@ def get_cluster_health(cluster_type: ClusterType) -> Dict[str, Any]:
         # Get status from batch result, fallback to individual check
         if vm_name in vm_statuses:
             status = vm_statuses[vm_name]
+        elif credentials is None:
+            status = "UNKNOWN"
         else:
             # Fallback: individual VM status check
             try:
@@ -555,6 +704,7 @@ def get_cluster_health(cluster_type: ClusterType) -> Dict[str, Any]:
             "active_users": active_users,
             "cpu_usage": latest_metrics.get("cpu_usage", 0) if latest_metrics else 0,
             "memory_usage": latest_metrics.get("memory_usage", 0) if latest_metrics else 0,
+            "efficiency_score": calculate_efficiency_score(latest_metrics, active_users),
             "last_updated": latest_metrics.get("collected_at") if latest_metrics else None
         }
         vm_health_data.append(vm_health)
@@ -562,6 +712,7 @@ def get_cluster_health(cluster_type: ClusterType) -> Dict[str, Any]:
     # Calculate cluster-wide stats
     total_users = sum(vm["active_users"] for vm in vm_health_data)
     avg_cpu = sum(vm["cpu_usage"] for vm in vm_health_data) / len(vm_health_data) if vm_health_data else 0
+    avg_efficiency = sum(vm["efficiency_score"] for vm in vm_health_data) / len(vm_health_data) if vm_health_data else 0
     running_vms = sum(1 for vm in vm_health_data if vm["status"] == "RUNNING")
     
     return {
@@ -570,6 +721,8 @@ def get_cluster_health(cluster_type: ClusterType) -> Dict[str, Any]:
         "running_vms": running_vms,
         "total_active_users": total_users,
         "average_cpu_usage": round(avg_cpu, 2),
+        "average_efficiency_score": round(avg_efficiency, 2),
+        "scoring_model": "S_eff_v1",
         "vms": vm_health_data
     }
 

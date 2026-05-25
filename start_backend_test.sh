@@ -1,22 +1,33 @@
 #!/bin/bash
 
+PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+BACKEND_DIR="$PROJECT_ROOT/backend"
+UVICORN_BIN="$PROJECT_ROOT/venv/bin/uvicorn"
+
 echo "═══════════════════════════════════════════════════════"
 echo "🚀 Starting Backend to Test Demo Mode"
 echo "═══════════════════════════════════════════════════════"
 echo ""
 
-cd "$(dirname "$0")/backend"
+cd "$BACKEND_DIR"
 
 echo "📋 Step 1: Checking .env file..."
-if grep -q "DEMO_MODE=true" .env 2>/dev/null; then
-    echo "✅ DEMO_MODE=true found in .env"
-elif grep -q "DEMO_MODE=false" .env 2>/dev/null; then
-    echo "✅ DEMO_MODE=false found in .env"
+if grep -qiE '^DEMO_MODE[[:space:]]*=[[:space:]]*true' .env 2>/dev/null; then
+    echo "✅ DEMO_MODE=True found in .env"
+elif grep -qiE '^DEMO_MODE[[:space:]]*=[[:space:]]*false' .env 2>/dev/null; then
+    echo "✅ DEMO_MODE=False found in .env"
 else
     echo "❌ DEMO_MODE not found in .env"
     echo ""
     echo "Add this line to backend/.env:"
     echo "DEMO_MODE=true"
+    exit 1
+fi
+
+if [ ! -x "$UVICORN_BIN" ]; then
+    echo "❌ Missing executable: $UVICORN_BIN"
+    echo "Run this first:"
+    echo "  $PROJECT_ROOT/venv/bin/python -m pip install -r $BACKEND_DIR/requirements.txt"
     exit 1
 fi
 
@@ -37,5 +48,4 @@ echo "────────────────────────�
 echo ""
 
 # Start uvicorn using the standard method
-exec uvicorn app.main:app --reload
-
+exec "$UVICORN_BIN" app.main:app --reload

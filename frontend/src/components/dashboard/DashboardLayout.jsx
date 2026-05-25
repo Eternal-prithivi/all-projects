@@ -1,6 +1,18 @@
+// =============================================================================
+// COMPONENT: DashboardLayout.jsx  (133 lines)
+// PURPOSE: Root layout wrapper for ALL /dashboard/* and /admin/* routes
+//   - Renders: Sidebar + Header + <Outlet> (child page) + ToastContainer + OnboardingTour
+//   - Handles sidebar open/close toggle state passed down to Sidebar
+//   - Mounts OnboardingTour here so it persists across page navigation
+// USED BY: React Router — wraps every ProtectedRoute in createBrowserRouter
+// DO NOT:
+//   - Move OnboardingTour out of this component — it must mount once at layout level
+//   - Add page-specific logic here — keep this as a pure layout shell
+//   - Remove ToastContainer — it's the global toast host for react-toastify
+// =============================================================================
 import React, { useState, useEffect } from "react";
 import { Outlet, useNavigate } from "react-router-dom";
-import { ToastContainer, toast } from "react-toastify";
+import { ToastContainer } from "react-toastify";
 import { useAuth } from "../../context/AuthContext.jsx";
 import { NotificationProvider } from "../../context/NotificationContext.jsx";
 import Sidebar from "./Sidebar.jsx";
@@ -10,6 +22,7 @@ import Breadcrumbs from "../Breadcrumbs.jsx";
 import QuickActions from "../QuickActions.jsx";
 import KeyboardShortcuts from "../KeyboardShortcuts.jsx";
 import GlobalSearch from "../GlobalSearch.jsx";
+import OnboardingTour from "../OnboardingTour.jsx";
 import "../../styles/dashboard.css";
 import "../../styles/cards.css";
 import "react-toastify/dist/ReactToastify.css";
@@ -103,6 +116,7 @@ function DashboardLayout() {
           isOpen={showSearch} 
           onClose={() => setShowSearch(false)} 
         />
+        <OnboardingTour />
         <ToastContainer
           position="top-right"
           autoClose={5000}

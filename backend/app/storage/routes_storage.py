@@ -1,3 +1,18 @@
+# =============================================================================
+# MODULE: routes_storage.py  (274 lines)
+# PURPOSE: Multi-cloud file management — ML-based placement analysis, upload
+#          (AWS/GCP/Azure), list, download (access tracked), delete, AWS S3 sync
+# READS FROM:  files collection, AWS/GCP/Azure cloud storage
+# WRITES TO:   files collection (including access_frequency_score tracking)
+# DEPENDS ON:  optimizer.py (ML ensemble), uploader.py, manager.py,
+#              credential_resolver.py (BYOC support), ml/repository.py
+# MOUNTED AT:  /api/storage → analyze, upload, files, download/{filename},
+#              delete/{filename}, sync/aws, restore-aws/{filename}
+# DO NOT:
+#   - Skip access tracking on download (access_frequency_score feeds ML tiering)
+#   - Change FileMetadata schema without updating tiering_tasks.py priority scoring
+#   - Hardcode AWS — CSP is always read from the file record (supports GCP/Azure)
+# =============================================================================
 from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException, status
 from fastapi.responses import JSONResponse
 from pymongo.collection import Collection
@@ -10,16 +25,19 @@ from botocore.config import Config
 from app.storage.manager import (
     delete_from_aws, delete_from_gcp, delete_from_azure,
     get_download_url_from_aws, get_download_url_from_gcp, get_download_url_from_azure,
-    initiate_glacier_restore_aws
+    initiate_glacier_restore_aws,
+    list_objects_aws,
 )
 from app.storage.uploader import upload_to_aws, upload_to_gcp, upload_to_azure
 from app.storage.optimizer import get_initial_placement_recommendation
+from app.ml.repository import log_ensemble_storage_prediction
 from app.utils.config import settings
 from app.users.routes_users import get_current_user
 from app.users.user_model import User
 from app.database.mongo_client import mongodb_client
 from app.storage.models_storage import FileMetadata
 from app.utils.logger import setup_logger
+from app.byoc.credential_resolver import resolve_aws_credentials
 
 logger = setup_logger(__name__)
 router = APIRouter(tags=["Storage"])
@@ -40,6 +58,14 @@ async def analyze_file_for_placement(request: AnalyzeRequest, user: User = Depen
         recommendation = get_initial_placement_recommendation(
             user_priority=request.user_priority, user_intent=request.user_intent,
             filename=request.filename, file_size_mb=request.file_size_mb,
+        )
+        log_ensemble_storage_prediction(
+            username=user.username,
+            filename=request.filename,
+            file_size_mb=request.file_size_mb,
+            user_priority=request.user_priority,
+            user_intent=request.user_intent,
+            recommendation=recommendation,
         )
         return recommendation
     except Exception as e:
@@ -79,8 +105,93 @@ async def list_files(user: User = Depends(get_current_user), files_db: Collectio
         })
     return files_list
 
+
+class StorageSyncResponse(BaseModel):
+    inserted: int
+    already_present: int
+    skipped_non_user_prefix: int
+    total_objects_seen: int
+    bucket_name: str
+    scanned_prefix: str
+
+
+@router.post("/sync/aws", response_model=StorageSyncResponse)
+async def sync_with_aws_bucket(
+    user: User = Depends(get_current_user),
+    files_db: Collection = Depends(get_files_collection),
+):
+    """
+    On-demand storage sync for AWS S3 (free-tier friendly).
+
+    Platform buckets are shared, so only the user's prefix is scanned. BYOC buckets
+    belong to the connected user, so the whole bucket is scanned to import objects
+    that may have been created outside Zenith, including Terraform-managed files.
+    This endpoint does not delete DB records.
+    """
+    try:
+        aws = resolve_aws_credentials(user.username)
+        bucket_name = aws["bucket_name"]
+        user_prefix = f"{user.username}/"
+        scanned_prefix = "" if aws.get("is_byoc") else user_prefix
+
+        objects = list_objects_aws(
+            bucket_name=bucket_name,
+            prefix=scanned_prefix,
+            access_key_id=aws["access_key_id"],
+            secret_access_key=aws["secret_access_key"],
+            session_token=aws.get("session_token"),
+            region_name=aws.get("region"),
+        )
+
+        inserted = 0
+        already_present = 0
+        skipped_non_user_prefix = 0
+
+        for obj in objects:
+            object_key = obj.get("object_key") or ""
+            if not aws.get("is_byoc") and not object_key.startswith(user_prefix):
+                skipped_non_user_prefix += 1
+                continue
+
+            filename = object_key[len(user_prefix):] if object_key.startswith(user_prefix) else object_key
+            if not filename:
+                continue
+
+            existing = files_db.find_one(
+                {
+                    "owner_username": user.username,
+                    "$or": [{"s3_key": object_key}, {"filename": filename}],
+                },
+                {"_id": 1},
+            )
+            if existing:
+                already_present += 1
+                continue
+
+            doc = FileMetadata(
+                filename=filename,
+                s3_key=object_key,
+                owner_username=user.username,
+                size_bytes=int(obj.get("size_bytes", 0) or 0),
+                csp="AWS",
+                storage_class=obj.get("storage_class") or "S3 Standard",
+            ).model_dump()
+            files_db.insert_one(doc)
+            inserted += 1
+
+        return StorageSyncResponse(
+            inserted=inserted,
+            already_present=already_present,
+            skipped_non_user_prefix=skipped_non_user_prefix,
+            total_objects_seen=len(objects),
+            bucket_name=bucket_name,
+            scanned_prefix=scanned_prefix,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to sync with AWS bucket: {str(e)}")
+
 # --- CHANGE: The /download endpoint is now upgraded to track file access ---
-@router.get("/download/{filename}")
+@router.get("/download/{filename:path}")
 async def generate_download_url(
     filename: str, 
     user: User = Depends(get_current_user),
@@ -125,7 +236,7 @@ async def generate_download_url(
         raise HTTPException(status_code=500, detail=f"Could not generate download URL from {csp}: {e}")
 
 
-@router.delete("/delete/{filename}")
+@router.delete("/delete/{filename:path}")
 # ... (This function remains exactly the same)
 async def delete_file(filename: str, user: User = Depends(get_current_user), files_db: Collection = Depends(get_files_collection)):
     file_record = files_db.find_one({"owner_username": user.username, "filename": filename})
@@ -144,7 +255,7 @@ async def delete_file(filename: str, user: User = Depends(get_current_user), fil
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Could not delete file from {csp}: {e}")
 
-@router.post("/restore-aws/{filename}", status_code=status.HTTP_202_ACCEPTED)
+@router.post("/restore-aws/{filename:path}", status_code=status.HTTP_202_ACCEPTED)
 async def restore_aws_file(
     filename: str,
     user: User = Depends(get_current_user),
