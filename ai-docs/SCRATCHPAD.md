@@ -4,6 +4,24 @@
 > Clear the Resume State section when a task is fully complete.
 > **Always update Last Known Good State at the end of every session.**
 
+## 📐 How to Use the Current Resume State Section
+
+**When STARTING a task (AI_MASTER.md Step 3 — do this BEFORE any code):**
+- Set status to `IN PROGRESS`
+- Write the plan: what files you will touch, in what order
+- Mark each step as `NOT YET DONE`
+
+**As you complete each step:**
+- Update the step from `NOT YET DONE` → `DONE`
+- This means another agent can take over from exactly where you left off
+
+**When the task is FULLY COMPLETE (session end):**
+- Set status to `COMPLETE`
+- Replace step-by-step plan with a brief summary of what was done
+- This is what PROGRESS.md and AUDIT_LOG.md will also record
+
+> ⚠️ **Do NOT leave status as `IN PROGRESS` when your session ends and the task is done.** Any future agent that sees `IN PROGRESS` will try to resume it.
+
 ---
 
 ## 🔍 Drift Detection Protocol
@@ -59,20 +77,28 @@ If 5 or more entries have passed since the last audit (or no audit has ever been
 
 ## 🔄 Current Resume State
 
+**Status:** COMPLETE — Phase 11 (Terraform Provisioning) fully done. No task in progress.
+
 **Last completed task:** Terraform provisioning integration (Phase 11, 2026-05-25).
+**What was done:** 7 Python files in `app/provision/` (models, runner, policy checker, cost estimator, drift detector, routes, tasks). 28 Terraform module files copied. ProvisionPage.jsx 4-step wizard. Sidebar nav. MongoDB indexes. Celery Beat drift check. All AI docs updated.
+**Verification:** Frontend build passes (2.2s), 18/18 non-ML tests pass.
 
-**Status:** COMPLETE — provisioning feature fully integrated.
+---
 
-**What was done (Antigravity Opus, 2026-05-25):**
-1. **Component 1 — Terraform files copied:** 28 files from `aws using terraform/` project into `backend/terraform/` (7 modules, root .tf files, policy-engine, opa-policies). 2 template .tfvars created (static-site, backend-app).
-2. **Component 2 — Backend provisioning module:** 7 new Python files in `app/provision/` — models.py (Pydantic schemas), terraform_runner.py (subprocess CLI wrapper with BYOC credential injection), policy_checker.py (YAML + OPA dual engine), cost_estimator.py (Infracost + built-in free-tier table), drift_detector.py (terraform plan parsing), routes_provision.py (10 API endpoints), tasks.py (Celery Beat daily drift).
-3. **Component 3 — MongoDB:** Added `provision_deployments` collection + 3 indexes to `ensure_indexes()`.
-4. **Component 4 — Frontend:** New `ProvisionPage.jsx` (4-step wizard: choose → configure → review → deploy) + `provision.css` (glassmorphic design). Added route `/dashboard/provision` in main.jsx. Added sidebar nav item with cloud-deploy icon.
-5. **Component 5 — Celery Beat:** Added daily drift check at 06:00 UTC + `app.provision.tasks` to includes.
-6. **Component 6 — main.py:** Mounted provision router at `/api/provision`. Added Terraform startup check.
-7. **Component 7 — AI docs:** Updated AI_RULES.md (provision_deployments, Terraform budget rule, beat schedule), DECISIONS.md (DEC-019), SCRATCHPAD.md.
+### 📌 Template for IN PROGRESS State (copy this when starting a new task)
 
-**Verification:** Frontend build passes (2.2s), 18/18 non-ML tests pass, policy engine loads 12 rules and correctly blocks EC2 without VPC, cost estimator returns free-tier estimates.
+```
+**Status:** IN PROGRESS (started: YYYY-MM-DD HH:MM)
+**Task:** [Task name / Phase number]
+**Files to touch:** [list the specific files you plan to modify]
+
+Steps:
+- [ ] Step 1: [description] — NOT YET DONE
+- [ ] Step 2: [description] — NOT YET DONE
+- [ ] Step 3: [description] — NOT YET DONE
+
+If another agent picks this up: start from the first NOT YET DONE step.
+```
 
 ## Suggested Next Tasks (from PROFESSIONAL_IMPROVEMENTS.md)
 

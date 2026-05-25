@@ -29,7 +29,31 @@ Full-stack task touching both                   →  read both
   - **If SCRATCHPAD has no resume notes for that task:** re-read the task description in PROGRESS.md, check which files it mentioned, then ask the user: *"I see an active task but no resume notes. Should I start fresh or do you want to describe where to pick up?"*
 - If none → ask the user what to work on next
 
-### Step 3 — Mandatory Onboarding Confirmation (before touching ANY code)
+### Step 3 — 🔴 CLAIM YOUR TASK BEFORE WRITING ANY CODE
+
+> This step is non-negotiable. No file edits until this is done.
+
+Once you know what task you're doing, **immediately update the docs to claim it** — before writing a single line of code:
+
+1. **Update `PROGRESS.md` → `## 🔴 Active Task`:**
+   - Write the task name, your session timestamp, and status: `IN PROGRESS`
+   - Example: `**Phase 12: Redis Cache Layer** | Started: 2026-05-25 20:00 | Status: IN PROGRESS`
+
+2. **Update `SCRATCHPAD.md` → `## 🔄 Current Resume State`:**
+   - Write what you're about to do and which files you plan to touch
+   - This is the breadcrumb trail for any agent that has to take over mid-task
+   - Example:
+     ```
+     Status: IN PROGRESS (started 2026-05-25 20:00)
+     Plan: Add Redis cache to cost_analysis routes. Files: routes_cost.py, config.py, requirements.txt
+     Step 1 of 3: Add REDIS_URL to config.py — NOT YET DONE
+     Step 2 of 3: Wrap /api/cost/summary in cache decorator — NOT YET DONE
+     Step 3 of 3: Update DECISIONS.md with DEC-020 — NOT YET DONE
+     ```
+
+> ⚠️ **Why this matters:** If you crash, get interrupted, hit a token limit, or another agent takes over — the docs are the ONLY way to know what was in progress and what was NOT yet done. Without Step 3, the project state is invisible mid-task.
+
+### Step 4 — Mandatory Onboarding Confirmation (before touching ANY code)
 
 **Output this exact block before writing or editing a single file:**
 
@@ -41,6 +65,7 @@ Last completed:  [Last completed task from PROGRESS.md]
 Active task:     [What you're about to work on]
 Active constraint: [One relevant rule from AI_RULES.md that applies to this task]
 Conflicts found: [Any conflict between the task and the docs — or write "None detected"]
+Step 3 doc update: ["Done — PROGRESS.md + SCRATCHPAD.md updated" or "Skipped — resuming existing IN PROGRESS task"]
 ─────────────────────────────────────────
 ```
 
@@ -56,11 +81,15 @@ Every session MUST end with ALL of the following — in this order:
 
 ```
 [ ] 1. Quality gates passed (lint + tests if applicable)
-[ ] 2. PROGRESS.md updated — task status, what was done, what's next
+[ ] 2. PROGRESS.md updated — task marked COMPLETE, what was done, what's next
 [ ] 3. AUDIT_LOG.md appended — new entry with SESSION_ID + summary
-[ ] 4. SCRATCHPAD.md updated — resume instructions OR cleared if task complete
-[ ] 5. Git commit + push to stage branch
+[ ] 4. SCRATCHPAD.md updated — Last Known Good State refreshed + resume state CLEARED if complete
+[ ] 5. If new backend routes added → update API Routes table in ai-docs/AI_CONTEXT_BACKEND.md
+[ ] 6. If new frontend pages or components added → update Pages/Components in ai-docs/AI_CONTEXT_FRONTEND.md
+[ ] 7. Git commit + push to stage branch
 ```
+
+> ⚠️ The SCRATCHPAD `## 🔄 Current Resume State` section must explicitly say `Status: COMPLETE` at session end — NOT just be left with the "IN PROGRESS" state from Step 3. Another agent reading it must know the task finished.
 
 ### Step 5 — Git Commit & Push (exact commands)
 
@@ -103,7 +132,7 @@ git push origin stage
 | Cloud Targets | AWS (primary), GCP, Azure — multi-cloud storage + compute          |
 | Database      | MongoDB Atlas (`CloudResourceOptimizationDB`)                      |
 | Task Queue    | Celery + CloudAMQP (RabbitMQ)                                     |
-| Phase         | **PHASE 10 COMPLETE** — Report-aligned VM taxonomy, decay-weighted cost forecast, ML feedback loop, benchmark script, frontend UI polish, and final handoff. |
+| Phase         | **PHASE 11 COMPLETE** — Terraform infrastructure provisioning integration (7 AWS modules, policy engine, drift detection, 4-step wizard). |
 | Budget        | **ZERO-COST** — Student project. Free-tier only. See `AI_RULES.md` for details. |
 | Reference Doc | `Major Project latest22- Report-5.pdf` (97-page report describes full intended system) |
 | Last Updated  | 2026-05-25                                                        |

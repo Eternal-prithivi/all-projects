@@ -79,6 +79,9 @@
 | ❌ No implementing ML/VM/Cost modules without checking report first | Report sections §4.1-§4.5 describe exact algorithms, inputs, outputs |
 | ❌ No installing new `pip` or `npm` packages without telling the user | State the package name and reason BEFORE installing — user must approve paid or heavy dependencies |
 | ❌ Never assume a service is running or a package is installed | Always verify: check venv is active, backend is up, Celery is running, etc. before writing code that depends on them |
+| ❌ **No writing code before claiming the task in PROGRESS.md + SCRATCHPAD.md** | If you start coding without marking IN PROGRESS, any agent that takes over mid-task has zero breadcrumbs. See AI_MASTER.md Step 3. |
+| ❌ No adding new API routes without updating `ai-docs/AI_CONTEXT_BACKEND.md` routes table | Other agents use that table to know what endpoints exist — stale table causes duplicate routes |
+| ❌ No adding new frontend pages/components without updating `ai-docs/AI_CONTEXT_FRONTEND.md` | Same reason — the context files are the living map of the codebase |
 
 ## 🧭 Product-Readiness Definitions
 
