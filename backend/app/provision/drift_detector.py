@@ -13,6 +13,8 @@ import logging
 from datetime import datetime
 from typing import Any, Optional
 
+from pydantic import BaseModel
+
 from app.provision.models import DriftReport, DriftStatus
 from app.provision.terraform_runner import TerraformRunner
 
@@ -92,4 +94,96 @@ def detect_drift(
             changes_detected=0,
             details=[f"Drift check error: {str(e)}"],
             checked_at=datetime.utcnow(),
+        )
+
+
+class RemediationResult(BaseModel):
+    """Outcome of a drift remediation attempt."""
+    success: bool = False
+    performed: bool = False
+    message: str = ""
+    plan_output: str = ""
+    apply_output: str = ""
+
+
+def remediate_drift(
+    workspace_dir: str,
+    aws_credentials: Optional[dict] = None,
+    check_only: bool = True,
+) -> RemediationResult:
+    """
+    Remediate detected drift by re-applying the Terraform configuration.
+
+    Adapted from aws-provision-using-terraform/drift-detection/remediation.py.
+
+    By default (check_only=True), runs ``terraform plan`` to show what would
+    change WITHOUT actually applying. Set ``check_only=False`` to run
+    ``terraform apply --auto-approve`` and restore desired state.
+
+    Args:
+        workspace_dir: Path to the Terraform workspace with state files.
+        aws_credentials: AWS env vars for Terraform subprocess.
+        check_only: If True, only show plan — do not apply.
+
+    Returns:
+        RemediationResult with success/performed flags and output text.
+    """
+    runner = TerraformRunner(workspace_dir, aws_credentials)
+
+    try:
+        # Step 1: terraform init (ensure plugins are ready)
+        init_result = runner.init()
+        if not init_result["success"]:
+            return RemediationResult(
+                success=False,
+                performed=False,
+                message="terraform init failed during remediation.",
+                plan_output=init_result.get("error", ""),
+            )
+
+        # Step 2: terraform plan (see what would change)
+        plan_result = runner.plan()
+        plan_output = plan_result.get("output", "")
+
+        if not plan_result.get("has_changes", True):
+            return RemediationResult(
+                success=True,
+                performed=False,
+                message="No drift detected — infrastructure matches desired state.",
+                plan_output=plan_output,
+            )
+
+        if check_only:
+            return RemediationResult(
+                success=True,
+                performed=False,
+                message="Drift remediation plan generated (check-only mode). Review output before applying.",
+                plan_output=plan_output,
+            )
+
+        # Step 3: terraform apply (only if check_only=False)
+        apply_result = runner.apply()
+        if not apply_result["success"]:
+            return RemediationResult(
+                success=False,
+                performed=True,
+                message="terraform apply failed during remediation.",
+                plan_output=plan_output,
+                apply_output=apply_result.get("error", ""),
+            )
+
+        return RemediationResult(
+            success=True,
+            performed=True,
+            message="Drift remediated successfully — infrastructure restored to desired state.",
+            plan_output=plan_output,
+            apply_output=apply_result.get("output", ""),
+        )
+
+    except Exception as e:
+        logger.error(f"Drift remediation failed: {e}")
+        return RemediationResult(
+            success=False,
+            performed=False,
+            message=f"Remediation error: {str(e)}",
         )

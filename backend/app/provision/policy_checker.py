@@ -11,8 +11,6 @@
 from __future__ import annotations
 
 import logging
-import subprocess
-import json
 from pathlib import Path
 from typing import Any
 
@@ -105,56 +103,40 @@ def evaluate_yaml_policies(config: dict[str, Any]) -> PolicyCheckResult:
 
 def evaluate_opa_policies(config: dict[str, Any]) -> PolicyCheckResult:
     """
-    Evaluate config against OPA (Rego) policies if OPA CLI is available.
+    Evaluate config against OPA (Rego) policies using the OPAEngine wrapper.
 
     Falls back gracefully if OPA is not installed.
     """
+    from app.provision.opa_engine import OPAEngine
+
     result = PolicyCheckResult(blocks=[], warnings=[], can_deploy=True)
 
-    # Check if OPA CLI is available
-    try:
-        subprocess.run(["opa", "version"], capture_output=True, timeout=5)
-    except (FileNotFoundError, subprocess.TimeoutExpired):
-        logger.info("OPA CLI not installed — skipping OPA policy check")
+    engine = OPAEngine(OPA_POLICIES_DIR)
+    opa_result = engine.evaluate(config_to_policy_dict(config))
+
+    if not opa_result.opa_available:
+        logger.info(f"OPA CLI not installed — skipping OPA policy check: {opa_result.error}")
         return result
 
-    rego_path = OPA_POLICIES_DIR / "aws_security.rego"
-    if not rego_path.exists():
-        logger.warning(f"OPA policy file not found: {rego_path}")
+    if opa_result.error:
+        logger.warning(f"OPA evaluation error: {opa_result.error}")
         return result
 
-    try:
-        policy_dict = config_to_policy_dict(config)
-        input_json = json.dumps({"input": policy_dict})
+    for deny_msg in opa_result.blocks:
+        result.blocks.append(PolicyViolation(
+            rule_name="opa_deny",
+            description=deny_msg,
+            severity="block",
+        ))
 
-        opa_result = subprocess.run(
-            ["opa", "eval", "--data", str(rego_path),
-             "--input", "/dev/stdin", "data.aws_security"],
-            input=input_json, capture_output=True, text=True, timeout=30,
-        )
+    for warn_msg in opa_result.warnings:
+        result.warnings.append(PolicyViolation(
+            rule_name="opa_warn",
+            description=warn_msg,
+            severity="warning",
+        ))
 
-        if opa_result.returncode == 0:
-            data = json.loads(opa_result.stdout)
-            opa_data = data.get("result", [{}])[0].get("expressions", [{}])[0].get("value", {})
-
-            for deny_msg in opa_data.get("deny", []):
-                result.blocks.append(PolicyViolation(
-                    rule_name="opa_deny",
-                    description=deny_msg,
-                    severity="block",
-                ))
-
-            for warn_msg in opa_data.get("warn", []):
-                result.warnings.append(PolicyViolation(
-                    rule_name="opa_warn",
-                    description=warn_msg,
-                    severity="warning",
-                ))
-
-            result.can_deploy = len(result.blocks) == 0
-
-    except Exception as e:
-        logger.error(f"OPA policy evaluation failed: {e}")
+    result.can_deploy = len(result.blocks) == 0
 
     return result
 

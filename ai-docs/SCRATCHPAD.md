@@ -77,11 +77,21 @@ If 5 or more entries have passed since the last audit (or no audit has ever been
 
 ## 🔄 Current Resume State
 
-**Status:** COMPLETE — Phase 11 (Terraform Provisioning) fully done. No task in progress.
+**Status:** IN PROGRESS (started: 2026-05-25 21:25 IST)
+**Task:** Phase 11b — 4 missing Terraform integration components
+**Files to touch:** `app/provision/opa_engine.py` (new), `app/provision/drift_detector.py`, `app/provision/routes_provision.py`, `app/provision/audit_logger.py` (new), `app/provision/rbac.py` (new), `app/provision/models.py`, `app/database/mongo_client.py`, `frontend/src/pages/ProvisionPage.jsx`
 
-**Last completed task:** Terraform provisioning integration (Phase 11, 2026-05-25).
-**What was done:** 7 Python files in `app/provision/` (models, runner, policy checker, cost estimator, drift detector, routes, tasks). 28 Terraform module files copied. ProvisionPage.jsx 4-step wizard. Sidebar nav. MongoDB indexes. Celery Beat drift check. All AI docs updated.
-**Verification:** Frontend build passes (2.2s), 18/18 non-ML tests pass.
+Steps:
+- [ ] Step 1: Create `opa_engine.py` — OPA wrapper class + OPAResult dataclass — NOT YET DONE
+- [ ] Step 2: Integrate OPA engine into `policy_checker.py` — NOT YET DONE
+- [ ] Step 3: Add drift remediation to `drift_detector.py` + new `/remediate` endpoint — NOT YET DONE
+- [ ] Step 4: Create `rbac.py` — role-based access for provision routes — NOT YET DONE
+- [ ] Step 5: Create `audit_logger.py` — provision audit logging to MongoDB — NOT YET DONE
+- [ ] Step 6: Wire RBAC + audit into `routes_provision.py` — NOT YET DONE
+- [ ] Step 7: Update frontend for new remediation button + role display — NOT YET DONE
+- [ ] Step 8: Tests + build verification — NOT YET DONE
+
+If another agent picks this up: start from the first NOT YET DONE step.
 
 ---
 

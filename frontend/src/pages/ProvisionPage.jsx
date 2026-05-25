@@ -61,6 +61,7 @@ export default function ProvisionPage() {
   const [step, setStep] = useState(0);
   const [terraformOk, setTerraformOk] = useState(null); // null = loading, true/false
   const [selectedTemplate, setSelectedTemplate] = useState(null);
+  const [userPermissions, setUserPermissions] = useState(null);
 
   const [config, setConfig] = useState({
     template: null,
@@ -101,14 +102,27 @@ export default function ProvisionPage() {
   useEffect(() => {
     checkTerraformStatus();
     loadDeployments();
+    loadPermissions();
   }, []);
 
   const checkTerraformStatus = async () => {
     try {
       const res = await api.get('/provision/status');
       setTerraformOk(res.data.terraform_installed);
+      if (res.data.user_permissions) {
+        setUserPermissions(res.data.user_permissions);
+      }
     } catch {
       setTerraformOk(false);
+    }
+  };
+
+  const loadPermissions = async () => {
+    try {
+      const res = await api.get('/provision/my-permissions');
+      setUserPermissions(res.data);
+    } catch {
+      // Silent — permissions badge just won't show
     }
   };
 
@@ -257,6 +271,29 @@ export default function ProvisionPage() {
     }
   };
 
+  // ── Drift Remediation ──
+  const runRemediate = async (depId, checkOnly = true) => {
+    if (!checkOnly && !window.confirm('This will run terraform apply to restore desired state. Continue?')) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await api.post(`/provision/deployments/${depId}/remediate`, { check_only: checkOnly });
+      if (res.data.success) {
+        setError(null);
+        if (res.data.performed) {
+          loadDeployments();
+        }
+        setPlanOutput(res.data.plan_output || res.data.message);
+      } else {
+        setError(res.data.message || 'Remediation failed');
+      }
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Remediation failed');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // ── Step navigation ──
   const nextStep = () => {
     if (step === 2) {
@@ -300,7 +337,12 @@ export default function ProvisionPage() {
       <div className="provision-status-bar">
         <span className={`status-dot ${terraformOk ? 'online' : 'offline'}`} />
         <span>Terraform: {terraformOk === null ? 'checking...' : terraformOk ? '✅ Installed' : '❌ Not found'}</span>
-        {terraformOk !== null && terraformOk && <span style={{ marginLeft: 'auto', opacity: 0.6 }}>Ready to provision</span>}
+        {userPermissions && (
+          <span className="role-badge" style={{ marginLeft: 'auto' }}>
+            🔐 Role: {userPermissions.provision_role}
+            {userPermissions.can_apply ? ' • Can deploy' : ' • View/plan only'}
+          </span>
+        )}
       </div>
 
       {/* Wizard Steps */}
@@ -709,10 +751,21 @@ export default function ProvisionPage() {
                     >
                       Check Drift
                     </button>
+                    {dep.latest_drift === 'drift_detected' && (
+                      <button
+                        className="btn-provision primary"
+                        onClick={() => runRemediate(dep.deployment_name, false)}
+                        disabled={loading || (userPermissions && !userPermissions.can_remediate)}
+                        title={userPermissions && !userPermissions.can_remediate ? 'Requires devops or admin role' : 'Apply terraform to fix drift'}
+                      >
+                        🔧 Fix Drift
+                      </button>
+                    )}
                     <button
                       className="btn-provision danger"
                       onClick={() => runDestroy(dep.deployment_name)}
-                      disabled={loading}
+                      disabled={loading || (userPermissions && !userPermissions.can_destroy)}
+                      title={userPermissions && !userPermissions.can_destroy ? 'Requires devops or admin role' : 'Destroy deployment'}
                     >
                       Destroy
                     </button>
