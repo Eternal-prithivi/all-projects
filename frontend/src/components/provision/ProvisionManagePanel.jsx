@@ -16,6 +16,14 @@ const formatDriftStatus = (s) => {
   return s || '—';
 };
 
+const LOADING_MESSAGES = {
+  drift: 'Checking drift against your AWS account… Terraform is comparing live state to your stack. This can take up to a minute.',
+  'remediate-preview': 'Running Terraform plan to preview fixes…',
+  'remediate-apply': 'Applying Terraform to restore desired state…',
+  destroy: 'Destroying infrastructure…',
+  detail: 'Loading deployment details…',
+};
+
 export default function ProvisionManagePanel({
   userPermissions,
   onDeploymentsChange,
@@ -23,9 +31,11 @@ export default function ProvisionManagePanel({
   const [deployments, setDeployments] = useState([]);
   const [selectedId, setSelectedId] = useState(null);
   const [detail, setDetail] = useState(null);
-  const [loading, setLoading] = useState(false);
+  const [loadingAction, setLoadingAction] = useState(null);
   const [error, setError] = useState(null);
   const [output, setOutput] = useState('');
+
+  const isBusy = Boolean(loadingAction);
 
   const loadDeployments = useCallback(async () => {
     try {
@@ -42,52 +52,61 @@ export default function ProvisionManagePanel({
     loadDeployments();
   }, [loadDeployments]);
 
-  const loadDetail = async (deploymentName) => {
+  const loadDetail = async (deploymentName, { quiet = false } = {}) => {
     setSelectedId(deploymentName);
-    setDetail(null);
-    setOutput('');
+    if (!quiet) {
+      setDetail(null);
+      setOutput('');
+      setLoadingAction('detail');
+    }
+    setError(null);
     try {
       const res = await api.get(`/provision/deployments/${deploymentName}`);
       setDetail(res.data);
     } catch (err) {
       setError(err.response?.data?.detail || 'Failed to load deployment');
+    } finally {
+      if (!quiet) {
+        setLoadingAction((current) => (current === 'detail' ? null : current));
+      }
     }
   };
 
   const runDriftCheck = async (depId) => {
-    setLoading(true);
+    setLoadingAction('drift');
     setError(null);
+    setOutput('');
     try {
       const res = await api.post(`/provision/deployments/${depId}/drift`);
       setOutput((res.data.details || []).join('\n'));
       await loadDeployments();
-      if (selectedId === depId) await loadDetail(depId);
+      if (selectedId === depId) await loadDetail(depId, { quiet: true });
     } catch (err) {
       setError(err.response?.data?.detail || 'Drift check failed');
     } finally {
-      setLoading(false);
+      setLoadingAction(null);
     }
   };
 
   const runRemediate = async (depId, checkOnly) => {
     if (!checkOnly && !window.confirm('Run terraform apply to restore desired state?')) return;
-    setLoading(true);
+    setLoadingAction(checkOnly ? 'remediate-preview' : 'remediate-apply');
     setError(null);
     try {
       const res = await api.post(`/provision/deployments/${depId}/remediate`, { check_only: checkOnly });
       setOutput(res.data.plan_output || res.data.message || '');
       await loadDeployments();
-      if (selectedId === depId) await loadDetail(depId);
+      if (selectedId === depId) await loadDetail(depId, { quiet: true });
     } catch (err) {
       setError(err.response?.data?.detail || 'Remediation failed');
     } finally {
-      setLoading(false);
+      setLoadingAction(null);
     }
   };
 
   const runDestroy = async (depId) => {
     if (!window.confirm('Destroy this deployment? This cannot be undone.')) return;
-    setLoading(true);
+    setLoadingAction('destroy');
     setError(null);
     try {
       await api.post(`/provision/destroy/${depId}`);
@@ -97,9 +116,16 @@ export default function ProvisionManagePanel({
     } catch (err) {
       setError(err.response?.data?.detail || 'Destroy failed');
     } finally {
-      setLoading(false);
+      setLoadingAction(null);
     }
   };
+
+  const renderActionSpinner = (label) => (
+    <>
+      <span className="btn-spinner" aria-hidden="true" />
+      {label}
+    </>
+  );
 
   if (deployments.length === 0) {
     return (
@@ -130,11 +156,12 @@ export default function ProvisionManagePanel({
           {deployments.map((dep) => (
             <div
               key={dep._id}
-              className={`deployment-card ${selectedId === dep.deployment_name ? 'selected' : ''}`}
-              onClick={() => loadDetail(dep.deployment_name)}
-              onKeyDown={(e) => e.key === 'Enter' && loadDetail(dep.deployment_name)}
+              className={`deployment-card ${selectedId === dep.deployment_name ? 'selected' : ''}${loadingAction === 'drift' && selectedId === dep.deployment_name ? ' card-busy' : ''}`}
+              onClick={() => !isBusy && loadDetail(dep.deployment_name)}
+              onKeyDown={(e) => e.key === 'Enter' && !isBusy && loadDetail(dep.deployment_name)}
               role="button"
-              tabIndex={0}
+              tabIndex={isBusy ? -1 : 0}
+              aria-disabled={isBusy}
             >
               <div className="deployment-info">
                 <h4>{dep.deployment_name}</h4>
@@ -154,9 +181,30 @@ export default function ProvisionManagePanel({
         </div>
 
         <div className="provision-detail-panel">
-          {!detail ? (
+          {loadingAction && (
+            <div
+              className="provision-action-status"
+              role="status"
+              aria-live="polite"
+              aria-busy="true"
+            >
+              <div className="provision-spinner" />
+              <div>
+                <strong>
+                  {loadingAction === 'drift' && 'Drift check in progress'}
+                  {loadingAction === 'remediate-preview' && 'Previewing fix'}
+                  {loadingAction === 'remediate-apply' && 'Applying fix'}
+                  {loadingAction === 'destroy' && 'Destroy in progress'}
+                  {loadingAction === 'detail' && 'Loading'}
+                </strong>
+                <p>{LOADING_MESSAGES[loadingAction]}</p>
+              </div>
+            </div>
+          )}
+
+          {!detail && loadingAction !== 'detail' ? (
             <p className="provision-empty-hint">Select a deployment to view drift history and actions.</p>
-          ) : (
+          ) : !detail ? null : (
             <>
               <h3>{detail.deployment_name}</h3>
               <p className="provision-empty-hint">
@@ -168,37 +216,45 @@ export default function ProvisionManagePanel({
                 <div className="provision-actions" style={{ marginTop: '1rem' }}>
                   <button
                     type="button"
-                    className="btn-provision secondary"
-                    disabled={loading}
+                    className={`btn-provision secondary${loadingAction === 'drift' ? ' is-loading' : ''}`}
+                    disabled={isBusy}
                     onClick={() => runDriftCheck(detail.deployment_name)}
                   >
-                    Check drift
+                    {loadingAction === 'drift'
+                      ? renderActionSpinner('Checking drift…')
+                      : 'Check drift'}
                   </button>
                   <button
                     type="button"
-                    className="btn-provision secondary"
-                    disabled={loading}
+                    className={`btn-provision secondary${loadingAction === 'remediate-preview' ? ' is-loading' : ''}`}
+                    disabled={isBusy}
                     onClick={() => runRemediate(detail.deployment_name, true)}
                   >
-                    Preview fix (plan only)
+                    {loadingAction === 'remediate-preview'
+                      ? renderActionSpinner('Planning…')
+                      : 'Preview fix (plan only)'}
                   </button>
                   {detail.latest_drift === 'drift_detected' && (
                     <button
                       type="button"
-                      className="btn-provision primary"
-                      disabled={loading || (userPermissions && !userPermissions.can_remediate)}
+                      className={`btn-provision primary${loadingAction === 'remediate-apply' ? ' is-loading' : ''}`}
+                      disabled={isBusy || (userPermissions && !userPermissions.can_remediate)}
                       onClick={() => runRemediate(detail.deployment_name, false)}
                     >
-                      Apply fix
+                      {loadingAction === 'remediate-apply'
+                        ? renderActionSpinner('Applying…')
+                        : 'Apply fix'}
                     </button>
                   )}
                   <button
                     type="button"
-                    className="btn-provision danger"
-                    disabled={loading || (userPermissions && !userPermissions.can_destroy)}
+                    className={`btn-provision danger${loadingAction === 'destroy' ? ' is-loading' : ''}`}
+                    disabled={isBusy || (userPermissions && !userPermissions.can_destroy)}
                     onClick={() => runDestroy(detail.deployment_name)}
                   >
-                    Destroy
+                    {loadingAction === 'destroy'
+                      ? renderActionSpinner('Destroying…')
+                      : 'Destroy'}
                   </button>
                 </div>
               )}
