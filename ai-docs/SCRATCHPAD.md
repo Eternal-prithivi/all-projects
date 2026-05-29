@@ -1,17 +1,20 @@
 # SCRATCHPAD.md
 
-**Status:** COMPLETE (2026-05-29) — roadmap docs only; no product code this session.
+**Status:** COMPLETE (2026-05-29)
 
-**Done:** Enterprise maturity audit → Phases **19–27** written to `PROGRESS.md`; `STATUS.md` + `PROGRESS_HISTORY.md` updated.
+**Phase 19 done:** CORS, DEPLOYMENT_SECRETS, CREDENTIAL_ROTATION, CLOUD_COST_GUARDRAILS, Sentry optional, uptime.yml, admin audit export, platform status GCP, vitest+CI.
 
-**LKGS:** Phase 18 complete; CI exists; org/team is membership-only until Phase 22+.
+**Git:** Pushed `153a519` (roadmap + prior work). Phase 19 commit pending push after `npm ci` / pytest.
 
-## Next session — start here
+**LKGS:** Phase 19 complete; no API keys needed except optional Sentry DSN.
 
-1. Read `STATUS.md` + this file.
-2. Open `PROGRESS.md` → **Phase 19** (isolated items first).
-3. Recommended first execute: **19.1** CORS + secrets docs, then **19.4–19.5** Sentry.
+## Next session
 
-**Do not start Phase 22 (org_id)** until Phase 19–21 items you care about are underway.
+1. `git pull` on `stage`
+2. `PROGRESS.md` → **Phase 20.1** (admin pytest)
+3. GCP billing when ready — not blocking Phase 20
 
-**User blocked:** GCP billing (₹1000 / card) — use `DEMO_MODE=true` or simulated VM until billing active; see **19.10**.
+**Optional env (not required):**
+
+- `SENTRY_DSN` / `VITE_SENTRY_DSN` — free at sentry.io
+- `UPTIME_API_URL` — GitHub repo secret for uptime workflow

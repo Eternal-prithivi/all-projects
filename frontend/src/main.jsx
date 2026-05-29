@@ -25,6 +25,9 @@ import ThemeSync from "./components/ThemeSync.jsx";
 import ErrorBoundary from "./components/ErrorBoundary.jsx";
 import LazyLoadFallback from "./components/LazyLoadFallback.jsx";
 import "./index.css";
+import { initSentry } from "./lib/sentry.js";
+
+initSentry();
 
 // Eager load: Critical pages needed immediately
 import HomePage from "./pages/HomePage.jsx";

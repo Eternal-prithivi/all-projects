@@ -29,6 +29,26 @@ const AdminSystemPage = () => {
     return new Date(dateString).toLocaleString();
   };
 
+  const handleExportAuditCsv = async () => {
+    try {
+      const res = await api.get('/audit-logs/export', {
+        params: { days: 30, format: 'csv' },
+        responseType: 'blob',
+      });
+      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `zenith_admin_audit_${new Date().toISOString().slice(0, 10)}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      toast.success('Audit log exported');
+    } catch {
+      toast.error('Failed to export audit log');
+    }
+  };
+
   if (loading) {
     return (
       <div className="admin-loading">
@@ -47,6 +67,11 @@ const AdminSystemPage = () => {
         kicker="Admin"
         title="System Health"
         subtitle="Monitor platform infrastructure and database status"
+        actions={
+          <button type="button" className="btn-export" onClick={handleExportAuditCsv}>
+            Export audit CSV
+          </button>
+        }
       />
 
       <div className="health-grid">

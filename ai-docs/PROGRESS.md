@@ -8,10 +8,10 @@
 
 ## 🔴 Active Task
 
-**None** — roadmap documented; pick **Phase 19** item **19.1** when ready to execute.
+**None** — Phase **19** complete. Next: **20.1**.
 
-| Next up (recommended) | `19.1` Security hardening (CORS + secrets docs) |
-|-----------------------|--------------------------------------------------|
+| Next up | Phase **20.1** — pytest admin CRUD |
+|---------|-------------------------------------|
 
 ---
 
@@ -19,7 +19,7 @@
 
 | Phase | Theme | Depends on | Status |
 |-------|--------|------------|--------|
-| **19** | Isolated ops & hygiene | — | ⬜ Not started |
+| **19** | Isolated ops & hygiene | — | ✅ Complete |
 | **20** | Quality, CI depth & CD | 19 (secrets/CORS doc) | ⬜ Not started |
 | **21** | Observability & runbooks | 19 | ⬜ Not started |
 | **22** | Org foundation (data model) | 19–21 recommended | ⬜ Not started |
@@ -35,18 +35,18 @@
 
 *No org model changes. No multi-service deploy required. Can be done one item at a time.*
 
-- [ ] **19.1** — CORS: restrict production origins in `main.py` (remove wildcard patterns for prod); document allowed origins in `docs/setup/`
-- [ ] **19.2** — Secrets hygiene: audit `backend/.env.example`; add `docs/setup/DEPLOYMENT_SECRETS.md` (Render/Vercel env vars, never commit `.env`, rotation checklist)
-- [ ] **19.3** — Credential rotation runbook (AWS keys, GCP SA keys, JWT `SECRET_KEY`, Razorpay) in `docs/`
-- [ ] **19.4** — Sentry: backend integration (`sentry-sdk` + FastAPI hook) + env `SENTRY_DSN`
-- [ ] **19.5** — Sentry: frontend integration (`@sentry/react`) + Vite env
-- [ ] **19.6** — External uptime check: document + optional GitHub Action cron hitting `GET /health` and public `GET /api/platform/status`
-- [ ] **19.7** — Audit log CSV export: `GET /api/admin/audit-log/export` + button on Security Settings / Admin
-- [ ] **19.8** — Platform status: enrich `GET /api/platform/status` with Mongo ping + `gcp_credentials_present` (no auth)
-- [ ] **19.9** — Sync `PROFESSIONAL_IMPROVEMENTS.md` (mark CI ✅; point remaining items to Phases 19–27 here)
-- [ ] **19.10** — Cloud cost guardrails doc: GCP $300 trial + ₹ prepayment note, AWS/GCP **budget alerts**, stop VMs when idle (link `CLOUD_CREDENTIAL_SETUP_GUIDE.md`)
-- [ ] **19.11** — Vitest scaffold: `frontend` test script + one smoke test (no product behavior change)
-- [ ] **19.12** — Security page 2FA dialog polish (overlay cancel — verify complete; close any open UX gaps)
+- [x] **19.1** — CORS: production tightening + `CORS_ALLOWED_ORIGINS` in `main.py`; `docs/setup/DEPLOYMENT_SECRETS.md`
+- [x] **19.2** — Secrets hygiene: `.env.example` + `DEPLOYMENT_SECRETS.md`
+- [x] **19.3** — Credential rotation runbook — `docs/setup/CREDENTIAL_ROTATION.md`
+- [x] **19.4** — Sentry backend (`sentry-sdk`, optional `SENTRY_DSN`)
+- [x] **19.5** — Sentry frontend (`@sentry/react`, optional `VITE_SENTRY_DSN`)
+- [x] **19.6** — Uptime workflow `.github/workflows/uptime.yml` (needs `UPTIME_API_URL` secret)
+- [x] **19.7** — Admin audit CSV export button (`/audit-logs/export`; user activity export already on Security Settings)
+- [x] **19.8** — Platform status: `gcp_credentials_present` + `gcp_integration` service row
+- [x] **19.9** — `PROFESSIONAL_IMPROVEMENTS.md` synced to Phase 19–27
+- [x] **19.10** — `docs/setup/CLOUD_COST_GUARDRAILS.md`
+- [x] **19.11** — Vitest scaffold + CI `npm run test`
+- [x] **19.12** — Security 2FA overlay dialog (shipped prior — verified)
 
 ---
 

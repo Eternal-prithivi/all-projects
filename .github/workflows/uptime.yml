@@ -1,0 +1,24 @@
+# Optional external sanity check — set repository secret UPTIME_API_URL (e.g. https://your-api.onrender.com)
+name: Uptime check
+
+on:
+  schedule:
+    - cron: "0 */6 * * *"
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Health check
+        if: ${{ secrets.UPTIME_API_URL != '' }}
+        run: |
+          BASE="${{ secrets.UPTIME_API_URL }}"
+          BASE="${BASE%/}"
+          curl -fsS "${BASE}/health" | tee health.json
+          curl -fsS "${BASE}/api/platform/status" | tee status.json
+          python3 -c "import json; h=json.load(open('health.json')); assert h.get('mongo_connected') is True, h"
+
+      - name: Skip (no secret)
+        if: ${{ secrets.UPTIME_API_URL == '' }}
+        run: echo "Set UPTIME_API_URL repository secret to enable scheduled uptime checks."

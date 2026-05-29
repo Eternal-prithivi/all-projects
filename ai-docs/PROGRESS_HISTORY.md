@@ -7,6 +7,15 @@
 
 ---
 
+**Phase 19: Isolated ops & hygiene** — COMPLETE 2026-05-29
+
+- CORS production tightening + `CORS_ALLOWED_ORIGINS`; `DEPLOYMENT_SECRETS.md`, `CREDENTIAL_ROTATION.md`, `CLOUD_COST_GUARDRAILS.md`
+- Optional Sentry (backend `SENTRY_DSN`, frontend `VITE_SENTRY_DSN`); `.github/workflows/uptime.yml`
+- Platform `/api/platform/status` exposes `gcp_credentials_present`; admin **Export audit CSV** on System Health
+- Vitest smoke test + CI `npm run test`; `gcp_credentials.py` helper
+
+---
+
 **Enterprise roadmap Phases 19–27** — DOCUMENTED 2026-05-29 (docs only, no code)
 
 - Captured enterprise gap assessment (tenancy, CI/CD, observability, IdP, scale, compliance, cloud parity).

@@ -54,6 +54,30 @@ from app.utils.config import settings
 import os
 import re
 
+from app.utils.gcp_credentials import gcp_credentials_file_present
+
+
+def _init_sentry() -> None:
+    dsn = os.getenv("SENTRY_DSN", "").strip()
+    if not dsn:
+        return
+    try:
+        import sentry_sdk
+        from sentry_sdk.integrations.fastapi import FastApiIntegration
+
+        sentry_sdk.init(
+            dsn=dsn,
+            environment=getattr(settings, "ENVIRONMENT", "development"),
+            integrations=[FastApiIntegration()],
+            traces_sample_rate=float(os.getenv("SENTRY_TRACES_SAMPLE_RATE", "0.1")),
+            send_default_pii=False,
+        )
+    except Exception as exc:
+        print(f"⚠️  Sentry init skipped: {exc}")
+
+
+_init_sentry()
+
 # Initialize rate limiter
 limiter = Limiter(key_func=get_remote_address)
 
@@ -63,40 +87,59 @@ app = FastAPI(title="Zenith API")
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
-# CORS configuration - Allow Vercel preview deployments with pattern matching
+# CORS — explicit allowlist + Vercel patterns (see docs/setup/DEPLOYMENT_SECRETS.md)
+_STATIC_ALLOWED_ORIGINS = [
+    "https://rajverse.me",
+    "https://www.rajverse.me",
+]
+
+_VERCEL_FRONTEND_PATTERNS = [
+    r"https://zenith-frontend-.*\.vercel\.app$",
+    r"https://zenith-frontend-.*-eternal-prithivis-projects\.vercel\.app$",
+]
+
+# Development only — broader preview URLs
+_VERCEL_DEV_EXTRA_PATTERNS = [
+    r"https://zenith-.*-eternal-prithivis-projects\.vercel\.app$",
+]
+
+
+def _extra_cors_origins() -> list[str]:
+    raw = os.getenv("CORS_ALLOWED_ORIGINS", "")
+    return [o.strip().rstrip("/") for o in raw.split(",") if o.strip()]
+
+
 def is_allowed_origin(origin: str) -> bool:
-    """Check if origin is allowed (localhost or Vercel domains)"""
+    """Return True if the browser Origin may call this API with credentials."""
     if not origin:
         return False
-    
-    # Allow local dev (Vite may use localhost or 127.0.0.1)
-    if origin.startswith("http://localhost:") or origin.startswith("http://127.0.0.1:"):
+
+    normalized = origin.rstrip("/")
+    env = getattr(settings, "ENVIRONMENT", "development") or "development"
+
+    for extra in _extra_cors_origins():
+        if normalized == extra.rstrip("/"):
+            return True
+
+    frontend_url = (os.getenv("FRONTEND_URL") or getattr(settings, "FRONTEND_URL", "") or "").rstrip("/")
+    if frontend_url and normalized == frontend_url:
         return True
-    
-    # Allow all Vercel preview and production URLs
-    vercel_patterns = [
-        r"https://zenith-frontend-.*\.vercel\.app$",
-        r"https://zenith-frontend-.*-eternal-prithivis-projects\.vercel\.app$",
-        r"https://zenith-.*-eternal-prithivis-projects\.vercel\.app$",
-    ]
-    
-    for pattern in vercel_patterns:
+
+    if normalized in _STATIC_ALLOWED_ORIGINS:
+        return True
+
+    if env != "production":
+        if normalized.startswith("http://localhost:") or normalized.startswith("http://127.0.0.1:"):
+            return True
+
+    patterns = list(_VERCEL_FRONTEND_PATTERNS)
+    if env != "production":
+        patterns.extend(_VERCEL_DEV_EXTRA_PATTERNS)
+
+    for pattern in patterns:
         if re.match(pattern, origin):
             return True
-    
-    # Allow custom domains
-    allowed_domains = [
-        "https://rajverse.me",
-        "https://www.rajverse.me"
-    ]
-    if origin in allowed_domains:
-        return True
-    
-    # Allow custom domain if set via environment
-    custom_domain = os.getenv("FRONTEND_URL")
-    if custom_domain and origin == custom_domain:
-        return True
-    
+
     return False
 
 # Headers allowed on cross-origin requests (login sends X-Device-Fingerprint)
@@ -189,24 +232,11 @@ def health_check():
     except Exception:
         mongo_ok = False
 
-    gcp_key = getattr(settings, 'GCP_SERVICE_ACCOUNT_JSON_PATH', None)
-    if not gcp_key:
-        # fallback for legacy name
-        gcp_key = getattr(settings, 'GCP_SA_KEY_PATH', None)
-
-    gcp_ok = False
-    if gcp_key:
-        # If absolute path, check directly; if relative, resolve relative to project root
-        if os.path.isabs(gcp_key):
-            gcp_ok = os.path.exists(gcp_key)
-        else:
-            # infer repo root from this file
-            base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-            project_root = os.path.dirname(base_dir)
-            gcp_path = os.path.join(project_root, 'backend', gcp_key)
-            gcp_ok = os.path.exists(gcp_path)
-
-    return {"mongo_connected": mongo_ok, "gcp_credentials_present": gcp_ok}
+    return {
+        "mongo_connected": mongo_ok,
+        "gcp_credentials_present": gcp_credentials_file_present(),
+        "environment": getattr(settings, "ENVIRONMENT", "development"),
+    }
 
 
 @app.on_event("startup")
