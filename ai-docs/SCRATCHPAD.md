@@ -1,31 +1,13 @@
-# SCRATCHPAD.md — Mid-Task Resume State
-
-## ✅ Last Known Good State
-
-> Updated: 2026-05-29
-
-| Check | Status |
-|-------|--------|
-| Backend tests | ✅ 67 passed |
-| Frontend build | ✅ Passes |
-| Frontend lint | ✅ 0 errors |
-| Phase | 14b complete |
-
----
-
-## 🔄 Current Resume State
+# SCRATCHPAD.md
 
 **Status:** COMPLETE (2026-05-29)
 
-**Task:** Phase 14b — Provision P0
+**Task:** Phase 14c — Provision governance UI (Zenith-scoped)
 
 **Summary:**
-- Added `byoc_credentials.py`; scheduled drift uses owner BYOC, skips without BYOC
-- 5 test modules, 21 new tests (67 total)
-- CI `terraform-validate` job; Provision CSS tokens; fixed `resolve_credentials`
+- Provision reframed: BYOC only in Settings; tabs for manage/drift, activity, policies, optional deploy wizard
+- No duplicate AWS connect UI on Provision page
+- Admin provision roles at `/admin/provision-roles`
+- pytest 69, build OK
 
-**Next:** Phase 14c — provision audit/RBAC UI
-
----
-
-_Last updated: 2026-05-29_
+**Next:** Phase 14d optional (cost/VM links after deploy)

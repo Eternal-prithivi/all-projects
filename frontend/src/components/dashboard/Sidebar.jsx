@@ -30,7 +30,7 @@ function Sidebar({ user }) {
         <path d="M5.5 16a3.5 3.5 0 01-.369-6.98 4 4 0 117.753-1.977A4.5 4.5 0 1113.5 16h-8z"/>
         <path d="M10 9l3 3m0 0l-3 3m3-3H7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
       </svg>
-    ), label: 'Provision' },
+    ), label: 'Infrastructure' },
     { to: '/dashboard/costs', icon: <IconBarChart className="rail-icon" />, label: 'Cost Analysis' },
     { to: '/dashboard/billing', icon: (
       <svg className="rail-icon" width="20" height="20" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">

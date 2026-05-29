@@ -23,6 +23,19 @@ Notes: [one line optional]
 ## Session Log (recent only)
 
 ---
+SESSION_ID: 20260529-270000
+Date: 2026-05-29
+Agent: Cursor Composer
+Task: Phase 14c — Provision governance UI (Zenith-scoped)
+Changes:
+  - Tabbed Provision; BYOC gate → Settings only (no duplicate connect)
+  - Manage/drift panel, activity audit, policies viewer, optional deploy tab
+  - Admin provision-roles page; policy-rules API
+Outcome: Done
+Notes: pytest 69, build OK
+---
+
+---
 SESSION_ID: 20260529-260000
 Date: 2026-05-29
 Agent: Cursor Composer

@@ -186,6 +186,14 @@ async def my_permissions(user: dict = Depends(get_current_user)):
     return get_user_permissions(user)
 
 
+@router.get("/policy-rules")
+async def list_policy_rules(user: dict = Depends(get_current_user)):
+    """Return YAML policy rules for read-only display in the UI."""
+    _enforce_permission(user, ProvisionAction.VIEW)
+    rules = get_yaml_rules()
+    return {"rules": rules, "count": len(rules)}
+
+
 # ── Policy Check & Cost Estimate (standalone) ──
 
 

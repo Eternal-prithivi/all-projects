@@ -673,6 +673,129 @@
   background: rgba(255,255,255,0.08);
 }
 
+/* ── Phase 14c: tabs, BYOC gate, manage layout ── */
+.provision-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+  border-bottom: 1px solid var(--border-subtle, rgba(255,255,255,0.08));
+  padding-bottom: 0.5rem;
+}
+
+.provision-tab {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary, rgba(255,255,255,0.6));
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.provision-tab.active {
+  background: var(--bg-elevated, rgba(255,255,255,0.06));
+  color: var(--gold-primary, #D4A843);
+}
+
+.provision-tab-badge {
+  background: var(--gold-primary, #D4A843);
+  color: #1a1a1a;
+  font-size: 0.7rem;
+  padding: 0.1rem 0.4rem;
+  border-radius: 999px;
+}
+
+.provision-settings-cta {
+  padding: 2rem;
+  background: var(--bg-elevated, rgba(255,255,255,0.04));
+  border: 1px solid var(--border-subtle, rgba(255,255,255,0.08));
+  border-radius: 14px;
+  max-width: 560px;
+}
+
+.provision-empty-state {
+  padding: 2rem;
+  text-align: center;
+  color: var(--text-secondary, rgba(255,255,255,0.65));
+}
+
+.provision-empty-hint {
+  font-size: 0.85rem;
+  color: var(--text-secondary, rgba(255,255,255,0.5));
+  margin-top: 0.5rem;
+}
+
+.provision-manage-grid {
+  display: grid;
+  grid-template-columns: minmax(260px, 1fr) 1.5fr;
+  gap: 1.5rem;
+  align-items: start;
+}
+
+.deployment-card.selected {
+  border-color: var(--gold-primary, #D4A843);
+  box-shadow: 0 0 0 1px var(--gold-primary, #D4A843);
+}
+
+.provision-detail-panel {
+  padding: 1.25rem;
+  background: var(--bg-elevated, rgba(255,255,255,0.03));
+  border: 1px solid var(--border-subtle, rgba(255,255,255,0.08));
+  border-radius: 12px;
+  min-height: 200px;
+}
+
+.provision-drift-history ul {
+  list-style: none;
+  padding: 0;
+  margin: 0.75rem 0 0;
+}
+
+.provision-drift-history li {
+  padding: 0.5rem 0;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  font-size: 0.85rem;
+}
+
+.provision-drift-detail {
+  font-size: 0.8rem;
+  color: var(--text-secondary, rgba(255,255,255,0.55));
+  margin-top: 0.25rem;
+}
+
+.provision-output-snippet {
+  margin-top: 1rem;
+  padding: 0.75rem;
+  background: rgba(0,0,0,0.35);
+  border-radius: 8px;
+  font-size: 0.75rem;
+  overflow-x: auto;
+  max-height: 160px;
+}
+
+.provision-activity-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+
+.provision-activity-status {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  margin-right: 0.5rem;
+}
+
+.provision-activity-status.status-success { color: var(--success, #27ae60); }
+.provision-activity-status.status-failed,
+.provision-activity-status.status-denied { color: var(--danger, #e74c3c); }
+
 /* ── Responsive ── */
 @media (max-width: 768px) {
   .provision-page { padding: 1rem; }
@@ -681,4 +804,5 @@
   .module-toggles { grid-template-columns: 1fr; }
   .wizard-step-label { display: none; }
   .deployment-card { flex-direction: column; align-items: flex-start; }
+  .provision-manage-grid { grid-template-columns: 1fr; }
 }

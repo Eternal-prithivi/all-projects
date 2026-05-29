@@ -7,6 +7,17 @@
 
 ---
 
+**Phase 14c: Provision governance UI (Zenith-scoped)** — COMPLETE 2026-05-29
+
+- ✅ Provision page tabs: Deployments & drift, Activity (audit), Policies, New stack (optional wizard)
+- ✅ BYOC gate: if AWS not connected in Settings, single CTA to Settings — no credential forms on Provision
+- ✅ Drift history + detail panel; link to cost optimization
+- ✅ Admin `provision-roles` page; `GET /provision/policy-rules`
+- ✅ Sidebar renamed Infrastructure; deploy wizard notes optimization is on other pages
+- ✅ pytest 69, lint 0 errors, build pass
+
+---
+
 **Phase 14b: Provision P0 (tests, BYOC drift, CI validate)** — COMPLETE 2026-05-29
 
 - ✅ `app/provision/byoc_credentials.py` — BYOC-only Terraform env (no platform fallback for scheduled drift)
