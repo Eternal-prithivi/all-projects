@@ -41,10 +41,10 @@
   bottom: 70px;
   right: 0;
   min-width: 260px;
-  background: #1a1a1a;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
   border-radius: 12px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  box-shadow: var(--shadow-elevated);
   animation: slideUp 0.3s ease;
   overflow: hidden;
   pointer-events: auto;
@@ -64,8 +64,8 @@
 .quick-actions-header {
   padding: 1rem;
   font-weight: 600;
-  color: #fff;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--text-primary);
+  border-bottom: 1px solid var(--border-default);
   font-size: 0.9rem;
 }
 
@@ -77,11 +77,11 @@
   padding: 0.875rem 1rem;
   background: transparent;
   border: none;
-  color: #fff;
+  color: var(--text-primary);
   text-align: left;
   cursor: pointer;
   transition: all 0.2s ease;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  border-bottom: 1px solid var(--border-subtle);
   pointer-events: auto;
   position: relative;
   z-index: 1;
@@ -113,12 +113,12 @@
 
 .quick-action-shortcut {
   padding: 0.25rem 0.5rem;
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: var(--bg-input);
+  border: 1px solid var(--border-default);
   border-radius: 4px;
   font-size: 0.75rem;
   font-family: monospace;
-  color: #888;
+  color: var(--text-muted);
   pointer-events: none;
 }
 

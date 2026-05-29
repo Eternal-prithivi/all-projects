@@ -29,7 +29,7 @@
 .mc-greeting {
   margin-bottom: var(--space-xl);
   padding: var(--space-xl);
-  background: linear-gradient(135deg, rgba(212, 175, 55, 0.08) 0%, rgba(20, 20, 20, 0.72) 54%, rgba(3, 3, 3, 0.7) 100%);
+  background: linear-gradient(135deg, var(--gold-glow) 0%, var(--bg-card) 55%, var(--bg-base) 100%);
   border: 1px solid var(--border-default);
   border-radius: var(--radius-xl);
   position: relative;
@@ -108,7 +108,7 @@
    BENTO CARD — Base
    ======================================== */
 .bento-card {
-  background: linear-gradient(145deg, rgba(24, 24, 24, 0.72), rgba(12, 12, 12, 0.62));
+  background: var(--bg-card);
   backdrop-filter: blur(22px);
   -webkit-backdrop-filter: blur(22px);
   border: 1px solid var(--border-default);
@@ -129,7 +129,7 @@
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.035), transparent 42%);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--text-primary) 6%, transparent), transparent 42%);
   pointer-events: none;
 }
 
@@ -434,7 +434,7 @@
    SPARKLINE TOOLTIP
    ======================================== */
 .sparkline-tooltip {
-  background: rgba(10, 10, 10, 0.9);
+  background: var(--bg-elevated);
   backdrop-filter: blur(12px);
   border: 1px solid var(--gold-border);
   border-radius: var(--radius-sm);
@@ -487,7 +487,7 @@
   align-items: center;
   gap: 0.4rem;
   padding: 1rem 0.5rem;
-  background: linear-gradient(145deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02));
+  background: var(--bg-input);
   border: 1px solid var(--border-default);
   border-radius: var(--radius-md);
   cursor: pointer;
@@ -563,7 +563,7 @@
   align-items: flex-start;
   gap: 0.6rem;
   padding: 0.75rem;
-  background: rgba(255, 255, 255, 0.035);
+  background: var(--bg-input);
   border: 1px solid var(--border-default);
   border-radius: var(--radius-md);
   min-width: 200px;

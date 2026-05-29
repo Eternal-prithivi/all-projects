@@ -148,7 +148,37 @@
 }
 
 [data-theme="light"] .dashboard-content {
+  background-color: var(--bg-base);
   background-image: radial-gradient(circle at 80% 10%, rgba(184, 134, 11, 0.06) 0%, transparent 40%);
+}
+
+[data-theme="light"] .mc-greeting {
+  background: linear-gradient(135deg, var(--gold-glow) 0%, var(--bg-card) 55%, var(--bg-base) 100%);
+  box-shadow: var(--shadow-card);
+}
+
+[data-theme="light"] .mc-greeting::before {
+  background: linear-gradient(90deg, rgba(184, 134, 11, 0.1), transparent 36%),
+    radial-gradient(circle at 85% 5%, rgba(184, 134, 11, 0.08) 0%, transparent 32%);
+}
+
+[data-theme="light"] .site-footer {
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  border-top-color: var(--border-default);
+}
+
+[data-theme="light"] .site-footer h3,
+[data-theme="light"] .site-footer h4 {
+  color: var(--text-primary);
+}
+
+[data-theme="light"] .site-footer a {
+  color: var(--text-secondary);
+}
+
+[data-theme="light"] .site-footer a:hover {
+  color: var(--gold-primary);
 }
 
 [data-theme="light"] .header-search-trigger,
@@ -609,12 +639,18 @@
 html[data-theme] body,
 html[data-theme] .nav-rail,
 html[data-theme] .dashboard-header,
+html[data-theme] .dashboard-content,
+html[data-theme] .dashboard-breadcrumbs-wrapper,
+html[data-theme] .mc-greeting,
 html[data-theme] .bento-card,
 html[data-theme] .stat-card,
+html[data-theme] .timeline-card,
+html[data-theme] .action-btn,
 html[data-theme] .settings-card,
 html[data-theme] .setting-item,
 html[data-theme] .byoc-provider-card,
 html[data-theme] .footer,
+html[data-theme] .site-footer,
 html[data-theme] .mobile-tab-bar {
   transition: background-color 0.35s ease,
               color 0.35s ease,

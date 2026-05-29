@@ -1,7 +1,7 @@
 /* Modern SaaS Footer — Gold Theme Aligned */
 .site-footer {
-  background: #060608;
-  color: #8b92a8;
+  background: var(--bg-surface);
+  color: var(--text-secondary);
   padding: 3rem 0 1.25rem;
   margin-top: auto;
   border-top: 1px solid var(--border-subtle);
