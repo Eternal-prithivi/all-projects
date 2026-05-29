@@ -246,12 +246,27 @@ const SettingsPage = () => {
     }
   };
 
+  const REPLICA_REGION = 'us-east-1';
+
+  const bucketRoleForField = (field) => {
+    if (field === 'replica_bucket_name') return 'replica';
+    if (field === 'secure_bucket_name') return 'secure';
+    return 'storage';
+  };
+
+  const regionForBucketField = (field, region) => {
+    if (field === 'replica_bucket_name') return REPLICA_REGION;
+    return region || awsForm.region;
+  };
+
   const handleCheckAwsBucket = async (field, bucketName, region) => {
     if (!bucketName || !awsCredentialsVerified) return;
+    const targetRegion = regionForBucketField(field, region);
     try {
       const response = await apiClient.post('/byoc/check-bucket-name', {
         bucket_name: bucketName,
-        region: region || awsForm.region,
+        region: targetRegion,
+        bucket_role: bucketRoleForField(field),
         connection_method: byocMethod,
         access_key_id: awsForm.access_key_id,
         secret_access_key: awsForm.secret_access_key,
@@ -288,6 +303,7 @@ const SettingsPage = () => {
           ...payload,
           ...awsForm,
           primary_region: awsForm.region,
+          replica_region: REPLICA_REGION,
           bucket_name: awsForm.storage_bucket_name || awsForm.bucket_name,
         };
       } else if (byocActiveCSP === 'GCP') Object.assign(payload, gcpForm);

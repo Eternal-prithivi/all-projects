@@ -34,6 +34,7 @@ from app.byoc.aws_bucket_helpers import (
     check_bucket_access,
     create_s3_bucket,
     ensure_aws_buckets_exist,
+    resolve_bucket_target_region,
     suggest_aws_bucket_names,
     test_aws_buckets_access,
     validate_bucket_name_format,
@@ -226,6 +227,7 @@ class BYOCCheckBucketRequest(BaseModel):
     """Check or create a single bucket with user's credentials."""
     bucket_name: str
     region: str = "ap-south-1"
+    bucket_role: str = "storage"  # storage | secure | replica
     connection_method: str = "access_keys"
     access_key_id: Optional[str] = None
     secret_access_key: Optional[str] = None
@@ -576,11 +578,14 @@ async def check_bucket_name(
     if fmt:
         return {"bucket_name": request.bucket_name, "status": "invalid", "message": fmt}
 
-    region = request.region or "ap-south-1"
+    primary_region = request.region or "ap-south-1"
+    region = resolve_bucket_target_region(
+        request.bucket_role, request.region, primary_region
+    )
     access_key_id, secret_access_key, session_token = _resolve_aws_session_creds(
         user.username,
         request.connection_method,
-        region,
+        primary_region,
         request.access_key_id,
         request.secret_access_key,
         request.role_arn,
@@ -619,7 +624,11 @@ async def check_bucket_name(
 
     messages = {
         "available": "Name is available — Zenith will create this bucket when you connect.",
-        "accessible": "Bucket exists and your credentials can access it.",
+        "accessible": f"Bucket exists in {region} and is ready.",
+        "wrong_region": (
+            f"Bucket exists in the wrong region. Delete it in AWS and try again "
+            f"(replica must be in {REPLICA_REGION_DEFAULT})."
+        ),
         "forbidden": "Bucket unavailable or access denied (name may be taken globally).",
         "invalid": "Invalid bucket name format.",
     }
@@ -674,7 +683,8 @@ async def connect_cloud(request: BYOCConnectRequest, user: User = Depends(get_cu
     
     if csp == "AWS":
         primary_region = request.primary_region or request.region or "ap-south-1"
-        replica_region = request.replica_region or REPLICA_REGION_DEFAULT
+        # Secure replica is always in N. Virginia — never inherit primary_region
+        replica_region = REPLICA_REGION_DEFAULT
         storage_bucket = _resolve_aws_storage_bucket(request)
         secure_bucket = (request.secure_bucket_name or storage_bucket).strip()
         replica_bucket = (request.replica_bucket_name or "").strip()

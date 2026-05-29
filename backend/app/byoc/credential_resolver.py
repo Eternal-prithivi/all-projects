@@ -16,6 +16,7 @@ or the user's own BYOC credentials for each operation.
 
 from typing import Optional, Dict, Any
 from app.database.mongo_client import get_database
+from app.byoc.aws_bucket_helpers import REPLICA_REGION_DEFAULT
 from app.byoc.encryption import decrypt_credentials_dict
 from app.utils.config import settings
 from app.utils.logger import setup_logger
@@ -51,7 +52,7 @@ def normalize_aws_byoc_layout(record: Dict[str, Any]) -> Dict[str, Any]:
         or record.get("region")
         or creds_region(record)
     )
-    replica_region = record.get("replica_region") or "us-east-1"
+    replica_region = REPLICA_REGION_DEFAULT if replica else ""
     dual_write = record.get("secure_dual_write")
     if dual_write is None:
         dual_write = bool(replica)

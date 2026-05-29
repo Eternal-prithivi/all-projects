@@ -5,10 +5,17 @@ from unittest.mock import MagicMock, patch
 from app.byoc.aws_bucket_helpers import (
     check_bucket_access,
     create_s3_bucket,
+    resolve_bucket_target_region,
     suggest_aws_bucket_names,
     sanitize_username_for_bucket,
     validate_bucket_name_format,
+    REPLICA_REGION_DEFAULT,
 )
+
+
+def test_resolve_bucket_target_region_replica_always_virginia():
+    assert resolve_bucket_target_region("replica", "ap-south-1", "ap-south-1") == REPLICA_REGION_DEFAULT
+    assert resolve_bucket_target_region("storage", None, "ap-south-1") == "ap-south-1"
 
 
 def test_suggest_aws_bucket_names_unique_suffix():

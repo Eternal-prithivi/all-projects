@@ -17,6 +17,41 @@ REPLICA_REGION_DEFAULT = "us-east-1"
 BUCKET_NAME_RE = re.compile(r"^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$")
 
 
+def resolve_bucket_target_region(
+    bucket_role: str,
+    requested_region: Optional[str],
+    primary_region: str = "ap-south-1",
+) -> str:
+    """Replica buckets are always created in us-east-1 (N. Virginia)."""
+    if (bucket_role or "").lower() == "replica":
+        return REPLICA_REGION_DEFAULT
+    return (requested_region or primary_region or "ap-south-1").strip()
+
+
+def normalize_s3_location_constraint(location_constraint: Optional[str]) -> str:
+    """Map GetBucketLocation response to a region code."""
+    if not location_constraint:
+        return "us-east-1"
+    return location_constraint
+
+
+def get_bucket_actual_region(
+    access_key_id: str,
+    secret_access_key: str,
+    bucket_name: str,
+    session_token: Optional[str] = None,
+) -> Optional[str]:
+    """Return the AWS region where the bucket actually lives."""
+    client = _s3_client_from_keys(
+        access_key_id, secret_access_key, "us-east-1", session_token
+    )
+    try:
+        loc = client.get_bucket_location(Bucket=bucket_name).get("LocationConstraint")
+        return normalize_s3_location_constraint(loc)
+    except ClientError:
+        return None
+
+
 def sanitize_username_for_bucket(username: str) -> str:
     safe = re.sub(r"[^a-z0-9-]", "-", username.lower())
     safe = re.sub(r"-+", "-", safe).strip("-")
@@ -113,10 +148,9 @@ def check_bucket_access(
     session_token: Optional[str] = None,
 ) -> str:
     """
-    Returns: available | accessible | forbidden | invalid
-    - available: 404 (no bucket in this account/region — name may be free to create)
-    - accessible: 200 (bucket exists and keys can access it)
-    - forbidden: 403 or other
+    Returns: available | accessible | forbidden | invalid | wrong_region
+    - accessible: bucket exists in the expected region
+    - wrong_region: bucket exists but not in `region` (common when replica should be us-east-1)
     """
     fmt_err = validate_bucket_name_format(bucket_name)
     if fmt_err:
@@ -127,16 +161,28 @@ def check_bucket_access(
     )
     try:
         client.head_bucket(Bucket=bucket_name)
-        return "accessible"
     except ClientError as e:
         code = e.response.get("Error", {}).get("Code", "")
         if code in ("404", "NoSuchBucket", "NotFound"):
             return "available"
         if code in ("403", "AccessDenied"):
             return "forbidden"
+        if code in ("301", "PermanentRedirect"):
+            actual = get_bucket_actual_region(
+                access_key_id, secret_access_key, bucket_name, session_token
+            )
+            if actual and actual != region:
+                return "wrong_region"
         return "forbidden"
     except Exception:
         return "forbidden"
+
+    actual = get_bucket_actual_region(
+        access_key_id, secret_access_key, bucket_name, session_token
+    )
+    if actual and actual != region:
+        return "wrong_region"
+    return "accessible"
 
 
 def _apply_bucket_baseline(
@@ -227,6 +273,15 @@ def create_s3_bucket(
             "Add s3:PutBucketPublicAccessBlock, PutEncryptionConfiguration, PutBucketVersioning to IAM.",
         )
 
+    actual = get_bucket_actual_region(
+        access_key_id, secret_access_key, bucket_name, session_token
+    )
+    if actual and actual != region:
+        return (
+            False,
+            f"Bucket '{bucket_name}' exists in {actual} but must be in {region}. "
+            "Delete the bucket in AWS and try again.",
+        )
     verify = check_bucket_access(
         access_key_id, secret_access_key, bucket_name, region, session_token
     )
@@ -249,6 +304,15 @@ def ensure_aws_buckets_exist(
         )
         if status == "accessible":
             continue
+        if status == "wrong_region":
+            actual = get_bucket_actual_region(
+                access_key_id, secret_access_key, bucket_name, session_token
+            )
+            return (
+                False,
+                f"Bucket '{bucket_name}' is in {actual or 'another region'}, "
+                f"but must be in {region}. Delete it in AWS and reconnect.",
+            )
         if status != "available":
             if status == "invalid":
                 return False, f"Invalid bucket name: '{bucket_name}'."
@@ -285,6 +349,15 @@ def test_aws_buckets_access(
             access_key_id, secret_access_key, bucket_name, region, session_token
         )
         if status != "accessible":
+            if status == "wrong_region":
+                actual = get_bucket_actual_region(
+                    access_key_id, secret_access_key, bucket_name, session_token
+                )
+                return (
+                    False,
+                    f"Bucket '{bucket_name}' is in {actual or 'another region'}, "
+                    f"not {region}. Delete it in AWS and try again.",
+                )
             if status == "available":
                 return (
                     False,

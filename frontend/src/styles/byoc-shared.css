@@ -79,7 +79,8 @@
 }
 
 .byoc-bucket-check--forbidden,
-.byoc-bucket-check--invalid {
+.byoc-bucket-check--invalid,
+.byoc-bucket-check--wrong_region {
   color: var(--danger, #f87171);
 }
 

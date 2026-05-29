@@ -15,6 +15,7 @@ from botocore.config import Config
 from google.cloud import storage as gcp_storage
 from google.oauth2 import service_account
 
+from app.byoc.aws_bucket_helpers import REPLICA_REGION_DEFAULT
 from app.byoc.credential_resolver import (
     get_aws_bucket_layout,
     resolve_aws_credentials,
@@ -157,7 +158,11 @@ def resolve_secure_aws_storage(username: str) -> SecureAwsStorage:
         secure_bucket = layout.get("secure_bucket_name") or aws["bucket_name"]
         primary_region = layout.get("primary_region") or aws.get("region") or settings.PRIMARY_S3_REGION
         replica_bucket = layout.get("replica_bucket_name") or ""
-        replica_region = layout.get("replica_region") or settings.REPLICA_S3_REGION
+        replica_region = (
+            REPLICA_REGION_DEFAULT
+            if layout.get("replica_bucket_name")
+            else (layout.get("replica_region") or REPLICA_REGION_DEFAULT)
+        )
         dual_write = layout.get("secure_dual_write", True)
         dedicated = bool(
             layout.get("secure_bucket_name")
