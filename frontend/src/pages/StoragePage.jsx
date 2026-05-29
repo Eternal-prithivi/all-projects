@@ -26,6 +26,7 @@ import {
 } from "../api";
 import "../styles/storage.css";
 import PageHeader from "../components/ui/PageHeader.jsx";
+import ByocStorageTargetBanner from "../components/ByocStorageTargetBanner.jsx";
 import EmptyState from "../components/EmptyState.jsx";
 import { IconHardDrive } from "../components/dashboard/Icons.jsx";
 
@@ -258,6 +259,8 @@ function StoragePage() {
         title="Standard Storage"
         subtitle="Upload, analyze, and sync files across your connected cloud providers"
       />
+
+      <ByocStorageTargetBanner variant="storage" />
 
       {/* Storage Process Flow */}
       <div className="storage-process-info">

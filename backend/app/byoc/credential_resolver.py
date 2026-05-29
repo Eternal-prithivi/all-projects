@@ -32,6 +32,35 @@ def _get_default_aws_bucket_name() -> str:
     return settings.S3_BUCKET_NAME
 
 
+def get_aws_byoc_record(username: str) -> Optional[Dict[str, Any]]:
+    """Active AWS BYOC Mongo record (not decrypted)."""
+    return byoc_collection.find_one(
+        {"username": username, "csp": "AWS", "is_active": True}
+    )
+
+
+def get_aws_bucket_layout(username: str) -> Optional[Dict[str, Any]]:
+    """Resolved bucket names and regions for AWS BYOC."""
+    record = get_aws_byoc_record(username)
+    if not record:
+        return None
+    storage = record.get("storage_bucket_name") or record.get("bucket_name") or ""
+    secure = record.get("secure_bucket_name") or storage
+    return {
+        "storage_bucket_name": storage,
+        "secure_bucket_name": secure,
+        "replica_bucket_name": record.get("replica_bucket_name") or "",
+        "primary_region": record.get("primary_region")
+        or record.get("region")
+        or settings.PRIMARY_S3_REGION,
+        "replica_region": record.get("replica_region") or "us-east-1",
+        "secure_dual_write": record.get("secure_dual_write", True),
+        "uses_dedicated_secure_bucket": bool(
+            record.get("secure_bucket_name") and secure != storage
+        ),
+    }
+
+
 def get_user_cloud_credentials(username: str, csp: str) -> Optional[Dict[str, Any]]:
     """
     Get cloud credentials for a user + CSP.
@@ -57,13 +86,29 @@ def get_user_cloud_credentials(username: str, csp: str) -> Optional[Dict[str, An
     encrypted_creds = record.get("credentials", {})
     decrypted = decrypt_credentials_dict(encrypted_creds)
     
+    layout = None
+    if record["csp"] == "AWS":
+        storage = record.get("storage_bucket_name") or record.get("bucket_name") or ""
+        layout = {
+            "storage_bucket_name": storage,
+            "secure_bucket_name": record.get("secure_bucket_name") or storage,
+            "replica_bucket_name": record.get("replica_bucket_name") or "",
+        }
+
     return {
         "csp": record["csp"],
         "connection_method": record.get("connection_method", "access_keys"),
         "bucket_name": record.get("bucket_name", ""),
+        "storage_bucket_name": record.get("storage_bucket_name", record.get("bucket_name", "")),
+        "secure_bucket_name": record.get("secure_bucket_name", ""),
+        "replica_bucket_name": record.get("replica_bucket_name", ""),
+        "primary_region": record.get("primary_region", ""),
+        "replica_region": record.get("replica_region", ""),
+        "secure_dual_write": record.get("secure_dual_write", True),
         "container_name": record.get("container_name", ""),
         "credentials": decrypted,
         "is_active": record.get("is_active", True),
+        "layout": layout,
     }
 
 
@@ -79,8 +124,16 @@ def resolve_aws_credentials(username: str) -> Dict[str, str]:
     if byoc:
         creds = byoc["credentials"]
         connection_method = (byoc.get("connection_method") or "access_keys").lower()
-        bucket_name = byoc.get("bucket_name") or _get_default_aws_bucket_name()
-        region = creds.get("region") or settings.PRIMARY_S3_REGION
+        bucket_name = (
+            byoc.get("storage_bucket_name")
+            or byoc.get("bucket_name")
+            or _get_default_aws_bucket_name()
+        )
+        region = (
+            creds.get("region")
+            or byoc.get("primary_region")
+            or settings.PRIMARY_S3_REGION
+        )
 
         if connection_method == "iam_role":
             role_arn = creds.get("role_arn", "")
@@ -210,10 +263,31 @@ def get_byoc_status(username: str) -> Dict[str, Any]:
             "csp": csp,
             "is_active": True
         })
-        status[csp.lower()] = {
+        entry = {
             "connected": record is not None,
             "connection_method": record.get("connection_method", None) if record else None,
             "bucket_name": record.get("bucket_name", record.get("container_name", "")) if record else "",
             "connected_at": record.get("created_at", None) if record else None,
         }
+        if record and csp == "AWS":
+            storage = record.get("storage_bucket_name") or record.get("bucket_name") or ""
+            entry.update({
+                "storage_bucket_name": storage,
+                "secure_bucket_name": record.get("secure_bucket_name") or storage,
+                "replica_bucket_name": record.get("replica_bucket_name") or "",
+                "primary_region": record.get("primary_region") or creds_region(record),
+                "replica_region": record.get("replica_region") or "us-east-1",
+                "secure_dual_write": record.get("secure_dual_write", True),
+                "bucket_name": storage,
+            })
+        status[csp.lower()] = entry
     return status
+
+
+def creds_region(record: dict) -> str:
+    enc = record.get("credentials") or {}
+    try:
+        dec = decrypt_credentials_dict(enc) if enc else {}
+        return dec.get("region") or settings.PRIMARY_S3_REGION
+    except Exception:
+        return settings.PRIMARY_S3_REGION

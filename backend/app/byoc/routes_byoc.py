@@ -27,7 +27,16 @@ from app.auth.auth_utils import get_current_user
 from app.users.user_model import User
 from app.database.mongo_client import get_database
 from app.byoc.encryption import encrypt_credential, encrypt_credentials_dict
-from app.byoc.credential_resolver import get_byoc_status
+from app.byoc.credential_resolver import get_aws_bucket_layout, get_byoc_status
+from app.byoc.aws_bucket_helpers import (
+    REPLICA_REGION_DEFAULT,
+    assume_role_temp_credentials,
+    check_bucket_access,
+    suggest_aws_bucket_names,
+    test_aws_buckets_access,
+    validate_bucket_name_format,
+    verify_aws_access_keys,
+)
 from app.utils.config import settings
 from app.utils.logger import setup_logger
 
@@ -78,7 +87,7 @@ IAM_POLICY_TEMPLATES = {
                 "Version": "2012-10-17",
                 "Statement": [
                     {
-                        "Sid": "ZenithStorageAccess",
+                        "Sid": "ZenithBYOCBuckets",
                         "Effect": "Allow",
                         "Action": [
                             "s3:PutObject",
@@ -88,8 +97,12 @@ IAM_POLICY_TEMPLATES = {
                             "s3:GetBucketLocation"
                         ],
                         "Resource": [
-                            "arn:aws:s3:::YOUR_BUCKET_NAME",
-                            "arn:aws:s3:::YOUR_BUCKET_NAME/*"
+                            "arn:aws:s3:::YOUR_STORAGE_BUCKET",
+                            "arn:aws:s3:::YOUR_STORAGE_BUCKET/*",
+                            "arn:aws:s3:::YOUR_SECURE_BUCKET",
+                            "arn:aws:s3:::YOUR_SECURE_BUCKET/*",
+                            "arn:aws:s3:::YOUR_REPLICA_BUCKET",
+                            "arn:aws:s3:::YOUR_REPLICA_BUCKET/*"
                         ]
                     }
                 ]
@@ -99,10 +112,11 @@ IAM_POLICY_TEMPLATES = {
                 "Select 'Another AWS account' as trusted entity",
                 "Enter Zenith's Account ID: {account_id}",
                 "Check 'Require external ID' and enter: {external_id}",
-                "Click Next → Create a policy with the permissions JSON below (replace YOUR_BUCKET_NAME)",
+                "Click Next → Create a policy with the permissions JSON below (replace YOUR_STORAGE_BUCKET, YOUR_SECURE_BUCKET, YOUR_REPLICA_BUCKET)",
                 "Attach the policy → Name the role 'ZenithBYOC' → Create",
+                "Create three S3 buckets in AWS (storage + secure in your primary region; replica in us-east-1)",
                 "Copy the Role ARN (e.g., arn:aws:iam::123456789012:role/ZenithBYOC)",
-                "Paste the Role ARN below"
+                "Paste the Role ARN in Step 1, then configure bucket names in Step 2"
             ]
         }
     },
@@ -162,8 +176,14 @@ class BYOCConnectRequest(BaseModel):
     # AWS - Access Keys method
     access_key_id: Optional[str] = Field(None, description="AWS Access Key ID")
     secret_access_key: Optional[str] = Field(None, description="AWS Secret Access Key")
-    bucket_name: Optional[str] = Field(None, description="S3 bucket name")
-    region: Optional[str] = Field("ap-south-1", description="AWS region")
+    bucket_name: Optional[str] = Field(None, description="Legacy: storage bucket name")
+    storage_bucket_name: Optional[str] = Field(None, description="S3 bucket for regular storage")
+    secure_bucket_name: Optional[str] = Field(None, description="S3 bucket for security vault")
+    replica_bucket_name: Optional[str] = Field(None, description="S3 replica bucket (us-east-1)")
+    secure_dual_write: bool = Field(True, description="Replicate secure files to replica bucket")
+    region: Optional[str] = Field("ap-south-1", description="AWS primary region")
+    primary_region: Optional[str] = Field(None, description="Region for storage + secure buckets")
+    replica_region: Optional[str] = Field(REPLICA_REGION_DEFAULT, description="Replica region")
     
     # AWS - IAM Role method
     role_arn: Optional[str] = Field(None, description="AWS IAM Role ARN")
@@ -185,6 +205,71 @@ class BYOCTestResult(BaseModel):
     message: str
     csp: str
     bucket_name: Optional[str] = None
+
+
+class BYOCVerifyCredentialsRequest(BaseModel):
+    """Step 1: verify AWS credentials only (not persisted)."""
+    csp: str = Field("AWS", description="Cloud provider")
+    connection_method: str = Field("access_keys", description="access_keys or iam_role")
+    access_key_id: Optional[str] = None
+    secret_access_key: Optional[str] = None
+    role_arn: Optional[str] = None
+    region: Optional[str] = "ap-south-1"
+
+
+class BYOCCheckBucketRequest(BaseModel):
+    """Check a single bucket name with user's credentials."""
+    bucket_name: str
+    region: str = "ap-south-1"
+    access_key_id: str
+    secret_access_key: str
+    session_token: Optional[str] = None
+
+
+def _resolve_aws_storage_bucket(request: BYOCConnectRequest) -> str:
+    return (
+        request.storage_bucket_name
+        or request.bucket_name
+        or ""
+    ).strip()
+
+
+def _save_aws_byoc_record(
+    user: User,
+    request: BYOCConnectRequest,
+    credentials_to_encrypt: dict,
+    storage_bucket: str,
+    secure_bucket: str,
+    replica_bucket: str,
+    primary_region: str,
+    replica_region: str,
+) -> None:
+    encrypted_creds = encrypt_credentials_dict(credentials_to_encrypt)
+    credentials_to_encrypt.setdefault("region", primary_region)
+
+    byoc_collection.update_one(
+        {"username": user.username, "csp": "AWS"},
+        {
+            "$set": {
+                "username": user.username,
+                "csp": "AWS",
+                "connection_method": request.connection_method,
+                "credentials": encrypted_creds,
+                "bucket_name": storage_bucket,
+                "storage_bucket_name": storage_bucket,
+                "secure_bucket_name": secure_bucket,
+                "replica_bucket_name": replica_bucket,
+                "primary_region": primary_region,
+                "replica_region": replica_region,
+                "region": primary_region,
+                "secure_dual_write": request.secure_dual_write,
+                "is_active": True,
+                "updated_at": datetime.utcnow(),
+            },
+            "$setOnInsert": {"created_at": datetime.utcnow()},
+        },
+        upsert=True,
+    )
 
 
 # --- Helper: Check plan eligibility ---
@@ -345,6 +430,134 @@ async def get_status(user: User = Depends(get_current_user)):
     }
 
 
+@router.get("/storage-targets", summary="Where Storage and Security files are stored")
+async def get_storage_targets(user: User = Depends(get_current_user)):
+    """Read-only destination info for Storage and Security pages."""
+    layout = get_aws_bucket_layout(user.username)
+    if layout:
+        storage = layout["storage_bucket_name"]
+        secure = layout["secure_bucket_name"]
+        return {
+            "mode": "byoc",
+            "csp": "AWS",
+            "storage": {
+                "bucket": storage,
+                "region": layout["primary_region"],
+                "key_prefix": f"{user.username}/",
+            },
+            "security": {
+                "bucket": secure,
+                "region": layout["primary_region"],
+                "key_prefix": f"{user.username}/"
+                if layout.get("uses_dedicated_secure_bucket")
+                else f"secure/{user.username}/",
+                "replica_bucket": layout.get("replica_bucket_name") or None,
+                "replica_region": layout.get("replica_region") or None,
+                "secure_dual_write": layout.get("secure_dual_write", True),
+            },
+        }
+    return {
+        "mode": "platform",
+        "storage": {
+            "bucket": getattr(settings, "REGULAR_S3_BUCKET_NAME", settings.S3_BUCKET_NAME),
+            "region": settings.PRIMARY_S3_REGION,
+            "key_prefix": f"{user.username}/",
+        },
+        "security": {
+            "bucket": settings.SECURE_S3_BUCKET_NAME,
+            "region": settings.PRIMARY_S3_REGION,
+            "key_prefix": f"{user.username}/",
+            "replica_bucket": settings.REPLICA_S3_BUCKET_NAME,
+            "replica_region": settings.REPLICA_S3_REGION,
+            "secure_dual_write": True,
+        },
+    }
+
+
+@router.post("/verify-credentials", summary="Step 1 — Verify cloud credentials only")
+async def verify_credentials(
+    request: BYOCVerifyCredentialsRequest,
+    user: User = Depends(get_current_user),
+):
+    """Validate credentials without saving. Returns suggested bucket names for Step 2."""
+    check_byoc_eligibility(user.username)
+    csp = request.csp.upper()
+    if csp != "AWS":
+        raise HTTPException(status_code=400, detail="Step 1 verify is implemented for AWS only.")
+
+    region = request.region or "ap-south-1"
+    suggestions = suggest_aws_bucket_names(user.username)
+
+    if request.connection_method == "iam_role":
+        if not request.role_arn:
+            raise HTTPException(status_code=400, detail="role_arn is required.")
+        ext_id = get_or_create_external_id(user.username)
+        ok, message, _temp = assume_role_temp_credentials(request.role_arn, ext_id, region)
+        if not ok:
+            raise HTTPException(status_code=400, detail=message)
+        return {
+            "valid": True,
+            "message": message,
+            "csp": "AWS",
+            "aws_account_id": None,
+            "suggestions": suggestions,
+            "primary_region": region,
+            "replica_region": REPLICA_REGION_DEFAULT,
+            "external_id": ext_id,
+        }
+
+    if not request.access_key_id or not request.secret_access_key:
+        raise HTTPException(
+            status_code=400,
+            detail="access_key_id and secret_access_key are required.",
+        )
+    ok, message, account_id = verify_aws_access_keys(
+        request.access_key_id, request.secret_access_key, region
+    )
+    if not ok:
+        raise HTTPException(status_code=400, detail=message)
+    return {
+        "valid": True,
+        "message": message,
+        "csp": "AWS",
+        "aws_account_id": account_id,
+        "suggestions": suggestions,
+        "primary_region": region,
+        "replica_region": REPLICA_REGION_DEFAULT,
+    }
+
+
+@router.post("/check-bucket-name", summary="Check S3 bucket name availability/access")
+async def check_bucket_name(
+    request: BYOCCheckBucketRequest,
+    user: User = Depends(get_current_user),
+):
+    """Check bucket format and HeadBucket status using provided credentials."""
+    check_byoc_eligibility(user.username)
+    fmt = validate_bucket_name_format(request.bucket_name)
+    if fmt:
+        return {"bucket_name": request.bucket_name, "status": "invalid", "message": fmt}
+
+    status = check_bucket_access(
+        request.access_key_id,
+        request.secret_access_key,
+        request.bucket_name,
+        request.region,
+        request.session_token,
+    )
+    messages = {
+        "available": "Name is free in your account — create this bucket in AWS before connecting.",
+        "accessible": "Bucket exists and your credentials can access it.",
+        "forbidden": "Bucket unavailable or access denied (name may be taken globally).",
+        "invalid": "Invalid bucket name format.",
+    }
+    return {
+        "bucket_name": request.bucket_name,
+        "status": status,
+        "message": messages.get(status, ""),
+    }
+
+
 @router.get("/policy-templates", summary="Get IAM Policy Templates")
 async def get_policy_templates(user: User = Depends(get_current_user)):
     """Get IAM policy templates with user-specific external ID."""
@@ -387,30 +600,113 @@ async def connect_cloud(request: BYOCConnectRequest, user: User = Depends(get_cu
     bucket_or_container = ""
     
     if csp == "AWS":
+        primary_region = request.primary_region or request.region or "ap-south-1"
+        replica_region = request.replica_region or REPLICA_REGION_DEFAULT
+        storage_bucket = _resolve_aws_storage_bucket(request)
+        secure_bucket = (request.secure_bucket_name or storage_bucket).strip()
+        replica_bucket = (request.replica_bucket_name or "").strip()
+
+        if not storage_bucket or not secure_bucket:
+            raise HTTPException(
+                status_code=400,
+                detail="storage_bucket_name and secure_bucket_name are required.",
+            )
+        if request.secure_dual_write and not replica_bucket:
+            raise HTTPException(
+                status_code=400,
+                detail="replica_bucket_name is required when secure replication is enabled.",
+            )
+
+        for name, label in [
+            (storage_bucket, "Storage bucket"),
+            (secure_bucket, "Secure bucket"),
+            (replica_bucket, "Replica bucket") if replica_bucket else (None, None),
+        ]:
+            if not name:
+                continue
+            fmt_err = validate_bucket_name_format(name)
+            if fmt_err:
+                raise HTTPException(status_code=400, detail=f"{label}: {fmt_err}")
+
+        session_token = None
+        access_key_id = request.access_key_id
+        secret_access_key = request.secret_access_key
+
         if request.connection_method == "iam_role":
-            # IAM Role method — use Role ARN
-            if not request.role_arn or not request.bucket_name:
-                raise HTTPException(status_code=400, detail="IAM Role method requires role_arn and bucket_name.")
-            
+            if not request.role_arn:
+                raise HTTPException(status_code=400, detail="IAM Role method requires role_arn.")
             ext_id = get_or_create_external_id(user.username)
-            test_result = test_aws_iam_role(request.role_arn, ext_id, request.bucket_name, request.region or "ap-south-1")
+            ok, message, temp = assume_role_temp_credentials(
+                request.role_arn, ext_id, primary_region
+            )
+            if not ok:
+                raise HTTPException(status_code=400, detail=message)
+            access_key_id = temp["access_key_id"]
+            secret_access_key = temp["secret_access_key"]
+            session_token = temp["session_token"]
             credentials_to_encrypt = {
                 "role_arn": request.role_arn,
                 "external_id": ext_id,
-                "region": request.region or "ap-south-1",
+                "region": primary_region,
             }
         else:
-            # Access Keys method
-            if not request.access_key_id or not request.secret_access_key or not request.bucket_name:
-                raise HTTPException(status_code=400, detail="Access Keys method requires access_key_id, secret_access_key, and bucket_name.")
-            
-            test_result = test_aws_access_keys(request.access_key_id, request.secret_access_key, request.bucket_name, request.region or "ap-south-1")
+            if not request.access_key_id or not request.secret_access_key:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Access Keys method requires access_key_id and secret_access_key.",
+                )
             credentials_to_encrypt = {
                 "access_key_id": request.access_key_id,
                 "secret_access_key": request.secret_access_key,
-                "region": request.region or "ap-south-1",
+                "region": primary_region,
             }
-        bucket_or_container = request.bucket_name
+
+        buckets_to_test = [
+            (storage_bucket, primary_region),
+            (secure_bucket, primary_region),
+        ]
+        if request.secure_dual_write and replica_bucket:
+            buckets_to_test.append((replica_bucket, replica_region))
+
+        ok, bucket_message = test_aws_buckets_access(
+            access_key_id,
+            secret_access_key,
+            buckets_to_test,
+            session_token,
+        )
+        if not ok:
+            raise HTTPException(status_code=400, detail=bucket_message)
+
+        _save_aws_byoc_record(
+            user,
+            request,
+            credentials_to_encrypt,
+            storage_bucket,
+            secure_bucket,
+            replica_bucket if request.secure_dual_write else "",
+            primary_region,
+            replica_region,
+        )
+        logger.info(
+            "BYOC: %s connected AWS (storage=%s secure=%s replica=%s)",
+            user.username,
+            storage_bucket,
+            secure_bucket,
+            replica_bucket,
+        )
+        return {
+            "success": True,
+            "message": "AWS account connected. Storage and Security will use your buckets.",
+            "csp": "AWS",
+            "connection_method": request.connection_method,
+            "storage_bucket_name": storage_bucket,
+            "secure_bucket_name": secure_bucket,
+            "replica_bucket_name": replica_bucket if request.secure_dual_write else None,
+            "primary_region": primary_region,
+            "replica_region": replica_region,
+            "secure_dual_write": request.secure_dual_write,
+            "bucket_name": storage_bucket,
+        }
     
     elif csp == "GCP":
         if not request.service_account_json or not request.gcp_bucket_name:
@@ -430,9 +726,9 @@ async def connect_cloud(request: BYOCConnectRequest, user: User = Depends(get_cu
     
     if not test_result.success:
         raise HTTPException(status_code=400, detail={"message": test_result.message, "csp": csp, "success": False})
-    
+
     encrypted_creds = encrypt_credentials_dict(credentials_to_encrypt)
-    
+
     byoc_collection.update_one(
         {"username": user.username, "csp": csp},
         {"$set": {
@@ -443,14 +739,14 @@ async def connect_cloud(request: BYOCConnectRequest, user: User = Depends(get_cu
             "bucket_name": bucket_or_container if csp != "AZURE" else "",
             "container_name": bucket_or_container if csp == "AZURE" else "",
             "is_active": True,
-            "created_at": datetime.utcnow(),
             "updated_at": datetime.utcnow(),
-        }},
-        upsert=True
+        },
+        "$setOnInsert": {"created_at": datetime.utcnow()}},
+        upsert=True,
     )
-    
+
     logger.info(f"BYOC: {user.username} connected {csp} account (method: {request.connection_method})")
-    
+
     return {
         "success": True,
         "message": test_result.message,

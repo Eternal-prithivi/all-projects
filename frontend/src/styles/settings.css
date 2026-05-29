@@ -2,6 +2,8 @@
    SETTINGS PAGE — Zenith Design System
    ============================================ */
 
+@import './byoc-shared.css';
+
 .settings-page {
   max-width: 1000px;
   margin: 0 auto;
@@ -934,3 +936,4 @@ input:disabled + .toggle-slider {
   border-radius: var(--radius-sm);
   margin-top: 0.25rem;
 }
+

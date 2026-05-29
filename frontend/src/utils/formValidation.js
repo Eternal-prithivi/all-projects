@@ -272,7 +272,45 @@ export const validatePasswordChangeForm = ({ currentPassword, newPassword, confi
   return buildResult(errors);
 };
 
-export const validateByocConnectionForm = ({ csp, method, awsForm = {}, gcpForm = {}, azureForm = {} }) => {
+export const validateByocAwsStep1 = ({ method, awsForm = {} }) => {
+  const errors = {};
+  if (method === 'access_keys') {
+    if (!trimValue(awsForm.access_key_id || '')) {
+      errors.access_key_id = 'Access key ID is required.';
+    }
+    if (!trimValue(awsForm.secret_access_key || '')) {
+      errors.secret_access_key = 'Secret access key is required.';
+    }
+  } else if (method === 'iam_role') {
+    if (!trimValue(awsForm.role_arn || '')) {
+      errors.role_arn = 'Role ARN is required.';
+    }
+  }
+  if (!trimValue(awsForm.region || '')) {
+    errors.region = 'Choose a primary region.';
+  }
+  return buildResult(errors);
+};
+
+export const validateByocAwsStep2 = ({ awsForm = {} }) => {
+  const errors = {};
+  const storage = trimValue(awsForm.storage_bucket_name || awsForm.bucket_name || '');
+  const secure = trimValue(awsForm.secure_bucket_name || '');
+  const replica = trimValue(awsForm.replica_bucket_name || '');
+
+  if (!storage) {
+    errors.storage_bucket_name = 'Storage bucket name is required.';
+  }
+  if (!secure) {
+    errors.secure_bucket_name = 'Secure bucket name is required.';
+  }
+  if (awsForm.secure_dual_write !== false && !replica) {
+    errors.replica_bucket_name = 'Replica bucket name is required for secure replication.';
+  }
+  return buildResult(errors);
+};
+
+export const validateByocConnectionForm = ({ csp, method, awsForm = {}, gcpForm = {}, azureForm = {}, awsStep = null }) => {
   const errors = {};
 
   if (!csp) {
@@ -280,6 +318,12 @@ export const validateByocConnectionForm = ({ csp, method, awsForm = {}, gcpForm 
   }
 
   if (csp === 'AWS') {
+    if (awsStep === 1) {
+      return validateByocAwsStep1({ method, awsForm });
+    }
+    if (awsStep === 2) {
+      return validateByocAwsStep2({ awsForm });
+    }
     if (method === 'access_keys') {
       if (!trimValue(awsForm.access_key_id || '')) {
         errors.access_key_id = 'Access key ID is required.';
@@ -294,8 +338,8 @@ export const validateByocConnectionForm = ({ csp, method, awsForm = {}, gcpForm 
       }
     }
 
-    if (!trimValue(awsForm.bucket_name || '')) {
-      errors.bucket_name = 'Bucket name is required.';
+    if (!trimValue(awsForm.storage_bucket_name || awsForm.bucket_name || '')) {
+      errors.storage_bucket_name = 'Storage bucket name is required.';
     }
 
     if (!trimValue(awsForm.region || '')) {

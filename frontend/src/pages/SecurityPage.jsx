@@ -42,6 +42,7 @@ import {
 } from "../api";
 import "../styles/security-page.css";
 import PageHeader from "../components/ui/PageHeader.jsx";
+import ByocStorageTargetBanner from "../components/ByocStorageTargetBanner.jsx";
 import EmptyState from "../components/EmptyState.jsx";
 import { IconLock } from "../components/dashboard/Icons.jsx";
 
@@ -472,6 +473,7 @@ function SecurityPage() {
           title="Security Center"
           subtitle="Scan, encrypt, and manage sensitive files with SSE-S3 or browser-side encryption."
         />
+        <ByocStorageTargetBanner variant="security" />
         <div className="page-card">
           <div className="page-header-row">
             <div>

@@ -9,16 +9,17 @@
 | Field | Value |
 |-------|--------|
 | Project | CloudResourceOptimizationPlatform (**Zenith**) |
-| Phase | **16** complete |
-| Last major complete | BYOC credential routing across storage, security, cost, VM GCP |
+| Phase | **17** in progress |
+| Last major complete | Phase 16 — BYOC credential routing (storage, security, cost, VM GCP) |
 
 ---
 
 ## 🔴 Active Task
 
-**None** — Phase 16 complete (2026-05-29).
+**Phase 17 — AWS BYOC two-step connect (three buckets)**
 
-| Next | Optional: Azure BYOC cost SP fields; per-user Celery anomaly |
+| Done | Two-step Settings wizard (verify → buckets), `/byoc/verify-credentials`, `/byoc/check-bucket-name`, `/byoc/storage-targets`, three-bucket connect + resolver, Storage/Security destination banners |
+| Next | Phase 2: replica dual-write hardening, CloudFormation template, bucket migration UI |
 
 ---
 
@@ -27,8 +28,7 @@
 | Check | Status |
 |-------|--------|
 | Backend pytest | Run after pull (`cd backend && pytest -q`) |
-| Frontend lint | ✅ 0 errors (prior) |
-| Frontend build | ✅ Passes (prior) |
+| Frontend build | Run `cd frontend && npm run build` after pull |
 
 ---
 

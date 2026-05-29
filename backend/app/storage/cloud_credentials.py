@@ -16,6 +16,7 @@ from google.cloud import storage as gcp_storage
 from google.oauth2 import service_account
 
 from app.byoc.credential_resolver import (
+    get_aws_bucket_layout,
     resolve_aws_credentials,
     resolve_azure_credentials,
     resolve_gcp_credentials,
@@ -66,9 +67,10 @@ class SecureAwsStorage:
     access_key_id: str
     secret_access_key: str
     session_token: Optional[str] = None
+    dedicated_secure_bucket: bool = False
 
     def object_key(self, username: str, filename: str) -> str:
-        if self.is_byoc:
+        if self.is_byoc and not self.dedicated_secure_bucket:
             return f"secure/{username}/{filename}"
         return f"{username}/{filename}"
 
@@ -80,18 +82,41 @@ def resolve_secure_aws_storage(username: str) -> SecureAwsStorage:
     """
     aws = resolve_aws_credentials(username)
     if aws.get("is_byoc"):
+        layout = get_aws_bucket_layout(username) or {}
+        secure_bucket = layout.get("secure_bucket_name") or aws["bucket_name"]
+        primary_region = layout.get("primary_region") or aws.get("region") or settings.PRIMARY_S3_REGION
+        replica_bucket = layout.get("replica_bucket_name") or ""
+        replica_region = layout.get("replica_region") or settings.REPLICA_S3_REGION
+        dual_write = layout.get("secure_dual_write", True)
+        dedicated = bool(
+            layout.get("secure_bucket_name")
+            and layout.get("secure_bucket_name") != layout.get("storage_bucket_name")
+        )
+
         primary = boto3.client("s3", **_aws_client_kwargs(aws))
+
+        replica_client = None
+        if dual_write and replica_bucket:
+            replica_kwargs = _aws_client_kwargs(aws)
+            replica_kwargs["region_name"] = replica_region
+            replica_client = boto3.client("s3", **replica_kwargs)
+
+        list_prefix = (
+            f"{username}/" if dedicated else f"secure/{username}/"
+        )
+
         return SecureAwsStorage(
             primary_client=primary,
-            replica_client=None,
-            primary_bucket=aws["bucket_name"],
-            replica_bucket=None,
-            region=aws.get("region") or settings.PRIMARY_S3_REGION,
+            replica_client=replica_client,
+            primary_bucket=secure_bucket,
+            replica_bucket=replica_bucket if replica_client else None,
+            region=primary_region,
             is_byoc=True,
-            list_prefix=f"secure/{username}/",
+            list_prefix=list_prefix,
             access_key_id=aws["access_key_id"],
             secret_access_key=aws["secret_access_key"],
             session_token=aws.get("session_token"),
+            dedicated_secure_bucket=dedicated,
         )
 
     primary = boto3.client(

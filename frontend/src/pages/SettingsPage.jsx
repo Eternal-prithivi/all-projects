@@ -22,6 +22,8 @@ import LoadingSpinner from '../components/LoadingSpinner';
 import {
   getValidationErrorMessage,
   validateByocConnectionForm,
+  validateByocAwsStep1,
+  validateByocAwsStep2,
 } from '../utils/formValidation';
 import '../styles/settings.css';
 import PageHeader from '../components/ui/PageHeader.jsx';
@@ -60,22 +62,50 @@ const SettingsPage = () => {
   const [byocTestResult, setByocTestResult] = useState(null);
   const [showPolicy, setShowPolicy] = useState(false);
   const [policyTemplates, setPolicyTemplates] = useState(null);
+  const [awsConnectStep, setAwsConnectStep] = useState(1);
+  const [awsCredentialsVerified, setAwsCredentialsVerified] = useState(false);
+  const [awsVerifying, setAwsVerifying] = useState(false);
+  const [bucketCheckStatus, setBucketCheckStatus] = useState({});
 
   // BYOC Form fields
-  const [awsForm, setAwsForm] = useState({ access_key_id: '', secret_access_key: '', bucket_name: '', region: 'ap-south-1', role_arn: '' });
+  const [awsForm, setAwsForm] = useState({
+    access_key_id: '',
+    secret_access_key: '',
+    bucket_name: '',
+    storage_bucket_name: '',
+    secure_bucket_name: '',
+    replica_bucket_name: '',
+    secure_dual_write: true,
+    region: 'ap-south-1',
+    role_arn: '',
+  });
   const [gcpForm, setGcpForm] = useState({ service_account_json: '', gcp_bucket_name: '' });
   const [azureForm, setAzureForm] = useState({ account_name: '', account_key: '', container_name: '' });
 
   const byocValidation = useMemo(
-    () => validateByocConnectionForm({
-      csp: byocActiveCSP,
-      method: byocMethod,
-      awsForm,
-      gcpForm,
-      azureForm,
-    }),
-    [byocActiveCSP, byocMethod, awsForm, gcpForm, azureForm]
+    () => {
+      if (byocActiveCSP === 'AWS') {
+        return awsConnectStep === 1
+          ? validateByocAwsStep1({ method: byocMethod, awsForm })
+          : validateByocAwsStep2({ awsForm });
+      }
+      return validateByocConnectionForm({
+        csp: byocActiveCSP,
+        method: byocMethod,
+        awsForm,
+        gcpForm,
+        azureForm,
+      });
+    },
+    [byocActiveCSP, byocMethod, awsForm, gcpForm, azureForm, awsConnectStep]
   );
+
+  const resetAwsConnectFlow = () => {
+    setAwsConnectStep(1);
+    setAwsCredentialsVerified(false);
+    setBucketCheckStatus({});
+    setByocTestResult(null);
+  };
 
   useEffect(() => {
     fetchSettings();
@@ -173,22 +203,100 @@ const SettingsPage = () => {
     }
   };
 
+  const handleAwsVerifyCredentials = async () => {
+    const step1 = validateByocAwsStep1({ method: byocMethod, awsForm });
+    if (!step1.isValid) {
+      setByocTestResult({ success: false, message: getValidationErrorMessage(step1.errors) });
+      return;
+    }
+    setAwsVerifying(true);
+    setByocTestResult(null);
+    try {
+      const payload = {
+        csp: 'AWS',
+        connection_method: byocMethod,
+        region: awsForm.region,
+        access_key_id: awsForm.access_key_id,
+        secret_access_key: awsForm.secret_access_key,
+        role_arn: awsForm.role_arn,
+      };
+      const response = await apiClient.post('/byoc/verify-credentials', payload);
+      const suggestions = response.data.suggestions || {};
+      setAwsForm((prev) => ({
+        ...prev,
+        storage_bucket_name: suggestions.storage_bucket_name || prev.storage_bucket_name,
+        secure_bucket_name: suggestions.secure_bucket_name || prev.secure_bucket_name,
+        replica_bucket_name: suggestions.replica_bucket_name || prev.replica_bucket_name,
+        bucket_name: suggestions.storage_bucket_name || prev.bucket_name,
+      }));
+      setAwsCredentialsVerified(true);
+      setAwsConnectStep(2);
+      setByocTestResult({
+        success: true,
+        message: response.data.message || 'Credentials verified. Configure your buckets below.',
+      });
+    } catch (error) {
+      const detail = error.response?.data?.detail;
+      setByocTestResult({
+        success: false,
+        message: typeof detail === 'string' ? detail : detail?.message || 'Verification failed',
+      });
+    } finally {
+      setAwsVerifying(false);
+    }
+  };
+
+  const handleCheckAwsBucket = async (field, bucketName, region) => {
+    if (!bucketName || byocMethod !== 'access_keys') return;
+    try {
+      const response = await apiClient.post('/byoc/check-bucket-name', {
+        bucket_name: bucketName,
+        region: region || awsForm.region,
+        access_key_id: awsForm.access_key_id,
+        secret_access_key: awsForm.secret_access_key,
+      });
+      setBucketCheckStatus((prev) => ({
+        ...prev,
+        [field]: response.data,
+      }));
+    } catch {
+      setBucketCheckStatus((prev) => ({
+        ...prev,
+        [field]: { status: 'forbidden', message: 'Could not check bucket.' },
+      }));
+    }
+  };
+
   const handleByocConnect = async () => {
     if (!byocValidation.isValid) {
       setByocTestResult({ success: false, message: getValidationErrorMessage(byocValidation.errors) });
+      return;
+    }
+    if (byocActiveCSP === 'AWS' && !awsCredentialsVerified) {
+      setByocTestResult({ success: false, message: 'Verify your credentials first (Step 1).' });
       return;
     }
 
     setByocConnecting(true);
     try {
       let payload = { csp: byocActiveCSP, connection_method: byocMethod };
-      if (byocActiveCSP === 'AWS') Object.assign(payload, awsForm);
-      else if (byocActiveCSP === 'GCP') Object.assign(payload, gcpForm);
+      if (byocActiveCSP === 'AWS') {
+        payload = {
+          ...payload,
+          ...awsForm,
+          primary_region: awsForm.region,
+          bucket_name: awsForm.storage_bucket_name || awsForm.bucket_name,
+        };
+      } else if (byocActiveCSP === 'GCP') Object.assign(payload, gcpForm);
       else if (byocActiveCSP === 'Azure') Object.assign(payload, azureForm);
 
-      await apiClient.post('/byoc/connect', payload);
+      const response = await apiClient.post('/byoc/connect', payload);
       setByocActiveCSP(null);
-      setByocTestResult(null);
+      resetAwsConnectFlow();
+      setByocTestResult({
+        success: true,
+        message: response.data.message || 'Connected successfully.',
+      });
       fetchByocStatus();
     } catch (error) {
       const detail = error.response?.data?.detail;
@@ -406,7 +514,14 @@ const SettingsPage = () => {
                     <div>
                       <h4>{csp === 'GCP' ? 'Google Cloud' : csp === 'Azure' ? 'Microsoft Azure' : 'Amazon Web Services'}</h4>
                       {isConnected ? (
-                        <span className="byoc-status-connected">● Connected — {connection.bucket_name}</span>
+                        <span className="byoc-status-connected">
+                          ● Connected
+                          {csp === 'AWS' && connection.storage_bucket_name ? (
+                            <> — storage: {connection.storage_bucket_name}</>
+                          ) : (
+                            connection.bucket_name ? <> — {connection.bucket_name}</> : null
+                          )}
+                        </span>
                       ) : (
                         <span className="byoc-status-disconnected">○ Not connected</span>
                       )}
@@ -417,7 +532,7 @@ const SettingsPage = () => {
                   ) : (
                     <button className="btn-connect" onClick={() => {
                       setByocActiveCSP(csp);
-                      setByocTestResult(null);
+                      resetAwsConnectFlow();
                       setByocMethod('access_keys');
                       if (!policyTemplates) fetchPolicyTemplates();
                     }}>Connect</button>
@@ -427,11 +542,21 @@ const SettingsPage = () => {
                 {/* Expanded Connection Form */}
                 {byocActiveCSP === csp && !isConnected && (
                   <div className="byoc-connect-form">
+                    {csp === 'AWS' && (
+                      <div className="byoc-step-indicator">
+                        <span className={awsConnectStep === 1 ? 'active' : awsCredentialsVerified ? 'done' : ''}>
+                          Step 1 — Verify credentials
+                        </span>
+                        <span className={awsConnectStep === 2 ? 'active' : ''}>
+                          Step 2 — Bucket configuration
+                        </span>
+                      </div>
+                    )}
                     {/* Method Selection */}
                     <div className="byoc-method-selector">
                       <button
                         className={`method-btn ${byocMethod === 'access_keys' ? 'active' : ''}`}
-                        onClick={() => setByocMethod('access_keys')}
+                        onClick={() => { setByocMethod('access_keys'); resetAwsConnectFlow(); }}
                       >
                         <span className="method-icon">🔑</span>
                         <span className="method-label">Quick Setup</span>
@@ -439,7 +564,7 @@ const SettingsPage = () => {
                       </button>
                       <button
                         className={`method-btn ${byocMethod === 'iam_role' ? 'active' : ''}`}
-                        onClick={() => setByocMethod('iam_role')}
+                        onClick={() => { setByocMethod('iam_role'); resetAwsConnectFlow(); }}
                       >
                         <span className="method-icon">🛡️</span>
                         <span className="method-label">Secure Setup (Recommended)</span>
@@ -489,8 +614,12 @@ const SettingsPage = () => {
                     </div>
 
                     {/* CSP-specific form fields */}
-                    {csp === 'AWS' && byocMethod === 'access_keys' && (
+                    {csp === 'AWS' && byocMethod === 'access_keys' && awsConnectStep === 1 && (
                       <div className="byoc-fields">
+                        <p className="byoc-field-hint">
+                          Enter your AWS keys. We will verify them before asking for bucket names.
+                          Create buckets in AWS (or use the suggested names in Step 2).
+                        </p>
                         <div className="byoc-field">
                           <label>Access Key ID</label>
                           <input type="text" placeholder="AKIA..." value={awsForm.access_key_id}
@@ -508,15 +637,7 @@ const SettingsPage = () => {
                           {byocValidation.errors.secret_access_key && <p id="byoc-aws-secret-key-error" className="form-field-error">{byocValidation.errors.secret_access_key}</p>}
                         </div>
                         <div className="byoc-field">
-                          <label>S3 Bucket Name</label>
-                          <input type="text" placeholder="my-company-bucket" value={awsForm.bucket_name}
-                            onChange={(e) => setAwsForm({...awsForm, bucket_name: e.target.value})}
-                            aria-invalid={!!byocValidation.errors.bucket_name}
-                            aria-describedby={byocValidation.errors.bucket_name ? 'byoc-aws-bucket-error' : undefined} />
-                          {byocValidation.errors.bucket_name && <p id="byoc-aws-bucket-error" className="form-field-error">{byocValidation.errors.bucket_name}</p>}
-                        </div>
-                        <div className="byoc-field">
-                          <label>Region</label>
+                          <label>Primary region (storage + secure buckets)</label>
                           <select className="zenith-select" value={awsForm.region} onChange={(e) => setAwsForm({...awsForm, region: e.target.value})}>
                             <option value="ap-south-1">AP South 1 (Mumbai)</option>
                             <option value="us-east-1">US East 1 (Virginia)</option>
@@ -527,7 +648,55 @@ const SettingsPage = () => {
                       </div>
                     )}
 
-                    {csp === 'AWS' && byocMethod === 'iam_role' && (
+                    {csp === 'AWS' && awsConnectStep === 2 && (
+                      <div className="byoc-fields">
+                        <p className="byoc-field-hint">
+                          Create these S3 buckets in your AWS account (primary region: {awsForm.region}).
+                          Replica bucket should be in <strong>US East (N. Virginia)</strong>.
+                        </p>
+                        {[
+                          { field: 'storage_bucket_name', label: 'Storage bucket', region: awsForm.region },
+                          { field: 'secure_bucket_name', label: 'Secure vault bucket', region: awsForm.region },
+                          ...(awsForm.secure_dual_write
+                            ? [{ field: 'replica_bucket_name', label: 'Secure replica bucket (Virginia)', region: 'us-east-1' }]
+                            : []),
+                        ].map(({ field, label, region }) => (
+                          <div className="byoc-field" key={field}>
+                            <label>{label}</label>
+                            <input
+                              type="text"
+                              value={awsForm[field]}
+                              onChange={(e) => setAwsForm({ ...awsForm, [field]: e.target.value, bucket_name: field === 'storage_bucket_name' ? e.target.value : awsForm.bucket_name })}
+                              onBlur={() => handleCheckAwsBucket(field, awsForm[field], region)}
+                              aria-invalid={!!byocValidation.errors[field]}
+                            />
+                            {byocValidation.errors[field] && (
+                              <p className="form-field-error">{byocValidation.errors[field]}</p>
+                            )}
+                            {bucketCheckStatus[field] && (
+                              <p className={`byoc-bucket-check byoc-bucket-check--${bucketCheckStatus[field].status}`}>
+                                {bucketCheckStatus[field].message}
+                              </p>
+                            )}
+                          </div>
+                        ))}
+                        <div className="byoc-field byoc-field-checkbox">
+                          <label>
+                            <input
+                              type="checkbox"
+                              checked={awsForm.secure_dual_write}
+                              onChange={(e) => setAwsForm({ ...awsForm, secure_dual_write: e.target.checked })}
+                            />
+                            Replicate secure files to replica bucket (recommended)
+                          </label>
+                        </div>
+                        <button type="button" className="btn-back-step" onClick={() => setAwsConnectStep(1)}>
+                          ← Back to credentials
+                        </button>
+                      </div>
+                    )}
+
+                    {csp === 'AWS' && byocMethod === 'iam_role' && awsConnectStep === 1 && (
                       <div className="byoc-fields">
                         {policyTemplates?.AWS?.iam_role?.external_id && (
                           <div className="byoc-readonly-field">
@@ -547,12 +716,7 @@ const SettingsPage = () => {
                           {byocValidation.errors.role_arn && <p id="byoc-aws-role-error" className="form-field-error">{byocValidation.errors.role_arn}</p>}
                         </div>
                         <div className="byoc-field">
-                          <label>S3 Bucket Name</label>
-                          <input type="text" placeholder="my-company-bucket" value={awsForm.bucket_name}
-                            onChange={(e) => setAwsForm({...awsForm, bucket_name: e.target.value})} />
-                        </div>
-                        <div className="byoc-field">
-                          <label>Region</label>
+                          <label>Primary region</label>
                           <select className="zenith-select" value={awsForm.region} onChange={(e) => setAwsForm({...awsForm, region: e.target.value})}>
                             <option value="ap-south-1">AP South 1 (Mumbai)</option>
                             <option value="us-east-1">US East 1 (Virginia)</option>
@@ -560,7 +724,7 @@ const SettingsPage = () => {
                             <option value="eu-west-1">EU West 1 (Ireland)</option>
                           </select>
                         </div>
-                        <p className="byoc-no-keys-note">✨ No access keys needed — Zenith assumes your role using temporary credentials that expire automatically.</p>
+                        <p className="byoc-no-keys-note">✨ No access keys stored — Zenith assumes your role with temporary credentials.</p>
                       </div>
                     )}
 
@@ -624,13 +788,32 @@ const SettingsPage = () => {
 
                     {/* Action Buttons */}
                     <div className="byoc-actions">
-                      <button className="btn-secondary" onClick={() => { setByocActiveCSP(null); setByocTestResult(null); }}>Cancel</button>
-                      <button className="btn-test" onClick={handleByocTest} disabled={byocTesting || !byocValidation.isValid}>
-                        {byocTesting ? '⏳ Testing...' : '🔍 Test Connection'}
-                      </button>
-                      <button className="btn-connect-save" onClick={handleByocConnect} disabled={byocConnecting || !byocValidation.isValid}>
-                        {byocConnecting ? '⏳ Connecting...' : '🔗 Connect & Save'}
-                      </button>
+                      <button className="btn-secondary" onClick={() => { setByocActiveCSP(null); resetAwsConnectFlow(); }}>Cancel</button>
+                      {byocActiveCSP === 'AWS' && awsConnectStep === 1 ? (
+                        <button
+                          className="btn-connect-save"
+                          type="button"
+                          onClick={handleAwsVerifyCredentials}
+                          disabled={awsVerifying || !byocValidation.isValid}
+                        >
+                          {awsVerifying ? '⏳ Verifying...' : '✓ Verify & continue'}
+                        </button>
+                      ) : (
+                        <>
+                          {byocActiveCSP !== 'AWS' && (
+                            <button className="btn-test" onClick={handleByocTest} disabled={byocTesting || !byocValidation.isValid}>
+                              {byocTesting ? '⏳ Testing...' : '🔍 Test Connection'}
+                            </button>
+                          )}
+                          <button
+                            className="btn-connect-save"
+                            onClick={handleByocConnect}
+                            disabled={byocConnecting || !byocValidation.isValid || (byocActiveCSP === 'AWS' && !awsCredentialsVerified)}
+                          >
+                            {byocConnecting ? '⏳ Connecting...' : '🔗 Complete connection'}
+                          </button>
+                        </>
+                      )}
                     </div>
 
                     <p className="byoc-encryption-note">

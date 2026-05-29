@@ -1,0 +1,106 @@
+/* BYOC destination banner (Storage / Security) + shared connect wizard bits */
+
+.byoc-target-banner {
+  margin: 0 0 1.25rem;
+  padding: 0.85rem 1rem;
+  background: var(--surface-elevated, rgba(255, 255, 255, 0.04));
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  font-size: 0.88rem;
+  color: var(--text-secondary);
+}
+
+.byoc-target-mode {
+  color: var(--gold-primary);
+  font-weight: 600;
+}
+
+.byoc-target-list {
+  margin: 0.5rem 0 0;
+  padding-left: 1.25rem;
+  list-style: disc;
+}
+
+.byoc-target-list code {
+  font-size: 0.82rem;
+  color: var(--text-primary);
+}
+
+.byoc-target-hint {
+  margin: 0.5rem 0 0;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.byoc-step-indicator {
+  display: flex;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+
+.byoc-step-indicator span {
+  flex: 1;
+  min-width: 10rem;
+  padding: 0.45rem 0.65rem;
+  font-size: 0.78rem;
+  text-align: center;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-default);
+  color: var(--text-muted);
+}
+
+.byoc-step-indicator span.active {
+  border-color: var(--gold-primary);
+  color: var(--gold-primary);
+  background: var(--gold-glow);
+}
+
+.byoc-step-indicator span.done {
+  border-color: var(--success);
+  color: var(--success);
+}
+
+.byoc-bucket-check {
+  margin-top: 0.35rem;
+  font-size: 0.78rem;
+}
+
+.byoc-bucket-check--available {
+  color: var(--success);
+}
+
+.byoc-bucket-check--accessible {
+  color: var(--success);
+}
+
+.byoc-bucket-check--forbidden,
+.byoc-bucket-check--invalid {
+  color: var(--danger, #f87171);
+}
+
+.byoc-field-checkbox label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.btn-back-step {
+  margin-top: 0.5rem;
+  padding: 0.35rem 0.75rem;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+
+.btn-back-step:hover {
+  color: var(--gold-primary);
+}
+
+html.theme-light .byoc-target-banner {
+  background: rgba(0, 0, 0, 0.03);
+}
