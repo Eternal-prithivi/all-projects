@@ -36,11 +36,11 @@ const ServerErrorPage = () => {
             <g transform="translate(100, 40)">
               {/* Server rack */}
               <rect x="0" y="0" width="100" height="120" rx="4" fill="#1a1f35" opacity="0.3" />
-              <rect x="5" y="5" width="90" height="110" rx="2" fill="#667eea" opacity="0.1" />
+              <rect x="5" y="5" width="90" height="110" rx="2" fill="var(--gold-primary)" opacity="0.1" />
               
               {/* Server panels */}
-              <rect x="10" y="15" width="80" height="25" rx="2" fill="#667eea" opacity="0.3" />
-              <rect x="10" y="50" width="80" height="25" rx="2" fill="#667eea" opacity="0.3" />
+              <rect x="10" y="15" width="80" height="25" rx="2" fill="var(--gold-primary)" opacity="0.3" />
+              <rect x="10" y="50" width="80" height="25" rx="2" fill="var(--gold-primary)" opacity="0.3" />
               <rect x="10" y="85" width="80" height="25" rx="2" fill="#ef4444" opacity="0.4" />
               
               {/* Indicator lights */}

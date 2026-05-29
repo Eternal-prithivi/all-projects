@@ -4,6 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import AdminSidebar from './AdminSidebar';
 import AdminHeader from './AdminHeader';
 import '../../styles/admin-layout.css';
+import '../../styles/dashboard-polish.css';
 import { FaShieldAlt, FaExclamationTriangle } from 'react-icons/fa';
 
 const AdminLayout = () => {

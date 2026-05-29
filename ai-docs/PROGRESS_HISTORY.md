@@ -7,6 +7,17 @@
 
 ---
 
+**Enterprise dashboard UI/UX — pass 3** — COMPLETE 2026-05-29
+
+- ✅ Pass 3 gap table in `UI_UX_AUDIT_2026.md` (layout, headers, contrast, IA, admin)
+- ✅ `dashboard-polish.css` — cost nested viewport fix, kickers, back-button, gold CTA text, focus rings
+- ✅ `PageHeader` on Storage, Settings, Profile; `CostHubNav` already on cost routes
+- ✅ Cost analysis/simulator/optimization: transparent bg, no `100vh` inside dashboard
+- ✅ Storage title gradient; Billing empty-state gold SVG
+- ✅ Quality gates: pytest 46, lint 0 errors, build pass; pushed `stage`
+
+---
+
 **Secure vault AWS sync (Security page parity with Storage)** — COMPLETE 2026-05-29
 
 - ✅ `POST /api/security/sync/aws`, `syncAwsSecureBucket()`, Security page sync button

@@ -70,20 +70,20 @@ class ErrorBoundary extends React.Component {
                 <g transform="translate(80, 50)">
                   {/* Code window */}
                   <rect x="0" y="0" width="140" height="100" rx="4" fill="#1a1f35" opacity="0.3" />
-                  <rect x="2" y="2" width="136" height="96" rx="3" fill="#667eea" opacity="0.1" />
+                  <rect x="2" y="2" width="136" height="96" rx="3" fill="var(--gold-primary)" opacity="0.1" />
                   
                   {/* Code lines */}
-                  <line x1="10" y1="20" x2="50" y2="20" stroke="#667eea" strokeWidth="2" opacity="0.6" />
-                  <line x1="10" y1="30" x2="80" y2="30" stroke="#667eea" strokeWidth="2" opacity="0.6" />
-                  <line x1="10" y1="40" x2="40" y2="40" stroke="#667eea" strokeWidth="2" opacity="0.6" />
+                  <line x1="10" y1="20" x2="50" y2="20" stroke="var(--gold-primary)" strokeWidth="2" opacity="0.6" />
+                  <line x1="10" y1="30" x2="80" y2="30" stroke="var(--gold-primary)" strokeWidth="2" opacity="0.6" />
+                  <line x1="10" y1="40" x2="40" y2="40" stroke="var(--gold-primary)" strokeWidth="2" opacity="0.6" />
                   
                   {/* Error line */}
                   <line x1="10" y1="50" x2="90" y2="50" stroke="#ef4444" strokeWidth="2" />
                   <line x1="10" y1="50" x2="90" y2="50" stroke="#ef4444" strokeWidth="4" opacity="0.3" />
                   
                   {/* More code lines */}
-                  <line x1="10" y1="60" x2="70" y2="60" stroke="#667eea" strokeWidth="2" opacity="0.6" />
-                  <line x1="10" y1="70" x2="60" y2="70" stroke="#667eea" strokeWidth="2" opacity="0.6" />
+                  <line x1="10" y1="60" x2="70" y2="60" stroke="var(--gold-primary)" strokeWidth="2" opacity="0.6" />
+                  <line x1="10" y1="70" x2="60" y2="70" stroke="var(--gold-primary)" strokeWidth="2" opacity="0.6" />
                   
                   {/* Error indicator */}
                   <circle cx="100" cy="50" r="8" fill="#ef4444" opacity="0.8" />

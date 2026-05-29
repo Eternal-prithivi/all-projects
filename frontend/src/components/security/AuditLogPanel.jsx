@@ -65,6 +65,25 @@ const AuditLogPanel = ({ onClose }) => {
 
   const totalPages = Math.max(1, Math.ceil(data.total / limit));
 
+  const handleExportCsv = async () => {
+    try {
+      const response = await apiClient.get('/profile/activity/export', {
+        params: { period_days: 30, category },
+        responseType: 'blob',
+      });
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `zenith_activity_${new Date().toISOString().slice(0, 10)}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('CSV export failed:', error);
+    }
+  };
+
   return (
     <div className="audit-panel" role="dialog" aria-label="Activity history">
       <div className="audit-panel-header">
@@ -75,9 +94,14 @@ const AuditLogPanel = ({ onClose }) => {
             {category !== 'all' ? ` · filtered` : ''}
           </p>
         </div>
-        <button type="button" className="audit-panel-close" onClick={onClose} aria-label="Close">
-          ✕
-        </button>
+        <div className="audit-panel-actions">
+          <button type="button" className="audit-export-btn" onClick={handleExportCsv}>
+            Export CSV
+          </button>
+          <button type="button" className="audit-panel-close" onClick={onClose} aria-label="Close">
+            ✕
+          </button>
+        </div>
       </div>
 
       <div className="audit-filters" role="tablist" aria-label="Filter by category">

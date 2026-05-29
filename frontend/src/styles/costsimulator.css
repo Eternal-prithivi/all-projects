@@ -3,7 +3,7 @@
   max-width: 1400px;
   margin: 0 auto;
   color: var(--text-primary);
-  min-height: 100vh;
+  min-height: auto;
 }
 
 .simulator-header {
@@ -231,20 +231,9 @@
   font-size: 0.85rem;
 }
 
+/* .config-select — see zenith-ui.css */
 .config-select {
-  padding: 0.8rem;
-  background: var(--bg-input);
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-sm);
-  color: var(--text-primary);
-  font-size: 1rem;
-  cursor: pointer;
-}
-
-.config-select:focus {
-  outline: none;
-  border-color: var(--gold-primary);
-  box-shadow: 0 0 0 2px var(--gold-glow);
+  width: 100%;
 }
 
 .comparison-grid,

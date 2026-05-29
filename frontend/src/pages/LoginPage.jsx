@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { loginUser } from '../api';
+import { loginUser, getApiErrorMessage } from '../api';
 import { useAuth } from '../context/AuthContext.jsx';
 import { getValidationErrorMessage, validateLoginForm } from '../utils/formValidation.js';
+import { getDeviceFingerprint } from '../utils/deviceFingerprint.js';
 import '../styles/auth.css';
 
 function LoginPage() {
@@ -40,13 +41,19 @@ function LoginPage() {
 
     setIsLoading(true);
     try {
-      const credentials = { username, password };
-      const data = await loginUser(credentials);
+      const credentials = { username: username.trim(), password };
+      let fingerprint = null;
+      try {
+        fingerprint = await getDeviceFingerprint();
+      } catch {
+        fingerprint = null;
+      }
+      const data = await loginUser(credentials, fingerprint);
       login(data.access_token);
       // After login, AuthContext will fetch user data
       // The useEffect above will handle the redirect once isAuthenticated is true
     } catch (err) {
-      setError(err.detail || 'An error occurred during login.');
+      setError(getApiErrorMessage(err, 'An error occurred during login.'));
     } finally {
       setIsLoading(false);
     }

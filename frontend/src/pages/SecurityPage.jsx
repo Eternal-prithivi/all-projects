@@ -40,6 +40,7 @@ import {
   uploadClientEncrypted,
   downloadClientCiphertext,
 } from "../api";
+import "../styles/security-page.css";
 
 // --- MAIN COMPONENT ---
 
@@ -78,8 +79,24 @@ function SecurityPage() {
   const [showEncryptPrompt, setShowEncryptPrompt] = useState(false);
   const [pendingLocalFile, setPendingLocalFile] = useState(null);
   const [pendingFileMeta, setPendingFileMeta] = useState(null);
+  const [alwaysAskEncryption, setAlwaysAskEncryption] = useState(() => {
+    try {
+      return localStorage.getItem("zenith-always-ask-encryption") === "true";
+    } catch {
+      return false;
+    }
+  });
 
   const canAccessSecureArea = !twoFAStatus.enabled || twoFAStatus.verified;
+
+  const handleAlwaysAskChange = (checked) => {
+    setAlwaysAskEncryption(checked);
+    try {
+      localStorage.setItem("zenith-always-ask-encryption", checked ? "true" : "false");
+    } catch {
+      /* ignore */
+    }
+  };
 
   const fetchSecureFiles = useCallback(async () => {
     if (!token || !canAccessSecureArea) return [];
@@ -211,9 +228,20 @@ function SecurityPage() {
     setIsUploading(true);
     const uploadedFileName = file.name;
     try {
-      const response = await uploadSecureFile(file, encrypt, token);
+      const response = await uploadSecureFile(file, encrypt, token, alwaysAskEncryption);
 
-      if (response.needs_encryption && response.status === "awaiting_encryption_choice") {
+      if (response.status === "auto_encrypted_sse") {
+        notifications.success(
+          response.message ||
+            `'${uploadedFileName}' was auto-protected with SSE-S3 (sensitive data detected).`
+        );
+        setPendingLocalFile(null);
+        setPendingFileMeta(null);
+        setShowEncryptPrompt(false);
+        await fetchSecureFiles();
+        setFile(null);
+        if (fileInputRef.current) fileInputRef.current.value = "";
+      } else if (response.needs_encryption && response.status === "awaiting_encryption_choice") {
         setPendingLocalFile(file);
         setPendingFileMeta({
           filename: uploadedFileName,
@@ -370,184 +398,9 @@ function SecurityPage() {
     return <span className="status-tag">Normal</span>;
   };
 
-  const pageStyles = `
-    :root {
-      --primary-gold: #d4af37; --hover-gold: #c8a430; --dark-bg: #121212;
-      --content-bg: #1a1a1a; --border-color: #2a2a2a; --text-primary: #e0e0e0;
-      --text-secondary: #a3a3a3; --danger-red: #dc3545; --primary-blue: #007bff;
-      --success-green: #28a745;
-    }
-    .page-container { padding: 2rem; color: var(--text-primary); font-family: 'Inter', sans-serif; }
-    .page-card { background: var(--content-bg); border: 1px solid var(--border-color); border-radius: 12px; padding: 2.5rem; margin-bottom: 2rem; box-shadow: 0 10px 30px rgba(0,0,0,0.3); }
-    .page-title { font-size: 1.75rem; font-weight: 600; color: #fff; margin-top: 0; margin-bottom: 1.5rem; }
-    .page-description { color: var(--text-secondary); margin-bottom: 2rem; line-height: 1.6; }
-    .form-group { display: flex; flex-wrap: wrap; align-items: center; gap: 1.5rem; }
-    .form-group.horizontal-form { flex-wrap: nowrap; justify-content: flex-start; align-items: center; gap: 1rem; }
-    .form-group.horizontal-form .file-input { flex: 1; min-width: 0; }
-    .form-group.horizontal-form .checkbox-group { flex-shrink: 0; white-space: nowrap; }
-    .form-group.horizontal-form .upload-btn { flex-shrink: 0; white-space: nowrap; }
-    .form-group input[type="file"] { color: #999; font-family: 'Inter', sans-serif; }
-    .form-group input[type="file"]::file-selector-button { background-color: var(--primary-gold); color: #000; border: none; padding: 12px 24px; border-radius: 8px; cursor: pointer; font-weight: 600; transition: all 0.2s ease; font-family: 'Inter', sans-serif; margin-right: 1rem; }
-    .form-group input[type="file"]::file-selector-button:hover { background-color: var(--hover-gold); transform: translateY(-2px); box-shadow: 0 6px 20px rgba(212, 175, 55, 0.2); }
-    .checkbox-group { display: flex; align-items: center; gap: 0.5rem; }
-    .checkbox-group label { margin: 0; cursor: pointer; user-select: none; }
-    .btn { background-color: var(--primary-gold); color: #000; border: none; padding: 12px 24px; border-radius: 8px; cursor: pointer; font-weight: 600; transition: all 0.2s ease; }
-    .btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,0,0,0.2); }
-    .btn.danger-btn { background-color: var(--danger-red); color: #fff; }
-    .btn.danger-btn:hover { box-shadow: 0 6px 20px rgba(220, 53, 69, 0.3); }
-    .btn.download-btn { background-color: var(--primary-blue); color: #fff; }
-    .btn.download-btn:hover { box-shadow: 0 6px 20px rgba(0, 123, 255, 0.3); }
-    .btn.success-btn { background-color: var(--success-green); color: #fff; }
-    .btn.success-btn:hover { box-shadow: 0 6px 20px rgba(40, 167, 69, 0.3); }
-    .btn:disabled { background-color: #444; color: #888; cursor: not-allowed; transform: none; box-shadow: none; }
-    
-    /* File table styles */
-    .files-section { background: var(--content-bg); border: 1px solid var(--border-color); border-radius: 12px; padding: 2rem; margin-top: 2rem; }
-    .section-title { font-size: 1.75rem; font-weight: 600; color: #fff; margin-top: 0; margin-bottom: 1.5rem; border-bottom: 1px solid var(--border-color); padding-bottom: 1rem; }
-    .list-header { display: flex; align-items: flex-end; justify-content: space-between; gap: 1rem; flex-wrap: wrap; margin-bottom: 1.5rem; }
-    .list-header .section-title { margin-bottom: 0; flex: 1; min-width: 200px; }
-    .btn.sync-btn { flex-shrink: 0; white-space: nowrap; }
-    .file-table { width: 100%; border-collapse: collapse; }
-    .file-table thead th { background: #111; color: var(--text-secondary); font-weight: 600; text-align: left; padding: 1rem; border-bottom: 2px solid var(--border-color); text-transform: uppercase; font-size: 0.85rem; letter-spacing: 0.5px; }
-    .file-table tbody td { padding: 1rem; border-bottom: 1px solid var(--border-color); color: var(--text-primary); }
-    .file-table tbody tr:hover { background: #1c1c1c; }
-    .file-table tbody tr:last-child td { border-bottom: none; }
-    .date-col { color: var(--text-secondary); font-size: 0.9rem; }
-    
-    /* Status tags */
-    .encrypted-tag { background-color: #6a0dad; color: white; padding: 4px 10px; border-radius: 12px; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; }
-    .encrypted-tag.sse-tag { background-color: #2563eb; }
-    .encrypted-tag.cse-tag { background-color: #7c3aed; }
-    .awaiting-tag { background-color: #f59e0b; color: #111; padding: 4px 10px; border-radius: 12px; font-size: 0.75rem; font-weight: 600; }
-    .sensitive-alert { border-color: #f59e0b; background: rgba(245, 158, 11, 0.08); }
-    .encrypt-prompt-actions { display: flex; justify-content: flex-end; gap: 1rem; margin-top: 1.5rem; }
-    .processing-tag { background-color: #10b981; color: white; padding: 4px 10px; border-radius: 12px; font-size: 0.75rem; font-weight: 600; }
-    .status-tag { background-color: #4b5563; color: white; padding: 4px 10px; border-radius: 12px; font-size: 0.75rem; font-weight: 600; }
-    
-    /* Action buttons */
-    .action-btn { background-color: var(--primary-blue); color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: 500; margin-right: 0.5rem; transition: all 0.2s ease; font-size: 0.9rem; }
-    .action-btn:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
-    .action-btn.primary-btn { background-color: var(--primary-gold); color: #000; }
-    .action-btn.download-btn { background-color: var(--primary-blue); }
-    .action-btn.delete-btn { background-color: var(--danger-red); }
-    .action-btn:last-child { margin-right: 0; }
-    
-    .deleting-indicator, .processing-indicator { color: var(--text-secondary); font-size: 0.9rem; font-style: italic; }
-    .empty-list-message { color: var(--text-secondary); text-align: center; padding: 2rem; }
-    .twofa-container { max-width: 500px; margin: 4rem auto; background: var(--content-bg); border: 1px solid var(--border-color); border-radius: 12px; padding: 2.5rem; box-shadow: 0 10px 30px rgba(0,0,0,0.3); text-align: center; }
-    .twofa-title { font-size: 1.75rem; font-weight: 600; color: #fff; margin-top: 0; margin-bottom: 1rem; }
-    .twofa-description { color: var(--text-secondary); margin-bottom: 2rem; line-height: 1.6; }
-    .twofa-input { display: block; width: 100%; box-sizing: border-box; padding: 12px; margin-bottom: 1.5rem; border-radius: 8px; border: 1px solid var(--border-color); background: #111; color: var(--text-primary); font-size: 1.2rem; text-align: center; letter-spacing: 0.3em; }
-    .confirm-modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); display: flex; align-items: center; justify-content: center; z-index: 1000; }
-    .modal-content { background: #252525; padding: 2.5rem; border-radius: 12px; text-align: center; }
-    .modal-content p { margin-bottom: 2rem; }
-    .modal-buttons .btn { margin: 0 0.5rem; }
-    
-    /* Security Process Info */
-    .security-process-info {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-      gap: 1.5rem;
-      margin: 2rem 0;
-      padding: 1.5rem;
-      background: #111;
-      border-radius: 12px;
-      border: 1px solid var(--border-color);
-    }
-    
-    .process-step {
-      display: flex;
-      align-items: flex-start;
-      gap: 1rem;
-    }
-    
-    .process-icon {
-      width: 48px;
-      height: 48px;
-      min-width: 48px;
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      position: relative;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-    }
-    
-    .process-icon svg {
-      width: 24px;
-      height: 24px;
-      z-index: 2;
-    }
-    
-    .process-icon.scan {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white;
-    }
-    
-    .process-icon.encrypt {
-      background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-      color: white;
-    }
-    
-    .process-icon.replicate {
-      background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
-      color: white;
-      animation: pulse 2s ease-in-out infinite;
-    }
-    
-    .process-icon.secure {
-      background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
-      color: white;
-    }
-    
-    @keyframes pulse {
-      0%, 100% {
-        transform: scale(1);
-        box-shadow: 0 4px 12px rgba(0,242,254,0.3);
-      }
-      50% {
-        transform: scale(1.05);
-        box-shadow: 0 6px 20px rgba(0,242,254,0.5);
-      }
-    }
-    
-    .process-text {
-      display: flex;
-      flex-direction: column;
-      gap: 0.25rem;
-    }
-    
-    .process-text strong {
-      color: #fff;
-      font-size: 0.95rem;
-      font-weight: 600;
-    }
-    
-    .process-text span {
-      color: var(--text-secondary);
-      font-size: 0.85rem;
-      line-height: 1.4;
-    }
-    
-    @media (max-width: 768px) {
-      .security-process-info {
-        grid-template-columns: 1fr;
-        gap: 1rem;
-      }
-      
-      .process-step {
-        padding: 0.5rem;
-      }
-      
-      .form-group.horizontal-form {
-        flex-wrap: wrap;
-      }
-    }
-  `;
-
   if (loading)
     return (
-      <div className="page-container">
+      <div className="security-page page-container">
         <p>Loading...</p>
       </div>
     );
@@ -557,26 +410,13 @@ function SecurityPage() {
   // 1. Show QR code setup if qrCode is present and 2FA is not yet enabled
   if (qrCode && !twoFAStatus.enabled && twoFAStatus.secret_exists) {
     return (
-      <>
-        <style>{pageStyles}</style>
+      <div className="security-page">
         <div className="twofa-container">
           <h3 className="twofa-title">Finalize 2FA Setup</h3>
           <p className="twofa-description">
             Scan this QR code, then enter the code from your app below.
           </p>
-          <img
-            src={qrCode}
-            alt="2FA QR Code"
-            style={{
-              display: "block",
-              width: "250px", // Increased size for visibility
-              height: "250px", // Increased size for visibility
-              margin: "0 auto 2rem auto",
-              background: "white",
-              borderRadius: "8px",
-              border: '5px solid red', // Added red border for debugging
-            }}
-          />
+          <img src={qrCode} alt="2FA QR Code" className="twofa-qr" />
           <input
             type="text"
             placeholder="Enter code to finalize"
@@ -584,24 +424,20 @@ function SecurityPage() {
             onChange={(e) => setTwoFACode(e.target.value)}
             maxLength="6"
             className="twofa-input"
+            aria-label="2FA verification code"
           />
-          <button
-            onClick={handleFinalize2FA}
-            className="btn"
-            style={{ width: "100%" }}
-          >
+          <button type="button" onClick={handleFinalize2FA} className="btn btn--block">
             Finalize Setup
           </button>
         </div>
-      </>
+      </div>
     );
   }
 
   // 2. Show 2FA verification if 2FA is enabled but not yet verified to access secure content
   if (twoFAStatus.enabled && !twoFAStatus.verified && twoFAStatus.secret_exists) {
     return (
-      <>
-        <style>{pageStyles}</style>
+      <div className="security-page">
         <div className="twofa-container">
           <h3 className="twofa-title">Two-Factor Authentication</h3>
           <p className="twofa-description">
@@ -614,29 +450,24 @@ function SecurityPage() {
             onChange={(e) => setTwoFACode(e.target.value)}
             maxLength="6"
             className="twofa-input"
+            aria-label="2FA verification code"
           />
-          <button
-            onClick={handleVerify2FA}
-            className="btn"
-            style={{ width: "100%" }}
-          >
+          <button type="button" onClick={handleVerify2FA} className="btn btn--block">
             Verify
           </button>
         </div>
-      </>
+      </div>
     );
   }
 
 
   // 3. Default return: main security page content (file upload, enable/disable button, file list)
   return (
-    <>
-      <style>{pageStyles}</style>
-      <div className="page-container">
+    <div className="security-page page-container">
         <div className="page-card">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+          <div className="page-header-row">
             <div>
-              <h3 className="page-title" style={{ marginBottom: 0 }}>Secure File Upload</h3>
+              <h3 className="page-title page-title--inline">Secure File Upload</h3>
             </div>
             <div>
               {twoFAStatus.enabled ? (
@@ -651,8 +482,9 @@ function SecurityPage() {
             </div>
           </div>
           <p className="page-description">
-            Files uploaded here are automatically scanned for sensitive data. If
-            found, they will be encrypted.
+            Files are scanned for sensitive data. By default, sensitive files are
+            auto-protected with SSE-S3. Enable the option below to always choose
+            server-side vs browser encryption.
           </p>
 
           {/* Security Process Flow */}
@@ -724,7 +556,16 @@ function SecurityPage() {
                 checked={encrypt}
                 onChange={() => setEncrypt(!encrypt)}
               />
-              <label htmlFor="encrypt-manual">Encrypt manually</label>
+              <label htmlFor="encrypt-manual">Choose encryption method (SSE or browser)</label>
+            </div>
+            <div className="checkbox-group">
+              <input
+                type="checkbox"
+                id="always-ask-encryption"
+                checked={alwaysAskEncryption}
+                onChange={(e) => handleAlwaysAskChange(e.target.checked)}
+              />
+              <label htmlFor="always-ask-encryption">Always ask before encrypting sensitive files</label>
             </div>
             <button
               onClick={handleUpload}
@@ -853,8 +694,7 @@ function SecurityPage() {
             </div>
           </div>
         )}
-      </div>
-    </>
+    </div>
   );
 }
 

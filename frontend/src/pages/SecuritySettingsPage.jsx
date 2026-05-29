@@ -265,7 +265,11 @@ const SecuritySettingsPage = () => {
             <div className="current-device-icon" aria-hidden="true">💻</div>
             <div>
               <h4>This device — {currentSession.device}</h4>
+              <p>Location: {currentSession.location}</p>
               <p>IP: {currentSession.ip}</p>
+              {currentSession.device_fingerprint_short && (
+                <p>Device ID: {currentSession.device_fingerprint_short}</p>
+              )}
               <p>Last active: {formatRelativeTime(currentSession.last_active)}</p>
               <span className="current-badge">Active now</span>
             </div>
@@ -289,7 +293,11 @@ const SecuritySettingsPage = () => {
                   <div>
                     <h4>{session.device}</h4>
                     <p className="session-meta">
-                      {session.location} · IP {session.ip} · {formatRelativeTime(session.last_active)}
+                      {session.location} · IP {session.ip}
+                      {session.device_fingerprint_short
+                        ? ` · Device ${session.device_fingerprint_short}`
+                        : ""}{" "}
+                      · {formatRelativeTime(session.last_active)}
                     </p>
                   </div>
                   <button

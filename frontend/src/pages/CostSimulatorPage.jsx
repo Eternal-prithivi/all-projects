@@ -23,6 +23,7 @@ import {
   IconTarget,
 } from '../components/dashboard/Icons.jsx';
 import '../styles/costsimulator.css';
+import CostHubNav from '../components/dashboard/CostHubNav.jsx';
 
 const ProviderLogo = ({ provider }) => {
   const logoMap = {
@@ -268,6 +269,8 @@ const CostSimulatorPage = () => {
         </div>
       </div>
 
+      <CostHubNav />
+
       {/* Service Type Selector */}
       <div className="service-selector">
         <button 
@@ -326,7 +329,7 @@ const CostSimulatorPage = () => {
               <select 
                 value={storageClass} 
                 onChange={(e) => setStorageClass(e.target.value)}
-                className="config-select"
+                className="zenith-select config-select"
               >
                 <option value="standard">Standard (Hot) - Frequent Access</option>
                 <option value="infrequent">Infrequent Access (Cool) - Monthly Access</option>
@@ -376,7 +379,7 @@ const CostSimulatorPage = () => {
               <select 
                 value={vmType} 
                 onChange={(e) => setVmType(e.target.value)}
-                className="config-select"
+                className="zenith-select config-select"
               >
                 <option value="general">General Purpose (t3/n2/D-series)</option>
                 <option value="compute">Compute Optimized (c5/c2/F-series)</option>
@@ -389,7 +392,7 @@ const CostSimulatorPage = () => {
               <select 
                 value={commitment} 
                 onChange={(e) => setCommitment(e.target.value)}
-                className="config-select"
+                className="zenith-select config-select"
               >
                 <option value="ondemand">On-Demand (Pay as you go)</option>
                 <option value="1year">1-Year Reserved (35% discount)</option>
@@ -486,7 +489,7 @@ const CostSimulatorPage = () => {
               <select 
                 value={dbType} 
                 onChange={(e) => setDbType(e.target.value)}
-                className="config-select"
+                className="zenith-select config-select"
               >
                 <option value="mysql">MySQL (RDS/Cloud SQL/Azure DB)</option>
                 <option value="postgres">PostgreSQL</option>

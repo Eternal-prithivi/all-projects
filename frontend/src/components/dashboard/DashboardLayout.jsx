@@ -25,6 +25,7 @@ import GlobalSearch from "../GlobalSearch.jsx";
 import OnboardingTour from "../OnboardingTour.jsx";
 import "../../styles/dashboard.css";
 import "../../styles/cards.css";
+import "../../styles/dashboard-polish.css";
 import "react-toastify/dist/ReactToastify.css";
 import "../../styles/toast-custom.css";
 

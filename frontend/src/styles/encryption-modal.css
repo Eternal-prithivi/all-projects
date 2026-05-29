@@ -15,8 +15,8 @@
 }
 
 .encryption-modal {
-  background: #1a1a1a;
-  border: 1px solid #2a2a2a;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
   border-radius: 16px;
   max-width: 900px;
   width: 100%;
@@ -30,13 +30,13 @@
   justify-content: space-between;
   align-items: center;
   padding: 2rem;
-  border-bottom: 1px solid #2a2a2a;
+  border-bottom: 1px solid var(--border-default);
 }
 
 .encryption-modal-header h2 {
   margin: 0;
   font-size: 1.75rem;
-  color: #fff;
+  color: var(--text-primary);
   font-weight: 600;
 }
 
@@ -57,8 +57,8 @@
 }
 
 .close-btn:hover {
-  background: #2a2a2a;
-  color: #fff;
+  background: var(--border-default);
+  color: var(--text-primary);
 }
 
 .encryption-modal-body {
@@ -74,7 +74,7 @@
 
 .file-info-banner p {
   margin: 0.5rem 0;
-  color: #fff;
+  color: var(--text-primary);
   font-size: 1rem;
 }
 
@@ -101,7 +101,7 @@
 
 .encryption-option {
   background: #111;
-  border: 2px solid #2a2a2a;
+  border: 2px solid var(--border-default);
   border-radius: 12px;
   padding: 1.5rem;
   cursor: pointer;
@@ -109,8 +109,8 @@
 }
 
 .encryption-option:hover {
-  border-color: #3b82f6;
-  background: #1a1a1a;
+  border-color: var(--gold-border);
+  background: var(--bg-elevated);
 }
 
 .encryption-option.selected {
@@ -136,7 +136,7 @@
 .option-header h3 {
   margin: 0;
   font-size: 1.25rem;
-  color: #fff;
+  color: var(--text-primary);
   font-weight: 600;
 }
 
@@ -164,13 +164,21 @@
   gap: 0.5rem;
 }
 
+.option-description li.pro {
+  color: var(--success);
+}
+
+.option-description li.caution {
+  color: var(--warning);
+}
+
 .recommendation {
-  background: rgba(59, 130, 246, 0.1);
-  border-left: 3px solid #3b82f6;
+  background: var(--gold-glow);
+  border-left: 3px solid var(--gold-primary);
   padding: 0.75rem 1rem;
   margin-top: 1rem;
-  border-radius: 4px;
-  color: #3b82f6 !important;
+  border-radius: var(--radius-sm);
+  color: var(--gold-light) !important;
 }
 
 .password-form {
@@ -207,10 +215,10 @@
 .password-input {
   width: 100%;
   padding: 1rem;
-  background: #1a1a1a;
-  border: 1px solid #2a2a2a;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
   border-radius: 8px;
-  color: #fff;
+  color: var(--text-primary);
   font-size: 1rem;
   font-family: 'Courier New', monospace;
   letter-spacing: 0.05em;
@@ -237,7 +245,7 @@
   justify-content: flex-end;
   gap: 1rem;
   padding: 2rem;
-  border-top: 1px solid #2a2a2a;
+  border-top: 1px solid var(--border-default);
 }
 
 .btn-cancel,
@@ -258,8 +266,8 @@
 }
 
 .btn-cancel:hover {
-  background: #2a2a2a;
-  color: #fff;
+  background: var(--border-default);
+  color: var(--text-primary);
 }
 
 .btn-encrypt {
@@ -287,7 +295,7 @@
 
 .password-strength-bar {
   height: 6px;
-  background: #2a2a2a;
+  background: var(--border-default);
   border-radius: 3px;
   overflow: hidden;
   margin-bottom: 0.5rem;
@@ -329,7 +337,7 @@
   font-size: 0.8rem;
   padding: 0.25rem 0.5rem;
   border-radius: 4px;
-  background: #2a2a2a;
+  background: var(--border-default);
 }
 
 .password-requirements small.met {

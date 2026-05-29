@@ -59,6 +59,25 @@
 
 **Resolved:** Security vault tokenized; billing/admin/public purple removed; cost hub sub-nav on Cost Analysis; shared `PageHeader` / `GlassPanel`.
 
+**2026-05-29 pass 2 (dashboard sweep):** `dashboard-polish.css` (focus, contrast, gold CTAs); token pass on billing/cost/admin CSS; legacy purple → gold; `#666`/`#a0a0a0` → `--text-secondary`; `CostHubNav` on all cost routes; lazy-load spinner tokens; pricing page aligned to dashboard.
+
+---
+
+## Pass 3 — Enterprise gap list (2026-05-29)
+
+| # | Gap | Severity | Fix |
+|---|-----|----------|-----|
+| 1 | Nested `min-height: 100vh` on cost pages inside dashboard → double scroll / tall layout | High | `min-height: auto` on cost containers |
+| 2 | Inconsistent headers (h2 only vs `PageHeader` + kicker) | Medium | `PageHeader` on Storage, Settings, Profile |
+| 3 | Legacy `#fff` titles on storage header | Medium | Token gradient via CSS |
+| 4 | Gold CTA white text (billing pay/change) | High | `dashboard-polish` + billing btn tokens |
+| 5 | Purple SVG accent in Billing empty state | Low | Gold fill token |
+| 6 | Admin modal panels still `#1a1a2e` | Medium | `--bg-elevated` |
+| 7 | `page-kicker` / `back-button` not aligned to design system | Low | Shared styles in `dashboard-polish.css` |
+| 8 | Cost pages: redundant “Back” + `CostHubNav` | Low | Style back link as secondary (keep a11y) |
+
+**Out of scope (public/marketing):** `about.css`, `contact.css`, `help-center.css` — not dashboard routes.
+
 ---
 
 ## Wave file lists

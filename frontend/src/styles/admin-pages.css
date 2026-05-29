@@ -135,7 +135,7 @@
 }
 
 .admin-stat-card.primary {
-  --accent-color: #667eea;
+  --accent-color: var(--gold-primary);
 }
 
 .admin-stat-card.success {
@@ -383,7 +383,7 @@
 }
 
 .bar-fill.free {
-  background: linear-gradient(90deg, #667eea, #764ba2);
+  background: linear-gradient(90deg, var(--gold-primary), var(--gold-light));
 }
 
 .bar-fill.basic {
@@ -428,7 +428,7 @@
 }
 
 .timeline-item.user_registration {
-  --timeline-color: #667eea;
+  --timeline-color: var(--gold-primary);
 }
 
 .timeline-item.vm_created {
@@ -459,7 +459,7 @@
 }
 
 .timeline-time {
-  color: #666;
+  color: var(--text-secondary);
   font-size: 0.85rem;
 }
 
@@ -555,7 +555,7 @@
 }
 
 .user-cell small {
-  color: #666;
+  color: var(--text-secondary);
   font-size: 0.85rem;
 }
 
@@ -569,8 +569,8 @@
 }
 
 .plan-badge.free {
-  background: rgba(102, 126, 234, 0.2);
-  color: #667eea;
+  background: rgba(212, 175, 55, 0.2);
+  color: var(--gold-primary);
 }
 
 .plan-badge.basic {
@@ -821,7 +821,7 @@
 }
 
 .text-muted {
-  color: #666;
+  color: var(--text-secondary);
   font-size: 0.9rem;
 }
 
@@ -864,7 +864,7 @@
 }
 
 .analytics-section {
-  background: #1a1a2e;
+  background: var(--bg-elevated);
   border-radius: 12px;
   padding: 1.5rem;
   margin-bottom: 2rem;
@@ -891,7 +891,7 @@
 }
 
 .plan-stat {
-  background: #16213e;
+  background: var(--bg-surface);
   padding: 1.5rem;
   border-radius: 8px;
   text-align: center;
@@ -926,7 +926,7 @@
 
 .filter-btn {
   padding: 0.6rem 1.2rem;
-  background: #1a1a2e;
+  background: var(--bg-elevated);
   color: #888;
   border: 2px solid #2a2a3e;
   border-radius: 8px;
@@ -937,7 +937,7 @@
 }
 
 .filter-btn:hover {
-  background: #16213e;
+  background: var(--bg-surface);
   color: #fff;
 }
 
@@ -972,7 +972,7 @@
 
 .plan-badge {
   padding: 0.3rem 0.8rem;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, var(--gold-primary) 0%, var(--gold-light) 100%);
   color: #fff;
   border-radius: 20px;
   font-size: 0.75rem;
@@ -986,7 +986,7 @@
 }
 
 .settings-section {
-  background: #1a1a2e;
+  background: var(--bg-elevated);
   border-radius: 12px;
   padding: 1.5rem;
   margin-bottom: 2rem;
@@ -1021,7 +1021,7 @@
 }
 
 .setting-input {
-  background: #16213e;
+  background: var(--bg-surface);
   border: 2px solid #2a2a3e;
   border-radius: 8px;
   padding: 0.8rem;
@@ -1045,7 +1045,7 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background: #16213e;
+  background: var(--bg-surface);
   border: 2px solid #2a2a3e;
   border-radius: 8px;
   padding: 1.2rem;
@@ -1112,4 +1112,8 @@
   opacity: 0.6;
   cursor: not-allowed;
   transform: none;
+}
+
+.stat-icon--gold {
+  background: linear-gradient(135deg, var(--gold-primary) 0%, var(--gold-light) 100%) !important;
 }

@@ -42,7 +42,7 @@ const EncryptionChoiceModal = ({ file, onClose, onChoose }) => {
     } else if (strength === 3 || strength === 4) {
       message = `Medium - Add: ${missing.join(', ')}`;
     } else if (strength === 5) {
-      message = 'Strong ✓';
+      message = 'Strong';
     }
 
     return { level: strength, message, checks };
@@ -96,15 +96,15 @@ const EncryptionChoiceModal = ({ file, onClose, onChoose }) => {
     <div className="encryption-modal-overlay">
       <div className="encryption-modal">
         <div className="encryption-modal-header">
-          <h2>🔐 Choose Encryption Method</h2>
+          <h2>Choose Encryption Method</h2>
           <button className="close-btn" onClick={onClose}>×</button>
         </div>
 
         <div className="encryption-modal-body">
           <div className="file-info-banner">
             <p>File: <strong>{file.filename}</strong></p>
-            <p className="sensitive-warning">
-              ⚠️ This file contains sensitive data or requires encryption
+            <p className="sensitive-warning" role="alert">
+              This file contains sensitive data or requires encryption.
             </p>
           </div>
 
@@ -120,15 +120,15 @@ const EncryptionChoiceModal = ({ file, onClose, onChoose }) => {
                   checked={selectedMethod === 'server-side'}
                   onChange={() => handleMethodSelect('server-side')}
                 />
-                <h3>🛡️ Server-Side Encryption (SSE-S3)</h3>
+                <h3>Server-Side Encryption (SSE-S3)</h3>
               </div>
               <div className="option-description">
                 <p><strong>AWS S3 encrypts at rest with managed keys (AES-256)</strong></p>
                 <ul>
-                  <li>✅ No password to remember</li>
-                  <li>✅ Fast upload — encryption handled by S3</li>
-                  <li>✅ Copied to replica bucket for redundancy</li>
-                  <li>⚠️ Zenith operators could access plaintext via cloud controls</li>
+                  <li className="pro">No password to remember</li>
+                  <li className="pro">Fast upload — encryption handled by S3</li>
+                  <li className="pro">Copied to replica bucket for redundancy</li>
+                  <li className="caution">Zenith operators could access plaintext via cloud controls</li>
                 </ul>
                 <p className="recommendation">
                   <strong>Best for:</strong> Convenience, compliance, shared team access
@@ -147,16 +147,16 @@ const EncryptionChoiceModal = ({ file, onClose, onChoose }) => {
                   checked={selectedMethod === 'client-side'}
                   onChange={() => handleMethodSelect('client-side')}
                 />
-                <h3>🔒 Client-Side Encryption (browser)</h3>
+                <h3>Client-Side Encryption (browser)</h3>
               </div>
               <div className="option-description">
                 <p><strong>Encrypted in your browser before upload — zero-knowledge</strong></p>
                 <ul>
-                  <li>✅ Password never sent to Zenith servers</li>
-                  <li>✅ AES-256-CBC + PBKDF2 (100k iterations) in Web Crypto</li>
-                  <li>✅ Ciphertext stored on S3 + replica bucket</li>
-                  <li>🔐 <strong>Only your password can decrypt</strong></li>
-                  <li>⚠️ If you lose your password, the file cannot be recovered</li>
+                  <li className="pro">Password never sent to Zenith servers</li>
+                  <li className="pro">AES-256-CBC + PBKDF2 (100k iterations) in Web Crypto</li>
+                  <li className="pro">Ciphertext stored on S3 + replica bucket</li>
+                  <li className="pro"><strong>Only your password can decrypt</strong></li>
+                  <li className="caution">If you lose your password, the file cannot be recovered</li>
                 </ul>
                 <p className="recommendation">
                   <strong>Best for:</strong> Credentials, secrets, maximum privacy
@@ -168,7 +168,7 @@ const EncryptionChoiceModal = ({ file, onClose, onChoose }) => {
           {showPasswordForm && selectedMethod === 'client-side' && (
             <div className="password-form">
               <div className="password-warning">
-                <strong>⚠️ IMPORTANT:</strong> Encryption happens locally in your browser. Your password
+                <strong>Important:</strong> Encryption happens locally in your browser. Your password
                 is not stored on our servers. If you forget it, the file cannot be recovered.
               </div>
               <div className="form-group">
@@ -216,15 +216,15 @@ const EncryptionChoiceModal = ({ file, onClose, onChoose }) => {
                   className="password-input"
                 />
                 {confirmPassword && password !== confirmPassword && (
-                  <p className="error-text">❌ Passwords do not match</p>
+                  <p className="error-text">Passwords do not match</p>
                 )}
               </div>
               {password && (
                 <div className="password-strength">
                   <p>Password strength: {
-                    password.length < 12 ? '❌ Too short' :
-                    password.length < 16 ? '⚠️ Moderate' :
-                    '✅ Strong'
+                    password.length < 12 ? 'Too short' :
+                    password.length < 16 ? 'Moderate' :
+                    'Strong'
                   }</p>
                 </div>
               )}

@@ -99,9 +99,8 @@
 }
 
 .wizard-step.active .wizard-step-number {
-  border-color: #D4A843;
-  color: #D4A843;
-  box-shadow: 0 0 12px rgba(212,168,67,0.3);
+  border-color: var(--gold-primary);
+  color: var(--gold-primary);
 }
 
 .wizard-step.completed .wizard-step-number {
@@ -327,7 +326,7 @@
 }
 
 .config-field select option {
-  background: #1a1a2e;
+  background: var(--bg-elevated);
   color: #fff;
 }
 

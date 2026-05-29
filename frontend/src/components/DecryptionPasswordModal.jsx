@@ -30,7 +30,7 @@ const DecryptionPasswordModal = ({ file, onClose, onDecrypt }) => {
     <div className="decryption-modal-overlay">
       <div className="decryption-modal">
         <div className="decryption-modal-header">
-          <h2>🔓 Enter Decryption Password</h2>
+          <h2>Enter Decryption Password</h2>
           <button className="close-btn" onClick={onClose}>×</button>
         </div>
 
@@ -38,7 +38,7 @@ const DecryptionPasswordModal = ({ file, onClose, onDecrypt }) => {
           <div className="file-info">
             <p>File: <strong>{file.filename}</strong></p>
             <p className="encryption-info">
-              🔒 This file is encrypted with client-side encryption
+              This file is encrypted with client-side encryption
             </p>
           </div>
 
@@ -61,7 +61,7 @@ const DecryptionPasswordModal = ({ file, onClose, onDecrypt }) => {
 
             <div className="info-box">
               <p>
-                ℹ️ This file was encrypted with <strong>AES-256</strong> using your password. 
+                This file was encrypted with <strong>AES-256</strong> using your password. 
                 Only the correct password can decrypt it.
               </p>
             </div>

@@ -28,6 +28,7 @@ import {
   validateRecoveryContactsForm,
 } from '../utils/formValidation';
 import '../styles/profile.css';
+import PageHeader from '../components/ui/PageHeader.jsx';
 
 const ProfilePage = () => {
   const { user, token, logout } = useAuth();
@@ -229,10 +230,11 @@ const ProfilePage = () => {
 
   return (
     <div className="profile-page">
-      <div className="profile-header">
-        <h2>Profile Settings</h2>
-        <p>Manage your account information and preferences</p>
-      </div>
+      <PageHeader
+        kicker="Account"
+        title="Profile"
+        subtitle="Manage your account information and preferences"
+      />
 
       <div className="profile-content">
         {/* Profile Picture Section */}

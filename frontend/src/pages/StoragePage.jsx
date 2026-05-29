@@ -24,7 +24,8 @@ import {
   uploadFile as uploadFileToCSP,
   syncAwsBucket,
 } from "../api";
-import "../styles/storage.css"; // We use the external stylesheet
+import "../styles/storage.css";
+import PageHeader from "../components/ui/PageHeader.jsx";
 
 // --- API FUNCTIONS (Missing from api.js) ---
 import { apiClient } from "../api";
@@ -250,9 +251,11 @@ function StoragePage() {
 
   return (
     <div className="storage-container">
-      <div className="storage-header">
-        <h2>Standard Storage</h2>
-      </div>
+      <PageHeader
+        kicker="Object storage"
+        title="Standard Storage"
+        subtitle="Upload, analyze, and sync files across your connected cloud providers"
+      />
 
       {/* Storage Process Flow */}
       <div className="storage-process-info">
@@ -320,7 +323,7 @@ function StoragePage() {
             <select
               value={userPriority}
               onChange={(e) => setUserPriority(e.target.value)}
-              className={`priority-select priority-${userPriority}`}
+              className={`zenith-select priority-select priority-${userPriority}`}
             >
               <option value="balanced">Balanced</option>
               <option value="cost">Prioritize Cost Savings</option>
@@ -331,7 +334,7 @@ function StoragePage() {
             <select
               value={userIntent}
               onChange={(e) => setUserIntent(e.target.value)}
-              className={`intent-select intent-${userIntent}`}
+              className={`zenith-select intent-select intent-${userIntent}`}
             >
               <option value="active">Active / Frequent</option>
               <option value="infrequent">Infrequent Access</option>
@@ -488,7 +491,7 @@ function StoragePage() {
             <div className="override-section">
               <label>Or, manually select a different provider:</label>
               <select
-                className="override-select"
+                className="zenith-select override-select"
                 onChange={(e) => setManualCspSelection(e.target.value)}
                 defaultValue={""}
               >
@@ -535,7 +538,7 @@ function StoragePage() {
                 id="restore-tier"
                 value={restoreTier}
                 onChange={(e) => setRestoreTier(e.target.value)}
-                className="restore-select"
+                className="zenith-select restore-select"
               >
                 <option value="Standard">Standard (3-5 hours, lowest cost)</option>
                 <option value="Bulk">Bulk (5-12 hours, very low cost for large archives)</option>

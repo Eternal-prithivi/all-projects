@@ -17,6 +17,7 @@ import { toast } from 'react-toastify';
 import { useNavigate } from 'react-router-dom';
 import { PageSkeleton } from '../components/Skeletons.jsx';
 import '../styles/billing.css';
+import CostHubNav from '../components/dashboard/CostHubNav.jsx';
 
 function BillingPage() {
   const [subscription, setSubscription] = useState(() => {
@@ -181,7 +182,7 @@ function BillingPage() {
           email: localStorage.getItem('email') || '',
         },
         theme: {
-          color: '#667eea'
+          color: 'var(--gold-primary)'
         },
         modal: {
           ondismiss: function() {
@@ -270,6 +271,8 @@ function BillingPage() {
           </button>
         )}
       </div>
+
+      <CostHubNav />
 
       <div className="billing-overview-grid">
         {billingOverview.map((item) => (
@@ -550,9 +553,9 @@ function BillingPage() {
         {paymentHistory.length === 0 ? (
           <div className="no-history">
             <svg width="80" height="80" viewBox="0 0 80 80" fill="none">
-              <rect width="80" height="80" rx="12" fill="rgba(102, 126, 234, 0.1)"/>
-              <path d="M30 35h20M30 45h15M30 55h20" stroke="#667eea" strokeWidth="3" strokeLinecap="round"/>
-              <rect x="25" y="25" width="30" height="35" rx="2" stroke="#667eea" strokeWidth="2"/>
+              <rect width="80" height="80" rx="12" fill="var(--gold-glow)"/>
+              <path d="M30 35h20M30 45h15M30 55h20" stroke="var(--gold-primary)" strokeWidth="3" strokeLinecap="round"/>
+              <rect x="25" y="25" width="30" height="35" rx="2" stroke="var(--gold-primary)" strokeWidth="2"/>
             </svg>
             <p>No payment history yet</p>
             {subscription?.plan_id === 'free' && (

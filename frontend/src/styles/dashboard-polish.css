@@ -1,0 +1,118 @@
+/**
+ * Dashboard-wide UI polish — contrast, focus, enterprise consistency.
+ * Loaded after page CSS in DashboardLayout / AdminLayout.
+ */
+
+.dashboard-content,
+.admin-content,
+.admin-main {
+  color: var(--text-primary);
+}
+
+/* Nested pages must not force full viewport height inside dashboard shell */
+.dashboard-content :is(
+  .cost-analysis-container,
+  .cost-simulator-container,
+  .cost-optimization-container
+) {
+  min-height: auto;
+  padding: 0;
+  background: transparent;
+}
+
+/* Unify kickers (Cost Simulator, Optimization, Provision, etc.) */
+.dashboard-content .page-kicker,
+.admin-content .page-kicker {
+  display: inline-flex;
+  margin-bottom: var(--space-sm);
+  padding: 6px 12px;
+  border-radius: var(--radius-full);
+  background: var(--gold-glow);
+  border: 1px solid var(--gold-border);
+  color: var(--gold-light);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+/* Secondary back navigation when CostHub is present */
+.dashboard-content .back-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-bottom: var(--space-md);
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color var(--duration-fast);
+}
+
+.dashboard-content .back-button:hover {
+  color: var(--gold-light);
+}
+
+.dashboard-content :is(.text-muted, .muted, small, .help-text) {
+  color: var(--text-secondary);
+}
+
+.dashboard-content input::placeholder,
+.dashboard-content textarea::placeholder,
+.admin-content input::placeholder {
+  color: var(--text-muted);
+  opacity: 1;
+}
+
+.dashboard-content :is(input, select, textarea):focus-visible,
+.admin-content :is(input, select, textarea):focus-visible {
+  outline: 2px solid var(--gold-primary);
+  outline-offset: 2px;
+  border-color: var(--gold-primary);
+}
+
+.dashboard-content button:focus-visible,
+.admin-content button:focus-visible {
+  outline: 2px solid var(--gold-primary);
+  outline-offset: 2px;
+}
+
+/* Gold-filled CTAs — readable dark text */
+.dashboard-content :is(
+  .btn-primary,
+  .btn-upgrade,
+  .primary-btn,
+  .submit-btn,
+  .btn-pay-now,
+  .service-btn.active
+):not(:disabled),
+.admin-content .btn-primary:not(:disabled) {
+  color: var(--bg-base);
+}
+
+.dashboard-content .toggle-btn.active {
+  color: var(--bg-base);
+}
+
+.dashboard-content table th {
+  color: var(--text-primary);
+}
+
+.dashboard-content table td {
+  color: var(--text-secondary);
+}
+
+.Toastify__toast-theme--dark {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  border: 1px solid var(--border-default);
+}
+
+/* Admin modals / panels */
+.admin-content :is(.modal-content, .admin-modal, .detail-panel) {
+  background: var(--bg-elevated);
+  border-color: var(--border-default);
+}

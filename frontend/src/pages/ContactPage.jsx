@@ -146,6 +146,7 @@ function ContactPage() {
                   <select
                     id="subject"
                     name="subject"
+                    className="zenith-select"
                     value={formData.subject}
                     onChange={handleChange}
                     required

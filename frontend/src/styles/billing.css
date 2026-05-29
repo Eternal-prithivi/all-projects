@@ -63,7 +63,7 @@
 
 .billing-overview-card.accent {
   border-color: rgba(212, 175, 55, 0.25);
-  background: linear-gradient(135deg, rgba(212, 175, 55, 0.12), rgba(102, 126, 234, 0.08));
+  background: linear-gradient(135deg, rgba(212, 175, 55, 0.12), rgba(212, 175, 55, 0.08));
 }
 
 .billing-overview-label {
@@ -94,10 +94,10 @@
   justify-content: center;
   min-height: 44px;
   padding: 12px 18px;
-  border: 1px solid rgba(212, 175, 55, 0.28);
+  border: 1px solid var(--gold-border);
   border-radius: 999px;
-  background: linear-gradient(135deg, rgba(212, 175, 55, 0.18), rgba(102, 126, 234, 0.16));
-  color: #fff;
+  background: var(--gold-glow);
+  color: var(--gold-light);
   font-weight: 700;
   box-shadow: 0 14px 30px rgba(0, 0, 0, 0.16);
 }
@@ -132,14 +132,14 @@
 
 /* Budget Card Styles */
 .budget-card {
-  background: linear-gradient(135deg, rgba(102, 234, 126, 0.08) 0%, rgba(75, 162, 118, 0.08) 100%);
-  border-color: rgba(102, 234, 126, 0.25);
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.08) 0%, rgba(22, 163, 74, 0.08) 100%);
+  border-color: rgba(34, 197, 94, 0.25);
 }
 
 .btn-edit-budget {
-  background: rgba(102, 234, 126, 0.15);
+  background: rgba(34, 197, 94, 0.15);
   color: #66ea7e;
-  border: 1px solid rgba(102, 234, 126, 0.3);
+  border: 1px solid rgba(34, 197, 94, 0.3);
   padding: 8px 16px;
   border-radius: 6px;
   font-size: 14px;
@@ -148,8 +148,8 @@
 }
 
 .btn-edit-budget:hover {
-  background: rgba(102, 234, 126, 0.25);
-  border-color: rgba(102, 234, 126, 0.5);
+  background: rgba(34, 197, 94, 0.25);
+  border-color: rgba(34, 197, 94, 0.5);
 }
 
 .budget-form {
@@ -219,13 +219,13 @@
 
 .btn-save:hover {
   transform: translateY(-2px);
-  box-shadow: 0 8px 16px rgba(102, 234, 126, 0.3);
+  box-shadow: 0 8px 16px rgba(34, 197, 94, 0.3);
 }
 
 .btn-test-sms {
-  background: rgba(102, 126, 234, 0.15);
-  color: #667eea;
-  border: 1px solid rgba(102, 126, 234, 0.3);
+  background: rgba(212, 175, 55, 0.15);
+  color: var(--gold-primary);
+  border: 1px solid rgba(212, 175, 55, 0.3);
   padding: 12px 24px;
   border-radius: 8px;
   font-size: 14px;
@@ -235,8 +235,8 @@
 }
 
 .btn-test-sms:hover {
-  background: rgba(102, 126, 234, 0.25);
-  border-color: rgba(102, 126, 234, 0.5);
+  background: rgba(212, 175, 55, 0.25);
+  border-color: rgba(212, 175, 55, 0.5);
 }
 
 .budgets-grid {
@@ -388,7 +388,7 @@
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, var(--gold-primary) 0%, var(--gold-light) 100%);
   color: #fff;
   border: none;
   padding: 12px 24px;
@@ -401,15 +401,15 @@
 
 .btn-primary:hover {
   transform: translateY(-2px);
-  box-shadow: 0 8px 16px rgba(102, 126, 234, 0.3);
+  box-shadow: 0 8px 16px rgba(212, 175, 55, 0.3);
 }
 
 /* Current Month Card */
 
 /* Current Month Card */
 .current-month-card {
-  background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
-  border-color: rgba(102, 126, 234, 0.3);
+  background: linear-gradient(135deg, rgba(212, 175, 55, 0.1) 0%, rgba(184, 134, 11, 0.1) 100%);
+  border-color: rgba(212, 175, 55, 0.3);
 }
 
 .days-remaining {
@@ -437,7 +437,7 @@
 .cost-item.cost-total {
   margin-top: 8px;
   padding-top: 16px;
-  border-top: 2px solid rgba(102, 126, 234, 0.5);
+  border-top: 2px solid rgba(212, 175, 55, 0.5);
   border-bottom: none;
 }
 
@@ -460,7 +460,7 @@
 
 .cost-total .cost-value {
   font-size: 24px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, var(--gold-primary) 0%, var(--gold-light) 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -525,7 +525,7 @@
 /* Generate Invoice Button */
 .btn-generate-invoice {
   padding: 10px 20px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, var(--gold-primary) 0%, var(--gold-light) 100%);
   border: none;
   border-radius: 8px;
   color: #fff;
@@ -537,7 +537,7 @@
 
 .btn-generate-invoice:hover {
   transform: translateY(-2px);
-  box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
+  box-shadow: 0 8px 20px rgba(212, 175, 55, 0.4);
 }
 
 .btn-generate-invoice:disabled {
@@ -564,7 +564,7 @@
 
 .btn-primary {
   padding: 12px 24px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, var(--gold-primary) 0%, var(--gold-light) 100%);
   border: none;
   border-radius: 8px;
   color: #fff;
@@ -576,7 +576,7 @@
 
 .btn-primary:hover {
   transform: translateY(-2px);
-  box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
+  box-shadow: 0 8px 20px rgba(212, 175, 55, 0.4);
 }
 
 /* Invoices Table */
@@ -625,7 +625,7 @@
 .invoice-id {
   font-family: 'Monaco', 'Menlo', monospace;
   font-size: 13px;
-  color: #667eea;
+  color: var(--gold-primary);
 }
 
 .invoice-amount {
@@ -752,8 +752,8 @@
 
 /* Subscription Card */
 .subscription-card {
-  background: linear-gradient(135deg, rgba(102, 126, 234, 0.08) 0%, rgba(118, 75, 162, 0.08) 100%);
-  border-color: rgba(102, 126, 234, 0.3);
+  background: linear-gradient(135deg, rgba(212, 175, 55, 0.08) 0%, rgba(184, 134, 11, 0.08) 100%);
+  border-color: rgba(212, 175, 55, 0.3);
 }
 
 .subscription-details {
@@ -788,13 +788,13 @@
 }
 
 .sub-detail .value.amount {
-  color: #667eea;
+  color: var(--gold-primary);
   font-size: 24px;
 }
 
 .billing-countdown {
-  background: rgba(102, 126, 234, 0.1);
-  border: 1px solid rgba(102, 126, 234, 0.2);
+  background: rgba(212, 175, 55, 0.1);
+  border: 1px solid rgba(212, 175, 55, 0.2);
   border-radius: 8px;
   padding: 16px;
 }
@@ -807,7 +807,7 @@
 }
 
 .countdown-info svg {
-  color: #667eea;
+  color: var(--gold-primary);
 }
 
 .subscription-limits {
@@ -833,12 +833,12 @@
   align-items: center;
   gap: 12px;
   padding: 12px;
-  background: rgba(102, 126, 234, 0.1);
+  background: rgba(212, 175, 55, 0.1);
   border-radius: 8px;
 }
 
 .limit-item svg {
-  color: #667eea;
+  color: var(--gold-primary);
   flex-shrink: 0;
 }
 
@@ -878,15 +878,15 @@
 }
 
 .btn-pay-now {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: #fff;
+  background: linear-gradient(135deg, var(--gold-dark) 0%, var(--gold-primary) 100%);
+  color: var(--bg-base);
   flex: 1;
   min-width: 200px;
 }
 
 .btn-pay-now:hover:not(:disabled) {
   transform: translateY(-2px);
-  box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
+  box-shadow: 0 8px 20px rgba(212, 175, 55, 0.4);
 }
 
 .btn-pay-now:disabled {
@@ -895,7 +895,7 @@
 }
 
 .btn-pay-now.processing {
-  background: #667eea;
+  background: var(--gold-primary);
 }
 
 .btn-upgrade-plan {
@@ -906,7 +906,7 @@
 
 .btn-upgrade-plan:hover {
   transform: translateY(-2px);
-  box-shadow: 0 8px 20px rgba(102, 234, 126, 0.4);
+  box-shadow: 0 8px 20px rgba(34, 197, 94, 0.4);
 }
 
 .btn-change-plan {
@@ -944,9 +944,9 @@
 }
 
 .status-active {
-  background: rgba(102, 234, 126, 0.15);
+  background: rgba(34, 197, 94, 0.15);
   color: #66ea7e;
-  border: 1px solid rgba(102, 234, 126, 0.3);
+  border: 1px solid rgba(34, 197, 94, 0.3);
 }
 
 .status-warning {
@@ -965,7 +965,7 @@
 /* Payment Method Card */
 .payment-method-card {
   background: linear-gradient(135deg, rgba(7, 38, 84, 0.3) 0%, rgba(11, 62, 138, 0.3) 100%);
-  border-color: rgba(102, 126, 234, 0.3);
+  border-color: rgba(212, 175, 55, 0.3);
 }
 
 .payment-method-content {
@@ -1007,8 +1007,8 @@
 
 .payment-badge {
   padding: 8px 16px;
-  background: rgba(102, 126, 234, 0.15);
-  border: 1px solid rgba(102, 126, 234, 0.3);
+  background: rgba(212, 175, 55, 0.15);
+  border: 1px solid rgba(212, 175, 55, 0.3);
   border-radius: 20px;
   color: rgba(255, 255, 255, 0.8);
   font-size: 13px;
@@ -1021,8 +1021,8 @@
 }
 
 .history-count {
-  background: rgba(102, 126, 234, 0.15);
-  color: #667eea;
+  background: rgba(212, 175, 55, 0.15);
+  color: var(--gold-primary);
   padding: 6px 12px;
   border-radius: 12px;
   font-size: 13px;
@@ -1045,7 +1045,7 @@
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, var(--gold-primary) 0%, var(--gold-light) 100%);
   color: #fff;
   padding: 12px 24px;
   border-radius: 8px;
@@ -1058,7 +1058,7 @@
 
 .btn-primary:hover {
   transform: translateY(-2px);
-  box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
+  box-shadow: 0 8px 20px rgba(212, 175, 55, 0.4);
 }
 
 .payment-history-table-wrapper {
@@ -1071,7 +1071,7 @@
 }
 
 .payment-history-table thead {
-  background: rgba(102, 126, 234, 0.1);
+  background: rgba(212, 175, 55, 0.1);
 }
 
 .payment-history-table th {
@@ -1092,7 +1092,7 @@
 }
 
 .payment-history-table tbody tr:hover {
-  background: rgba(102, 126, 234, 0.05);
+  background: rgba(212, 175, 55, 0.05);
 }
 
 .payment-date {
@@ -1100,8 +1100,8 @@
 }
 
 .plan-badge {
-  background: rgba(102, 126, 234, 0.15);
-  color: #667eea;
+  background: rgba(212, 175, 55, 0.15);
+  color: var(--gold-primary);
   padding: 4px 12px;
   border-radius: 12px;
   font-size: 12px;
@@ -1136,7 +1136,7 @@
 }
 
 .payment-status-badge.success {
-  background: rgba(102, 234, 126, 0.15);
+  background: rgba(34, 197, 94, 0.15);
   color: #66ea7e;
 }
 
@@ -1258,7 +1258,7 @@
 }
 
 .cost-card.platform {
-  border-color: rgba(102, 126, 234, 0.3);
+  border-color: rgba(212, 175, 55, 0.3);
 }
 
 .cost-header {
@@ -1284,7 +1284,7 @@
 }
 
 .cost-card.platform .cost-header {
-  color: #667eea;
+  color: var(--gold-primary);
 }
 
 .cost-amount {
@@ -1354,7 +1354,7 @@
 }
 
 .btn-upgrade-plan-header {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, var(--gold-primary) 0%, var(--gold-light) 100%);
   color: #fff;
   padding: 12px 24px;
   border-radius: 8px;
@@ -1367,7 +1367,7 @@
 
 .btn-upgrade-plan-header:hover {
   transform: translateY(-2px);
-  box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
+  box-shadow: 0 8px 20px rgba(212, 175, 55, 0.4);
 }
 
 /* Cost Breakdown Summary */
@@ -1396,7 +1396,7 @@
 }
 
 .summary-row.highlight {
-  background: rgba(102, 126, 234, 0.1);
+  background: rgba(212, 175, 55, 0.1);
   padding: 12px;
   border-radius: 8px;
   border-bottom: none;
@@ -1422,8 +1422,8 @@
   justify-content: space-between;
   align-items: center;
   padding: 24px;
-  background: linear-gradient(135deg, rgba(102, 126, 234, 0.2) 0%, rgba(118, 75, 162, 0.2) 100%);
-  border: 2px solid rgba(102, 126, 234, 0.4);
+  background: linear-gradient(135deg, rgba(212, 175, 55, 0.2) 0%, rgba(184, 134, 11, 0.2) 100%);
+  border: 2px solid rgba(212, 175, 55, 0.4);
   border-radius: 12px;
   margin-bottom: 16px;
 }
@@ -1437,8 +1437,8 @@
 .total-amount {
   font-size: 36px;
   font-weight: 800;
-  color: #667eea;
-  text-shadow: 0 0 20px rgba(102, 126, 234, 0.5);
+  color: var(--gold-primary);
+  text-shadow: 0 0 20px rgba(212, 175, 55, 0.5);
 }
 
 @media (max-width: 768px) {

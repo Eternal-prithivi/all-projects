@@ -574,7 +574,7 @@
 
 .access-denied-detail {
   font-size: 0.95rem;
-  color: #666;
+  color: var(--text-secondary);
   margin-top: 1rem;
   font-style: italic;
 }

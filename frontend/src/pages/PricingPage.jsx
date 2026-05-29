@@ -94,7 +94,7 @@ const PricingPage = () => {
           email: localStorage.getItem('email') || '',
         },
         theme: {
-          color: '#8B5CF6'
+          color: '#d4af37'
         },
         modal: {
           ondismiss: function() {
@@ -154,20 +154,24 @@ const PricingPage = () => {
         <div className="pricing-grid">
           {plans.map((plan) => {
             const isCurrentPlan = currentSubscription?.plan_id === plan.plan_id;
+            const isFeatured = plan.plan_id === 'pro' && !isCurrentPlan;
             const isPlanDisabled = plan.plan_id === 'free' || processingPlanId !== null;
 
             return (
               <div
                 key={plan.plan_id}
                 className={`pricing-card ${isCurrentPlan ? 'current-plan' : ''} ${
-                  plan.plan_id === 'pro' ? 'featured' : ''
+                  isFeatured ? 'featured' : ''
                 }`}
               >
-                {plan.plan_id === 'pro' && (
+                {isFeatured && (
                   <div className="featured-badge">Most Popular</div>
                 )}
 
                 <div className="plan-header">
+                  {isCurrentPlan && (
+                    <span className="pricing-kicker your-plan-chip">Your plan</span>
+                  )}
                   <h3>{plan.name}</h3>
                   <p className="plan-description">{plan.description}</p>
                 </div>

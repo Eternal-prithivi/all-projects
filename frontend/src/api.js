@@ -48,6 +48,19 @@ apiClient.interceptors.request.use(
 
 // ---------------- AUTH ----------------
 
+/** Parse FastAPI / Zenith error payloads for UI messages */
+export const getApiErrorMessage = (error, fallback = "Something went wrong.") => {
+  if (!error) return fallback;
+  const detail = error.detail ?? error.response?.data?.detail;
+  if (typeof detail === "string") return detail;
+  if (detail && typeof detail === "object" && detail.message) return detail.message;
+  if (error.message && !error.message.includes("Network Error")) return error.message;
+  if (!error.response) {
+    return "Cannot reach the server. Start the backend (http://localhost:8000) and try again.";
+  }
+  return fallback;
+};
+
 // Register
 export const registerUser = async (userData) => {
   try {
@@ -59,15 +72,18 @@ export const registerUser = async (userData) => {
 };
 
 // Login
-export const loginUser = async (credentials) => {
+export const loginUser = async (credentials, deviceFingerprint = null) => {
   const formData = new URLSearchParams();
-  formData.append("username", credentials.username);
+  formData.append("username", String(credentials.username || "").trim());
   formData.append("password", credentials.password);
 
+  const headers = { "Content-Type": "application/x-www-form-urlencoded" };
+  if (deviceFingerprint) {
+    headers["X-Device-Fingerprint"] = deviceFingerprint;
+  }
+
   try {
-    const response = await apiClient.post("/auth/token", formData, {
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    });
+    const response = await apiClient.post("/auth/token", formData, { headers });
     return response.data; // { access_token, token_type }
   } catch (error) {
     throw error.response?.data || error;
@@ -194,10 +210,11 @@ export const getDashboardStats = async (token) => {
 
 // ---------------- SECURE STORAGE ----------------
 
-export const uploadSecureFile = async (file, encrypt, token) => {
+export const uploadSecureFile = async (file, encrypt, token, alwaysAskEncryption = false) => {
   const formData = new FormData();
   formData.append("file", file);
   formData.append("encrypt_manual", encrypt);
+  formData.append("always_ask_encryption", alwaysAskEncryption);
 
   try {
     const response = await apiClient.post("/security/upload-secure", formData, {

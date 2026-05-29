@@ -140,7 +140,7 @@
 }
 
 .hint-text {
-  color: #666;
+  color: var(--text-secondary);
   font-size: 0.85rem;
   margin: 0;
 }

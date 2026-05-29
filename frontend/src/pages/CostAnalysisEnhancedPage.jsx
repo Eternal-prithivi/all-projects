@@ -14,13 +14,13 @@ import React, { useState, useEffect } from 'react';
 import { apiClient } from '../api.js';
 import { useNotifications } from "../hooks/useNotifications";
 import { useNavigate } from 'react-router-dom';
+import CostHubNav from '../components/dashboard/CostHubNav.jsx';
+import PageHeader from '../components/ui/PageHeader.jsx';
 import {
   IconAlert,
   IconActivity,
   IconBarChart,
   IconDownload,
-  IconDollarSign,
-  IconLightbulb,
 } from '../components/dashboard/Icons.jsx';
 import '../styles/costanalysis.css';
 
@@ -390,23 +390,12 @@ const CostAnalysisEnhancedPage = () => {
 
   return (
     <div className="cost-analysis-container">
-      {/* Header */}
-      <div className="cost-header">
-        <div>
-          <h1>Cost Analysis</h1>
-          <p>Monitor and optimize your multi-cloud spending</p>
-        </div>
-        <div className="header-buttons">
-          <button className="simulator-button" type="button" onClick={() => navigate('/dashboard/simulator')}>
-            <IconDollarSign aria-hidden="true" />
-            Cost Simulator
-          </button>
-          <button className="optimization-button" type="button" onClick={() => navigate('/dashboard/optimization')}>
-            <IconLightbulb aria-hidden="true" />
-            Optimization Tips
-          </button>
-        </div>
-      </div>
+      <PageHeader
+        kicker="Cost intelligence"
+        title="Cost Analysis"
+        subtitle="Monitor and optimize your multi-cloud spending"
+      />
+      <CostHubNav />
 
       {/* Anomaly Alerts Banner */}
       {anomalySummary && anomalySummary.total_unacknowledged > 0 && (
@@ -478,13 +467,13 @@ const CostAnalysisEnhancedPage = () => {
               min="0"
               step="0.01"
             />
-            <select value={budgetForm.provider} onChange={(e) => setBudgetForm({...budgetForm, provider: e.target.value})}>
+            <select className="zenith-select" value={budgetForm.provider} onChange={(e) => setBudgetForm({...budgetForm, provider: e.target.value})}>
               <option value="all">All Providers</option>
               <option value="aws">AWS</option>
               <option value="gcp">GCP</option>
               <option value="azure">Azure</option>
             </select>
-            <select value={budgetForm.period} onChange={(e) => setBudgetForm({...budgetForm, period: e.target.value})}>
+            <select className="zenith-select" value={budgetForm.period} onChange={(e) => setBudgetForm({...budgetForm, period: e.target.value})}>
               <option value="daily">Daily</option>
               <option value="weekly">Weekly</option>
               <option value="monthly">Monthly</option>
@@ -560,7 +549,7 @@ const CostAnalysisEnhancedPage = () => {
       <div className="cost-filters">
         <div className="filter-group">
           <label>Provider</label>
-          <select value={selectedProvider} onChange={(e) => setSelectedProvider(e.target.value)}>
+          <select className="zenith-select filter-select" value={selectedProvider} onChange={(e) => setSelectedProvider(e.target.value)}>
             <option value="aws">AWS</option>
             <option value="gcp">Google Cloud</option>
             <option value="azure">Azure</option>
@@ -587,7 +576,7 @@ const CostAnalysisEnhancedPage = () => {
 
         <div className="filter-group">
           <label>Granularity</label>
-          <select value={granularity} onChange={(e) => setGranularity(e.target.value)}>
+          <select className="zenith-select filter-select" value={granularity} onChange={(e) => setGranularity(e.target.value)}>
             <option value="DAILY">Daily</option>
             <option value="MONTHLY">Monthly</option>
           </select>

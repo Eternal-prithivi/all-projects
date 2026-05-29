@@ -31,15 +31,7 @@ Scope: [...] | Do NOT touch: [...] | Done when: [...]
 
 ## 🔴 Active Task
 
-**Phase 12: Security Research Paper Parity**
-
-| | |
-|--|--|
-| Status | **IN PROGRESS** \| Started: 2026-05-29 |
-| Done | Browser CSE, sensitive scan, encrypt modal, SSE-S3 dual-bucket, secure vault AWS sync |
-| Open | Session geo/fingerprint, detector benchmarks, auto SSE default for sensitive |
-| Spec | `PHASE_12_SECURITY_RESEARCH_PARITY.md` |
-| Resume | `SCRATCHPAD.md` |
+**None** — Enterprise dashboard UI/UX pass 3 **COMPLETE** (2026-05-29). See `PROGRESS_HISTORY.md` and `UI_UX_AUDIT_2026.md` Pass 3.
 
 ---
 
@@ -55,7 +47,7 @@ Scope: [...] | Do NOT touch: [...] | Done when: [...]
 
 ### ✅ UI/UX platform polish (2026-05-29) — complete
 
-Waves 0–5 done: Security vault CSS extraction, billing/admin/public token pass, cost hub sub-nav, `PageHeader`/`GlassPanel`, `DESIGN_SYSTEM.md` → 93/100. Details: `UI_UX_AUDIT_2026.md`.
+Waves 0–5 + **pass 3**: `dashboard-polish.css`, `CostHubNav`, `PageHeader` on Storage/Settings/Profile/Cost Analysis, cost page layout fix (no nested 100vh), Pass 3 gap table in `UI_UX_AUDIT_2026.md`.
 
 ### Phase 12 checklist
 

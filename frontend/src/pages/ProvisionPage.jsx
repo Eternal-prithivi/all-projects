@@ -446,7 +446,7 @@ export default function ProvisionPage() {
           <div className="config-form">
             <div className="config-field">
               <label>AWS Region</label>
-              <select value={config.aws_region} onChange={e => updateConfig('aws_region', e.target.value)}>
+              <select className="zenith-select" value={config.aws_region} onChange={e => updateConfig('aws_region', e.target.value)}>
                 <option value="ap-south-1">Asia Pacific (Mumbai)</option>
                 <option value="us-east-1">US East (N. Virginia)</option>
                 <option value="us-west-2">US West (Oregon)</option>
@@ -459,7 +459,7 @@ export default function ProvisionPage() {
               <>
                 <div className="config-field">
                   <label>Instance Type</label>
-                  <select value={config.instance_type} onChange={e => updateConfig('instance_type', e.target.value)}>
+                  <select className="zenith-select" value={config.instance_type} onChange={e => updateConfig('instance_type', e.target.value)}>
                     <option value="t2.micro">t2.micro (Free Tier)</option>
                     <option value="t3.micro">t3.micro (Free Tier)</option>
                     <option value="t2.small">t2.small ($16.79/mo)</option>

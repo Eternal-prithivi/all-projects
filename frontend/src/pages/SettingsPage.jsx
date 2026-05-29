@@ -24,6 +24,7 @@ import {
   validateByocConnectionForm,
 } from '../utils/formValidation';
 import '../styles/settings.css';
+import PageHeader from '../components/ui/PageHeader.jsx';
 
 const SettingsPage = () => {
   const notifications = useNotifications();
@@ -504,7 +505,7 @@ const SettingsPage = () => {
                         </div>
                         <div className="byoc-field">
                           <label>Region</label>
-                          <select value={awsForm.region} onChange={(e) => setAwsForm({...awsForm, region: e.target.value})}>
+                          <select className="zenith-select" value={awsForm.region} onChange={(e) => setAwsForm({...awsForm, region: e.target.value})}>
                             <option value="ap-south-1">AP South 1 (Mumbai)</option>
                             <option value="us-east-1">US East 1 (Virginia)</option>
                             <option value="us-west-2">US West 2 (Oregon)</option>
@@ -540,7 +541,7 @@ const SettingsPage = () => {
                         </div>
                         <div className="byoc-field">
                           <label>Region</label>
-                          <select value={awsForm.region} onChange={(e) => setAwsForm({...awsForm, region: e.target.value})}>
+                          <select className="zenith-select" value={awsForm.region} onChange={(e) => setAwsForm({...awsForm, region: e.target.value})}>
                             <option value="ap-south-1">AP South 1 (Mumbai)</option>
                             <option value="us-east-1">US East 1 (Virginia)</option>
                             <option value="us-west-2">US West 2 (Oregon)</option>
@@ -639,10 +640,11 @@ const SettingsPage = () => {
 
   return (
     <div className="settings-page">
-      <div className="settings-header">
-        <h2>Settings</h2>
-        <p>Manage your application preferences and configurations</p>
-      </div>
+      <PageHeader
+        kicker="Workspace"
+        title="Settings"
+        subtitle="Manage your application preferences and configurations"
+      />
 
       <div className="settings-content stagger-children">
         {/* BYOC Section — First for visibility */}
@@ -695,7 +697,7 @@ const SettingsPage = () => {
           <div className="settings-group">
             <div className="setting-item-full">
               <label>Theme</label>
-              <select name="theme" value={preferences.theme} onChange={handlePreferenceChange} className="settings-select">
+              <select name="theme" value={preferences.theme} onChange={handlePreferenceChange} className="zenith-select settings-select">
                 <option value="dark">Dark</option>
                 <option value="light">Light</option>
                 <option value="auto">Auto (System)</option>
@@ -706,7 +708,7 @@ const SettingsPage = () => {
                 Language
                 <span className="coming-soon-badge">Coming Soon</span>
               </label>
-              <select name="language" value={preferences.language} onChange={handlePreferenceChange} className="settings-select" disabled>
+              <select name="language" value={preferences.language} onChange={handlePreferenceChange} className="zenith-select settings-select" disabled>
                 <option value="en">English</option>
                 <option value="es">Spanish</option>
                 <option value="fr">French</option>
@@ -715,7 +717,7 @@ const SettingsPage = () => {
             </div>
             <div className="setting-item-full">
               <label>Timezone</label>
-              <select name="timezone" value={preferences.timezone} onChange={handlePreferenceChange} className="settings-select">
+              <select name="timezone" value={preferences.timezone} onChange={handlePreferenceChange} className="zenith-select settings-select">
                 <option value="UTC-8">Pacific Time (UTC-8)</option>
                 <option value="UTC-5">Eastern Time (UTC-5)</option>
                 <option value="UTC+0">UTC</option>
@@ -725,7 +727,7 @@ const SettingsPage = () => {
             </div>
             <div className="setting-item-full">
               <label>Date Format</label>
-              <select name="dateFormat" value={preferences.dateFormat} onChange={handlePreferenceChange} className="settings-select">
+              <select name="dateFormat" value={preferences.dateFormat} onChange={handlePreferenceChange} className="zenith-select settings-select">
                 <option value="MM/DD/YYYY">MM/DD/YYYY</option>
                 <option value="DD/MM/YYYY">DD/MM/YYYY</option>
                 <option value="YYYY-MM-DD">YYYY-MM-DD</option>
@@ -733,7 +735,7 @@ const SettingsPage = () => {
             </div>
             <div className="setting-item-full">
               <label>Currency</label>
-              <select name="currency" value={preferences.currency} onChange={handlePreferenceChange} className="settings-select">
+              <select name="currency" value={preferences.currency} onChange={handlePreferenceChange} className="zenith-select settings-select">
                 <option value="USD">USD ($)</option>
                 <option value="INR">INR (₹)</option>
                 <option value="EUR">EUR (€)</option>

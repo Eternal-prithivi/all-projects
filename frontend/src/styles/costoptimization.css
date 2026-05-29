@@ -3,7 +3,7 @@
   max-width: 1400px;
   margin: 0 auto;
   color: var(--text-primary);
-  min-height: 100vh;
+  min-height: auto;
 }
 
 .optimization-header {
@@ -225,6 +225,7 @@
   background: rgba(212, 175, 55, 0.1);
   color: var(--gold-primary);
   border: 1px solid var(--gold-border);
+  box-shadow: var(--shadow-card);
 }
 
 .strategy-icon svg {

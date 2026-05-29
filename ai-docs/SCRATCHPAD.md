@@ -69,8 +69,8 @@ If 5+ sessions since last drift audit (or none ever), run the checklist below.
 | Backend tests | ✅ 46 passed (`backend/.venv/bin/python -m pytest -q`) |
 | Frontend build | ✅ Passes (`npm run build`) |
 | Frontend lint | ✅ 0 errors (warnings pre-existing) |
-| Phase | 12 COMPLETE — gap execution (auto SSE, sessions, CI, benchmarks) |
-| Last verified feature | Phase 12 + Phase 13 ops (2026-05-29) |
+| Phase | 13 — dashboard UI/UX pass 3 complete |
+| Last verified feature | Enterprise dashboard polish (2026-05-29) |
 
 **Re-verify:** `cd backend && .venv/bin/python -m pytest -q` · `cd frontend && npm run lint && npm run build`
 
@@ -78,13 +78,16 @@ If 5+ sessions since last drift audit (or none ever), run the checklist below.
 
 ## 🔄 Current Resume State
 
-**Status:** IDLE — no active task (last completed: Post–Phase 12 professional ops, 2026-05-29).
+**Status:** COMPLETE (2026-05-29)
 
-**Next agent:** On a new task, replace this section in **PRE-PHASE** (before any product code) using the template below. Do not leave this block empty or stale `IN PROGRESS` when starting work.
+**Task:** Enterprise dashboard UI/UX audit + fixes (pass 3)
 
-**Last completed summary:**
-- Auto SSE-S3, session geo + fingerprint, detector benchmark, CI (`.github/workflows/ci.yml`), demo runbook, expanded pytest (46).
-- See `ai-docs/PHASE_12_SECURITY_RESEARCH_PARITY.md` and `STATUS.md` backlog for optional follow-ups.
+**Summary:**
+- Documented 8 enterprise gaps in `UI_UX_AUDIT_2026.md` Pass 3
+- Expanded `dashboard-polish.css` (kickers, back links, gold CTA text, cost layout)
+- `PageHeader` on Storage, Settings, Profile; cost containers `min-height: auto`
+- Billing empty-state SVG gold; storage title gradient
+- pytest 46, lint 0 errors, build OK
 
 ---
 

@@ -94,7 +94,7 @@ const AdminPaymentsPage = () => {
       {/* Stats Cards */}
       <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', marginBottom: '20px' }}>
         <div className="stat-card">
-          <div className="stat-icon" style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>
+          <div className="stat-icon stat-icon--gold">
             <FaDollarSign />
           </div>
           <div className="stat-info">
