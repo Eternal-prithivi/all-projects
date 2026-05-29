@@ -12,21 +12,21 @@
 | Field | Value |
 |-------|--------|
 | Project | CloudResourceOptimizationPlatform (**Zenith**) |
-| Phase | **13** — Enterprise dashboard UI/UX (pass 5 complete) |
-| Last major complete | Admin PageHeader parity, cost modal tokens, onboarding tour tokens |
+| Phase | **14** — AWS Terraform integration plan (complete) |
+| Last major complete | `AWS_TERRAFORM_INTEGRATION_PLAN.md` feasibility + adopt/skip matrix |
 | Budget | Zero-cost / student free-tier only |
-| Spec | `ai-docs/UI_UX_AUDIT_2026.md` |
+| Spec | `ai-docs/AWS_TERRAFORM_INTEGRATION_PLAN.md` |
 
 ---
 
 ## 🔴 Active Task
 
-**None** — last completed: Enterprise dashboard UI/UX pass 5 (final polish), 2026-05-29.
+**None** — last completed: AWS Terraform integration feasibility plan, 2026-05-29.
 
 | | |
 |--|--|
 | Resume | `SCRATCHPAD.md` (IDLE) |
-| Audit | `UI_UX_AUDIT_2026.md` → Pass 5 gap table |
+| Next | Phase 14b — P0 tests + BYOC scheduled drift (see plan doc) |
 
 ---
 
@@ -55,11 +55,10 @@
 
 ## Next Backlog (optional)
 
-1. New-device login email alerts
-2. Production ML artifact hot-swap after real feedback volume
-3. Full GCP live demo (see `docs/GCP_DEMO_SETUP.md`)
-4. PageHeader on VM Cluster / Provision / Security (optional)
-5. Onboarding tour (`PROFESSIONAL_IMPROVEMENTS.md`)
+1. **Phase 14b** — Provision pytest suite + BYOC drift in Celery (P0 in plan)
+2. **Phase 14c** — Provision audit/RBAC UI + drift panel (P1)
+3. New-device login email alerts
+4. Full GCP live demo (`docs/GCP_DEMO_SETUP.md`)
 
 ---
 
@@ -67,12 +66,11 @@
 
 | Need | Read |
 |------|------|
+| Terraform integration | `AWS_TERRAFORM_INTEGRATION_PLAN.md` |
 | Frontend/UI | `AI_CONTEXT_FRONTEND.md`, `DESIGN_SYSTEM.md` |
-| UI/UX audit + wave log | `UI_UX_AUDIT_2026.md` |
 | Backend/API/ML | `AI_CONTEXT_BACKEND.md` |
 | Architecture dispute | `DECISIONS.md` |
 | Hard constraints | `AI_RULES.md` |
-| Session starter | `AI_MASTER.md` |
 
 ---
 

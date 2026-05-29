@@ -7,6 +7,16 @@
 
 ---
 
+**Phase 14: AWS Terraform integration feasibility plan** — COMPLETE 2026-05-29
+
+- Audited Zenith (`backend/terraform/`, `app/provision/`, `ProvisionPage.jsx`) vs standalone `aws using terraform` (Phases 1–16, 308 tests, Next.js ops UI).
+- Finding: DEC-019 merge already delivered modules, policy/OPA, wizard API, drift/RBAC/audit, BYOC — ~70% parity; gaps are tests, BYOC on scheduled drift, admin UI for audit/RBAC/policies, cost/VM linkage after deploy.
+- Deliverable: `ai-docs/AWS_TERRAFORM_INTEGRATION_PLAN.md` — adopt/skip matrix, P0–P2 roadmap, explicit “do not port” list (Next.js, CLI wizard, CloudShell, GitHub teams.yaml, hardcoded remote state).
+- Verdict: **Yes, continue integration** as upstream spec + sync; keep standalone repo for module/tests reference; do not duplicate UI stack.
+- Quality: pytest 46, lint 0 errors, build pass; docs-only session (no product code).
+
+---
+
 **Enterprise dashboard UI/UX — pass 3** — COMPLETE 2026-05-29
 
 - ✅ Pass 3 gap table in `UI_UX_AUDIT_2026.md` (layout, headers, contrast, IA, admin)

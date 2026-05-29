@@ -1,9 +1,6 @@
 # PROGRESS.md — Task Tracker
 
 > **Startup:** read `STATUS.md` only (not this file unless updating active task).
-> **Full PRE-PHASE:** fill `## 🔴 Active Task` before code (never leave empty while work is in flight).
-> **Full POST-PHASE:** finalize with `STATUS.md`, then commit + push. **Lightweight fix:** skip if active task unchanged.
-> Narratives → `PROGRESS_HISTORY.md` only (never duplicate here or in chat).
 > Last Updated: 2026-05-29
 
 ---
@@ -19,19 +16,9 @@
 
 ---
 
-## 📋 Task Template
-
-```
-## 🔴 Active Task
-**[Name]** | Status: IN PROGRESS | Started: YYYY-MM-DD
-Scope: [...] | Do NOT touch: [...] | Done when: [...]
-```
-
----
-
 ## 🔴 Active Task
 
-**None** — Enterprise dashboard UI/UX pass 5 **COMPLETE** (2026-05-29). See `PROGRESS_HISTORY.md` and `UI_UX_AUDIT_2026.md` Pass 5.
+**None** — AWS Terraform integration feasibility plan **COMPLETE** (2026-05-29). See `AWS_TERRAFORM_INTEGRATION_PLAN.md` and `PROGRESS_HISTORY.md`.
 
 ---
 
@@ -44,27 +31,16 @@ Scope: [...] | Do NOT touch: [...] | Done when: [...]
 | 5–10 | ✅ | ML foundation → hardening, demo runbook |
 | 11–11b | ✅ | Terraform provision, OPA, drift, RBAC, audit |
 | **12** | **✅** | SSE-S3 + browser CSE + auto SSE + sessions + benchmarks |
+| **13** | **✅** | Enterprise dashboard UI/UX passes 0–5 |
+| **14** | **✅ plan** | AWS Terraform adopt/skip matrix + roadmap |
+| **14b+** | 🔲 | Implementation waves per plan (user approval) |
 
-### ✅ UI/UX platform polish (2026-05-29) — complete
+### Phase 14 checklist
 
-Waves 0–5 + **pass 3**: `dashboard-polish.css`, `CostHubNav`, `PageHeader` on Storage/Settings/Profile/Cost Analysis, cost page layout fix (no nested 100vh), Pass 3 gap table in `UI_UX_AUDIT_2026.md`.
-
-### Phase 12 checklist
-
-- [x] `clientEncryption.js` (PBKDF2 + AES-CBC)
-- [x] `sensitive_file_detector.py` + upload encrypt flow
-- [x] SSE-S3 dual-bucket + UI badges SSE / CSE
-- [x] Secure vault AWS sync
-- [x] Auto SSE-S3 when sensitive (no modal for default path)
-- [x] Session geolocation + device fingerprint
-- [x] Detector benchmark tests + labeled dataset
-- [ ] KMS — **out of scope**
-
-### Product readiness (post–Phase 12)
-
-- [ ] Backend re-validation schemas for all forms (partial — auth/forms done)
-- [x] CI/CD (pytest + eslint + build) — `.github/workflows/ci.yml`
-- [x] Expanded tests (46 pytest: session, BYOC, storage, security, benchmark)
+- [x] Inventory both repos
+- [x] Gap analysis + adopt/skip matrix
+- [x] Recommendation + phased roadmap (`AWS_TERRAFORM_INTEGRATION_PLAN.md`)
+- [ ] P0 implementation (tests, BYOC drift) — **next session**
 
 ---
 
@@ -72,14 +48,12 @@ Waves 0–5 + **pass 3**: `dashboard-polish.css`, `CostHubNav`, `PageHeader` on 
 
 | Issue | Status |
 |-------|--------|
-| Sidebar `/dashboard/costs` and `/dashboard/compute` dead links | Open — add routes or remove links |
-| 39 empty stub files | Open — build or document |
-| CI/CD | Not active |
-
-Fixed issues (CORS, .env in git, dashboard stats, admin self-delete, login validation) → `PROGRESS_HISTORY.md`
+| Provision path has no dedicated pytest suite | Open — P0 in plan |
+| Scheduled drift without BYOC creds | Open — P0 in plan |
+| Sidebar dead links (`/dashboard/costs`, `/dashboard/compute`) | Open |
 
 ---
 
 ## Report parity
 
-High-level report vs code matrix lives in `PROGRESS_HISTORY.md` (§ Report vs Code). Phase 5 contracts: `DECISIONS.md` + `backend/app/ml/acceptance.py`.
+High-level report vs code matrix lives in `PROGRESS_HISTORY.md`. Phase 5 contracts: `DECISIONS.md` + `backend/app/ml/acceptance.py`.
