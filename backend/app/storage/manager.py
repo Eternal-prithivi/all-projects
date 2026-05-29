@@ -8,6 +8,7 @@ from app.byoc.credential_resolver import resolve_azure_credentials
 from app.storage.cloud_credentials import (
     S3_CONFIG_V4,
     build_aws_s3_client,
+    build_aws_s3_client_for_bucket,
     build_azure_blob_service,
     build_gcp_storage_client,
 )
@@ -72,21 +73,41 @@ def list_objects_aws(
 
     return results
 
-def delete_from_aws(username: str, object_key: str):
-    """Deletes an object from the user's resolved AWS S3 bucket."""
-    s3_client, bucket_name, _ = build_aws_s3_client(username)
-    s3_client.delete_object(Bucket=bucket_name, Key=object_key)
-    logger.info(f"Deleted {object_key} from AWS S3 bucket {bucket_name}")
+def delete_from_aws(
+    username: str,
+    object_key: str,
+    *,
+    bucket_name: str | None = None,
+    region_name: str | None = None,
+):
+    """Deletes an object from the user's AWS S3 bucket (default or specified)."""
+    if bucket_name and region_name:
+        s3_client, _ = build_aws_s3_client_for_bucket(username, region_name)
+        target_bucket = bucket_name
+    else:
+        s3_client, target_bucket, _ = build_aws_s3_client(username)
+    s3_client.delete_object(Bucket=target_bucket, Key=object_key)
+    logger.info(f"Deleted {object_key} from AWS S3 bucket {target_bucket}")
 
 
-def get_download_url_from_aws(username: str, object_key: str) -> str:
+def get_download_url_from_aws(
+    username: str,
+    object_key: str,
+    *,
+    bucket_name: str | None = None,
+    region_name: str | None = None,
+) -> str:
     """
     Generates a pre-signed download URL for an object in AWS S3.
     Includes logic to check for Glacier and handle restoration status.
     """
     try:
-        s3_client, bucket_name, _ = build_aws_s3_client(username)
-        response = s3_client.head_object(Bucket=bucket_name, Key=object_key)
+        if bucket_name and region_name:
+            s3_client, _ = build_aws_s3_client_for_bucket(username, region_name)
+            target_bucket = bucket_name
+        else:
+            s3_client, target_bucket, _ = build_aws_s3_client(username)
+        response = s3_client.head_object(Bucket=target_bucket, Key=object_key)
         storage_class = response.get('StorageClass')
         restore_status = response.get('Restore') # e.g., 'ongoing-request="false", expiry-date="Mon, 27 Nov 2023 00:00:00 GMT"'
 
@@ -112,7 +133,7 @@ def get_download_url_from_aws(username: str, object_key: str) -> str:
         # If not Glacier, or if Glacier and already restored, proceed to generate URL
         url = s3_client.generate_presigned_url(
             "get_object",
-            Params={"Bucket": bucket_name, "Key": object_key},
+            Params={"Bucket": target_bucket, "Key": object_key},
             ExpiresIn=3600,
         )
         return url
@@ -124,16 +145,28 @@ def get_download_url_from_aws(username: str, object_key: str) -> str:
             detail=f"Error processing download for {object_key}: {e}"
         )
 
-# --- NEW: Function to initiate Glacier restore on AWS ---
-def initiate_glacier_restore_aws(username: str, object_key: str, tier: str = "Standard", days: int = 7):
+
+def initiate_glacier_restore_aws(
+    username: str,
+    object_key: str,
+    tier: str = "Standard",
+    days: int = 7,
+    *,
+    bucket_name: str | None = None,
+    region_name: str | None = None,
+):
     """
     Initiates a restore request for an object in Glacier or Deep Archive storage class.
     Tier can be 'Expedited', 'Standard', or 'Bulk'.
     """
     try:
-        s3_client, bucket_name, _ = build_aws_s3_client(username)
+        if bucket_name and region_name:
+            s3_client, _ = build_aws_s3_client_for_bucket(username, region_name)
+            target_bucket = bucket_name
+        else:
+            s3_client, target_bucket, _ = build_aws_s3_client(username)
         s3_client.restore_object(
-            Bucket=bucket_name,
+            Bucket=target_bucket,
             Key=object_key,
             RestoreRequest={
                 "Days": days,

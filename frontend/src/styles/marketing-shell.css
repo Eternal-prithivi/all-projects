@@ -1,0 +1,257 @@
+/* Shared shell for public marketing pages (aligned with landing) */
+
+@import './animated-background.css';
+@import './landing-scroll.css';
+
+.marketing-page {
+  position: relative;
+  min-height: 100vh;
+  color: var(--text-primary);
+  font-family: 'Inter', system-ui, sans-serif;
+  overflow-x: hidden;
+}
+
+.marketing-page > *:not(.landing-backdrop) {
+  position: relative;
+  z-index: 1;
+}
+
+.marketing-page__main {
+  padding-top: 5.5rem;
+  min-height: 60vh;
+}
+
+.marketing-page__footer {
+  padding-top: 2rem;
+}
+
+/* Nav — same tokens as landing (subset) */
+.marketing-page .landing-nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  transition:
+    background 0.4s ease,
+    border-color 0.4s ease,
+    box-shadow 0.4s ease;
+}
+
+.marketing-page .landing-nav--scrolled {
+  background: rgba(6, 6, 8, 0.94);
+  border-bottom: 1px solid rgba(212, 175, 55, 0.12);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+
+.marketing-page .nav-container {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 1.1rem 2rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.marketing-page .nav-logo {
+  text-decoration: none;
+}
+
+.marketing-page .nav-logo h2 {
+  margin: 0;
+  font-family: 'Outfit', sans-serif;
+  font-size: 1.5rem;
+  font-weight: 800;
+  background: linear-gradient(135deg, #ffe566, #d4af37 45%, #b8860b);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.marketing-page .nav-links {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.marketing-page .nav-links a {
+  color: rgba(255, 255, 255, 0.72);
+  text-decoration: none;
+  font-size: 0.88rem;
+  font-weight: 500;
+  transition: color 0.25s ease;
+}
+
+.marketing-page .nav-links a:hover {
+  color: #fff;
+}
+
+.marketing-page .btn-nav-login {
+  padding: 0.55rem 1.1rem;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #fff !important;
+}
+
+.marketing-page .btn-nav-signup {
+  padding: 0.55rem 1.25rem;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #ffe566, #d4af37);
+  color: #0a0a0a !important;
+  font-weight: 700;
+}
+
+/* Page hero strip (optional utility) */
+.marketing-page-hero {
+  text-align: center;
+  max-width: 42rem;
+  margin: 0 auto 3rem;
+  padding: 0 1.5rem;
+}
+
+.marketing-page-hero__eyebrow {
+  display: inline-block;
+  margin-bottom: 0.75rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #d4af37;
+}
+
+.marketing-page-hero h1 {
+  font-family: 'Outfit', sans-serif;
+  font-size: clamp(2rem, 4vw, 2.75rem);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  margin: 0 0 0.75rem;
+}
+
+.marketing-page-hero p {
+  font-size: 1.05rem;
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.58);
+  margin: 0;
+}
+
+/* Token overrides — retire legacy purple page backgrounds */
+.marketing-page .features-page,
+.marketing-page .about-page,
+.marketing-page .contact-page,
+.marketing-page .help-center-page,
+.marketing-page .legal-page {
+  background: transparent !important;
+  color: var(--text-primary);
+  min-height: auto;
+}
+
+.marketing-page .about-container,
+.marketing-page .contact-container {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 2rem 1.5rem 4rem;
+}
+
+.marketing-page .contact-page {
+  padding: 0;
+}
+
+/* Glass cards on marketing subpages */
+.marketing-page .feature-card,
+.marketing-page .info-card,
+.marketing-page .step-card,
+.marketing-page .metrics-card,
+.marketing-page .faq-item,
+.marketing-page .contact-support-card,
+.marketing-page .about-section .feature-card,
+.marketing-page .tech-category,
+.marketing-page .contact-form-wrapper {
+  background: rgba(14, 14, 18, 0.75) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  transition:
+    transform 0.35s cubic-bezier(0.16, 1, 0.3, 1),
+    border-color 0.35s ease,
+    box-shadow 0.35s ease;
+}
+
+.marketing-page .feature-card:hover,
+.marketing-page .info-card:hover,
+.marketing-page .step-card:hover,
+.marketing-page .faq-item:hover {
+  transform: translateY(-4px);
+  border-color: rgba(212, 175, 55, 0.28) !important;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35);
+}
+
+.marketing-page .features-glow-card,
+.marketing-page .features-cta-inner {
+  background: rgba(12, 12, 16, 0.85) !important;
+  border: 1px solid rgba(212, 175, 55, 0.2) !important;
+}
+
+.marketing-page .btn-primary,
+.marketing-page .submit-button,
+.marketing-page .cta-btn.primary {
+  background: linear-gradient(135deg, #ffe566, #d4af37) !important;
+  color: #0a0a0a !important;
+  border: none;
+  box-shadow: 0 6px 24px rgba(212, 175, 55, 0.35);
+}
+
+.marketing-page .btn-primary:hover,
+.marketing-page .submit-button:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 32px rgba(212, 175, 55, 0.45);
+}
+
+.marketing-page .help-header {
+  background: transparent !important;
+  border: none;
+  padding-top: 0;
+}
+
+.marketing-page .help-header .back-button {
+  display: none;
+}
+
+.marketing-page .help-title {
+  color: var(--text-primary) !important;
+}
+
+.marketing-page .legal-page {
+  padding-bottom: 4rem;
+}
+
+.marketing-page .legal-content {
+  background: rgba(14, 14, 18, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  padding: 2rem;
+  max-width: 900px;
+  margin: 0 auto 2rem;
+}
+
+.marketing-page .legal-header .back-button {
+  display: none;
+}
+
+.marketing-page .legal-header-content h1 {
+  color: var(--text-primary);
+}
+
+.marketing-page .section-heading::before,
+.marketing-page .landing-section__header::before {
+  display: block;
+}
+
+@media (max-width: 768px) {
+  .marketing-page .nav-links a:not(.btn-nav-login):not(.btn-nav-signup) {
+    display: none;
+  }
+
+  .marketing-page .nav-links a[href='/help'] {
+    display: none;
+  }
+}

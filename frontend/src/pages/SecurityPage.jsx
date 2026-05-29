@@ -41,8 +41,9 @@ import {
   downloadClientCiphertext,
 } from "../api";
 import "../styles/security-page.css";
+import LoadingSpinner from "../components/LoadingSpinner.jsx";
 import PageHeader from "../components/ui/PageHeader.jsx";
-import ByocStorageTargetBanner from "../components/ByocStorageTargetBanner.jsx";
+import BucketRegionSelector from "../components/BucketRegionSelector.jsx";
 import EmptyState from "../components/EmptyState.jsx";
 import { IconLock } from "../components/dashboard/Icons.jsx";
 
@@ -71,6 +72,7 @@ function SecurityPage() {
   });
   const [qrCode, setQrCode] = useState(null);
   const [twoFACode, setTwoFACode] = useState("");
+  const [verifyPanelOpen, setVerifyPanelOpen] = useState(true);
   const fileInputRef = useRef(null);
   const [showModal, setShowModal] = useState(false);
   const [fileToDelete, setFileToDelete] = useState(null);
@@ -90,6 +92,33 @@ function SecurityPage() {
       return false;
     }
   });
+  const [selectedBucket, setSelectedBucket] = useState(() => {
+    try {
+      return sessionStorage.getItem("zenith.security.bucket") || null;
+    } catch {
+      return null;
+    }
+  });
+  const [selectedRegion, setSelectedRegion] = useState(() => {
+    try {
+      return sessionStorage.getItem("zenith.security.region") || "all";
+    } catch {
+      return "all";
+    }
+  });
+  const handleBucketSelect = (name, region) => {
+    setSelectedBucket(name);
+    if (region) setSelectedRegion(region);
+  };
+
+  const handleRegionSelect = (region) => {
+    setSelectedRegion(region);
+    try {
+      sessionStorage.setItem("zenith.security.region", region);
+    } catch {
+      /* ignore */
+    }
+  };
 
   const canAccessSecureArea = !twoFAStatus.enabled || twoFAStatus.verified;
 
@@ -105,7 +134,10 @@ function SecurityPage() {
   const fetchSecureFiles = useCallback(async () => {
     if (!token || !canAccessSecureArea) return [];
     try {
-      const files = await listSecureFiles(token);
+      const files = await listSecureFiles(token, {
+        bucket: selectedBucket || undefined,
+        region: selectedRegion !== "all" ? selectedRegion : undefined,
+      });
       setSecureFiles(files);
       sessionStorage.setItem('cache_secureFiles', JSON.stringify(files));
       return files;
@@ -113,7 +145,7 @@ function SecurityPage() {
       notifications.error("Could not fetch secure file list.");
       return [];
     }
-  }, [token, canAccessSecureArea]);
+  }, [token, canAccessSecureArea, selectedBucket, selectedRegion]);
 
   useEffect(() => {
     const wsRef = { current: null };
@@ -157,28 +189,68 @@ function SecurityPage() {
     check2FA();
   }, [token]);
 
+  const clearModalState = () => {
+    setShowEncryptPrompt(false);
+    setShowEncryptionModal(false);
+    setShowDecryptionModal(false);
+    setShowModal(false);
+    setFileAwaitingEncryption(null);
+    setFileToDecrypt(null);
+    setPendingFileMeta(null);
+  };
+
+  const persistTwoFAStatus = (status) => {
+    sessionStorage.setItem("cache_2faStatus", JSON.stringify(status));
+  };
+
+  const cancelTwoFASetup = async () => {
+    try {
+      if (twoFAStatus.secret_exists && !twoFAStatus.enabled) {
+        await disable2FA(token);
+      }
+    } catch (err) {
+      notifications.error(err.detail || "Could not cancel 2FA setup");
+      return;
+    }
+    setQrCode(null);
+    setTwoFACode("");
+    const reset = { enabled: false, verified: false, secret_exists: false };
+    setTwoFAStatus(reset);
+    persistTwoFAStatus(reset);
+    notifications.info("2FA setup cancelled");
+  };
+
   const handleVerify2FA = async () => {
     try {
       const res = await verify2FA(token, twoFACode);
       if (res.verified) {
         notifications.success("2FA verified successfully!");
-        setTwoFAStatus((prev) => ({ ...prev, verified: true }));
+        setTwoFAStatus((prev) => {
+          const next = { ...prev, verified: true };
+          persistTwoFAStatus(next);
+          return next;
+        });
+        setVerifyPanelOpen(false);
       }
     } catch (err) {
       notifications.error(err.detail || "Error verifying 2FA");
     }
   };
+
   const handleEnable2FA = async () => {
+    clearModalState();
+    setVerifyPanelOpen(true);
     try {
       const res = await enable2FA(token);
       if (res.qr_code) {
         setQrCode(res.qr_code);
-        console.log("State set: qrCode =", res.qr_code ? "SET" : "NOT SET");
-        setTwoFAStatus((prev) => ({
-          ...prev,
+        const next = {
           secret_exists: true,
-          enabled: false, // 2FA is not fully enabled until finalized
-        }));
+          enabled: false,
+          verified: false,
+        };
+        setTwoFAStatus(next);
+        persistTwoFAStatus(next);
       }
     } catch (err) {
       notifications.error(err.detail || "Failed to enable 2FA");
@@ -189,8 +261,11 @@ function SecurityPage() {
       const res = await finalize2FA(token, twoFACode);
       if (res.verified) {
         notifications.success("2FA setup complete!");
-        setTwoFAStatus({ enabled: true, verified: true, secret_exists: true });
-        setQrCode(null); // Clear QR code after successful setup
+        const next = { enabled: true, verified: true, secret_exists: true };
+        setTwoFAStatus(next);
+        persistTwoFAStatus(next);
+        setQrCode(null);
+        setVerifyPanelOpen(true);
       }
     } catch (err) {
       notifications.error(err.detail || "Invalid code.");
@@ -200,7 +275,11 @@ function SecurityPage() {
     try {
       await disable2FA(token);
       notifications.success("2FA has been disabled.");
-      setTwoFAStatus({ enabled: false, verified: false, secret_exists: false });
+      setQrCode(null);
+      setTwoFACode("");
+      const reset = { enabled: false, verified: false, secret_exists: false };
+      setTwoFAStatus(reset);
+      persistTwoFAStatus(reset);
     } catch (err) {
       notifications.error(err.detail || "Failed to disable 2FA.");
     }
@@ -211,10 +290,13 @@ function SecurityPage() {
     if (!token || !canAccessSecureArea) return;
     setIsSyncing(true);
     try {
-      const result = await syncAwsSecureBucket(token);
+      const result = await syncAwsSecureBucket(token, {
+        bucket: selectedBucket || undefined,
+        region: selectedRegion !== "all" ? selectedRegion : undefined,
+      });
       const scanned = result.scanned_prefix
         ? `prefix '${result.scanned_prefix}'`
-        : "the secure vault";
+        : `bucket '${result.bucket_name}'`;
       const removedMsg = result.removed > 0 ? ` Removed ${result.removed} stale record(s).` : "";
       notifications.success(
         `Secure sync complete. Added ${result.inserted} new file(s) from AWS after scanning ${scanned}.${removedMsg}`
@@ -335,11 +417,16 @@ function SecurityPage() {
     handleStartEncryptFlow(file);
   };
 
-  const handleDelete = async (filename) => {
+  const handleDelete = async (fileRef) => {
+    const filename = typeof fileRef === "string" ? fileRef : fileRef.filename;
+    const bucket =
+      typeof fileRef === "object"
+        ? fileRef.cloud_bucket || selectedBucket
+        : selectedBucket;
     setShowModal(false);
     setIsDeleting(filename);
     try {
-      await deleteSecureFile(filename, token);
+      await deleteSecureFile(filename, token, { bucket: bucket || undefined });
       await fetchSecureFiles();
       notifications.success(`File '${filename}' was deleted successfully.`);
     } catch (err) {
@@ -351,7 +438,9 @@ function SecurityPage() {
 
   const handleDownload = async (file) => {
     try {
-      const response = await getSecureDownloadUrl(file.filename, token);
+      const response = await getSecureDownloadUrl(file.filename, token, {
+        bucket: file.cloud_bucket || selectedBucket || undefined,
+      });
       
       // Check if file is client-side encrypted
       if (response.client_side_encrypted) {
@@ -373,7 +462,8 @@ function SecurityPage() {
     try {
       const ciphertextBlob = await downloadClientCiphertext(
         fileToDecrypt.filename,
-        token
+        token,
+        { bucket: fileToDecrypt.cloud_bucket || selectedBucket || undefined }
       );
       const plainBlob = await decryptBlobInBrowser(ciphertextBlob, password);
       downloadBlob(plainBlob, fileToDecrypt.filename);
@@ -402,95 +492,183 @@ function SecurityPage() {
     return <span className="status-tag">Normal</span>;
   };
 
-  if (loading)
-    return (
-      <div className="security-page page-container">
-        <p>Loading...</p>
-      </div>
-    );
-
-  // --- NEW ORDER OF CONDITIONAL RENDERING ---
-
-  // 1. Show QR code setup if qrCode is present and 2FA is not yet enabled
-  if (qrCode && !twoFAStatus.enabled && twoFAStatus.secret_exists) {
-    return (
-      <div className="security-page">
-        <div className="twofa-container">
-          <h3 className="twofa-title">Finalize 2FA Setup</h3>
-          <p className="twofa-description">
-            Scan this QR code, then enter the code from your app below.
-          </p>
-          <img src={qrCode} alt="2FA QR Code" className="twofa-qr" />
-          <input
-            type="text"
-            placeholder="Enter code to finalize"
-            value={twoFACode}
-            onChange={(e) => setTwoFACode(e.target.value)}
-            maxLength="6"
-            className="twofa-input"
-            aria-label="2FA verification code"
-          />
-          <button type="button" onClick={handleFinalize2FA} className="btn btn--block">
-            Finalize Setup
-          </button>
-        </div>
-      </div>
-    );
+  if (loading) {
+    return <LoadingSpinner size="large" text="Loading security..." />;
   }
 
-  // 2. Show 2FA verification if 2FA is enabled but not yet verified to access secure content
-  if (twoFAStatus.enabled && !twoFAStatus.verified && twoFAStatus.secret_exists) {
-    return (
-      <div className="security-page">
-        <div className="twofa-container">
-          <h3 className="twofa-title">Two-Factor Authentication</h3>
-          <p className="twofa-description">
-            Enter the 6-digit code from your authenticator app to continue.
-          </p>
-          <input
-            type="text"
-            placeholder="6-digit code"
-            value={twoFACode}
-            onChange={(e) => setTwoFACode(e.target.value)}
-            maxLength="6"
-            className="twofa-input"
-            aria-label="2FA verification code"
-          />
-          <button type="button" onClick={handleVerify2FA} className="btn btn--block">
-            Verify
-          </button>
-        </div>
-      </div>
-    );
-  }
+  const showSetupPanel = Boolean(
+    qrCode && !twoFAStatus.enabled && twoFAStatus.secret_exists,
+  );
+  const showVerifyPanel = Boolean(
+    twoFAStatus.enabled &&
+      !twoFAStatus.verified &&
+      twoFAStatus.secret_exists &&
+      verifyPanelOpen,
+  );
+  const twoFAOverlayOpen = showSetupPanel || showVerifyPanel;
 
-
-  // 3. Default return: main security page content (file upload, enable/disable button, file list)
   return (
-    <div className="security-page page-container">
+    <div className="security-page page-container zenith-page-enter">
+        {twoFAOverlayOpen && (
+          <div
+            className="twofa-overlay"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="twofa-dialog-title"
+          >
+            <div className="twofa-panel settings-card zenith-surface">
+              <button
+                type="button"
+                className="twofa-panel__close"
+                onClick={showSetupPanel ? cancelTwoFASetup : () => setVerifyPanelOpen(false)}
+                aria-label={showSetupPanel ? "Cancel 2FA setup" : "Close verification dialog"}
+              >
+                ×
+              </button>
+              {showSetupPanel ? (
+                <>
+                  <h3 id="twofa-dialog-title" className="twofa-title">
+                    Finalize 2FA setup
+                  </h3>
+                  <p className="twofa-description">
+                    Scan this QR code with your authenticator app, then enter the 6-digit code below.
+                  </p>
+                  <img src={qrCode} alt="2FA QR Code" className="twofa-qr" />
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    placeholder="Enter code to finalize"
+                    value={twoFACode}
+                    onChange={(e) => setTwoFACode(e.target.value)}
+                    maxLength={6}
+                    className="twofa-input"
+                    aria-label="2FA verification code"
+                  />
+                  <button type="button" onClick={handleFinalize2FA} className="btn btn--block">
+                    Finalize setup
+                  </button>
+                  <button
+                    type="button"
+                    className="twofa-panel__cancel-link"
+                    onClick={cancelTwoFASetup}
+                  >
+                    Cancel setup
+                  </button>
+                </>
+              ) : (
+                <>
+                  <h3 id="twofa-dialog-title" className="twofa-title">
+                    Verify your identity
+                  </h3>
+                  <p className="twofa-description">
+                    Enter the 6-digit code from your authenticator app to unlock the secure vault.
+                  </p>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    placeholder="6-digit code"
+                    value={twoFACode}
+                    onChange={(e) => setTwoFACode(e.target.value)}
+                    maxLength={6}
+                    className="twofa-input"
+                    aria-label="2FA verification code"
+                  />
+                  <button type="button" onClick={handleVerify2FA} className="btn btn--block">
+                    Verify
+                  </button>
+                  <button
+                    type="button"
+                    className="twofa-panel__cancel-link"
+                    onClick={() => setVerifyPanelOpen(false)}
+                  >
+                    Not now
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        )}
+
+        <div
+          className={
+            twoFAOverlayOpen ? "security-page__body security-page__body--dimmed" : "security-page__body"
+          }
+          aria-hidden={twoFAOverlayOpen ? true : undefined}
+        >
         <PageHeader
           kicker="Secure vault"
           title="Security Center"
           subtitle="Scan, encrypt, and manage sensitive files with SSE-S3 or browser-side encryption."
         />
-        <ByocStorageTargetBanner variant="security" />
-        <div className="page-card">
-          <div className="page-header-row">
-            <div>
-              <h3 className="page-title page-title--inline">Secure File Upload</h3>
-            </div>
-            <div>
-              {twoFAStatus.enabled ? (
-                <button className="btn danger-btn" onClick={handleDisable2FA}>
-                  Disable 2FA
-                </button>
-              ) : (
-                <button onClick={handleEnable2FA} className="btn success-btn">
-                  Enable 2FA
-                </button>
-              )}
+
+        <div className="security-2fa-bar" role="region" aria-label="Two-factor authentication">
+          <div className="security-2fa-bar__content">
+            <span className="security-2fa-bar__icon" aria-hidden="true">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <rect x="3" y="11" width="18" height="11" rx="2" />
+                <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+              </svg>
+            </span>
+            <div className="security-2fa-bar__text">
+              <span className="security-2fa-bar__title">Two-factor authentication</span>
+              <span className="security-2fa-bar__status">
+                {twoFAStatus.enabled ? (
+                  <>
+                    <span className="security-2fa-badge security-2fa-badge--on">Enabled</span>
+                    {twoFAStatus.verified
+                      ? 'Your vault session is verified.'
+                      : 'Verify your code to access the secure vault.'}
+                  </>
+                ) : (
+                  <>
+                    <span className="security-2fa-badge security-2fa-badge--off">Off</span>
+                    Protect uploads with an authenticator app (recommended).
+                  </>
+                )}
+              </span>
             </div>
           </div>
+          <div className="security-2fa-bar__actions">
+            {twoFAStatus.enabled ? (
+              <>
+                {!twoFAStatus.verified && !verifyPanelOpen && (
+                  <button
+                    type="button"
+                    className="btn success-btn"
+                    onClick={() => {
+                      clearModalState();
+                      setVerifyPanelOpen(true);
+                    }}
+                  >
+                    Verify now
+                  </button>
+                )}
+                <button type="button" className="btn danger-btn" onClick={handleDisable2FA}>
+                  Disable 2FA
+                </button>
+              </>
+            ) : (
+              <button type="button" onClick={handleEnable2FA} className="btn success-btn">
+                Enable 2FA
+              </button>
+            )}
+          </div>
+        </div>
+
+        {canAccessSecureArea && (
+          <BucketRegionSelector
+            surface="security"
+            storageKeyPrefix="zenith.security"
+            selectedBucket={selectedBucket}
+            selectedRegion={selectedRegion}
+            onBucketChange={handleBucketSelect}
+            onRegionChange={handleRegionSelect}
+          />
+        )}
+        <div className="page-card zenith-surface zenith-surface--accent-security">
+          <h3 className="page-title">Secure File Upload</h3>
           <p className="page-description">
             Files are scanned for sensitive data. By default, sensitive files are
             auto-protected with SSE-S3. Enable the option below to always choose
@@ -587,7 +765,7 @@ function SecurityPage() {
           </div>
         </div>
         {/* Secure Files Table */}
-        <div className="files-section">
+        <div className="files-section zenith-surface zenith-surface--accent-security">
           <div className="list-header">
             <h3 className="section-title">Your Secure Files</h3>
             <button
@@ -596,7 +774,7 @@ function SecurityPage() {
               onClick={handleSyncWithSecureBucket}
               disabled={isSyncing}
             >
-              {isSyncing ? "Syncing..." : "Sync with Bucket (AWS)"}
+              {isSyncing ? "Syncing..." : selectedBucket ? `Sync ${selectedBucket}` : "Sync with Bucket (AWS)"}
             </button>
           </div>
           {!secureFiles || secureFiles.length === 0 ? (
@@ -620,7 +798,7 @@ function SecurityPage() {
               {secureFiles.map((f) => {
                   const showEncryptionChoice = f.awaiting_encryption_choice && f.encryption_status === 'awaiting_choice';
                   return (
-                    <tr key={f.filename}>
+                    <tr key={`${f.cloud_bucket || ""}-${f.s3_key || f.filename}`}>
                       <td>{f.filename}</td>
                       <td>{(f.size_bytes / 1024).toFixed(2)}</td>
                       <td className="date-col">
@@ -639,7 +817,7 @@ function SecurityPage() {
                             <button onClick={() => handleDownload(f)} className="action-btn download-btn">
                               Download
                             </button>
-                            <button onClick={() => { setFileToDelete(f.filename); setShowModal(true); }} className="action-btn delete-btn">
+                            <button onClick={() => { setFileToDelete(f); setShowModal(true); }} className="action-btn delete-btn">
                               Delete
                             </button>
                           </>
@@ -652,7 +830,8 @@ function SecurityPage() {
           </table>
           )}
         </div>
-        
+        </div>
+
         {showEncryptPrompt && pendingFileMeta && (
           <EncryptSensitivePromptModal
             file={{ filename: pendingFileMeta.filename }}
@@ -689,7 +868,11 @@ function SecurityPage() {
         {showModal && (
           <div className="confirm-modal-overlay">
             <div className="modal-content">
-              <p>Are you sure you want to delete '{fileToDelete}'?</p>
+              <p>
+                Are you sure you want to delete &apos;
+                {typeof fileToDelete === "object" ? fileToDelete?.filename : fileToDelete}
+                &apos;?
+              </p>
               <div className="modal-buttons">
                 <button
                   onClick={() => handleDelete(fileToDelete)}

@@ -17,7 +17,7 @@ Supports two methods:
   - IAM Role: User creates a role in their account, Zenith assumes it via STS (no keys exchanged)
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 from typing import Optional, Dict, Any
 from datetime import datetime
@@ -28,6 +28,11 @@ from app.users.user_model import User
 from app.database.mongo_client import get_database
 from app.byoc.encryption import encrypt_credential, encrypt_credentials_dict
 from app.byoc.credential_resolver import get_aws_bucket_layout, get_byoc_status
+from app.byoc.aws_bucket_discovery import (
+    get_buckets_for_user,
+    invalidate_bucket_cache,
+)
+from app.byoc.aws_bucket_helpers import SUPPORTED_AWS_REGIONS
 from app.byoc.aws_bucket_helpers import (
     REPLICA_REGION_DEFAULT,
     assume_role_temp_credentials,
@@ -511,6 +516,48 @@ async def get_storage_targets(user: User = Depends(get_current_user)):
             "replica_region": settings.REPLICA_S3_REGION,
             "secure_dual_write": True,
         },
+    }
+
+
+@router.get("/aws-buckets", summary="List S3 buckets for Storage or Security UI")
+async def list_aws_buckets(
+    user: User = Depends(get_current_user),
+    surface: str = Query("storage", pattern="^(storage|security)$"),
+    region: Optional[str] = Query(None, description="Filter by region; omit for all regions"),
+):
+    """Discover account buckets (BYOC) or return platform defaults."""
+    result = get_buckets_for_user(
+        user.username,
+        surface=surface,  # type: ignore[arg-type]
+        region=region,
+        force_refresh=False,
+    )
+    return {
+        "surface": surface,
+        "region_filter": region,
+        "supported_regions": result.get("supported_regions") or list(SUPPORTED_AWS_REGIONS),
+        **result,
+    }
+
+
+@router.post("/aws-buckets/refresh", summary="Refresh cached S3 bucket list")
+async def refresh_aws_buckets(
+    user: User = Depends(get_current_user),
+    surface: str = Query("storage", pattern="^(storage|security)$"),
+    region: Optional[str] = Query(None),
+):
+    invalidate_bucket_cache(user.username)
+    result = get_buckets_for_user(
+        user.username,
+        surface=surface,  # type: ignore[arg-type]
+        region=region,
+        force_refresh=True,
+    )
+    return {
+        "surface": surface,
+        "region_filter": region,
+        "supported_regions": result.get("supported_regions") or list(SUPPORTED_AWS_REGIONS),
+        **result,
     }
 
 

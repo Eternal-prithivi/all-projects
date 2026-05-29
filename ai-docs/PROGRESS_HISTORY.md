@@ -7,6 +7,17 @@
 
 ---
 
+**Enterprise roadmap Phases 19–27** — DOCUMENTED 2026-05-29 (docs only, no code)
+
+- Captured enterprise gap assessment (tenancy, CI/CD, observability, IdP, scale, compliance, cloud parity).
+- Wrote **77 numbered checklist items** into `PROGRESS.md`:
+  - **19–21** isolated / low dependency (ops, quality+CD, observability) — **do first**
+  - **22–27** dependent (org foundation → org-scoped product → SAML/SCIM → scale → commercial → CloudFormation/GCP billing UI)
+- Updated `STATUS.md` (phase pointer, deferred → phase map), `SCRATCHPAD.md` (resume at 19.1).
+- `PROFESSIONAL_IMPROVEMENTS.md` sync deferred to task **19.9**.
+
+---
+
 **Phase 18d: Notifications, team, SSO, email verify** — COMPLETE 2026-05-29
 
 - `/dashboard/notifications` + persisted `/api/notifications`

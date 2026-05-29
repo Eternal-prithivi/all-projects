@@ -29,3 +29,7 @@ class FileMetadata(BaseModel):
     awaiting_encryption_choice: bool = False
     client_side_encrypted: bool = False  # True if encrypted with user's password
 
+    # Multi-bucket BYOC: which S3 bucket/region holds this object
+    cloud_bucket: Optional[str] = None
+    region: Optional[str] = None
+

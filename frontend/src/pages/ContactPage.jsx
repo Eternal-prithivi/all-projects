@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
-import Footer from '../components/layout/Footer.jsx';
+import MarketingPageLayout from '../components/layout/MarketingPageLayout.jsx';
 import { getValidationErrorMessage, validateContactForm } from '../utils/formValidation.js';
 import '../styles/contact.css';
 
@@ -63,34 +63,35 @@ function ContactPage() {
   };
 
   return (
-    <>
+    <MarketingPageLayout>
       <div className="contact-page">
         <div className="contact-container">
-          {/* Header */}
-          <div className="contact-header">
-            <h1>Get in Touch</h1>
-            <p>Have a question or need support? We're here to help.</p>
+          <div className="contact-header reveal-group">
+            <div className="reveal-item">
+              <p className="marketing-page-hero__eyebrow">Support</p>
+              <h1>Get in Touch</h1>
+              <p>Have a question or need support? We're here to help.</p>
+            </div>
           </div>
 
-          {/* Two Column Layout */}
-          <div className="contact-content">
+          <div className="contact-content reveal-group">
             {/* Left: Contact Info */}
-            <div className="contact-info">
-              <div className="info-card">
+            <div className="contact-info reveal-stagger">
+              <div className="info-card reveal-item">
                 <div className="info-icon">📧</div>
                 <h3>Email Us</h3>
                 <p>support@rajverse.me</p>
                 <span className="info-note">We'll respond within 24 hours</span>
               </div>
 
-              <div className="info-card">
+              <div className="info-card reveal-item">
                 <div className="info-icon">📞</div>
                 <h3>Call Us</h3>
                 <p>+91 88077 30239</p>
                 <span className="info-note">Available 9 AM - 6 PM IST</span>
               </div>
 
-              <div className="info-card">
+              <div className="info-card reveal-item">
                 <div className="info-icon">📚</div>
                 <h3>Documentation</h3>
                 <p>Check our help center</p>
@@ -99,7 +100,7 @@ function ContactPage() {
             </div>
 
             {/* Right: Contact Form */}
-            <div className="contact-form-wrapper">
+            <div className="contact-form-wrapper reveal-item reveal-item--delay-2">
               <form className="contact-form" onSubmit={handleSubmit}>
                 <div className="form-group">
                   <label htmlFor="name">Name *</label>
@@ -198,8 +199,7 @@ function ContactPage() {
           </div>
         </div>
       </div>
-      <Footer />
-    </>
+    </MarketingPageLayout>
   );
 }
 

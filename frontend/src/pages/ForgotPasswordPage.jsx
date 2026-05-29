@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { requestPasswordReset } from '../api';
 import { getValidationErrorMessage, validateForgotPasswordForm } from '../utils/formValidation.js';
 import '../styles/auth.css';
+import '../styles/auth-polish.css';
 
 function ForgotPasswordPage() {
   const [identifier, setIdentifier] = useState('');

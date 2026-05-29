@@ -131,11 +131,12 @@ export const getCurrentUser = async (token) => {
 
 // ---------------- STORAGE ----------------
 
-export const uploadFile = async (file, csp, storageClass, token) => {
+export const uploadFile = async (file, csp, storageClass, token, { bucket } = {}) => {
   const formData = new FormData();
   formData.append("file", file);
   formData.append("csp", csp);
   formData.append("storage_class", storageClass);
+  if (bucket) formData.append("bucket", bucket);
 
   try {
     const response = await apiClient.post("/storage/upload", formData, {
@@ -150,9 +151,35 @@ export const uploadFile = async (file, csp, storageClass, token) => {
   }
 };
 
-export const listFiles = async (token) => {
+export const getAwsBuckets = async (surface = "storage", { region } = {}) => {
   try {
+    const params = { surface };
+    if (region) params.region = region;
+    const response = await apiClient.get("/byoc/aws-buckets", { params });
+    return response.data;
+  } catch (error) {
+    throw error.response?.data || error;
+  }
+};
+
+export const refreshAwsBuckets = async (surface = "storage", { region } = {}) => {
+  try {
+    const params = { surface };
+    if (region) params.region = region;
+    const response = await apiClient.post("/byoc/aws-buckets/refresh", null, { params });
+    return response.data;
+  } catch (error) {
+    throw error.response?.data || error;
+  }
+};
+
+export const listFiles = async (token, { bucket, region } = {}) => {
+  try {
+    const params = {};
+    if (bucket) params.bucket = bucket;
+    if (region && region !== "all") params.region = region;
     const response = await apiClient.get("/storage/files", {
+      params,
       headers: { Authorization: `Bearer ${token}` },
     });
     return response.data;
@@ -161,34 +188,45 @@ export const listFiles = async (token) => {
   }
 };
 
-export const getDownloadUrl = async (filename, token) => {
+export const getDownloadUrl = async (filename, token, { bucket } = {}) => {
   try {
-    const response = await apiClient.get(`/storage/download/${encodeURIComponent(filename)}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    return response.data;
-  } catch (error) {
-    throw error.response?.data || error;
-  }
-};
-
-export const deleteFile = async (filename, token) => {
-  try {
-    await apiClient.delete(`/storage/delete/${encodeURIComponent(filename)}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-  } catch (error) {
-    throw error.response?.data || error;
-  }
-};
-
-export const syncAwsBucket = async (token) => {
-  try {
-    const response = await apiClient.post(
-      "/storage/sync/aws",
-      {},
-      { headers: { Authorization: `Bearer ${token}` } }
+    const params = {};
+    if (bucket) params.bucket = bucket;
+    const response = await apiClient.get(
+      `/storage/download/${encodeURIComponent(filename)}`,
+      {
+        params,
+        headers: { Authorization: `Bearer ${token}` },
+      }
     );
+    return response.data;
+  } catch (error) {
+    throw error.response?.data || error;
+  }
+};
+
+export const deleteFile = async (filename, token, { bucket } = {}) => {
+  try {
+    const params = {};
+    if (bucket) params.bucket = bucket;
+    await apiClient.delete(`/storage/delete/${encodeURIComponent(filename)}`, {
+      params,
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  } catch (error) {
+    throw error.response?.data || error;
+  }
+};
+
+export const syncAwsBucket = async (token, { bucket, region } = {}) => {
+  try {
+    const params = {};
+    if (bucket) params.bucket = bucket;
+    if (region && region !== "all") params.region = region;
+    const response = await apiClient.post("/storage/sync/aws", {}, {
+      params,
+      headers: { Authorization: `Bearer ${token}` },
+    });
     return response.data;
   } catch (error) {
     throw error.response?.data || error;
@@ -229,9 +267,13 @@ export const uploadSecureFile = async (file, encrypt, token, alwaysAskEncryption
   }
 };
 
-export const listSecureFiles = async (token) => {
+export const listSecureFiles = async (token, { bucket, region } = {}) => {
   try {
+    const params = {};
+    if (bucket) params.bucket = bucket;
+    if (region && region !== "all") params.region = region;
     const response = await apiClient.get("/security/list-secure", {
+      params,
       headers: { Authorization: `Bearer ${token}` },
     });
     return response.data;
@@ -240,9 +282,12 @@ export const listSecureFiles = async (token) => {
   }
 };
 
-export const getSecureDownloadUrl = async (filename, token) => {
+export const getSecureDownloadUrl = async (filename, token, { bucket } = {}) => {
   try {
+    const params = {};
+    if (bucket) params.bucket = bucket;
     const response = await apiClient.get(`/security/download/${filename}`, {
+      params,
       headers: { Authorization: `Bearer ${token}` },
     });
     return response.data;
@@ -251,9 +296,12 @@ export const getSecureDownloadUrl = async (filename, token) => {
   }
 };
 
-export const deleteSecureFile = async (filename, token) => {
+export const deleteSecureFile = async (filename, token, { bucket } = {}) => {
   try {
+    const params = {};
+    if (bucket) params.bucket = bucket;
     await apiClient.delete(`/security/delete/${filename}`, {
+      params,
       headers: { Authorization: `Bearer ${token}` },
     });
   } catch (error) {
@@ -261,13 +309,15 @@ export const deleteSecureFile = async (filename, token) => {
   }
 };
 
-export const syncAwsSecureBucket = async (token) => {
+export const syncAwsSecureBucket = async (token, { bucket, region } = {}) => {
   try {
-    const response = await apiClient.post(
-      "/security/sync/aws",
-      {},
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
+    const params = {};
+    if (bucket) params.bucket = bucket;
+    if (region && region !== "all") params.region = region;
+    const response = await apiClient.post("/security/sync/aws", {}, {
+      params,
+      headers: { Authorization: `Bearer ${token}` },
+    });
     return response.data;
   } catch (error) {
     throw error.response?.data || error;
@@ -298,11 +348,14 @@ export const uploadClientEncrypted = async (
   }
 };
 
-export const downloadClientCiphertext = async (filename, token) => {
+export const downloadClientCiphertext = async (filename, token, { bucket } = {}) => {
   try {
+    const params = {};
+    if (bucket) params.bucket = bucket;
     const response = await apiClient.get(
       `/security/download-ciphertext/${encodeURIComponent(filename)}`,
       {
+        params,
         headers: { Authorization: `Bearer ${token}` },
         responseType: "blob",
       }

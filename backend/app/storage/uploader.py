@@ -9,6 +9,7 @@ from google.cloud import storage as gcp_storage
 
 from app.storage.cloud_credentials import (
     build_aws_s3_client,
+    build_aws_s3_client_for_bucket,
     build_azure_blob_service,
     build_gcp_storage_client,
 )
@@ -17,9 +18,22 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-def upload_to_aws(file: UploadFile, username: str, filename: str, storage_class: str):
+def upload_to_aws(
+    file: UploadFile,
+    username: str,
+    filename: str,
+    storage_class: str,
+    *,
+    bucket_name: str | None = None,
+    region_name: str | None = None,
+):
     """Uploads a file to the user's resolved AWS S3 bucket (BYOC or platform)."""
-    s3_client, bucket_name, is_byoc = build_aws_s3_client(username)
+    if bucket_name and region_name:
+        s3_client, is_byoc = build_aws_s3_client_for_bucket(username, region_name)
+        target_bucket = bucket_name
+    else:
+        s3_client, target_bucket, is_byoc = build_aws_s3_client(username)
+    bucket_name = target_bucket
     object_key = f"{username}/{filename}"
 
     aws_storage_class_map = {

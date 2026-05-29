@@ -3,6 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { resetPasswordWithToken } from '../api';
 import { getValidationErrorMessage, validateResetPasswordForm } from '../utils/formValidation.js';
 import '../styles/auth.css';
+import '../styles/auth-polish.css';
 
 function ResetPasswordPage() {
   const [searchParams] = useSearchParams();

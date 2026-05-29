@@ -207,7 +207,7 @@ function DashboardPage() {
   const totalVMs = vmHealth.healthy + vmHealth.warning + vmHealth.critical;
 
   return (
-    <div className="dashboard-overview">
+    <div className="dashboard-overview zenith-page-enter">
       {/* ============ GREETING ============ */}
       <div className="mc-greeting">
         <div className="mc-greeting-text">

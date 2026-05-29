@@ -1,26 +1,23 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
-import { FaArrowLeft, FaFileContract } from 'react-icons/fa';
+import { FaFileContract } from 'react-icons/fa';
+import MarketingPageLayout from '../components/layout/MarketingPageLayout.jsx';
 import '../styles/legal-pages.css';
 
 const TermsOfServicePage = () => {
-  const navigate = useNavigate();
   const lastUpdated = "November 30, 2025";
 
   return (
+    <MarketingPageLayout>
     <div className="legal-page">
-      <div className="legal-header">
-        <button onClick={() => navigate(-1)} className="back-button">
-          <FaArrowLeft /> Back
-        </button>
-        <div className="legal-header-content">
+      <div className="legal-header reveal-group">
+        <div className="legal-header-content reveal-item">
           <FaFileContract className="legal-icon" />
           <h1>Terms of Service</h1>
           <p className="last-updated">Last Updated: {lastUpdated}</p>
         </div>
       </div>
 
-      <div className="legal-content">
+      <div className="legal-content reveal-item">
         <div className="legal-intro">
           <p>
             Welcome to Zenith. These Terms of Service ("Terms") govern your access to and use of Zenith's 
@@ -309,6 +306,7 @@ const TermsOfServicePage = () => {
         </div>
       </div>
     </div>
+    </MarketingPageLayout>
   );
 };
 

@@ -4,7 +4,6 @@ import os
 import secrets
 from urllib.parse import urlencode
 
-import httpx
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import RedirectResponse
 
@@ -16,11 +15,8 @@ from app.utils.logger import setup_logger
 logger = setup_logger(__name__)
 router = APIRouter(prefix="/sso", tags=["SSO"])
 
-DB = get_database()
-
-
 def _platform_settings():
-    doc = DB["platform_settings"].find_one({"_id": "platform_config"}) or {}
+    doc = get_database()["platform_settings"].find_one({"_id": "platform_config"}) or {}
     return doc
 
 
@@ -85,6 +81,14 @@ async def google_login_callback(code: str):
 
     backend_base = os.getenv("PUBLIC_API_URL", "http://localhost:8000").rstrip("/")
     redirect_uri = f"{backend_base}/api/auth/sso/google/callback"
+
+    try:
+        import httpx
+    except ImportError as exc:
+        raise HTTPException(
+            status_code=501,
+            detail="Google SSO requires httpx. Run: pip install httpx",
+        ) from exc
 
     async with httpx.AsyncClient() as client:
         token_res = await client.post(

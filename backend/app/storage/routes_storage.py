@@ -13,7 +13,9 @@
 #   - Change FileMetadata schema without updating tiering_tasks.py priority scoring
 #   - Hardcode AWS — CSP is always read from the file record (supports GCP/Azure)
 # =============================================================================
-from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException, status
+from typing import Optional
+
+from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException, Query, status
 from fastapi.responses import JSONResponse
 from pymongo.collection import Collection
 from pydantic import BaseModel
@@ -38,9 +40,19 @@ from app.database.mongo_client import mongodb_client
 from app.storage.models_storage import FileMetadata
 from app.utils.logger import setup_logger
 from app.byoc.credential_resolver import (
+    get_aws_bucket_layout,
     resolve_aws_credentials,
     resolve_azure_credentials,
     resolve_gcp_credentials,
+)
+from app.byoc.aws_bucket_discovery import (
+    classify_bucket_role,
+    configured_security_bucket_names,
+    infer_security_bucket_by_name,
+)
+from app.storage.file_queries import (
+    build_storage_list_filter,
+    find_storage_file,
 )
 
 logger = setup_logger(__name__)
@@ -77,7 +89,14 @@ async def analyze_file_for_placement(request: AnalyzeRequest, user: User = Depen
 
 @router.post("/upload", status_code=201)
 # ... (This function remains exactly the same)
-async def upload_file_to_csp(csp: str = Form(...), storage_class: str = Form(...), file: UploadFile = File(...), user: User = Depends(get_current_user), files_db: Collection = Depends(get_files_collection)):
+async def upload_file_to_csp(
+    csp: str = Form(...),
+    storage_class: str = Form(...),
+    file: UploadFile = File(...),
+    bucket: Optional[str] = Form(None),
+    user: User = Depends(get_current_user),
+    files_db: Collection = Depends(get_files_collection),
+):
     upload_functions = {"AWS": upload_to_aws, "GCP": upload_to_gcp, "Azure": upload_to_azure}
     upload_function = upload_functions.get(csp)
     if not upload_function:
@@ -86,7 +105,34 @@ async def upload_file_to_csp(csp: str = Form(...), storage_class: str = Form(...
         file.file.seek(0, 2)
         file_size = file.file.tell()
         file.file.seek(0)
-        object_key = upload_function(file, user.username, file.filename, storage_class)
+        if csp == "AWS" and bucket:
+            aws = resolve_aws_credentials(user.username)
+            layout = get_aws_bucket_layout(user.username)
+            upload_region = aws.get("region")
+            if layout and bucket == layout.get("storage_bucket_name"):
+                upload_region = layout.get("primary_region") or upload_region
+            elif layout:
+                from app.byoc.aws_bucket_helpers import get_bucket_actual_region
+
+                upload_region = (
+                    get_bucket_actual_region(
+                        aws["access_key_id"],
+                        aws["secret_access_key"],
+                        bucket,
+                        aws.get("session_token"),
+                    )
+                    or upload_region
+                )
+            object_key = upload_function(
+                file,
+                user.username,
+                file.filename,
+                storage_class,
+                bucket_name=bucket,
+                region_name=upload_region,
+            )
+        else:
+            object_key = upload_function(file, user.username, file.filename, storage_class)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"File upload to {csp} failed: {str(e)}")
     bucket_resolvers = {
@@ -94,7 +140,26 @@ async def upload_file_to_csp(csp: str = Form(...), storage_class: str = Form(...
         "GCP": lambda u: resolve_gcp_credentials(u)["bucket_name"],
         "Azure": lambda u: resolve_azure_credentials(u)["container_name"],
     }
-    cloud_bucket = bucket_resolvers.get(csp, lambda _u: "")(user.username)
+    cloud_bucket = bucket or bucket_resolvers.get(csp, lambda _u: "")(user.username)
+    upload_region = None
+    if csp == "AWS":
+        aws = resolve_aws_credentials(user.username)
+        layout = get_aws_bucket_layout(user.username)
+        upload_region = aws.get("region")
+        if layout and cloud_bucket == layout.get("storage_bucket_name"):
+            upload_region = layout.get("primary_region") or upload_region
+        elif cloud_bucket and cloud_bucket != aws.get("bucket_name"):
+            from app.byoc.aws_bucket_helpers import get_bucket_actual_region
+
+            upload_region = (
+                get_bucket_actual_region(
+                    aws["access_key_id"],
+                    aws["secret_access_key"],
+                    cloud_bucket,
+                    aws.get("session_token"),
+                )
+                or upload_region
+            )
 
     file_metadata = FileMetadata(
         filename=file.filename,
@@ -103,22 +168,40 @@ async def upload_file_to_csp(csp: str = Form(...), storage_class: str = Form(...
         size_bytes=file_size,
         csp=csp,
         storage_class=storage_class,
+        cloud_bucket=cloud_bucket,
+        region=upload_region,
     )
     doc = file_metadata.model_dump()
-    doc["cloud_bucket"] = cloud_bucket
     files_db.insert_one(doc)
-    return {"filename": file.filename, "csp": csp, "status": "upload successful", "bucket": cloud_bucket}
+    return {
+        "filename": file.filename,
+        "csp": csp,
+        "status": "upload successful",
+        "bucket": cloud_bucket,
+        "region": upload_region,
+    }
 
 @router.get("/files")
-# ... (This function remains exactly the same)
-async def list_files(user: User = Depends(get_current_user), files_db: Collection = Depends(get_files_collection)):
-    user_files = files_db.find({"owner_username": user.username})
+async def list_files(
+    user: User = Depends(get_current_user),
+    files_db: Collection = Depends(get_files_collection),
+    bucket: Optional[str] = Query(None),
+    region: Optional[str] = Query(None),
+):
+    aws = resolve_aws_credentials(user.username)
+    default_bucket = aws["bucket_name"]
+    query = build_storage_list_filter(user.username, bucket, region, default_bucket)
     files_list = []
-    for file in user_files:
+    for file in files_db.find(query):
         files_list.append({
-            "filename": file.get("filename"), "size_bytes": file.get("size_bytes"),
-            "upload_date": file.get("upload_date"), "csp": file.get("csp", "AWS"),
-            "storage_class": file.get("storage_class", "Standard")
+            "filename": file.get("filename"),
+            "size_bytes": file.get("size_bytes"),
+            "upload_date": file.get("upload_date"),
+            "csp": file.get("csp", "AWS"),
+            "storage_class": file.get("storage_class", "Standard"),
+            "cloud_bucket": file.get("cloud_bucket") or default_bucket,
+            "region": file.get("region"),
+            "s3_key": file.get("s3_key"),
         })
     return files_list
 
@@ -137,6 +220,8 @@ class StorageSyncResponse(BaseModel):
 async def sync_with_aws_bucket(
     user: User = Depends(get_current_user),
     files_db: Collection = Depends(get_files_collection),
+    bucket: Optional[str] = Query(None),
+    region: Optional[str] = Query(None),
 ):
     """
     On-demand storage sync for AWS S3 (free-tier friendly).
@@ -148,7 +233,23 @@ async def sync_with_aws_bucket(
     """
     try:
         aws = resolve_aws_credentials(user.username)
-        bucket_name = aws["bucket_name"]
+        bucket_name = bucket or aws["bucket_name"]
+        sync_region = region or aws.get("region")
+        layout = get_aws_bucket_layout(user.username)
+        if layout and bucket_name:
+            role = classify_bucket_role(bucket_name, layout)
+            vault_names = configured_security_bucket_names(layout)
+            if (
+                role in ("secure", "replica")
+                or bucket_name in vault_names
+                or infer_security_bucket_by_name(bucket_name)
+            ):
+                raise HTTPException(
+                    status_code=400,
+                    detail="Use the Security page to sync secure vault buckets.",
+                )
+            if bucket_name == layout.get("storage_bucket_name"):
+                sync_region = layout.get("primary_region") or sync_region
         user_prefix = f"{user.username}/"
         scanned_prefix = "" if aws.get("is_byoc") else user_prefix
 
@@ -158,7 +259,7 @@ async def sync_with_aws_bucket(
             access_key_id=aws["access_key_id"],
             secret_access_key=aws["secret_access_key"],
             session_token=aws.get("session_token"),
-            region_name=aws.get("region"),
+            region_name=sync_region,
         )
 
         inserted = 0
@@ -183,6 +284,7 @@ async def sync_with_aws_bucket(
             existing = files_db.find_one(
                 {
                     "owner_username": user.username,
+                    "cloud_bucket": bucket_name,
                     "$or": [{"s3_key": object_key}, {"filename": filename}],
                 },
                 {"_id": 1},
@@ -198,16 +300,32 @@ async def sync_with_aws_bucket(
                 size_bytes=int(obj.get("size_bytes", 0) or 0),
                 csp="AWS",
                 storage_class=obj.get("storage_class") or "S3 Standard",
+                cloud_bucket=bucket_name,
+                region=sync_region,
             ).model_dump()
             files_db.insert_one(doc)
             inserted += 1
 
-        # --- Remove stale DB records for AWS files no longer present in S3 ---
+        # --- Remove stale DB records for this bucket only ---
         removed = 0
-        stale_filter = {
-            "owner_username": user.username,
-            "csp": "AWS",
-        }
+        default_bucket = aws["bucket_name"]
+        if bucket_name == default_bucket:
+            stale_filter: dict = {
+                "owner_username": user.username,
+                "csp": "AWS",
+                "$or": [
+                    {"cloud_bucket": bucket_name},
+                    {"cloud_bucket": {"$exists": False}},
+                    {"cloud_bucket": None},
+                    {"cloud_bucket": ""},
+                ],
+            }
+        else:
+            stale_filter = {
+                "owner_username": user.username,
+                "csp": "AWS",
+                "cloud_bucket": bucket_name,
+            }
         if live_s3_keys:
             stale_filter["s3_key"] = {"$nin": list(live_s3_keys)}
         # If live_s3_keys is empty and objects were returned (empty bucket/prefix),
@@ -235,17 +353,16 @@ async def sync_with_aws_bucket(
 # --- CHANGE: The /download endpoint is now upgraded to track file access ---
 @router.get("/download/{filename:path}")
 async def generate_download_url(
-    filename: str, 
+    filename: str,
     user: User = Depends(get_current_user),
-    files_db: Collection = Depends(get_files_collection)
+    files_db: Collection = Depends(get_files_collection),
+    bucket: Optional[str] = Query(None),
 ):
     """
     Finds a file, **updates its access metadata**, determines its CSP, 
     and then calls the correct manager function to generate a download URL.
     """
-    file_record = files_db.find_one({"owner_username": user.username, "filename": filename})
-    if not file_record:
-        raise HTTPException(status_code=404, detail="File not found in database.")
+    file_record = find_storage_file(files_db, user.username, filename, bucket)
 
     # --- NEW: This is the core logic for access tracking ---
     # Before we do anything else, we update the database to record this access event.
@@ -272,7 +389,15 @@ async def generate_download_url(
         raise HTTPException(status_code=500, detail=f"No download function configured for CSP: {csp}")
 
     try:
-        url = download_function(user.username, object_key)
+        if csp == "AWS":
+            url = download_function(
+                user.username,
+                object_key,
+                bucket_name=file_record.get("cloud_bucket"),
+                region_name=file_record.get("region"),
+            )
+        else:
+            url = download_function(user.username, object_key)
         return {"presigned_url": url}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Could not generate download URL from {csp}: {e}")
@@ -280,10 +405,13 @@ async def generate_download_url(
 
 @router.delete("/delete/{filename:path}")
 # ... (This function remains exactly the same)
-async def delete_file(filename: str, user: User = Depends(get_current_user), files_db: Collection = Depends(get_files_collection)):
-    file_record = files_db.find_one({"owner_username": user.username, "filename": filename})
-    if not file_record:
-        raise HTTPException(status_code=404, detail="File not found in database.")
+async def delete_file(
+    filename: str,
+    user: User = Depends(get_current_user),
+    files_db: Collection = Depends(get_files_collection),
+    bucket: Optional[str] = Query(None),
+):
+    file_record = find_storage_file(files_db, user.username, filename, bucket)
     csp = file_record.get("csp")
     object_key = file_record.get("s3_key")
     delete_functions = {"AWS": delete_from_aws, "GCP": delete_from_gcp, "Azure": delete_from_azure}
@@ -291,7 +419,15 @@ async def delete_file(filename: str, user: User = Depends(get_current_user), fil
     if not delete_function:
         raise HTTPException(status_code=500, detail=f"No delete function configured for CSP: {csp}")
     try:
-        delete_function(user.username, object_key)
+        if csp == "AWS":
+            delete_function(
+                user.username,
+                object_key,
+                bucket_name=file_record.get("cloud_bucket"),
+                region_name=file_record.get("region"),
+            )
+        else:
+            delete_function(user.username, object_key)
         files_db.delete_one({"_id": file_record["_id"]})
         return JSONResponse(status_code=status.HTTP_200_OK, content={"message": f"File '{filename}' deleted successfully from {csp}."})
     except Exception as e:
@@ -302,15 +438,14 @@ async def restore_aws_file(
     filename: str,
     user: User = Depends(get_current_user),
     files_db: Collection = Depends(get_files_collection),
-    tier: str = Form("Standard"), # Allowed values: 'Expedited', 'Standard', 'Bulk'
-    days: int = Form(7) # How long the restored copy will be available (1-30 days)
+    tier: str = Form("Standard"),
+    days: int = Form(7),
+    bucket: Optional[str] = Query(None),
 ):
     """
     Initiates a restore operation for a file stored in AWS Glacier/Deep Archive.
     """
-    file_record = files_db.find_one({"owner_username": user.username, "filename": filename})
-    if not file_record:
-        raise HTTPException(status_code=404, detail="File not found in database.")
+    file_record = find_storage_file(files_db, user.username, filename, bucket)
 
     if file_record.get("csp") != "AWS":
         raise HTTPException(status_code=400, detail="Restore operation is only for AWS files via this endpoint.")
@@ -323,7 +458,14 @@ async def restore_aws_file(
 
     try:
         # Call the manager function to initiate the restore
-        restore_message = initiate_glacier_restore_aws(user.username, object_key, tier, days)
+        restore_message = initiate_glacier_restore_aws(
+            user.username,
+            object_key,
+            tier,
+            days,
+            bucket_name=file_record.get("cloud_bucket"),
+            region_name=file_record.get("region"),
+        )
         return {"message": restore_message["message"]} # Return the message from the manager function
     except HTTPException as e:
         raise e # Re-raise HTTPExceptions from manager.py

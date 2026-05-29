@@ -16,6 +16,14 @@ S3_CONFIG = Config(signature_version="s3v4")
 REPLICA_REGION_DEFAULT = "us-east-1"
 BUCKET_NAME_RE = re.compile(r"^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$")
 
+# Regions offered in Settings and bucket/region filters on Storage & Security.
+SUPPORTED_AWS_REGIONS = [
+    "ap-south-1",
+    "us-east-1",
+    "us-west-2",
+    "eu-west-1",
+]
+
 
 def resolve_bucket_target_region(
     bucket_role: str,

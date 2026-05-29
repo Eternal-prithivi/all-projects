@@ -15,7 +15,9 @@
 # =============================================================================
 from datetime import datetime
 from typing import Optional
-from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException, status
+from typing import Any, Optional, Tuple
+
+from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException, Query, status
 from fastapi.responses import Response
 from pydantic import BaseModel
 from pymongo.collection import Collection
@@ -27,11 +29,19 @@ from app.database.mongo_client import mongodb_client
 from app.storage.models_storage import FileMetadata
 from app.storage.manager import list_objects_aws
 from app.storage.tasks import apply_encryption_to_file
+from app.byoc.aws_bucket_discovery import classify_bucket_role
+from app.byoc.aws_bucket_helpers import REPLICA_REGION_DEFAULT
+from app.byoc.credential_resolver import get_aws_bucket_layout
 from app.storage.cloud_credentials import (
     SecureAwsStorage,
+    build_aws_s3_client_for_bucket,
     delete_secure_object_dual,
     put_secure_object_dual,
     resolve_secure_aws_storage,
+)
+from app.storage.file_queries import (
+    build_secure_list_filter,
+    find_secure_file,
 )
 from app.security.encryption_handler import (
     decrypt_file_client_side,
@@ -45,6 +55,40 @@ router = APIRouter(tags=["Security"])
 
 def get_secure_files_collection() -> Collection:
     return mongodb_client.get_collection("secure_files")
+
+
+def _resolve_secure_bucket_sync(
+    username: str,
+    bucket: Optional[str],
+    region: Optional[str],
+) -> Tuple[Any, str, str, str, SecureAwsStorage]:
+    """Return (s3_client, bucket_name, list_prefix, region, storage_ctx)."""
+    storage = resolve_secure_aws_storage(username)
+    bucket_name = bucket or storage.primary_bucket
+    layout = get_aws_bucket_layout(username)
+
+    if layout and bucket_name == layout.get("replica_bucket_name"):
+        sync_region = layout.get("replica_region") or REPLICA_REGION_DEFAULT
+        client, _ = build_aws_s3_client_for_bucket(username, sync_region)
+        return client, bucket_name, storage.list_prefix, sync_region, storage
+
+    if bucket_name == storage.primary_bucket:
+        return storage.primary_client, bucket_name, storage.list_prefix, storage.region, storage
+
+    sync_region = region or storage.region
+    if layout and bucket_name:
+        role = classify_bucket_role(bucket_name, layout)
+        if role == "storage":
+            raise HTTPException(
+                status_code=400,
+                detail="Use the Storage page to sync general storage buckets.",
+            )
+        if bucket_name == layout.get("secure_bucket_name"):
+            sync_region = layout.get("primary_region") or sync_region
+
+    client, _ = build_aws_s3_client_for_bucket(username, sync_region)
+    scanned_prefix = "" if storage.is_byoc else storage.list_prefix
+    return client, bucket_name, scanned_prefix, sync_region, storage
 
 
 def _persist_sse_secure_file(
@@ -76,6 +120,7 @@ def _persist_sse_secure_file(
     doc = file_metadata.model_dump()
     doc["upload_date"] = datetime.utcnow()
     doc["cloud_bucket"] = storage.primary_bucket
+    doc["region"] = storage.region
     doc["is_byoc"] = storage.is_byoc
     if scan_reasons is not None:
         doc["scan_reasons"] = scan_reasons
@@ -148,6 +193,8 @@ def _encryption_flags_from_s3_head(head: dict) -> dict:
 async def sync_secure_aws_bucket(
     user: UserInDB = Depends(require_2fa),
     files_db: Collection = Depends(get_secure_files_collection),
+    bucket: Optional[str] = Query(None),
+    region: Optional[str] = Query(None),
 ):
     """
     On-demand reconcile of the secure S3 vault into MongoDB (free-tier friendly).
@@ -156,16 +203,16 @@ async def sync_secure_aws_bucket(
     records or modify S3 objects. New rows inherit encryption flags from S3 headers.
     """
     try:
-        storage = resolve_secure_aws_storage(user.username)
-        bucket_name = storage.primary_bucket
-        user_prefix = storage.list_prefix
+        sync_client, bucket_name, user_prefix, sync_region, storage = _resolve_secure_bucket_sync(
+            user.username, bucket, region
+        )
         objects = list_objects_aws(
             bucket_name=bucket_name,
             prefix=user_prefix,
             access_key_id=storage.access_key_id,
             secret_access_key=storage.secret_access_key,
             session_token=storage.session_token,
-            region_name=storage.region,
+            region_name=sync_region,
         )
 
         inserted = 0
@@ -190,6 +237,7 @@ async def sync_secure_aws_bucket(
             existing = files_db.find_one(
                 {
                     "owner_username": user.username,
+                    "cloud_bucket": bucket_name,
                     "$or": [{"s3_key": object_key}, {"filename": filename}],
                 },
                 {"_id": 1},
@@ -206,7 +254,7 @@ async def sync_secure_aws_bucket(
                 "awaiting_encryption_choice": False,
             }
             try:
-                head = storage.primary_client.head_object(
+                head = sync_client.head_object(
                     Bucket=bucket_name, Key=object_key
                 )
                 encryption_flags = _encryption_flags_from_s3_head(head)
@@ -221,6 +269,7 @@ async def sync_secure_aws_bucket(
                 "size_bytes": int(obj.get("size_bytes", 0) or 0),
                 "upload_date": upload_date,
                 "cloud_bucket": bucket_name,
+                "region": sync_region,
                 "is_byoc": storage.is_byoc,
                 "is_sensitive": False,
                 **encryption_flags,
@@ -228,20 +277,26 @@ async def sync_secure_aws_bucket(
             files_db.insert_one(doc)
             inserted += 1
 
-        # --- Remove stale DB records for files no longer present in S3 ---
+        # --- Remove stale DB records for this bucket only ---
         removed = 0
-        import re
-
-        prefix_base = re.escape(user_prefix.rstrip("/"))
-        stale_filter = {
-            "owner_username": user.username,
-            "s3_key": {"$regex": f"^{prefix_base}/"},
-        }
-        if live_s3_keys:
-            stale_filter["s3_key"] = {
-                "$regex": f"^{prefix_base}/",
-                "$nin": list(live_s3_keys),
+        primary_secure = storage.primary_bucket
+        if bucket_name == primary_secure:
+            stale_filter: dict = {
+                "owner_username": user.username,
+                "$or": [
+                    {"cloud_bucket": bucket_name},
+                    {"cloud_bucket": {"$exists": False}},
+                    {"cloud_bucket": None},
+                    {"cloud_bucket": ""},
+                ],
             }
+        else:
+            stale_filter = {
+                "owner_username": user.username,
+                "cloud_bucket": bucket_name,
+            }
+        if live_s3_keys:
+            stale_filter["s3_key"] = {"$nin": list(live_s3_keys)}
         stale_cursor = files_db.find(stale_filter, {"_id": 1, "filename": 1})
         stale_ids = [doc["_id"] for doc in stale_cursor]
         if stale_ids:
@@ -414,15 +469,18 @@ async def upload_client_encrypted(
 @router.get("/list-secure")
 async def list_secure_files(
     user: UserInDB = Depends(require_2fa),
-    files_db: Collection = Depends(get_secure_files_collection)
+    files_db: Collection = Depends(get_secure_files_collection),
+    bucket: Optional[str] = Query(None),
+    region: Optional[str] = Query(None),
 ):
     """
     Lists file metadata from the secure_files collection in MongoDB.
     """
-    user_files = files_db.find({"owner_username": user.username})
-
+    storage = resolve_secure_aws_storage(user.username)
+    default_bucket = storage.primary_bucket
+    query = build_secure_list_filter(user.username, bucket, region, default_bucket)
     files_list = []
-    for file in user_files:
+    for file in files_db.find(query):
         files_list.append({
             "filename": file.get("filename"),
             "upload_date": file.get("upload_date"),
@@ -434,6 +492,9 @@ async def list_secure_files(
             "awaiting_encryption_choice": file.get("awaiting_encryption_choice", False),
             "client_side_encrypted": file.get("client_side_encrypted", False),
             "scan_reasons": file.get("scan_reasons", []),
+            "cloud_bucket": file.get("cloud_bucket") or default_bucket,
+            "region": file.get("region"),
+            "s3_key": file.get("s3_key"),
         })
     return files_list
 
@@ -499,23 +560,24 @@ async def choose_encryption_method(
 # --- FIX: ADD THIS MISSING DOWNLOAD ENDPOINT ---
 @router.get("/download/{filename}")
 async def generate_secure_download_url(
-    filename: str, 
+    filename: str,
     user: UserInDB = Depends(require_2fa),
-    files_db: Collection = Depends(get_secure_files_collection)
+    files_db: Collection = Depends(get_secure_files_collection),
+    bucket: Optional[str] = Query(None),
 ):
     """
     Generates a pre-signed URL for securely downloading a file.
     For client-side encrypted files, returns metadata indicating password is needed.
     """
     storage = resolve_secure_aws_storage(user.username)
-    object_key = storage.object_key(user.username, filename)
-    file_doc = files_db.find_one(
-        {"owner_username": user.username, "$or": [{"s3_key": object_key}, {"filename": filename}]}
-    )
-    if not file_doc:
-        raise HTTPException(status_code=404, detail="File not found")
-    object_key = file_doc.get("s3_key") or object_key
-    bucket = file_doc.get("cloud_bucket") or storage.primary_bucket
+    file_doc = find_secure_file(files_db, user.username, filename, bucket)
+    object_key = file_doc.get("s3_key") or storage.object_key(user.username, filename)
+    target_bucket = file_doc.get("cloud_bucket") or storage.primary_bucket
+    file_region = file_doc.get("region") or storage.region
+    if target_bucket != storage.primary_bucket and file_region:
+        dl_client, _ = build_aws_s3_client_for_bucket(user.username, file_region)
+    else:
+        dl_client = storage.primary_client
 
     # Check if file is client-side encrypted
     if file_doc.get("client_side_encrypted"):
@@ -526,9 +588,9 @@ async def generate_secure_download_url(
         }
     
     try:
-        url = storage.primary_client.generate_presigned_url(
+        url = dl_client.generate_presigned_url(
             'get_object',
-            Params={'Bucket': bucket, 'Key': object_key},
+            Params={'Bucket': target_bucket, 'Key': object_key},
             ExpiresIn=3600  # URL is valid for 1 hour
         )
         # The key "presigned_url" matches what the frontend expects
@@ -549,24 +611,25 @@ async def download_client_encrypted_ciphertext(
     filename: str,
     user: UserInDB = Depends(require_2fa),
     files_db: Collection = Depends(get_secure_files_collection),
+    bucket: Optional[str] = Query(None),
 ):
     """Return raw ciphertext for browser-side decryption (zero-knowledge)."""
     storage = resolve_secure_aws_storage(user.username)
-    object_key = storage.object_key(user.username, filename)
-    file_doc = files_db.find_one(
-        {"owner_username": user.username, "$or": [{"s3_key": object_key}, {"filename": filename}]}
-    )
-    if not file_doc:
-        raise HTTPException(status_code=404, detail="File not found")
-    object_key = file_doc.get("s3_key") or object_key
-    bucket = file_doc.get("cloud_bucket") or storage.primary_bucket
+    file_doc = find_secure_file(files_db, user.username, filename, bucket)
+    object_key = file_doc.get("s3_key") or storage.object_key(user.username, filename)
+    target_bucket = file_doc.get("cloud_bucket") or storage.primary_bucket
+    file_region = file_doc.get("region") or storage.region
+    if target_bucket != storage.primary_bucket and file_region:
+        dl_client, _ = build_aws_s3_client_for_bucket(user.username, file_region)
+    else:
+        dl_client = storage.primary_client
     if not file_doc.get("client_side_encrypted"):
         raise HTTPException(
             status_code=400,
             detail="File is not browser-encrypted. Use the standard download URL.",
         )
     try:
-        response = storage.primary_client.get_object(Bucket=bucket, Key=object_key)
+        response = dl_client.get_object(Bucket=target_bucket, Key=object_key)
         body = response["Body"].read()
         return Response(
             content=body,
@@ -583,29 +646,27 @@ async def download_client_encrypted_ciphertext(
 async def decrypt_and_download(
     request: DecryptionRequest,
     user: UserInDB = Depends(require_2fa),
-    files_db: Collection = Depends(get_secure_files_collection)
+    files_db: Collection = Depends(get_secure_files_collection),
+    bucket: Optional[str] = Query(None),
 ):
     """
     Decrypts a client-side encrypted file with user's password and returns the file directly.
     """
     storage = resolve_secure_aws_storage(user.username)
-    object_key = storage.object_key(user.username, request.filename)
-    file_doc = files_db.find_one(
-        {
-            "owner_username": user.username,
-            "$or": [{"s3_key": object_key}, {"filename": request.filename}],
-        }
-    )
-    if not file_doc:
-        raise HTTPException(status_code=404, detail="File not found")
-    object_key = file_doc.get("s3_key") or object_key
-    bucket = file_doc.get("cloud_bucket") or storage.primary_bucket
+    file_doc = find_secure_file(files_db, user.username, request.filename, bucket)
+    object_key = file_doc.get("s3_key") or storage.object_key(user.username, request.filename)
+    target_bucket = file_doc.get("cloud_bucket") or storage.primary_bucket
+    file_region = file_doc.get("region") or storage.region
+    if target_bucket != storage.primary_bucket and file_region:
+        dl_client, _ = build_aws_s3_client_for_bucket(user.username, file_region)
+    else:
+        dl_client = storage.primary_client
 
     if not file_doc.get("client_side_encrypted"):
         raise HTTPException(status_code=400, detail="File is not client-side encrypted")
     
     try:
-        response = storage.primary_client.get_object(Bucket=bucket, Key=object_key)
+        response = dl_client.get_object(Bucket=target_bucket, Key=object_key)
         encrypted_content = response['Body'].read()
         salt, iv, encrypted_data = extract_encrypted_file_components(encrypted_content)
         
@@ -643,23 +704,26 @@ async def decrypt_and_download(
 
 @router.delete("/delete/{filename}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_secure_file(
-    filename: str, 
+    filename: str,
     user: UserInDB = Depends(require_2fa),
-    files_db: Collection = Depends(get_secure_files_collection)
+    files_db: Collection = Depends(get_secure_files_collection),
+    bucket: Optional[str] = Query(None),
 ):
     """
     Deletes a file from both primary and replica S3 buckets and from MongoDB.
     """
     storage = resolve_secure_aws_storage(user.username)
-    object_key = storage.object_key(user.username, filename)
-    file_doc = files_db.find_one(
-        {"owner_username": user.username, "$or": [{"s3_key": object_key}, {"filename": filename}]}
-    )
-    if file_doc:
-        object_key = file_doc.get("s3_key") or object_key
+    file_doc = find_secure_file(files_db, user.username, filename, bucket)
+    object_key = file_doc.get("s3_key") or storage.object_key(user.username, filename)
+    target_bucket = file_doc.get("cloud_bucket") or storage.primary_bucket
+    file_region = file_doc.get("region") or storage.region
     try:
-        delete_secure_object_dual(storage, object_key)
-        files_db.delete_one({"owner_username": user.username, "s3_key": object_key})
+        if target_bucket == storage.primary_bucket:
+            delete_secure_object_dual(storage, object_key)
+        else:
+            client, _ = build_aws_s3_client_for_bucket(user.username, file_region)
+            client.delete_object(Bucket=target_bucket, Key=object_key)
+        files_db.delete_one({"_id": file_doc["_id"]})
         return
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Could not delete file: {e}")

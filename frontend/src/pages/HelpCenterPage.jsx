@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FaSearch, FaQuestionCircle, FaChevronDown, FaChevronUp, FaRocket, FaDollarSign, FaServer, FaDatabase, FaShieldAlt, FaUser, FaArrowLeft, FaEnvelope } from 'react-icons/fa';
+import { FaSearch, FaQuestionCircle, FaChevronDown, FaChevronUp, FaRocket, FaDollarSign, FaServer, FaDatabase, FaShieldAlt, FaUser, FaEnvelope } from 'react-icons/fa';
+import MarketingPageLayout from '../components/layout/MarketingPageLayout.jsx';
 import '../styles/help-center.css';
 
 const HelpCenterPage = () => {
@@ -227,28 +228,24 @@ const HelpCenterPage = () => {
   };
 
   return (
+    <MarketingPageLayout>
     <div className="help-center-page">
-      {/* Header */}
-      <div className="help-header">
+      <div className="help-header reveal-group">
         <div className="help-header-content">
-          <button onClick={() => navigate(-1)} className="back-button">
-            <FaArrowLeft /> Back
-          </button>
-          <h1 className="help-title">
+          <h1 className="help-title reveal-item">
             <FaQuestionCircle className="title-icon" />
             Help Center
           </h1>
-          <p className="help-subtitle">
+          <p className="help-subtitle reveal-item">
             Find answers to common questions and learn how to get the most out of Zenith
           </p>
-          <button onClick={() => navigate('/contact')} className="header-contact-button">
+          <button type="button" onClick={() => navigate('/contact')} className="header-contact-button reveal-item">
             <FaEnvelope /> Contact Support
           </button>
         </div>
       </div>
 
-      {/* Search Bar */}
-      <div className="help-search-section">
+      <div className="help-search-section reveal-item">
         <div className="search-container">
           <FaSearch className="search-icon" />
           <input
@@ -267,7 +264,7 @@ const HelpCenterPage = () => {
       </div>
 
       {/* Category Filters */}
-      <div className="help-categories">
+      <div className="help-categories reveal-item">
         {categories.map(category => {
           const Icon = category.icon;
           return (
@@ -284,7 +281,7 @@ const HelpCenterPage = () => {
       </div>
 
       {/* FAQ List */}
-      <div className="help-content">
+      <div className="help-content reveal-group">
         {filteredFaqs.length === 0 ? (
           <div className="no-results">
             <FaQuestionCircle className="no-results-icon" />
@@ -306,7 +303,7 @@ const HelpCenterPage = () => {
             )}
             
             {filteredFaqs.map(faq => (
-              <div key={faq.id} className="faq-item">
+              <div key={faq.id} className="faq-item reveal-item">
                 <button
                   onClick={() => toggleQuestion(faq.id)}
                   className="faq-question"
@@ -336,7 +333,7 @@ const HelpCenterPage = () => {
       </div>
 
       {/* Contact Support */}
-      <div className="help-footer">
+      <div className="help-footer reveal-item">
         <div className="contact-support-card">
           <FaEnvelope className="contact-icon" />
           <h3>Still need help?</h3>
@@ -347,6 +344,7 @@ const HelpCenterPage = () => {
         </div>
       </div>
     </div>
+    </MarketingPageLayout>
   );
 };
 

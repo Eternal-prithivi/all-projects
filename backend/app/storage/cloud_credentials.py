@@ -47,6 +47,18 @@ def build_aws_s3_client(username: str) -> Tuple[Any, str, bool]:
     return client, aws["bucket_name"], bool(aws.get("is_byoc"))
 
 
+def build_aws_s3_client_for_bucket(
+    username: str,
+    region_name: str,
+) -> Tuple[Any, bool]:
+    """S3 client for a specific bucket region (uses BYOC or platform credentials)."""
+    aws = resolve_aws_credentials(username)
+    kwargs = _aws_client_kwargs(aws)
+    kwargs["region_name"] = region_name or aws.get("region") or settings.PRIMARY_S3_REGION
+    client = boto3.client("s3", **kwargs)
+    return client, bool(aws.get("is_byoc"))
+
+
 def build_aws_ce_client(username: str) -> Tuple[Any, bool]:
     """Return (boto3 Cost Explorer client, is_byoc)."""
     aws = resolve_aws_credentials(username)

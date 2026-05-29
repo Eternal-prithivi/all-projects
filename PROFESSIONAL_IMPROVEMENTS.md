@@ -1,8 +1,12 @@
 # 🚀 Professional Improvements — Zenith Cloud Platform
 
-> **Last audited:** 2026-05-25  
-> **Auditor:** Antigravity (Claude Opus 4.6 Thinking)  
-> **Original items:** 20 | **Already implemented:** 15 | **Remaining (worthwhile):** 5 | **Removed (unnecessary):** 5
+> **Last audited:** 2026-05-25 (content) · **Roadmap sync:** 2026-05-29  
+> **Live enterprise backlog:** `ai-docs/PROGRESS.md` **Phases 19–27** (77 items; isolated work in Phase 19–21 first).  
+> **Original items:** 20 | **Already implemented:** 16+ | **Remaining:** tracked in PROGRESS Phase 19–27
+
+---
+
+> ⚠️ **CI/CD:** GitHub Actions **CI exists** (`.github/workflows/ci.yml` — pytest, lint, build, terraform validate). **CD / deploy automation** → PROGRESS **20.9–20.10**. This file’s “no CI” notes below are **outdated** until task **19.9** rewrites Tier 1.
 
 ---
 
@@ -86,27 +90,9 @@ The following items from the original list have been **removed** because they ar
 
 ---
 
-#### 2. ⬜ CI/CD Pipeline (GitHub Actions)
-**Priority:** 🔴 High  
-**Effort:** 1 day  
-**Current:** No automated pipeline  
-**Gap:** Manual lint/test/build verification  
-
-**Why it matters:** Every professional project has CI. A GitHub Actions workflow that runs `pytest`, `eslint`, and `npm run build` on every push would cost zero dollars and immediately signal maturity.
-
-**Recommended scope:**
-```yaml
-# .github/workflows/ci.yml
-on: [push, pull_request]
-jobs:
-  backend:
-    - pip install -r requirements.txt
-    - pytest
-  frontend:
-    - npm ci
-    - npm run lint
-    - npm run build
-```
+#### 2. ~~CI/CD Pipeline (GitHub Actions)~~ ✅ CI DONE · CD ⬜
+**Status:** **CI implemented** — see `.github/workflows/ci.yml`.  
+**Remaining:** CD deploy workflows, Mongo in CI, Playwright — **`PROGRESS.md` Phase 20**.
 
 ---
 

@@ -26,7 +26,7 @@ import {
 } from "../api";
 import "../styles/storage.css";
 import PageHeader from "../components/ui/PageHeader.jsx";
-import ByocStorageTargetBanner from "../components/ByocStorageTargetBanner.jsx";
+import BucketRegionSelector from "../components/BucketRegionSelector.jsx";
 import EmptyState from "../components/EmptyState.jsx";
 import { IconHardDrive } from "../components/dashboard/Icons.jsx";
 
@@ -90,6 +90,33 @@ function StoragePage() {
   const [manualCspSelection, setManualCspSelection] = useState(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [fileToDelete, setFileToDelete] = useState(null);
+  const [selectedBucket, setSelectedBucket] = useState(() => {
+    try {
+      return sessionStorage.getItem("zenith.storage.bucket") || null;
+    } catch {
+      return null;
+    }
+  });
+  const [selectedRegion, setSelectedRegion] = useState(() => {
+    try {
+      return sessionStorage.getItem("zenith.storage.region") || "all";
+    } catch {
+      return "all";
+    }
+  });
+  const handleBucketSelect = (name, region) => {
+    setSelectedBucket(name);
+    if (region) setSelectedRegion(region);
+  };
+
+  const handleRegionSelect = (region) => {
+    setSelectedRegion(region);
+    try {
+      sessionStorage.setItem("zenith.storage.region", region);
+    } catch {
+      /* ignore */
+    }
+  };
 
   // --- NEW STATE for Glacier Restore ---
   const [showRestoreModal, setShowRestoreModal] = useState(false);
@@ -103,21 +130,29 @@ function StoragePage() {
     if (!token) return;
     try {
       setIsLoading(true);
-      const fileList = await listFiles(token);
+      const fileList = await listFiles(token, {
+        bucket: selectedBucket || undefined,
+        region: selectedRegion !== "all" ? selectedRegion : undefined,
+      });
       setFiles(fileList);
     } catch (error) {
       notifyError(error.message || "Failed to fetch files.");
     } finally {
       setIsLoading(false);
     }
-  }, [token, notifyError]);
+  }, [token, notifyError, selectedBucket, selectedRegion]);
 
   const handleSyncWithBucket = async () => {
     if (!token) return;
     setIsSyncing(true);
     try {
-      const result = await syncAwsBucket(token);
-      const scanned = result.scanned_prefix ? `prefix '${result.scanned_prefix}'` : "the whole bucket";
+      const result = await syncAwsBucket(token, {
+        bucket: selectedBucket || undefined,
+        region: selectedRegion !== "all" ? selectedRegion : undefined,
+      });
+      const scanned = result.scanned_prefix
+        ? `prefix '${result.scanned_prefix}'`
+        : `bucket '${result.bucket_name}'`;
       const removedMsg = result.removed > 0 ? ` Removed ${result.removed} stale record(s).` : "";
       notifySuccess(`Sync complete. Added ${result.inserted} new file(s) from AWS after scanning ${scanned}.${removedMsg}`);
       await fetchFiles();
@@ -171,7 +206,9 @@ function StoragePage() {
     setIsUploading(true);
 
     try {
-      await uploadFileToCSP(selectedFile, finalCsp, storageClass, token);
+      await uploadFileToCSP(selectedFile, finalCsp, storageClass, token, {
+        bucket: finalCsp === "AWS" && selectedBucket ? selectedBucket : undefined,
+      });
       notifySuccess(
         `'${selectedFile.name}' uploaded successfully to ${finalCsp}!`
       );
@@ -185,16 +222,18 @@ function StoragePage() {
     }
   };
 
-  const openDeleteConfirmation = (filename) => {
-    setFileToDelete(filename);
+  const openDeleteConfirmation = (file) => {
+    setFileToDelete(file);
     setShowDeleteModal(true);
   };
 
   const confirmDelete = async () => {
     if (!fileToDelete) return;
     try {
-      await deleteFile(fileToDelete, token);
-      notifySuccess(`'${fileToDelete}' deleted successfully.`);
+      await deleteFile(fileToDelete.filename, token, {
+        bucket: fileToDelete.cloud_bucket || selectedBucket || undefined,
+      });
+      notifySuccess(`'${fileToDelete.filename}' deleted successfully.`);
       await fetchFiles();
     } catch (error) {
       notifyError(error.message || "Failed to delete file.");
@@ -205,13 +244,19 @@ function StoragePage() {
   };
 
   // --- MODIFIED handleDownload to manage Glacier restores ---
-  const handleDownload = async (filename) => {
+  const handleDownload = async (file) => {
+    const filename = typeof file === "string" ? file : file.filename;
+    const bucket =
+      typeof file === "object" ? file.cloud_bucket || selectedBucket : selectedBucket;
     try {
-      const { presigned_url } = await getDownloadUrl(filename, token);
+      const { presigned_url } = await getDownloadUrl(filename, token, {
+        bucket: bucket || undefined,
+      });
       window.open(presigned_url, "_blank");
     } catch (error) {
+      const msg = error.message || error.detail || "";
       // Check for the specific Glacier error message and status code from backend
-      if (error.message.includes("is in GLACIER storage") && error.message.includes("412")) {
+      if (msg.includes("is in GLACIER storage") && msg.includes("412")) {
         setFileToRestore(filename);
         setShowRestoreModal(true); // Open the restore modal
         notifyInfo("This file is in Glacier. It needs to be restored before download.");
@@ -253,17 +298,23 @@ function StoragePage() {
     manualCspSelection || (recommendation && recommendation.recommendation.csp);
 
   return (
-    <div className="storage-container">
+    <div className="storage-container zenith-page-enter">
       <PageHeader
         kicker="Object storage"
         title="Standard Storage"
         subtitle="Upload, analyze, and sync files across your connected cloud providers"
       />
 
-      <ByocStorageTargetBanner variant="storage" />
+      <BucketRegionSelector
+        surface="storage"
+        storageKeyPrefix="zenith.storage"
+        selectedBucket={selectedBucket}
+        selectedRegion={selectedRegion}
+        onBucketChange={handleBucketSelect}
+        onRegionChange={handleRegionSelect}
+      />
 
-      {/* Storage Process Flow */}
-      <div className="storage-process-info">
+      <div className="storage-process-info zenith-surface">
         <div className="process-step">
           <div className="process-icon analyze">
             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -316,7 +367,7 @@ function StoragePage() {
         </div>
       </div>
 
-      <div className="upload-section">
+      <div className="upload-section zenith-surface">
         <h3 className="upload-title">Intelligent File Ingestion</h3>
         <div className="upload-form">
           <div className="file-input-group">
@@ -358,7 +409,7 @@ function StoragePage() {
         </div>
       </div>
 
-      <div className="list-section">
+      <div className="list-section zenith-surface">
         <div className="list-header">
           <h3 className="list-title">Your Files</h3>
           <button
@@ -367,7 +418,7 @@ function StoragePage() {
             onClick={handleSyncWithBucket}
             disabled={isSyncing}
           >
-            {isSyncing ? "Syncing..." : "Sync with Bucket (AWS)"}
+            {isSyncing ? "Syncing..." : selectedBucket ? `Sync ${selectedBucket}` : "Sync with Bucket (AWS)"}
           </button>
         </div>
         {isLoading ? (
@@ -391,7 +442,7 @@ function StoragePage() {
             </thead>
             <tbody>
               {files.map((file) => (
-                  <tr key={file.filename}>
+                  <tr key={`${file.cloud_bucket || ""}-${file.s3_key || file.filename}`}>
                     <td>{file.filename}</td>
                     <td>{(file.size_bytes / 1024).toFixed(2)}</td>
                     <td className="date-col">
@@ -405,12 +456,11 @@ function StoragePage() {
                     </td>
                     <td>
                       <button
-                        onClick={() => handleDownload(file.filename)}
+                        onClick={() => handleDownload(file)}
                         className="action-btn download-btn"
                       >
                         Download
                       </button>
-                      {/* --- NEW: Restore button for AWS Glacier/Deep Archive files --- */}
                       {file.csp === "AWS" &&
                        (file.storage_class === "GLACIER" || file.storage_class === "DEEP_ARCHIVE") && (
                         <button
@@ -423,7 +473,7 @@ function StoragePage() {
                         </button>
                       )}
                       <button
-                        onClick={() => openDeleteConfirmation(file.filename)}
+                        onClick={() => openDeleteConfirmation(file)}
                         className="action-btn delete-btn"
                       >
                         Delete
@@ -439,7 +489,7 @@ function StoragePage() {
       {showDeleteModal && (
         <div className="modal-overlay">
           <div className="modal-content">
-            <p>Are you sure you want to delete '{fileToDelete}'?</p>
+            <p>Are you sure you want to delete &apos;{fileToDelete?.filename}&apos;?</p>
             <div className="modal-buttons">
               <button onClick={confirmDelete} className="modal-btn danger">
                 Yes, Delete

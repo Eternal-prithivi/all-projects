@@ -1,0 +1,388 @@
+/**
+ * Zenith Experience Layer — ambient depth, motion, and premium surfaces.
+ * Import after design tokens (index.css). Respects prefers-reduced-motion.
+ */
+
+/* ─── Extended tokens ─── */
+:root {
+  --zenith-mesh-gold: rgba(212, 175, 55, 0.09);
+  --zenith-mesh-blue: rgba(59, 130, 246, 0.06);
+  --zenith-mesh-teal: rgba(34, 197, 94, 0.04);
+  --zenith-glass-blur: 24px;
+  --zenith-shine: linear-gradient(
+    105deg,
+    transparent 40%,
+    rgba(255, 255, 255, 0.06) 45%,
+    rgba(255, 255, 255, 0.12) 50%,
+    rgba(255, 255, 255, 0.06) 55%,
+    transparent 60%
+  );
+}
+
+/* ─── Ambient mesh (dashboard main) ─── */
+.dashboard-content {
+  position: relative;
+  isolation: isolate;
+}
+
+.zenith-ambient {
+  pointer-events: none;
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  opacity: 0.85;
+}
+
+.zenith-ambient::before,
+.zenith-ambient::after {
+  content: "";
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  animation: zenith-drift 28s ease-in-out infinite alternate;
+}
+
+.zenith-ambient::before {
+  width: min(55vw, 520px);
+  height: min(55vw, 520px);
+  top: -8%;
+  right: 5%;
+  background: radial-gradient(circle, var(--zenith-mesh-gold) 0%, transparent 70%);
+}
+
+.zenith-ambient::after {
+  width: min(45vw, 420px);
+  height: min(45vw, 420px);
+  bottom: 5%;
+  left: 8%;
+  background: radial-gradient(circle, var(--zenith-mesh-blue) 0%, transparent 70%);
+  animation-delay: -14s;
+}
+
+@keyframes zenith-drift {
+  0% {
+    transform: translate(0, 0) scale(1);
+  }
+  100% {
+    transform: translate(3%, 4%) scale(1.08);
+  }
+}
+
+.dashboard-content > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* ─── Page enter choreography ─── */
+.zenith-page-enter {
+  animation: zenith-page-in 0.65s var(--ease-out) both;
+}
+
+.zenith-page-enter > * {
+  animation: zenith-fade-up 0.55s var(--ease-out) both;
+}
+
+.zenith-page-enter > *:nth-child(1) { animation-delay: 0.04s; }
+.zenith-page-enter > *:nth-child(2) { animation-delay: 0.1s; }
+.zenith-page-enter > *:nth-child(3) { animation-delay: 0.16s; }
+.zenith-page-enter > *:nth-child(4) { animation-delay: 0.22s; }
+.zenith-page-enter > *:nth-child(5) { animation-delay: 0.28s; }
+.zenith-page-enter > *:nth-child(6) { animation-delay: 0.34s; }
+
+@keyframes zenith-page-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes zenith-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ─── Premium page header ─── */
+.zenith-page-header--premium {
+  position: relative;
+  padding-bottom: var(--space-md);
+}
+
+.zenith-page-header--premium::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 120px;
+  height: 3px;
+  border-radius: var(--radius-full);
+  background: linear-gradient(90deg, var(--gold-primary), transparent);
+  opacity: 0.9;
+}
+
+.zenith-page-kicker--shine {
+  text-shadow: 0 0 20px rgba(212, 175, 55, 0.25);
+  transition: text-shadow 0.35s ease, color 0.35s ease;
+}
+
+.zenith-page-header--premium:hover .zenith-page-kicker--shine {
+  text-shadow: 0 0 28px rgba(212, 175, 55, 0.45);
+}
+
+/* ─── Premium glass surfaces ─── */
+.zenith-surface {
+  position: relative;
+  overflow: hidden;
+  transition:
+    border-color var(--duration-normal) var(--ease-out),
+    box-shadow var(--duration-normal) var(--ease-out),
+    transform var(--duration-normal) var(--ease-out);
+}
+
+.storage-container .zenith-surface,
+.security-page .zenith-surface {
+  /* Existing page CSS sets glass + padding; experience adds hover shine only */
+}
+
+.zenith-surface::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.4s var(--ease-out);
+  background: radial-gradient(
+    520px circle at 50% 0%,
+    rgba(212, 175, 55, 0.14) 0%,
+    transparent 55%
+  );
+}
+
+.zenith-surface::after {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  padding: 1px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.4s var(--ease-out);
+  background: linear-gradient(
+    145deg,
+    rgba(212, 175, 55, 0.45) 0%,
+    rgba(212, 175, 55, 0.08) 40%,
+    rgba(255, 255, 255, 0.06) 50%,
+    rgba(212, 175, 55, 0.2) 100%
+  );
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+}
+
+.zenith-surface:hover {
+  border-color: rgba(212, 175, 55, 0.35);
+  transform: translateY(-3px);
+  box-shadow:
+    0 16px 48px rgba(0, 0, 0, 0.35),
+    0 0 0 1px rgba(212, 175, 55, 0.12),
+    0 24px 60px rgba(212, 175, 55, 0.1);
+}
+
+.zenith-surface:hover::before,
+.zenith-surface:hover::after {
+  opacity: 1;
+}
+
+.zenith-surface--accent-security:hover {
+  border-color: rgba(96, 165, 250, 0.35);
+  box-shadow: 0 8px 32px rgba(96, 165, 250, 0.12);
+}
+
+/* ─── Bucket selector (premium) ─── */
+.bucket-selector {
+  position: relative;
+  border: 1px solid var(--border-default);
+  background:
+    linear-gradient(145deg, rgba(212, 175, 55, 0.04) 0%, transparent 42%),
+    var(--bg-card);
+  box-shadow:
+    var(--shadow-card),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.bucket-selector::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 180px;
+  height: 180px;
+  background: radial-gradient(circle at 100% 0%, var(--zenith-mesh-gold) 0%, transparent 65%);
+  pointer-events: none;
+  opacity: 0.6;
+}
+
+.bucket-selector--security::after {
+  background: radial-gradient(circle at 100% 0%, rgba(96, 165, 250, 0.12) 0%, transparent 65%);
+}
+
+.bucket-selector-context {
+  background: linear-gradient(
+    90deg,
+    rgba(212, 175, 55, 0.1) 0%,
+    rgba(212, 175, 55, 0.02) 100%
+  );
+  border: 1px solid rgba(212, 175, 55, 0.2);
+}
+
+.bucket-selector--security .bucket-selector-context {
+  background: linear-gradient(
+    90deg,
+    rgba(96, 165, 250, 0.1) 0%,
+    rgba(96, 165, 250, 0.02) 100%
+  );
+  border-color: rgba(96, 165, 250, 0.22);
+}
+
+.bucket-selector-pill {
+  transition:
+    transform var(--duration-fast) var(--ease-out),
+    box-shadow var(--duration-fast),
+    background var(--duration-fast),
+    color var(--duration-fast);
+}
+
+.bucket-selector-pill:hover {
+  transform: translateY(-1px);
+}
+
+.bucket-selector-pill--active {
+  box-shadow: 0 4px 14px rgba(212, 175, 55, 0.25);
+}
+
+.bucket-selector--security .bucket-selector-pill--active {
+  box-shadow: 0 4px 14px rgba(96, 165, 250, 0.25);
+}
+
+.bucket-selector-chip {
+  transition:
+    transform var(--duration-fast) var(--ease-out),
+    border-color var(--duration-fast),
+    box-shadow var(--duration-fast);
+}
+
+.bucket-selector-chip:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+}
+
+.bucket-selector-chip--active {
+  transform: translateY(-1px);
+  box-shadow: 0 0 0 1px var(--gold-primary), 0 8px 24px rgba(212, 175, 55, 0.15);
+}
+
+/* ─── 2FA bar (security) ─── */
+.security-2fa-bar {
+  background:
+    linear-gradient(135deg, rgba(96, 165, 250, 0.08) 0%, transparent 50%),
+    var(--bg-card);
+  border: 1px solid rgba(96, 165, 250, 0.2);
+  box-shadow: 0 4px 24px rgba(96, 165, 250, 0.08);
+  transition: box-shadow var(--duration-normal), border-color var(--duration-normal);
+}
+
+.security-2fa-bar:hover {
+  border-color: rgba(96, 165, 250, 0.35);
+  box-shadow: 0 8px 32px rgba(96, 165, 250, 0.12);
+}
+
+/* ─── Storage process strip ─── */
+.storage-process-info .process-step {
+  transition:
+    transform var(--duration-normal) var(--ease-out),
+    border-color var(--duration-normal),
+    box-shadow var(--duration-normal);
+}
+
+.storage-process-info .process-step:hover {
+  transform: translateY(-3px);
+  border-color: var(--gold-border);
+  box-shadow: var(--shadow-gold);
+}
+
+/* ─── Tables & actions ─── */
+.storage-container .file-table tbody tr,
+.security-page .file-table tbody tr {
+  transition: background var(--duration-fast);
+}
+
+.storage-container .file-table tbody tr:hover,
+.security-page .file-table tbody tr:hover {
+  background: rgba(212, 175, 55, 0.04);
+}
+
+.storage-container .action-btn,
+.security-page .action-btn {
+  transition:
+    transform var(--duration-fast) var(--ease-out),
+    box-shadow var(--duration-fast),
+    filter var(--duration-fast);
+}
+
+.storage-container .action-btn:hover:not(:disabled),
+.security-page .action-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  filter: brightness(1.05);
+}
+
+.storage-container .upload-btn:hover:not(:disabled),
+.security-page .upload-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow:
+    0 10px 32px rgba(212, 175, 55, 0.35),
+    0 0 0 1px rgba(212, 175, 55, 0.25);
+  filter: brightness(1.06);
+}
+
+/* ─── Auth pages subtle glow ─── */
+.auth-container,
+.login-container {
+  position: relative;
+}
+
+/* ─── Reduced motion ─── */
+@media (prefers-reduced-motion: reduce) {
+  .zenith-page-enter,
+  .zenith-page-enter > *,
+  .zenith-ambient::before,
+  .zenith-ambient::after,
+
+  .zenith-surface:hover,
+  .bucket-selector-chip:hover,
+  .storage-process-info .process-step:hover {
+    transform: none;
+  }
+}
+
+html.theme-light .zenith-ambient {
+  opacity: 0.5;
+}
+
+html.theme-light .bucket-selector {
+  background: var(--bg-card);
+  box-shadow: 0 2px 16px rgba(0, 0, 0, 0.06);
+}
