@@ -17,6 +17,12 @@ import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useNotifications } from "../hooks/useNotifications";
 import EncryptionChoiceModal from "../components/EncryptionChoiceModal";
 import DecryptionPasswordModal from "../components/DecryptionPasswordModal";
+import EncryptSensitivePromptModal from "../components/EncryptSensitivePromptModal";
+import {
+  encryptFileInBrowser,
+  decryptBlobInBrowser,
+  downloadBlob,
+} from "../utils/clientEncryption";
 
 import { useAuth } from "../context/AuthContext.jsx";
 import {
@@ -31,7 +37,8 @@ import {
   uploadSecureFile,
   syncAwsSecureBucket,
   chooseEncryption,
-  decryptAndDownload
+  uploadClientEncrypted,
+  downloadClientCiphertext,
 } from "../api";
 
 // --- MAIN COMPONENT ---
@@ -68,6 +75,9 @@ function SecurityPage() {
   const [fileAwaitingEncryption, setFileAwaitingEncryption] = useState(null);
   const [showDecryptionModal, setShowDecryptionModal] = useState(false);
   const [fileToDecrypt, setFileToDecrypt] = useState(null);
+  const [showEncryptPrompt, setShowEncryptPrompt] = useState(false);
+  const [pendingLocalFile, setPendingLocalFile] = useState(null);
+  const [pendingFileMeta, setPendingFileMeta] = useState(null);
 
   const canAccessSecureArea = !twoFAStatus.enabled || twoFAStatus.verified;
 
@@ -184,8 +194,9 @@ function SecurityPage() {
       const scanned = result.scanned_prefix
         ? `prefix '${result.scanned_prefix}'`
         : "the secure vault";
+      const removedMsg = result.removed > 0 ? ` Removed ${result.removed} stale record(s).` : "";
       notifications.success(
-        `Secure sync complete. Added ${result.inserted} new file(s) from AWS after scanning ${scanned}.`
+        `Secure sync complete. Added ${result.inserted} new file(s) from AWS after scanning ${scanned}.${removedMsg}`
       );
       await fetchSecureFiles();
     } catch (err) {
@@ -201,55 +212,95 @@ function SecurityPage() {
     const uploadedFileName = file.name;
     try {
       const response = await uploadSecureFile(file, encrypt, token);
-      
-      // Check if encryption choice is needed IMMEDIATELY
-      if (response.needs_encryption && response.status === 'awaiting_encryption_choice') {
-        notifications.warning(`⚠️ Action Required: Choose encryption method for '${uploadedFileName}'`);
-        await fetchSecureFiles(); // Refresh to show the file
-      } else {
-        notifications.success(`✅ '${uploadedFileName}' uploaded successfully!`);
+
+      if (response.needs_encryption && response.status === "awaiting_encryption_choice") {
+        setPendingLocalFile(file);
+        setPendingFileMeta({
+          filename: uploadedFileName,
+          is_sensitive: response.is_sensitive,
+          scan_reasons: response.scan_reasons || [],
+        });
+        setShowEncryptPrompt(true);
+        notifications.warning(
+          `Sensitive data detected in '${uploadedFileName}'. Please encrypt this file.`
+        );
         await fetchSecureFiles();
+      } else {
+        notifications.success(`'${uploadedFileName}' uploaded to your secure vault.`);
+        setPendingLocalFile(null);
+        setPendingFileMeta(null);
+        setShowEncryptPrompt(false);
+        await fetchSecureFiles();
+        setFile(null);
+        if (fileInputRef.current) fileInputRef.current.value = "";
       }
     } catch (err) {
       notifications.error(err.detail || "Secure upload failed.");
     } finally {
       setIsUploading(false);
-      setFile(null);
-      if (fileInputRef.current) fileInputRef.current.value = "";
     }
   };
 
-  const handleChooseEncryption = (file) => {
-    setFileAwaitingEncryption(file);
+  const handleStartEncryptFlow = (fileRow) => {
+    const meta = fileRow || {
+      filename: pendingFileMeta?.filename,
+      is_sensitive: pendingFileMeta?.is_sensitive,
+      scan_reasons: pendingFileMeta?.scan_reasons,
+    };
+    setFileAwaitingEncryption(meta);
+    setShowEncryptPrompt(false);
     setShowEncryptionModal(true);
   };
 
   const handleEncryptionChoice = async (encryptionMethod, password) => {
     if (!fileAwaitingEncryption) return;
 
-    console.log('Sending encryption choice:', {
-      filename: fileAwaitingEncryption.filename,
-      encryptionMethod,
-      hasPassword: !!password
-    });
-
     try {
-      await chooseEncryption(
-        fileAwaitingEncryption.filename,
-        encryptionMethod,
-        password,
-        token
-      );
-      notifications.success(`${encryptionMethod} encryption applied successfully for '${fileAwaitingEncryption.filename}'`);
+      if (encryptionMethod === "server-side") {
+        await chooseEncryption(
+          fileAwaitingEncryption.filename,
+          "server-side",
+          null,
+          token
+        );
+        notifications.success(
+          `'${fileAwaitingEncryption.filename}' encrypted with SSE-S3 and stored (primary + replica).`
+        );
+      } else if (encryptionMethod === "client-side") {
+        if (!pendingLocalFile) {
+          throw new Error(
+            "Original file is no longer in memory. Please re-upload and choose client-side encryption immediately."
+          );
+        }
+        const encryptedBlob = await encryptFileInBrowser(pendingLocalFile, password);
+        await uploadClientEncrypted(
+          encryptedBlob,
+          fileAwaitingEncryption.filename,
+          Boolean(fileAwaitingEncryption.is_sensitive ?? pendingFileMeta?.is_sensitive),
+          token
+        );
+        notifications.success(
+          `'${fileAwaitingEncryption.filename}' encrypted in your browser and stored. Your password was not sent to the server.`
+        );
+      }
+
       setShowEncryptionModal(false);
       setFileAwaitingEncryption(null);
-      
-      // Refresh file list immediately to show encrypted file
+      setPendingLocalFile(null);
+      setPendingFileMeta(null);
+      setShowEncryptPrompt(false);
+      setFile(null);
+      if (fileInputRef.current) fileInputRef.current.value = "";
       await fetchSecureFiles();
     } catch (err) {
-      console.error('Encryption choice error:', err);
-      notifications.error(err.detail || "Failed to apply encryption");
+      const msg = err.detail || err.message || "Failed to apply encryption";
+      notifications.error(typeof msg === "string" ? msg : "Failed to apply encryption");
+      throw err;
     }
+  };
+
+  const handleChooseEncryption = (file) => {
+    handleStartEncryptFlow(file);
   };
 
   const handleDelete = async (filename) => {
@@ -287,30 +338,36 @@ function SecurityPage() {
   const handleDecryptDownload = async (password) => {
     if (!fileToDecrypt) return;
 
-    console.log('=== DECRYPT HANDLER STARTED ===');
-    console.log('File:', fileToDecrypt);
-    console.log('Password length:', password?.length);
-    console.log('Token exists:', !!token);
-
     try {
-      console.log('Starting decryption for:', fileToDecrypt.filename);
-      const response = await decryptAndDownload(fileToDecrypt.filename, password, token);
-      console.log('Decryption response:', response);
-      
-      // Check your browser's Downloads folder!
-      notifications.success("File decrypted and downloaded successfully! Check your Downloads folder.");
+      const ciphertextBlob = await downloadClientCiphertext(
+        fileToDecrypt.filename,
+        token
+      );
+      const plainBlob = await decryptBlobInBrowser(ciphertextBlob, password);
+      downloadBlob(plainBlob, fileToDecrypt.filename);
+      notifications.success("File decrypted in your browser and downloaded.");
       setShowDecryptionModal(false);
       setFileToDecrypt(null);
     } catch (error) {
-      console.error('=== DECRYPT ERROR CAUGHT ===');
-      console.error('Error:', error);
-      console.error('Error type:', typeof error);
-      console.error('Error constructor:', error?.constructor?.name);
-      console.error('Error message:', error?.message);
-      console.error('Error detail:', error?.detail);
-      console.error('Error stack:', error?.stack);
-      throw new Error(error.detail || error.message || "Decryption failed");
+      const detail = error.detail || error.message;
+      throw new Error(detail || "Decryption failed");
     }
+  };
+
+  const renderEncryptionBadge = (f) => {
+    if (f.awaiting_encryption_choice && f.encryption_status === "awaiting_choice") {
+      return <span className="awaiting-tag">Action required</span>;
+    }
+    if (f.client_side_encrypted || f.encryption_method === "client-side") {
+      return <span className="encrypted-tag cse-tag">CSE (browser)</span>;
+    }
+    if (f.encryption_method === "server-side" || (f.is_encrypted && !f.client_side_encrypted)) {
+      return <span className="encrypted-tag sse-tag">SSE-S3</span>;
+    }
+    if (f.is_encrypted) {
+      return <span className="encrypted-tag">Encrypted</span>;
+    }
+    return <span className="status-tag">Normal</span>;
   };
 
   const pageStyles = `
@@ -359,7 +416,11 @@ function SecurityPage() {
     
     /* Status tags */
     .encrypted-tag { background-color: #6a0dad; color: white; padding: 4px 10px; border-radius: 12px; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; }
-    .awaiting-tag { background-color: #f59e0b; color: white; padding: 4px 10px; border-radius: 12px; font-size: 0.75rem; font-weight: 600; }
+    .encrypted-tag.sse-tag { background-color: #2563eb; }
+    .encrypted-tag.cse-tag { background-color: #7c3aed; }
+    .awaiting-tag { background-color: #f59e0b; color: #111; padding: 4px 10px; border-radius: 12px; font-size: 0.75rem; font-weight: 600; }
+    .sensitive-alert { border-color: #f59e0b; background: rgba(245, 158, 11, 0.08); }
+    .encrypt-prompt-actions { display: flex; justify-content: flex-end; gap: 1rem; margin-top: 1.5rem; }
     .processing-tag { background-color: #10b981; color: white; padding: 4px 10px; border-radius: 12px; font-size: 0.75rem; font-weight: 600; }
     .status-tag { background-color: #4b5563; color: white; padding: 4px 10px; border-radius: 12px; font-size: 0.75rem; font-weight: 600; }
     
@@ -708,17 +769,13 @@ function SecurityPage() {
                       <td className="date-col">
                         {f.upload_date ? new Date(f.upload_date).toLocaleDateString() : 'N/A'}
                       </td>
-                      <td>
-                        {f.is_encrypted && <span className="encrypted-tag">Encrypted</span>}
-                        {showEncryptionChoice && <span className="awaiting-tag">⚠️ Action Required</span>}
-                        {!f.is_encrypted && !showEncryptionChoice && <span className="status-tag">Normal</span>}
-                      </td>
+                      <td>{renderEncryptionBadge(f)}</td>
                       <td>
                         {isDeleting === f.filename ? (
                           <span className="deleting-indicator">Deleting...</span>
                         ) : showEncryptionChoice ? (
                           <button onClick={() => handleChooseEncryption(f)} className="action-btn primary-btn">
-                            Choose Encryption
+                            Encrypt this
                           </button>
                         ) : (
                           <>
@@ -745,6 +802,15 @@ function SecurityPage() {
           </table>
         </div>
         
+        {showEncryptPrompt && pendingFileMeta && (
+          <EncryptSensitivePromptModal
+            file={{ filename: pendingFileMeta.filename }}
+            scanReasons={pendingFileMeta.scan_reasons}
+            onEncrypt={() => handleStartEncryptFlow(pendingFileMeta)}
+            onDismiss={() => setShowEncryptPrompt(false)}
+          />
+        )}
+
         {/* Encryption Choice Modal */}
         {showEncryptionModal && fileAwaitingEncryption && (
           <EncryptionChoiceModal

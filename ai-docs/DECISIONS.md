@@ -25,7 +25,7 @@
 | Deploying to production? | Not yet — restrict CORS first, rotate `.env` credentials | DEC-006 |
 | Renaming "Zenith" or changing branding? | DON'T — 2FA issuer, API title, sidebar all use "Zenith"/"ZenithApp" | DEC-010 |
 | Working on SecurityPage.jsx? | Uses `api.js` named exports + inline `<style>`; Phase 12 encryption work per research paper | DEC-018, DEC-020 |
-| Security encryption (paper vs code)? | Phase 12: KMS auto-encrypt + browser CSE — see `PHASE_12_SECURITY_RESEARCH_PARITY.md` | DEC-020 |
+| Security encryption (paper vs code)? | Phase 12: **SSE-S3** (no KMS) + **browser CSE** — see `PHASE_12_SECURITY_RESEARCH_PARITY.md` §2–§3 | DEC-020 |
 | Adding/modifying provisioning? | Terraform modules in `backend/terraform/`, API in `app/provision/`, BYOC credentials for AWS auth | DEC-019 |
 
 ---
@@ -199,9 +199,11 @@
 ---
 
 ### [DEC-020] Phase 12 — Security Research Paper as Acceptance Source
-- **Date**: 2026-05-29
+- **Date**: 2026-05-29 (updated 2026-05-29 — SSE not KMS; browser CSE gap documented)
 - **Status**: Planned (not implemented)
-- **Context**: The 6-page research paper (`research paper Major 6 pages-2.pdf`) describes hybrid encryption (SSE-KMS + zero-knowledge CSE), automated sensitive-data detection, CRR, and session fingerprinting. The live Security page implements a **subset**: choice modal, SSE-S3 (`AES256`), server-side PBKDF2+CSE (password on wire), basic regex scan, dual-bucket upload. Empty stubs: `kms_encryption.py`, `sensitive_file_detector.py`.
-- **Decision**: **Phase 12** is the next implementation phase. Acceptance criteria live in `ai-docs/PHASE_12_SECURITY_RESEARCH_PARITY.md`. Do not mark §4.4 Security “complete” in PROGRESS until Phase 12 done criteria are met.
-- **Consequences**: New security work must align with paper Tables 1–2 and Figure 2 (auto KMS on detection, optional CSE in browser). Free-tier KMS and CRR constraints apply (`AI_RULES.md`).
-- **DO NOT**: Claim zero-knowledge CSE while encrypting on the server with a plaintext password. Do not document “KMS” while only using SSE-S3.
+- **Context**: The 6-page research paper describes hybrid encryption (server-managed + zero-knowledge CSE), detection, CRR, and session auditing. Zenith today has: **SSE-S3** (`ServerSideEncryption='AES256'`) on the server-side encryption path, a **mislabeled** “client-side” path that encrypts on the **server** (password in API), sensitive scan inline in `routes_security.py`, dual-bucket replicate. **Browser client-side encryption architecture is completely missing.** `sensitive_file_detector.py` is an empty stub. `kms_encryption.py` is an empty stub and **not needed for Phase 12**.
+- **Decision**: **Phase 12** acceptance criteria are in `ai-docs/PHASE_12_SECURITY_RESEARCH_PARITY.md`.
+  - **Server-side:** Use **SSE-S3 only** — sufficient for the product. **Do not implement AWS KMS** in Phase 12.
+  - **Client-side:** Build **browser** zero-knowledge CSE (Web Crypto); do not call server-side password encryption “client-side architecture.”
+- **Consequences**: Docs and UI must say **SSE** / **SSE-S3**, not KMS. Auto-encrypt on sensitive detect uses SSE-S3. CSE requires new `clientEncryption.js` and API changes.
+- **DO NOT**: Implement KMS or require `kms_encryption.py` for Phase 12. Do not claim zero-knowledge while sending passwords to `/choose-encryption` or `/decrypt-download`.

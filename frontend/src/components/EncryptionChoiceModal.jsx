@@ -120,19 +120,18 @@ const EncryptionChoiceModal = ({ file, onClose, onChoose }) => {
                   checked={selectedMethod === 'server-side'}
                   onChange={() => handleMethodSelect('server-side')}
                 />
-                <h3>🛡️ Server-Side Encryption</h3>
+                <h3>🛡️ Server-Side Encryption (SSE-S3)</h3>
               </div>
               <div className="option-description">
-                <p><strong>AWS manages the encryption keys</strong></p>
+                <p><strong>AWS S3 encrypts at rest with managed keys (AES-256)</strong></p>
                 <ul>
-                  <li>✅ Automatic encryption with AES-256</li>
-                  <li>✅ No password needed</li>
-                  <li>✅ Replicated to secondary region</li>
-                  <li>⚠️ Platform administrators can access the file</li>
-                  <li>💰 Standard cost</li>
+                  <li>✅ No password to remember</li>
+                  <li>✅ Fast upload — encryption handled by S3</li>
+                  <li>✅ Copied to replica bucket for redundancy</li>
+                  <li>⚠️ Zenith operators could access plaintext via cloud controls</li>
                 </ul>
                 <p className="recommendation">
-                  <strong>Best for:</strong> Compliance requirements, team collaboration
+                  <strong>Best for:</strong> Convenience, compliance, shared team access
                 </p>
               </div>
             </div>
@@ -148,20 +147,19 @@ const EncryptionChoiceModal = ({ file, onClose, onChoose }) => {
                   checked={selectedMethod === 'client-side'}
                   onChange={() => handleMethodSelect('client-side')}
                 />
-                <h3>🔒 Client-Side Encryption</h3>
+                <h3>🔒 Client-Side Encryption (browser)</h3>
               </div>
               <div className="option-description">
-                <p><strong>You control the encryption key</strong></p>
+                <p><strong>Encrypted in your browser before upload — zero-knowledge</strong></p>
                 <ul>
-                  <li>✅ Maximum security - only you can decrypt</li>
-                  <li>✅ AES-256 encryption with your password</li>
-                  <li>✅ Replicated to secondary region</li>
-                  <li>🔐 <strong>Even platform admins cannot read your file</strong></li>
-                  <li>⚠️ If you lose your password, file is unrecoverable</li>
-                  <li>💰 Standard cost</li>
+                  <li>✅ Password never sent to Zenith servers</li>
+                  <li>✅ AES-256-CBC + PBKDF2 (100k iterations) in Web Crypto</li>
+                  <li>✅ Ciphertext stored on S3 + replica bucket</li>
+                  <li>🔐 <strong>Only your password can decrypt</strong></li>
+                  <li>⚠️ If you lose your password, the file cannot be recovered</li>
                 </ul>
                 <p className="recommendation">
-                  <strong>Best for:</strong> Highly sensitive personal data, maximum privacy
+                  <strong>Best for:</strong> Credentials, secrets, maximum privacy
                 </p>
               </div>
             </div>
@@ -170,8 +168,8 @@ const EncryptionChoiceModal = ({ file, onClose, onChoose }) => {
           {showPasswordForm && selectedMethod === 'client-side' && (
             <div className="password-form">
               <div className="password-warning">
-                <strong>⚠️ IMPORTANT:</strong> You must remember this password. There is no way to recover 
-                your file if you forget it. We recommend using a password manager.
+                <strong>⚠️ IMPORTANT:</strong> Encryption happens locally in your browser. Your password
+                is not stored on our servers. If you forget it, the file cannot be recovered.
               </div>
               <div className="form-group">
                 <label>Encryption Password</label>

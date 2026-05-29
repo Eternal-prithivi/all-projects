@@ -1,106 +1,47 @@
-# Cloud Resource Optimization - AI Continuity & Development Rules
+# Zenith (CloudResourceOptimizationPlatform) — Cursor Rules
 
-## ⚡ CRITICAL: Read First
+## Startup (Tier A only)
 
-Before doing ANYTHING in this project, read:
-1. `AI_MASTER.md` — mandatory startup flow
-2. `AI_CONTEXT.md` — architecture and tech stack
-3. `PROGRESS.md` — current task status
+**Every thread / session — read only:**
+- `ai-docs/STATUS.md`
+- `ai-docs/SCRATCHPAD.md`
 
-Do not write any code until you have finished reading all files listed in AI_MASTER.md's startup flow.
+**Read `ai-docs/AI_MASTER.md` once per thread** — apply PRE → EXECUTE → POST from memory on later messages. Do not re-open it every turn.
 
----
-
-## Continuity Requirements (Mandatory)
-
-- **Use repo-owned docs**: `PROGRESS.md`, `AUDIT_LOG.md`, `SCRATCHPAD.md`
-- **Update after EVERY task**: These three files must be updated before finishing any work
-- **SESSION_ID required**: Every audit log entry must include a unique `SESSION_ID`
-- **Mid-task resume**: If stopping mid-task, write exact resume instructions into `SCRATCHPAD.md`
-- **No manual state tracking**: All state lives in these three files, not chat history
+**Never read at startup:** `AUDIT_LOG.md`, `AUDIT_LOG_ARCHIVE_*.md`, `PROGRESS_HISTORY.md`, full `docs/`.
 
 ---
 
-## Development Rules
+## PRE-PHASE (before product code)
 
-### Frontend Code Style (JavaScript / JSX — NOT TypeScript)
-- Use functional React components only
-- Use async/await, not callbacks
-- Use const/let, avoid var
-- Use explicit imports
+**Full** (features, multi-file, API, security, ML): update `STATUS.md` + `PROGRESS.md` + `SCRATCHPAD.md`, output `📋 PRE-PHASE COMPLETE`.
 
-### Backend Code Style (Python 3.x)
-- Type hints on all function signatures
-- Use async def for route handlers
-- Use Pydantic models for validation
-- Use pydantic_settings for config
-
-### Project Structure
-- `frontend/src/` — React app (pages, components, context, hooks, styles)
-- `backend/app/` — FastAPI app (auth, users, storage, security, database, etc.)
-- `devops/` — Docker, Terraform, CI/CD configs
-- `docs/` — Project documentation
-
-### Testing
-- Backend: pytest (from `backend/` directory)
-- Frontend: ESLint (`npm run lint`)
-- Write tests for new features and fixes
+**Lightweight** (one-file typo/format/tiny fix): Tier A only, one chat line `Lightweight: …`, skip claim rewrite if task unchanged — see `AI_MASTER.md`.
 
 ---
 
-## Quality Gates (Required Before Finishing)
+## POST-PHASE (before stop)
 
-**Every session must:**
-- [ ] Run `cd backend && pytest` — all backend tests pass
-- [ ] Run `cd frontend && npm run lint` — no ESLint errors
-- [ ] Update `PROGRESS.md` — current status documented
-- [ ] Update `AUDIT_LOG.md` — session entry with SESSION_ID appended
-- [ ] Clear `SCRATCHPAD.md` — no active task (or write resume state)
+**Full:** tests/lint → `STATUS` + `PROGRESS` + `SCRATCHPAD` → append `PROGRESS_HISTORY` (long narrative) → append `AUDIT_LOG` (≤5 bullets). Chat reply ≤5 bullets.
 
-**If quality gates fail:**
-- Fix the issue
-- Re-run checks
-- Document failures if unable to fix
+**Lightweight:** lint/test if needed only; skip `AUDIT_LOG` and `PROGRESS_HISTORY` unless user asked.
+
+**Git:** commit/push **only when user asks** or at phase/milestone — not every session.
 
 ---
 
-## What NOT to Do
+## Anti-waste
 
-- ❌ Do not make broad refactors unless explicitly requested
-- ❌ Do not bypass abstractions by hardcoding into implementation
-- ❌ Do not use destructive git operations without permission
-- ❌ Do not store plaintext credentials
-- ❌ Do not leave TODO markers without tracking them in PROGRESS.md
+- No long session stories in chat or `PROGRESS.md` — use `PROGRESS_HISTORY.md`
+- No re-reading `AI_MASTER` or `AUDIT_LOG` each message
+- Load `AI_RULES`, `AI_CONTEXT_*`, `DECISIONS` on demand only
 
 ---
 
-## Architecture to Preserve
+## Non-negotiables
 
-- Monorepo: frontend/ + backend/ — never merge
-- FastAPI only — no Flask/Django
-- MongoDB Atlas — no SQL database
-- Celery + CloudAMQP for async tasks
-- JWT stateless auth (HS256)
-- Multi-cloud: AWS S3 + GCP Cloud Storage + Azure Blob Storage
-- 2FA (pyotp TOTP) required for security endpoints
-- Product name: "Zenith" — do not change branding
-- See DECISIONS.md for full rationale
-
----
-
-## Reference Commands
-
-### Backend
-- Run server: `cd backend && uvicorn app.main:app --reload`
-- Run tests: `cd backend && pytest`
-- Run celery: `cd backend && celery -A app.celery_worker worker --loglevel=info`
-- Main entry: `backend/app/main.py`
-
-### Frontend
-- Run dev: `cd frontend && npm run dev`
-- Lint: `cd frontend && npm run lint`
-- Main entry: `frontend/src/main.jsx`
-
----
-
-**Last updated**: 2026-05-13
+- Never commit `backend/.env`
+- Zero-cost / free-tier — `ai-docs/AI_RULES.md`
+- Brand **Zenith** / **ZenithApp**
+- Max 2 heavy processes (pytest, npm install, uvicorn, celery)
+- Full PRE-PHASE required for security, auth, BYOC, phase work

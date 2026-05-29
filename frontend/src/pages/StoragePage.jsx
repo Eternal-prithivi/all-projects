@@ -114,7 +114,8 @@ function StoragePage() {
     try {
       const result = await syncAwsBucket(token);
       const scanned = result.scanned_prefix ? `prefix '${result.scanned_prefix}'` : "the whole bucket";
-      notifySuccess(`Sync complete. Added ${result.inserted} new file(s) from AWS after scanning ${scanned}.`);
+      const removedMsg = result.removed > 0 ? ` Removed ${result.removed} stale record(s).` : "";
+      notifySuccess(`Sync complete. Added ${result.inserted} new file(s) from AWS after scanning ${scanned}.${removedMsg}`);
       await fetchFiles();
     } catch (error) {
       notifyError(error.detail || error.message || "Sync failed.");

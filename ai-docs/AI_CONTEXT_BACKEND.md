@@ -22,7 +22,7 @@ For frontend context → read `AI_CONTEXT_FRONTEND.md`
 |--------|--------------|-----------|-------|
 | **auth** | `routes_auth.py`, `routes_password_reset.py` | `auth_service.py`, `auth_utils.py`, `auth_controller.py`, `password_reset_service.py` | JWT login, register, forgot/reset password (email link + SMS OTP), recovery contacts |
 | **users** | `routes_users.py`, `routes_profile.py`, `routes_settings.py` | `user_model.py` | Profile edit, recovery contacts, settings preferences, BYOC, theme, currency, audit log |
-| **security** | `routes_security.py`, `routes_2fa.py` | `encryption_handler.py`, `tasks_alerts.py` | 2FA TOTP, secure vault, partial SSE-S3 + server-side CSE — **Phase 12:** KMS, browser CSE, detector (`PHASE_12_SECURITY_RESEARCH_PARITY.md`) |
+| **security** | `routes_security.py`, `routes_2fa.py` | `encryption_handler.py`, `tasks_alerts.py` | 2FA, secure vault, **SSE-S3** on server-side path — **Phase 12:** auto SSE, **browser CSE**, detector (`PHASE_12_SECURITY_RESEARCH_PARITY.md` §2–§3) |
 | **storage** | `routes_storage.py` | `optimizer.py`, `uploader.py`, `manager.py`, `tasks.py`, `tiering_tasks.py`, `models_storage.py` | ML ensemble analysis, multi-cloud upload/download/delete, nightly lifecycle tiering |
 | **vm** | `routes_vm.py`, `routes_admin_cleanup.py` | `manager.py`, `nlp_workload.py`, `models.py`, `metrics_collector.py`, `migration_recommender.py`, `workload_guidance.py`, `tasks.py` | NLP workload classification → five-cluster assignment, VM lifecycle, metrics, migration |
 | **cost** | `routes_cost.py`, `routes_forecast.py`, `routes_anomaly.py`, `routes_export.py` | `manager.py`, `forecasting.py`, `tasks_anomaly.py` | Decay-weighted linear regression forecast, Z-score anomaly detection, CSV export |
@@ -47,7 +47,7 @@ For frontend context → read `AI_CONTEXT_FRONTEND.md`
 | `backend/app/queue/` | `sns_notifications.py`, `sqs_jobs.py` |
 | `backend/app/errors/` | `ec2_errors.py`, `general_errors.py`, `s3_errors.py` |
 | `backend/app/database/` | `dynamodb_client.py` |
-| `backend/app/security/` | `audit_logs.py`, `kms_encryption.py`, `sensitive_file_detector.py` — **empty stubs; Phase 12 must implement** |
+| `backend/app/security/` | `sensitive_file_detector.py` — **empty; Phase 12 implement**. `kms_encryption.py` — **empty; not required (SSE-S3 sufficient)**. `audit_logs.py` — stub |
 | `backend/app/storage/` | `cost_estimator.py`, `storage_controller.py`, `storage_service.py` |
 | `backend/app/dashboard/` | `dashboard_controller.py`, `dashboard_service.py`, `dashboard_utils.py` |
 | `backend/app/users/` | `user_controller.py`, `user_service.py` |
@@ -120,7 +120,7 @@ Database: `CloudResourceOptimizationDB`
 | Validation | Pydantic v2 + pydantic-settings |
 | Email | Gmail SMTP (`smtplib`) via `contact/email_service.py` |
 | SMS | Twilio (optional) |
-| Encryption | AES-256-GCM (BYOC credentials); secure files: SSE-S3 today — **paper targets SSE-KMS + browser CSE (Phase 12)** |
+| Encryption | BYOC credentials: AES-256-GCM. Secure vault: **SSE-S3** (`AES256`) for server-side; user-password path uses server `encryption_handler.py` — **Phase 12: browser CSE** (see `PHASE_12_SECURITY_RESEARCH_PARITY.md` §2–§3). **KMS not used.** |
 | Payments | Razorpay |
 
 ---

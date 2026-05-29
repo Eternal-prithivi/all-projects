@@ -257,6 +257,45 @@ export const syncAwsSecureBucket = async (token) => {
   }
 };
 
+export const uploadClientEncrypted = async (
+  encryptedBlob,
+  originalFilename,
+  isSensitive,
+  token
+) => {
+  const formData = new FormData();
+  formData.append("file", encryptedBlob, `${originalFilename}.enc`);
+  formData.append("original_filename", originalFilename);
+  formData.append("is_sensitive", isSensitive ? "true" : "false");
+
+  try {
+    const response = await apiClient.post("/security/upload-client-encrypted", formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    return response.data;
+  } catch (error) {
+    throw error.response?.data || error;
+  }
+};
+
+export const downloadClientCiphertext = async (filename, token) => {
+  try {
+    const response = await apiClient.get(
+      `/security/download-ciphertext/${encodeURIComponent(filename)}`,
+      {
+        headers: { Authorization: `Bearer ${token}` },
+        responseType: "blob",
+      }
+    );
+    return response.data;
+  } catch (error) {
+    throw error.response?.data || error;
+  }
+};
+
 export const chooseEncryption = async (filename, encryptionMethod, password, token) => {
   try {
     const response = await apiClient.post(
@@ -264,7 +303,7 @@ export const chooseEncryption = async (filename, encryptionMethod, password, tok
       {
         filename,
         encryption_method: encryptionMethod,
-        password: password || null,
+        password: null,
       },
       {
         headers: {

@@ -59,6 +59,19 @@
 - **Avoid** S3 Event Notifications → SNS/SQS (requires public endpoint + costs). Use on-demand sync instead.
 - **Terraform provisioning**: Default budget $1/month, all templates use free-tier resources. Policy engine blocks non-free-tier instance types.
 
+## 📉 Token & Doc Discipline (anti-waste)
+
+| Rule | Why |
+|------|-----|
+| ❌ Do not re-read `AI_MASTER.md` every message | Once per Cursor thread; Tier A = `STATUS` + `SCRATCHPAD` only |
+| ❌ Do not read `AUDIT_LOG.md` or `PROGRESS_HISTORY.md` at startup | Append-only; use `STATUS` for live state |
+| ❌ Do not paste long session narratives in chat | ≤5 bullets to user; detail → `PROGRESS_HISTORY.md` |
+| ❌ Do not duplicate narratives in `PROGRESS.md` | Active task + checklist only |
+| ✅ Use **Lightweight PRE/POST** for one-file trivial fixes | See `AI_MASTER.md` — skip claim rewrite + skip audit/history |
+| ✅ `git commit` / `git push` only when user asks or at milestone | Not after every AI session |
+
+---
+
 ## ❌ What NOT to Do
 
 | Rule | Why |
@@ -79,7 +92,7 @@
 | ❌ No implementing ML/VM/Cost modules without checking report first | Report sections §4.1-§4.5 describe exact algorithms, inputs, outputs |
 | ❌ No installing new `pip` or `npm` packages without telling the user | State the package name and reason BEFORE installing — user must approve paid or heavy dependencies |
 | ❌ Never assume a service is running or a package is installed | Always verify: check venv is active, backend is up, Celery is running, etc. before writing code that depends on them |
-| ❌ **No writing code before claiming the task in PROGRESS.md + SCRATCHPAD.md** | If you start coding without marking IN PROGRESS, any agent that takes over mid-task has zero breadcrumbs. See AI_MASTER.md Step 3. |
+| ❌ **No writing code before claiming the task in STATUS.md + PROGRESS.md + SCRATCHPAD.md** | Mid-task handoff requires IN PROGRESS in docs. See AI_MASTER.md Step 3. |
 | ❌ No adding new API routes without updating `ai-docs/AI_CONTEXT_BACKEND.md` routes table | Other agents use that table to know what endpoints exist — stale table causes duplicate routes |
 | ❌ No adding new frontend pages/components without updating `ai-docs/AI_CONTEXT_FRONTEND.md` | Same reason — the context files are the living map of the codebase |
 
@@ -226,11 +239,16 @@ npm run build                   # Vite production build — must pass
 > ⚠️ **A task is NOT done until all quality gates pass.** "It works locally" is not a quality gate.
 
 ### Checklist Before Every Session End
+
+**Full POST-PHASE** (normal tasks):
 - [ ] No `.env` files committed
-- [ ] No `console.log` debug statements left in production code (backend has some — legacy)
-- [ ] `PROGRESS.md` updated
-- [ ] `AUDIT_LOG.md` entry appended
+- [ ] `STATUS.md` + `PROGRESS.md` updated
+- [ ] Long narrative → `PROGRESS_HISTORY.md` (not chat / not PROGRESS)
+- [ ] `AUDIT_LOG.md` entry appended (≤5 bullets) — append only, never required to read
 - [ ] `SCRATCHPAD.md` cleared or updated with resume state
+- [ ] Chat summary ≤5 bullets
+
+**Lightweight POST-PHASE** (trivial one-file fix): lint/test if needed; skip AUDIT_LOG + PROGRESS_HISTORY unless user asked
 
 ---
 

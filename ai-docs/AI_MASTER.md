@@ -1,256 +1,247 @@
-# AI_MASTER.md — Mandatory Startup Protocol
+# AI_MASTER.md — Agent Protocol
 
-> ⚡ Every AI agent MUST read this file first. No exceptions. No code before reading.
-
----
-
-## 🚀 Startup Flow (Run Every Session)
-
-### Step 1 — Read These Files in Order
-All files are in the `ai-docs/` folder:
-```
-1. ai-docs/AI_MASTER.md        ← you are here (includes project summary + context routing)
-2. ai-docs/AI_RULES.md         ← constraints + what not to do (resource limits + zero-cost rules)
-3. ai-docs/PROGRESS.md         ← current task + standing anti-tasks + backlog
-4. ai-docs/SCRATCHPAD.md       ← Last Known Good State + mid-task resume state
-5. ai-docs/DECISIONS.md        ← WHY architecture is the way it is (Before You Code checklist at top)
-```
-
-### Step 1b — Pick Your Context File (based on task type)
-```
-Frontend, UI, CSS, components, pages, routing  →  ai-docs/AI_CONTEXT_FRONTEND.md
-Backend, API routes, database, Celery, ML, auth →  ai-docs/AI_CONTEXT_BACKEND.md
-Full-stack task touching both                   →  read both
-```
-
-### Step 2 — Check Active Task
-- Open `PROGRESS.md` → find `## 🔴 Active Task`
-- If there is one → resume it using notes in `SCRATCHPAD.md`
-  - **If SCRATCHPAD has no resume notes for that task:** re-read the task description in PROGRESS.md, check which files it mentioned, then ask the user: *"I see an active task but no resume notes. Should I start fresh or do you want to describe where to pick up?"*
-- If none → ask the user what to work on next
-
-### Step 3 — 🔴 CLAIM YOUR TASK BEFORE WRITING ANY CODE
-
-> This step is non-negotiable. No file edits until this is done.
-
-Once you know what task you're doing, **immediately update the docs to claim it** — before writing a single line of code:
-
-1. **Update `PROGRESS.md` → `## 🔴 Active Task`:**
-   - Write the task name, your session timestamp, and status: `IN PROGRESS`
-   - Example: `**Phase 12: Redis Cache Layer** | Started: 2026-05-25 20:00 | Status: IN PROGRESS`
-
-2. **Update `SCRATCHPAD.md` → `## 🔄 Current Resume State`:**
-   - Write what you're about to do and which files you plan to touch
-   - This is the breadcrumb trail for any agent that has to take over mid-task
-   - Example:
-     ```
-     Status: IN PROGRESS (started 2026-05-25 20:00)
-     Plan: Add Redis cache to cost_analysis routes. Files: routes_cost.py, config.py, requirements.txt
-     Step 1 of 3: Add REDIS_URL to config.py — NOT YET DONE
-     Step 2 of 3: Wrap /api/cost/summary in cache decorator — NOT YET DONE
-     Step 3 of 3: Update DECISIONS.md with DEC-020 — NOT YET DONE
-     ```
-
-> ⚠️ **Why this matters:** If you crash, get interrupted, hit a token limit, or another agent takes over — the docs are the ONLY way to know what was in progress and what was NOT yet done. Without Step 3, the project state is invisible mid-task.
-
-### Step 4 — Mandatory Onboarding Confirmation (before touching ANY code)
-
-**Output this exact block before writing or editing a single file:**
-
-```
-📋 CONTEXT LOADED
-─────────────────────────────────────────
-Phase:           [Current project phase from AI_MASTER.md]
-Last completed:  [Last completed task from PROGRESS.md]
-Active task:     [What you're about to work on]
-Active constraint: [One relevant rule from AI_RULES.md that applies to this task]
-Conflicts found: [Any conflict between the task and the docs — or write "None detected"]
-Step 3 doc update: ["Done — PROGRESS.md + SCRATCHPAD.md updated" or "Skipped — resuming existing IN PROGRESS task"]
-─────────────────────────────────────────
-```
-
-> This is not optional. If an agent skips this block, context was not loaded correctly.
-> The user can reject any work done by an agent that skipped this step.
-
+> **This file is the rulebook, not the live state.**  
+> Live phase, task, health → `STATUS.md` · Resume breadcrumbs → `SCRATCHPAD.md`  
+> **Read this file once per Cursor thread** — then follow the phases from memory. Do **not** re-open it every message.
 
 ---
 
-## 🔄 Session End Protocol (Required Before Stopping)
+## Token discipline (anti-waste) — enforced
 
-Every session MUST end with ALL of the following — in this order:
+| Risk | Rule |
+|------|------|
+| Re-reading `AI_MASTER.md` every turn | **Once per thread only.** Tier A startup = `STATUS.md` + `SCRATCHPAD.md` only. |
+| Reading `AUDIT_LOG.md` / `PROGRESS_HISTORY.md` at startup | **Forbidden** unless user says "debug continuity" or drift audit (count entries only — see `SCRATCHPAD.md`). |
+| Long write-ups in chat | **Max 5 bullets** in the final reply; put detail in `PROGRESS_HISTORY.md` at POST-PHASE. |
+| Long write-ups in `PROGRESS.md` | **Active task + checklist only** — narratives go to `PROGRESS_HISTORY.md`. |
+| Full PRE-PHASE for trivial edits | Use **Lightweight path** below (1 file, no API/architecture/security). |
+
+---
+
+## Lifecycle (always in order)
 
 ```
-[ ] 1. Quality gates passed (lint + tests if applicable)
-[ ] 2. PROGRESS.md updated — task marked COMPLETE, what was done, what's next
-[ ] 3. AUDIT_LOG.md appended — new entry with SESSION_ID + summary
-[ ] 4. SCRATCHPAD.md updated — Last Known Good State refreshed + resume state CLEARED if complete
-[ ] 5. If new backend routes added → update API Routes table in ai-docs/AI_CONTEXT_BACKEND.md
-[ ] 6. If new frontend pages or components added → update Pages/Components in ai-docs/AI_CONTEXT_FRONTEND.md
-[ ] 7. Git commit + push to stage branch
+PRE-PHASE  →  load context, claim task in docs, confirm — NO product code yet
+EXECUTE    →  implement scoped work; follow AI_RULES.md when in doubt
+POST-PHASE →  tests/lint, update docs, audit log — before you stop
 ```
 
-> ⚠️ The SCRATCHPAD `## 🔄 Current Resume State` section must explicitly say `Status: COMPLETE` at session end — NOT just be left with the "IN PROGRESS" state from Step 3. Another agent reading it must know the task finished.
+**Golden rule:** No edits to `backend/`, `frontend/`, or `docs/` implementation files until PRE-PHASE is complete.
 
-### Step 5 — Git Commit & Push (exact commands)
+---
+
+## PRE-PHASE — Before any task or code change
+
+Use **Full PRE-PHASE** (below) for features, multi-file work, API/security/ML, or phase tasks.  
+Use **Lightweight PRE-PHASE** for trivial single-file edits (see end of this section).
+
+### 1. Load context (Tier A — every session)
+
+| Read | When |
+|------|------|
+| `STATUS.md` | **Every session / every thread start** |
+| `SCRATCHPAD.md` | **Every session / every thread start** |
+| `AI_MASTER.md` | **First agent turn in thread only** — not on follow-up messages |
+
+**Never read at startup:** `AUDIT_LOG.md`, `AUDIT_LOG_ARCHIVE_*.md`, `PROGRESS_HISTORY.md`, full `docs/`.
+
+**Tier B** — read only if the task needs it (see routing table in `STATUS.md`):
+
+- UI → `DESIGN_SYSTEM.md` + `AI_CONTEXT_FRONTEND.md`
+- API/ML/DB → `AI_CONTEXT_BACKEND.md`
+- Structure/architecture → `DECISIONS.md` (Before You Code checklist)
+- Budget, conflicts, hard limits → `AI_RULES.md`
+- Phase 12 security → `PHASE_12_SECURITY_RESEARCH_PARITY.md`
+
+### 2. Resolve what you are doing
+
+- If `STATUS.md` / `SCRATCHPAD.md` show **IN PROGRESS** → resume from first `NOT YET DONE` step in SCRATCHPAD.
+- If active task exists but SCRATCHPAD is empty → read `PROGRESS.md` active section, then ask the user whether to resume or restart.
+- If no active task → ask the user **or** use the task they gave in chat.
+
+**Scope every task** (in chat and in docs):
+
+```
+Scope:       [files/pages in scope]
+Do NOT touch: [explicit exclusions]
+Done when:   [measurable finish line]
+```
+
+### 3. Claim the task in docs (mandatory before code)
+
+Update these **before** touching product code:
+
+| File | What to write |
+|------|----------------|
+| `STATUS.md` | Active task name, `IN PROGRESS`, started timestamp, scope / do-not / done-when |
+| `PROGRESS.md` | Same under `## 🔴 Active Task` |
+| `SCRATCHPAD.md` | `## 🔄 Current Resume State`: plan, files to touch, steps as `NOT YET DONE` |
+
+**Example SCRATCHPAD step list:**
+
+```
+Status: IN PROGRESS (started: 2026-05-29 14:00)
+Plan: Auto SSE on sensitive upload. Files: routes_security.py, SecurityPage.jsx
+- [ ] Step 1: Default SSE path when scan hits — NOT YET DONE
+- [ ] Step 2: Manual test upload — NOT YET DONE
+- [ ] Step 3: Update STATUS + PROGRESS — NOT YET DONE
+```
+
+If resuming an existing **IN PROGRESS** task with valid SCRATCHPAD notes, you may skip rewriting claim text but must still output the confirmation block (step 4).
+
+### 4. Confirm in chat (mandatory before code)
+
+Output this block once per session (or once per new task):
+
+```
+📋 PRE-PHASE COMPLETE
+─────────────────────────────────────────
+Phase:            [from STATUS.md]
+Active task:      [name + IN PROGRESS or resuming]
+Scope / Done when:[one line each]
+Docs updated:     STATUS + PROGRESS + SCRATCHPAD — [Done | Skipped — resuming]
+Tier B loaded:    [files read, or "none needed"]
+Conflicts:        [None | describe — see AI_RULES conflict protocol]
+─────────────────────────────────────────
+```
+
+If the user’s request conflicts with `AI_RULES.md` or `DECISIONS.md`, **stop** and ask before EXECUTE.
+
+### Lightweight PRE-PHASE (trivial changes only)
+
+**Qualifies when ALL are true:**
+
+- One file (or one line in one file): typo, comment, formatting, tiny bugfix
+- No new routes, env vars, dependencies, security logic, or phase scope change
+- User did not ask for a new feature or audit trail
+
+**Do:**
+
+1. Read Tier A only (`STATUS.md` + `SCRATCHPAD.md`) — do **not** re-read `AI_MASTER.md`
+2. Do **not** rewrite `STATUS.md` / `PROGRESS.md` claim blocks if the active task is unchanged
+3. One chat line instead of the full block: `Lightweight: [file] — [one-line intent]`
+4. Proceed to EXECUTE
+
+**Do not use Lightweight** for Phase 12 security, auth, BYOC, ML, Terraform, or multi-file refactors.
+
+---
+
+## EXECUTE — Implementation
+
+- Stay inside **Scope**; do not expand unless the user agrees.
+- Obey **Standing anti-tasks** in `STATUS.md`.
+- New `pip` / `npm` packages → state name + reason; get approval if non-free or heavy.
+- Max **2 concurrent heavy processes** on dev machine (pytest, uvicorn, npm install, celery) — see `AI_RULES.md`.
+
+**Commands (reference):**
 
 ```bash
-# From project root
+cd backend && .venv/bin/python -m pytest -q
+cd frontend && npm run lint && npm run build
+```
+
+---
+
+## POST-PHASE — After the task (before you stop)
+
+Use **Full POST-PHASE** after normal tasks. Use **Lightweight POST-PHASE** only if you used Lightweight PRE-PHASE.
+
+### Lightweight POST-PHASE
+
+- [ ] Lint/test **only if** the file type requires it (JS → lint; Python logic → pytest)
+- [ ] **Skip** `PROGRESS_HISTORY.md`, **skip** `AUDIT_LOG.md` unless user asked to log it
+- [ ] **Skip** rewriting `STATUS.md` / `PROGRESS.md` if the active task did not change
+- [ ] Optional: one-line note in `SCRATCHPAD.md` LKGS if verification mattered
+
+### Full POST-PHASE
+
+Run in order. Do not end the session with an incomplete checklist.
+
+### 1. Quality gates
+
+- [ ] Backend: `pytest` (if backend touched)
+- [ ] Frontend: `npm run lint` (if frontend touched)
+- [ ] Build passes if UI changed
+
+### 2. Update docs
+
+| File | Action |
+|------|--------|
+| `STATUS.md` | Task status, what’s done / open, refresh health row if you ran tests |
+| `PROGRESS.md` | Match STATUS; update Phase checklist `[x]` / `[ ]` |
+| `SCRATCHPAD.md` | If **complete**: `Status: COMPLETE`, clear step list, refresh **Last Known Good State**. If **partial**: update steps (`DONE` / `NOT YET DONE`) |
+| `PROGRESS_HISTORY.md` | Append long “what was completed” narrative **only here** — never in chat or `PROGRESS.md` |
+| `AUDIT_LOG.md` | **Append only** at session end (≤5 bullets). **Never read** at startup. Archive if >12 entries → `AUDIT_LOG_ARCHIVE_2026.md` |
+
+### 3. Context files (only if changed this session)
+
+- [ ] New backend routes → `AI_CONTEXT_BACKEND.md` API table
+- [ ] New pages/components → `AI_CONTEXT_FRONTEND.md`
+- [ ] New architecture decision → `DECISIONS.md`
+
+### 4. Chat reply (Full POST-PHASE only)
+
+- Summarize in **≤5 bullets** for the user.
+- Do **not** paste session narratives — they belong in `PROGRESS_HISTORY.md`.
+
+### 5. Git (optional — not every session)
+
+**Default: no commit, no push** unless the user says e.g. “commit”, “push”, or “end of phase / ready for backup”.
+
+```bash
 git add ai-docs/ backend/ frontend/src/ docs/ render.yaml PROFESSIONAL_IMPROVEMENTS.md
+git diff --cached --name-only | grep -E '\.env|secret|zenith-backend' && echo '⛔ STOP' || echo '✅ OK'
+git commit -m 'feat|fix|docs: summary
 
-# Verify no .env or secrets staged
-git diff --cached --name-only | grep -E "\.env|secret|zenith-backend" && echo "⛔ STOP — sensitive file staged" || echo "✅ Safe to commit"
-
-# Commit with a descriptive message
-git commit -m "feat/fix/docs: [short description of what was done]
-
-- [bullet 1: main change]
-- [bullet 2: files changed]
-- [bullet 3: outcome/test result]"
-
-# Push to stage branch
-git push origin stage
+- change 1
+- change 2'
+git push origin stage   # never --force
 ```
 
-### Commit message rules
-- Prefix: `feat:` (new feature), `fix:` (bug fix), `docs:` (docs only), `chore:` (cleanup)
-- First line: max 72 characters
-- Body: bullet list of what changed and why
-- **NEVER** include `.env`, `node_modules/`, `zenith-backend.env`, or `*.backup` in the commit
-
-### If push fails
-- Check `git remote -v` — remote should be `https://github.com/Eternal-prithivi/all-projects.git`
-- If auth fails: user needs to re-authenticate GitHub credentials locally
-- Do NOT force-push — always use `git push origin stage` (no `--force`)
-
-
-## 🏗 Project Identity
-| Field         | Value                                                              |
-|---------------|--------------------------------------------------------------------| 
-| Project       | CloudResourceOptimizationPlatform (branded as **Zenith**)          |
-| Type          | Monorepo — React 19 Frontend + FastAPI Backend                     |
-| Purpose       | Multi-cloud resource optimization: intelligent storage tiering, VM cluster management, NLP workload classification, cost analysis, 2FA-secured file handling, ML-driven predictions |
-| Cloud Targets | AWS (primary), GCP, Azure — multi-cloud storage + compute          |
-| Database      | MongoDB Atlas (`CloudResourceOptimizationDB`)                      |
-| Task Queue    | Celery + CloudAMQP (RabbitMQ)                                     |
-| Phase         | **PHASE 11 COMPLETE** — Terraform provisioning. **NEXT: PHASE 12** — Security research paper parity (hybrid KMS/CSE encryption, detection, session audit). See `ai-docs/PHASE_12_SECURITY_RESEARCH_PARITY.md`. |
-| Budget        | **ZERO-COST** — Student project. Free-tier only. See `AI_RULES.md` for details. |
-| Reference Doc | `Major Project latest22- Report-5.pdf` (full system); `research paper Major 6 pages-2.pdf` (security architecture — Phase 12 source of truth) |
-| Last Updated  | 2026-05-29                                                        |
-
-### Quick Tech Facts
-- **Frontend:** React 19 + Vite 7, 60+ pages, glassmorphic Mission Control dashboard
-- **Backend:** FastAPI + Python, 25 route files, 16 routers, Celery background tasks
-- **Database:** MongoDB Atlas (`CloudResourceOptimizationDB`), 14 collections
-- **Auth:** JWT (HS256), bcrypt, 2FA TOTP (issuer: `ZenithApp`)
-- **ML:** RF+XGBoost storage ensemble, NLP VM workload classifier, guarded self-retraining
-- **Queue:** Celery + CloudAMQP (RabbitMQ)
-- **Cloud:** AWS S3 (primary), GCP Cloud Storage, Azure Blob Storage
-- Venv at `backend/.venv/` — NOT project root
-- Language: Python 3.x backend, JavaScript (JSX) frontend — NOT TypeScript
-- Tests: 34 backend (`python -m pytest -q`), lint: 0 errors
-- CORS: `allow_origins=["*"]` — restrict before public deployment
+Never commit: `backend/.env`, `node_modules/`, `*.backup`.
 
 ---
 
-## 🚨 CRITICAL: Project Recovery Context
+## Session starter (paste for new chats)
 
-**What happened:** The developer's laptop was repaired, causing data loss. The codebase was incomplete compared to the project report. A full gap analysis was performed on 2026-05-23, and recovery work has rebuilt the major report modules through Phase 9.
+**Full copy-paste templates (PDF + Markdown):** `ai-docs/ZENITH_AI_SESSION_PROMPTS.pdf` · `ai-docs/ZENITH_AI_SESSION_PROMPTS.md`
 
-**Recovery approach:** Get existing features running first (Done), then rebuild missing modules one by one to match the report. Phases 1-9 are core complete. See `PROGRESS.md` for the current roadmap and remaining hardening work.
+```
+Zenith — follow ai-docs/AI_MASTER.md (PRE → EXECUTE → POST).
 
-### What WORKS (exists in code):
-- Auth (JWT + 2FA), BYOC (Bring Your Own Cloud via IAM/STS), Multi-cloud storage (AWS/GCP/Azure), ensemble storage tiering, Celery tiering/feedback/security tasks, secure file vault, WebSocket notifications, VM workload NLP classification, five-cluster VM assignment, cost analysis/forecast/anomaly APIs, dashboard/settings/profile/security UX, and benchmark validation scripts.
+Read Tier A: STATUS.md + SCRATCHPAD.md.
 
-### Remaining Report Gaps / Hardening:
-- Optional real model artifact retraining/hot-swap after enough feedback data exists.
-- Larger benchmark datasets from real cloud/user telemetry instead of mostly synthetic validation.
-- Final demo runbook, screenshots, and end-to-end handoff verification.
-- Redis cache layer remains optional; current Celery broker is CloudAMQP, not Redis.
-- Production security hardening remains: rotate exposed/stale credentials and restrict CORS before public deployment.
-
-### What's BROKEN (needs fixing before running):
-- ~~Python venv has NO packages installed (only pip)~~ (Fixed)
-- ~~All cloud credentials are stale/expired~~ (MongoDB, CloudAMQP, Gmail fixed. AWS/GCP/Azure pending individual user setup)
-- ~~GCP key file path is wrong~~ (Fixed)
-- ~~Settings UI toggles (Theme, notifications, currency) save to DB but currently have no effect~~ (Fixed in Phase 3 — ThemeContext, PreferencesContext, and Coming Soon badges added).
+Task: [describe]
+Scope: [...] | Do NOT touch: [...] | Done when: [...]
+```
 
 ---
 
-## 📁 File Directory
+## ai-docs index (quick reference)
 
-All AI context files live in the **`ai-docs/`** folder at the project root:
+| File | When |
+|------|------|
+| `STATUS.md` | Every session — live snapshot |
+| `SCRATCHPAD.md` | Every session — resume / LKGS |
+| `AI_MASTER.md` | Protocol — **read once per thread** |
+| `PROGRESS.md` | Active task + checklist only (update on task change) |
+| `PROGRESS_HISTORY.md` | **Append only** — never read at startup |
+| `AI_RULES.md` | Constraints, conflicts, zero-cost |
+| `DECISIONS.md` | Before structural changes |
+| `AI_CONTEXT_*.md` | Module maps when editing that stack |
+| `AUDIT_LOG.md` | **Append only** — never read at startup |
 
-| File                       | Purpose                            |
-|----------------------------|------------------------------------| 
-| `ai-docs/AI_MASTER.md`             | This file — startup protocol + project summary + context routing |
-| `ai-docs/AI_CONTEXT_FRONTEND.md`   | Frontend: pages, components, contexts, routing, CSS system |
-| `ai-docs/AI_CONTEXT_BACKEND.md`    | Backend: routes, modules, MongoDB, ML, Celery, env vars |
-| `ai-docs/AI_RULES.md`              | Hard constraints + code standards + resource limits |
-| `ai-docs/PROGRESS.md`              | Task tracker — standing anti-tasks + active task + backlog |
-| `ai-docs/SCRATCHPAD.md`            | Last Known Good State + mid-task resume state |
-| `ai-docs/AUDIT_LOG.md`             | Per-session activity log (append-only, immutable) |
-| `ai-docs/DECISIONS.md`             | Architecture decisions — Before You Code checklist at top |
-| `ai-docs/DESIGN_SYSTEM.md`         | Styling rules, design tokens, Mission Control layout — read before any UI work |
-| `ai-docs/PHASE_12_SECURITY_RESEARCH_PARITY.md` | **Next phase** — security paper gaps (KMS, browser CSE, detection, CRR, session geo) |
-| `Major Project latest22- Report-5.pdf` | Full project report (97 pages) — stays in project root |
-| `research paper Major 6 pages-2.pdf` | 6-page security research paper — Phase 12 acceptance criteria |
+PDFs (project root): full report + Phase 12 security paper — use when spec is unclear.
 
 ---
 
-## 🤖 How to Start a New AI Session
+## Non-negotiables (protocol level)
 
-Paste this at the start of every new AI session:
+1. **PRE-PHASE before code** — claim in STATUS + PROGRESS + SCRATCHPAD.
+2. **Never commit `backend/.env`** — rotate credentials before any public repo.
+3. **Brand: Zenith / ZenithApp** — do not rename without user approval.
+4. **POST-PHASE before stop** — SCRATCHPAD must say `COMPLETE` or show exact resume steps; never leave silent `IN PROGRESS` when work is done.
+5. **No startup reads** of `AUDIT_LOG.md` or `PROGRESS_HISTORY.md` — Tier A is `STATUS` + `SCRATCHPAD` only.
+6. **Git** — commit/push only when the user asks or at a agreed milestone — not after every AI stop.
 
-```
-Continue CloudResourceOptimizationPlatform (Zenith) — IMPLEMENTATION MODE.
-
-Read ai-docs/AI_MASTER.md and follow the startup protocol exactly.
-Also read ai-docs/PROGRESS.md and ai-docs/SCRATCHPAD.md.
-
-Current task: [describe task here]
-─── OR ─── check ai-docs/PROGRESS.md and ai-docs/SCRATCHPAD.md and resume from where the last agent left off.
-
-Based on the task above, decide the following before starting:
-- If the task involves any frontend, UI, CSS, or components → read ai-docs/DESIGN_SYSTEM.md first.
-- If the task involves any architectural, structural, or module-level changes → read ai-docs/DECISIONS.md first.
-- If the task is to resume or continue from a previous session → treat ai-docs/SCRATCHPAD.md as your primary starting point.
-
-Follow ai-docs/AI_RULES.md at all times. Do not skip the session-end protocol.
-```
-
-### ⚠️ Always scope your task (takes 30 seconds, saves 40% tokens):
-
-Add these 3 lines to any task you describe:
-```
-Scope: [which pages/files are in scope — e.g. "DashboardPage and DashboardLayout only"]
-Do NOT touch: [files explicitly out of scope — e.g. "SecurityPage.jsx, any ML files"]
-Done when: [clear finish line — e.g. "build passes, feature works, no new lint errors"]
-```
-
-**Example of a well-scoped task:**
-```
-Current task: Add a loading skeleton to the VM Cluster page
-Scope: VMClusterPage.jsx and vmcluster.css only
-Do NOT touch: StoragePage.jsx, SecurityPage.jsx, any backend files
-Done when: Skeleton shows while data loads, build passes, no new lint errors
-```
-
-### What the agent MUST do at session end (non-negotiable):
-- `PROGRESS.md` — update task status and what was done
-- `AUDIT_LOG.md` — append a new entry (SESSION_ID format: YYYYMMDD-HHMMSS)
-- `SCRATCHPAD.md` — update Last Known Good State + clear or write resume state
-- **If new backend routes were added this session** → update the API Routes table in `ai-docs/AI_CONTEXT_BACKEND.md`
-- **If new frontend pages or components were added this session** → update the Pages/Components sections in `ai-docs/AI_CONTEXT_FRONTEND.md`
-
-
----
-
-## ⚠️ Critical Warnings
-
-1. ❌ **`backend/.env` contains live cloud credentials — NEVER commit it.** It was already committed in the first git push — rotate all credentials before making the repo public.
-2. **The app is branded "Zenith"** — FastAPI title is `"Zenith API"`, sidebar says `"Zenith"`, 2FA issuer is `"ZenithApp"`. Do NOT change branding without asking.
-3. **Empty stub files still exist** — `aws/`, `providers/`, `queue/`, `errors/`, and several others. Do NOT delete them — they represent planned architecture. See `AI_CONTEXT_BACKEND.md` for the full stub list.
-4. **SecurityPage.jsx has its own inline API functions** — it does NOT use `api.js`. This is a known pattern deviation. See `AI_CONTEXT_FRONTEND.md`.
-5. **`CORS allow_origins=["*"]`** in `main.py` — restrict before any public deployment.
-6. **Venv is at `backend/.venv/`** — NOT `venv/` at the project root. Use `backend/.venv/bin/python` and `backend/.venv/bin/pytest`.
-7. **`routes_auth.py` is mounted twice** (`/api/auth` and `/auth`) in `main.py` — legacy duplicate, the `/auth` alias can be removed if needed.
+*Protocol version: 2026-05-29 · Live data always wins over this file — trust `STATUS.md`.*

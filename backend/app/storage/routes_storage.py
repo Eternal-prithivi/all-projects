@@ -109,6 +109,7 @@ async def list_files(user: User = Depends(get_current_user), files_db: Collectio
 class StorageSyncResponse(BaseModel):
     inserted: int
     already_present: int
+    removed: int
     skipped_non_user_prefix: int
     total_objects_seen: int
     bucket_name: str
@@ -147,6 +148,9 @@ async def sync_with_aws_bucket(
         already_present = 0
         skipped_non_user_prefix = 0
 
+        # Collect all valid S3 object keys so we can detect stale DB records
+        live_s3_keys: set[str] = set()
+
         for obj in objects:
             object_key = obj.get("object_key") or ""
             if not aws.get("is_byoc") and not object_key.startswith(user_prefix):
@@ -156,6 +160,8 @@ async def sync_with_aws_bucket(
             filename = object_key[len(user_prefix):] if object_key.startswith(user_prefix) else object_key
             if not filename:
                 continue
+
+            live_s3_keys.add(object_key)
 
             existing = files_db.find_one(
                 {
@@ -179,9 +185,28 @@ async def sync_with_aws_bucket(
             files_db.insert_one(doc)
             inserted += 1
 
+        # --- Remove stale DB records for AWS files no longer present in S3 ---
+        removed = 0
+        stale_filter = {
+            "owner_username": user.username,
+            "csp": "AWS",
+        }
+        if live_s3_keys:
+            stale_filter["s3_key"] = {"$nin": list(live_s3_keys)}
+        # If live_s3_keys is empty and objects were returned (empty bucket/prefix),
+        # all AWS records for this user are stale.
+        # If list_objects_aws returned nothing but the call succeeded, remove all.
+        stale_cursor = files_db.find(stale_filter, {"_id": 1, "filename": 1})
+        stale_ids = [doc["_id"] for doc in stale_cursor]
+        if stale_ids:
+            result = files_db.delete_many({"_id": {"$in": stale_ids}})
+            removed = result.deleted_count
+            logger.info(f"Sync removed {removed} stale AWS record(s) for user {user.username}")
+
         return StorageSyncResponse(
             inserted=inserted,
             already_present=already_present,
+            removed=removed,
             skipped_non_user_prefix=skipped_non_user_prefix,
             total_objects_seen=len(objects),
             bucket_name=bucket_name,

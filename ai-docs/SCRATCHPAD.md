@@ -30,18 +30,22 @@
 This prevents small inaccuracies from building up across sessions.
 
 ### How to know if this is a 5th session
-Check `AUDIT_LOG.md` — count the entries since the last audit entry marked `[DRIFT AUDIT]`.
-If 5 or more entries have passed since the last audit (or no audit has ever been done), run the audit now.
+Count sessions **without reading log narratives** — e.g. from project root:
+`rg -c '^SESSION_ID:' ai-docs/AUDIT_LOG.md`  
+Compare to the last `[DRIFT AUDIT]` entry date in that file (open only for counting, or use `rg 'DRIFT AUDIT' ai-docs/AUDIT_LOG.md`).
+If 5+ sessions since last drift audit (or none ever), run the checklist below.
+**Do not** load `AUDIT_LOG_ARCHIVE_*.md` or `PROGRESS_HISTORY.md` for drift.
 
 ### The Audit Checklist
 
 ```
-[ ] PROGRESS.md — Is the Active Task still accurate? Are all "completed" items truly done?
-[ ] SCRATCHPAD.md — Does Last Known Good State match what's in the codebase right now?
-[ ] AUDIT_LOG.md — Does it have a recent entry? No entries = session-end protocol was skipped.
-[ ] DECISIONS.md — Are any "Planned" decisions now implemented? Update them.
-[ ] AI_MASTER.md — Is the project phase still correct? Are the Quick Tech Facts still accurate?
-[ ] Module headers — Do any file-level DO NOT comments contradict current code reality?
+[ ] STATUS.md — Phase, active task, and health table still accurate?
+[ ] PROGRESS.md — Active task matches STATUS.md?
+[ ] SCRATCHPAD.md — Does Last Known Good State match the codebase?
+[ ] AUDIT_LOG.md — Entry count ≤12? (if not, archive oldest to AUDIT_LOG_ARCHIVE — do not read archive at startup)
+[ ] DECISIONS.md — Any "Planned" decisions now implemented?
+[ ] AI_MASTER.md — Tier lists and Critical Warnings still correct?
+[ ] Module headers — Any DO NOT comments contradict current code?
 ```
 
 ### What to do with findings
@@ -58,30 +62,36 @@ If 5 or more entries have passed since the last audit (or no audit has ever been
 
 ## ✅ Last Known Good State
 
-> Updated: 2026-05-25 | Agent: Antigravity (Opus)
+> Updated: 2026-05-29 | See also `STATUS.md` for canonical health row.
 
 | Check | Status |
 |-------|--------|
-| Backend tests | ✅ 18/18 passing (ML tests pre-broken, excluded) |
-| Frontend build | ✅ Passes (~2.2s, `npm run build`) |
-| Frontend lint | ✅ 0 errors / 28 warnings (all pre-existing) |
-| Dev server ports | Backend `:8000`, Frontend `:5173` |
-| Terraform CLI | ✅ Installed (checked on startup) |
-| Policy engine | ✅ 12 rules loaded from rules.yaml |
-| Provision API | ✅ 10 endpoints at `/api/provision/*` |
-| Last verified feature | Terraform provisioning integration (Phase 11, 2026-05-25) |
+| Backend tests | ✅ 34 passed (`backend/.venv/bin/python -m pytest -q`) |
+| Frontend build | ✅ Passes (`npm run build`) |
+| Frontend lint | ✅ 0 errors (warnings pre-existing) |
+| Phase | 12 IN PROGRESS — browser CSE + SSE-S3 core paths implemented |
+| Last verified feature | Security upload encrypt flow + sensitive detector (2026-05-29) |
 
-**To re-verify:** `cd backend && source .venv/bin/activate && python -m pytest -q` then `cd frontend && npm run build`
+**Re-verify:** `cd backend && .venv/bin/python -m pytest -q` · `cd frontend && npm run lint && npm run build`
 
 ---
 
 ## 🔄 Current Resume State
 
-**Status:** NOT STARTED — Phase 12 Security Research Paper Parity.
+**Status:** IN PROGRESS — Phase 12 (browser CSE + SSE flow implemented 2026-05-29).
 
-**Next task:** Phase 12 per `ai-docs/PHASE_12_SECURITY_RESEARCH_PARITY.md` (KMS auto-encrypt, browser CSE, detector module, session geo, CRR).
+**Resume here:**
+1. Manual test: Security page upload file with `password=xxx` → Encrypt this → Client-side → download with password.
+2. Optional: auto SSE on sensitive without modal (`routes_security.py` upload path).
+3. Session geo + fingerprint (`routes_auth.py`).
+4. Run `pytest backend/tests/test_sensitive_file_detector.py`.
 
-**Last completed (docs-only, 2026-05-29):** Research paper gap analysis; Phase 12 spec written; AI_MASTER/PROGRESS updated. Code sync feature from prior session already shipped.
+**Implemented files:**
+- `frontend/src/utils/clientEncryption.js`, `EncryptSensitivePromptModal.jsx`
+- `backend/app/security/sensitive_file_detector.py`, routes: upload-client-encrypted, download-ciphertext
+- `SecurityPage.jsx`, `api.js`, `EncryptionChoiceModal.jsx`
+
+**Not done:** KMS (intentionally out of scope).
 
 ---
 

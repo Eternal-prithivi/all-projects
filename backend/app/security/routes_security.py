@@ -14,8 +14,6 @@
 #   - Use the same S3 bucket as regular storage (SECURE_S3_BUCKET_NAME is separate)
 # =============================================================================
 import boto3
-import re
-import io
 from datetime import datetime
 from typing import Optional
 from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException, status
@@ -33,8 +31,9 @@ from app.storage.manager import list_objects_aws
 from app.storage.tasks import apply_encryption_to_file
 from app.security.encryption_handler import (
     decrypt_file_client_side,
-    extract_encrypted_file_components
+    extract_encrypted_file_components,
 )
+from app.security.sensitive_file_detector import scan_file_content
 
 # The prefix is removed here as it is handled in main.py
 router = APIRouter(tags=["Security"])
@@ -61,6 +60,33 @@ def get_secure_files_collection() -> Collection:
     return mongodb_client.get_collection("secure_files")
 
 
+def _put_secure_object_dual(
+    body: bytes,
+    object_key: str,
+    *,
+    server_side_encryption: bool = False,
+    metadata: Optional[dict] = None,
+) -> None:
+    """Write object to primary + replica secure buckets (redundancy)."""
+    put_kwargs: dict = {"Bucket": settings.SECURE_S3_BUCKET_NAME, "Key": object_key, "Body": body}
+    if server_side_encryption:
+        put_kwargs["ServerSideEncryption"] = "AES256"
+    if metadata:
+        put_kwargs["Metadata"] = metadata
+    s3_client_primary.put_object(**put_kwargs)
+
+    replica_kwargs = {
+        "Bucket": settings.REPLICA_S3_BUCKET_NAME,
+        "Key": object_key,
+        "Body": body,
+    }
+    if server_side_encryption:
+        replica_kwargs["ServerSideEncryption"] = "AES256"
+    if metadata:
+        replica_kwargs["Metadata"] = metadata
+    s3_client_replica.put_object(**replica_kwargs)
+
+
 # Request models
 class EncryptionChoiceRequest(BaseModel):
     filename: str
@@ -76,6 +102,7 @@ class DecryptionRequest(BaseModel):
 class SecureSyncResponse(BaseModel):
     inserted: int
     already_present: int
+    removed: int
     skipped_non_user_prefix: int
     total_objects_seen: int
     bucket_name: str
@@ -136,6 +163,9 @@ async def sync_secure_aws_bucket(
         already_present = 0
         skipped_non_user_prefix = 0
 
+        # Collect all valid S3 object keys so we can detect stale DB records
+        live_s3_keys: set[str] = set()
+
         for obj in objects:
             object_key = obj.get("object_key") or ""
             if not object_key.startswith(user_prefix):
@@ -145,6 +175,8 @@ async def sync_secure_aws_bucket(
             filename = object_key[len(user_prefix) :]
             if not filename or filename.endswith("/"):
                 continue
+
+            live_s3_keys.add(object_key)
 
             existing = files_db.find_one(
                 {
@@ -185,9 +217,30 @@ async def sync_secure_aws_bucket(
             files_db.insert_one(doc)
             inserted += 1
 
+        # --- Remove stale DB records for files no longer present in S3 ---
+        removed = 0
+        stale_filter = {
+            "owner_username": user.username,
+            "s3_key": {"$regex": f"^{user.username}/"},
+        }
+        if live_s3_keys:
+            stale_filter["s3_key"] = {
+                "$regex": f"^{user.username}/",
+                "$nin": list(live_s3_keys),
+            }
+        stale_cursor = files_db.find(stale_filter, {"_id": 1, "filename": 1})
+        stale_ids = [doc["_id"] for doc in stale_cursor]
+        if stale_ids:
+            from app.utils.logger import setup_logger
+            _logger = setup_logger(__name__)
+            result = files_db.delete_many({"_id": {"$in": stale_ids}})
+            removed = result.deleted_count
+            _logger.info(f"Secure sync removed {removed} stale record(s) for user {user.username}")
+
         return SecureSyncResponse(
             inserted=inserted,
             already_present=already_present,
+            removed=removed,
             skipped_non_user_prefix=skipped_non_user_prefix,
             total_objects_seen=len(objects),
             bucket_name=bucket_name,
@@ -209,28 +262,13 @@ async def upload_secure_file(
 ):
     """
     Step 1: Scan file for sensitive data BEFORE uploading to S3.
-    If encryption needed, return immediately asking user to choose encryption method.
+    If encryption needed, register awaiting state and prompt UI to encrypt (SSE or browser CSE).
     """
-    import re
-    import io
-    
-    # Read file content for scanning
     file_content = await file.read()
     file_size = len(file_content)
-    
-    # Scan for sensitive data
-    is_sensitive = False
-    try:
-        content_str = file_content.decode('utf-8', errors='ignore')
-        credit_card_pattern = r'\b(?:\d[ -]*?){13,16}\b'
-        secret_keywords_pattern = r'(?i)\b(password|secret|key|pwd|token|credentials|apikeys|private_key|auth_token)\b'
-        
-        if re.search(credit_card_pattern, content_str) or re.search(secret_keywords_pattern, content_str):
-            is_sensitive = True
-    except:
-        pass
-    
-    # Determine if encryption is needed
+
+    scan = scan_file_content(file_content, file.filename)
+    is_sensitive = scan.is_sensitive
     needs_encryption = is_sensitive or encrypt_manual
     
     if needs_encryption:
@@ -240,10 +278,11 @@ async def upload_secure_file(
             "owner_username": user.username,
             "size_bytes": file_size,
             "is_sensitive": is_sensitive,
+            "scan_reasons": scan.reasons,
             "awaiting_encryption_choice": True,
             "encryption_status": "awaiting_choice",
-            "temp_file_content": file_content,  # Store temporarily
-            "upload_date": datetime.utcnow()
+            "temp_file_content": file_content,
+            "upload_date": datetime.utcnow(),
         }
         
         # Check if file already exists
@@ -260,35 +299,93 @@ async def upload_secure_file(
             "filename": file.filename,
             "needs_encryption": True,
             "is_sensitive": is_sensitive,
-            "status": "awaiting_encryption_choice"
+            "scan_reasons": scan.reasons,
+            "status": "awaiting_encryption_choice",
         }
     else:
-        # File doesn't need encryption, upload directly to S3
         object_key = f"{user.username}/{file.filename}"
         try:
-            s3_client_primary.upload_fileobj(
-                io.BytesIO(file_content),
-                settings.SECURE_S3_BUCKET_NAME,
-                object_key
-            )
+            _put_secure_object_dual(file_content, object_key, server_side_encryption=True)
         except Exception as e:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Upload failed: {str(e)}"
+                detail=f"Upload failed: {str(e)}",
             )
-        
+
         file_metadata = FileMetadata(
             filename=file.filename,
             s3_key=object_key,
             owner_username=user.username,
             size_bytes=file_size,
             is_sensitive=False,
-            is_encrypted=False,
-            encryption_status="none"
+            is_encrypted=True,
+            encryption_method="server-side",
+            encryption_status="encrypted",
+            client_side_encrypted=False,
         )
         files_db.insert_one(file_metadata.model_dump())
-        
-        return {"filename": file.filename, "needs_encryption": False, "status": "uploaded"}
+
+        return {
+            "filename": file.filename,
+            "needs_encryption": False,
+            "status": "uploaded",
+            "encryption_method": "server-side",
+        }
+
+
+@router.post("/upload-client-encrypted", status_code=status.HTTP_200_OK)
+async def upload_client_encrypted(
+    user: UserInDB = Depends(require_2fa),
+    files_db: Collection = Depends(get_secure_files_collection),
+    file: UploadFile = File(...),
+    original_filename: str = Form(...),
+    is_sensitive: bool = Form(False),
+):
+    """
+    Accept ciphertext from browser (zero-knowledge). Password never sent to API.
+    Format: [salt][iv][AES-256-CBC ciphertext] — same as encryption_handler storage layout.
+    """
+    encrypted_body = await file.read()
+    if len(encrypted_body) < 33:
+        raise HTTPException(status_code=400, detail="Invalid encrypted payload.")
+
+    object_key = f"{user.username}/{original_filename}"
+    try:
+        _put_secure_object_dual(
+            encrypted_body,
+            object_key,
+            metadata={"encryption": "client-side", "algorithm": "AES-256-CBC"},
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to store encrypted file: {str(e)}",
+        )
+
+    doc = {
+        "filename": original_filename,
+        "s3_key": object_key,
+        "owner_username": user.username,
+        "size_bytes": len(encrypted_body),
+        "upload_date": datetime.utcnow(),
+        "is_sensitive": is_sensitive,
+        "is_encrypted": True,
+        "encryption_method": "client-side",
+        "encryption_status": "encrypted",
+        "client_side_encrypted": True,
+        "awaiting_encryption_choice": False,
+    }
+    files_db.update_one(
+        {"filename": original_filename, "owner_username": user.username},
+        {"$set": doc, "$unset": {"temp_file_content": "", "scan_reasons": ""}},
+        upsert=True,
+    )
+    return {
+        "filename": original_filename,
+        "encryption_method": "client-side",
+        "client_side_encrypted": True,
+        "message": "Encrypted file stored in secure vault.",
+    }
 
 @router.get("/list-secure")
 async def list_secure_files(
@@ -311,7 +408,8 @@ async def list_secure_files(
             "encryption_method": file.get("encryption_method", "none"),
             "encryption_status": file.get("encryption_status", "none"),
             "awaiting_encryption_choice": file.get("awaiting_encryption_choice", False),
-            "client_side_encrypted": file.get("client_side_encrypted", False)
+            "client_side_encrypted": file.get("client_side_encrypted", False),
+            "scan_reasons": file.get("scan_reasons", []),
         })
     return files_list
 
@@ -326,8 +424,6 @@ async def choose_encryption_method(
     Step 2: User selects encryption method.
     Apply encryption to temp file, then upload encrypted file to S3.
     """
-    import io
-    from app.security.encryption_handler import encrypt_file_client_side, prepare_encrypted_file_for_storage
     from app.utils.logger import setup_logger
     
     logger = setup_logger(__name__)
@@ -344,14 +440,12 @@ async def choose_encryption_method(
     if not file_doc.get("awaiting_encryption_choice"):
         raise HTTPException(status_code=400, detail="File is not awaiting encryption choice")
     
-    # Validate encryption method
-    if request.encryption_method not in ["server-side", "client-side"]:
-        raise HTTPException(status_code=400, detail="Invalid encryption method")
-    
-    # Validate password for client-side encryption
-    if request.encryption_method == "client-side" and not request.password:
-        raise HTTPException(status_code=400, detail="Password required for client-side encryption")
-    
+    if request.encryption_method != "server-side":
+        raise HTTPException(
+            status_code=400,
+            detail="Client-side encryption must be performed in the browser. Use upload-client-encrypted.",
+        )
+
     # Get the temp file content
     file_content = file_doc.get("temp_file_content")
     if not file_content:
@@ -360,86 +454,25 @@ async def choose_encryption_method(
     object_key = f"{user.username}/{request.filename}"
     
     try:
-        if request.encryption_method == "server-side":
-            # Upload with AWS server-side encryption
-            s3_client_primary.put_object(
-                Bucket=settings.SECURE_S3_BUCKET_NAME,
-                Key=object_key,
-                Body=file_content,
-                ServerSideEncryption='AES256'
-            )
-            
-            # Replicate to backup
-            s3_client_replica.put_object(
-                Bucket=settings.REPLICA_S3_BUCKET_NAME,
-                Key=object_key,
-                Body=file_content,
-                ServerSideEncryption='AES256'
-            )
-            
-            # Update database
-            files_db.update_one(
-                {"filename": request.filename, "owner_username": user.username},
-                {
-                    "$set": {
-                        "s3_key": object_key,
-                        "is_encrypted": True,
-                        "encryption_method": "server-side",
-                        "encryption_status": "encrypted",
-                        "awaiting_encryption_choice": False,
-                        "client_side_encrypted": False
-                    },
-                    "$unset": {"temp_file_content": ""}  # Remove temp data
-                }
-            )
-            
-        else:  # client-side encryption
-            # Encrypt file with user's password
-            encrypted_content, salt, iv = encrypt_file_client_side(file_content, request.password)
-            final_encrypted_data = prepare_encrypted_file_for_storage(encrypted_content, salt, iv)
-            
-            # Upload encrypted file to S3
-            s3_client_primary.put_object(
-                Bucket=settings.SECURE_S3_BUCKET_NAME,
-                Key=object_key,
-                Body=final_encrypted_data,
-                Metadata={
-                    'encryption': 'client-side',
-                    'algorithm': 'AES-256-CBC'
-                }
-            )
-            
-            # Replicate to backup
-            s3_client_replica.put_object(
-                Bucket=settings.REPLICA_S3_BUCKET_NAME,
-                Key=object_key,
-                Body=final_encrypted_data,
-                Metadata={
-                    'encryption': 'client-side',
-                    'algorithm': 'AES-256-CBC'
-                }
-            )
-            
-            # Update database
-            files_db.update_one(
-                {"filename": request.filename, "owner_username": user.username},
-                {
-                    "$set": {
-                        "s3_key": object_key,
-                        "is_encrypted": True,
-                        "encryption_method": "client-side",
-                        "encryption_status": "encrypted",
-                        "awaiting_encryption_choice": False,
-                        "client_side_encrypted": True
-                    },
-                    "$unset": {"temp_file_content": ""}  # Remove temp data
-                }
-            )
-        
+        _put_secure_object_dual(file_content, object_key, server_side_encryption=True)
+        files_db.update_one(
+            {"filename": request.filename, "owner_username": user.username},
+            {
+                "$set": {
+                    "s3_key": object_key,
+                    "is_encrypted": True,
+                    "encryption_method": "server-side",
+                    "encryption_status": "encrypted",
+                    "awaiting_encryption_choice": False,
+                    "client_side_encrypted": False,
+                },
+                "$unset": {"temp_file_content": "", "scan_reasons": ""},
+            },
+        )
         return {
-            "message": f"{request.encryption_method} encryption applied successfully",
+            "message": "Server-side encryption (SSE-S3) applied successfully",
             "filename": request.filename,
-            "encryption_method": request.encryption_method
+            "encryption_method": "server-side",
         }
     
     except Exception as e:
@@ -489,8 +522,8 @@ async def generate_secure_download_url(
     if file_doc.get("client_side_encrypted"):
         return {
             "client_side_encrypted": True,
-            "message": "This file is encrypted with your password. Use the decryption endpoint.",
-            "encryption_method": "client-side"
+            "message": "Decrypt in your browser with your encryption password.",
+            "encryption_method": "client-side",
         }
     
     try:
@@ -510,6 +543,38 @@ async def generate_secure_download_url(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, 
             detail=f"Could not generate download URL: {e}"
         )
+
+
+@router.get("/download-ciphertext/{filename}")
+async def download_client_encrypted_ciphertext(
+    filename: str,
+    user: UserInDB = Depends(require_2fa),
+    files_db: Collection = Depends(get_secure_files_collection),
+):
+    """Return raw ciphertext for browser-side decryption (zero-knowledge)."""
+    object_key = f"{user.username}/{filename}"
+    file_doc = files_db.find_one({"s3_key": object_key, "owner_username": user.username})
+    if not file_doc:
+        raise HTTPException(status_code=404, detail="File not found")
+    if not file_doc.get("client_side_encrypted"):
+        raise HTTPException(
+            status_code=400,
+            detail="File is not browser-encrypted. Use the standard download URL.",
+        )
+    try:
+        response = s3_client_primary.get_object(
+            Bucket=settings.SECURE_S3_BUCKET_NAME, Key=object_key
+        )
+        body = response["Body"].read()
+        return Response(
+            content=body,
+            media_type="application/octet-stream",
+            headers={
+                "Content-Disposition": f'attachment; filename="{filename}.encrypted"',
+            },
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Could not download ciphertext: {e}")
 
 
 @router.post("/decrypt-download")
