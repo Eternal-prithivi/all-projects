@@ -2,11 +2,11 @@
 
 **Status:** COMPLETE (2026-05-29)
 
-**Task:** Phase 15 — UI controls & API wiring audit
+**Task:** Phase 16 — BYOC platform-wide credential routing
 
 **Summary:**
-- Light/dark theme: API sync, header toggle, tokenized dashboard shell, toast theme
-- Settings theme saves on change; BYOC plan lookup fixed for `user_id`/`username`
-- pytest 73, lint 0 errors, build OK
+- Storage uploads/sync already BYOC; extended to secure vault, cost APIs, dashboard cache, billing, budgets, Celery secure tasks
+- VM cluster: GCP BYOC via request context (`gcp_runtime.py`)
+- Added `backend/app/aws/*` helpers; matrix in `AI_CONTEXT_BACKEND.md`
 
-**Next:** Phase 14d optional (cost/VM links after deploy)
+**Next:** Azure cost via BYOC service principal (optional)

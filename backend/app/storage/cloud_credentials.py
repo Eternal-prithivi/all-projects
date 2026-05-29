@@ -1,0 +1,157 @@
+"""
+Build per-user cloud clients using BYOC credentials when configured,
+otherwise Zenith platform defaults from settings.
+"""
+
+from __future__ import annotations
+
+import json
+from dataclasses import dataclass
+from typing import Any, Optional, Tuple
+
+import boto3
+from azure.storage.blob import BlobServiceClient
+from botocore.config import Config
+from google.cloud import storage as gcp_storage
+from google.oauth2 import service_account
+
+from app.byoc.credential_resolver import (
+    resolve_aws_credentials,
+    resolve_azure_credentials,
+    resolve_gcp_credentials,
+)
+from app.utils.config import settings
+
+S3_CONFIG_V4 = Config(signature_version="s3v4")
+
+
+def _aws_client_kwargs(aws: dict) -> dict:
+    kwargs: dict = {
+        "aws_access_key_id": aws["access_key_id"],
+        "aws_secret_access_key": aws["secret_access_key"],
+        "region_name": aws.get("region") or settings.PRIMARY_S3_REGION,
+        "config": S3_CONFIG_V4,
+    }
+    session_token = aws.get("session_token")
+    if session_token:
+        kwargs["aws_session_token"] = session_token
+    return kwargs
+
+
+def build_aws_s3_client(username: str) -> Tuple[Any, str, bool]:
+    """Return (boto3 S3 client, bucket_name, is_byoc)."""
+    aws = resolve_aws_credentials(username)
+    client = boto3.client("s3", **_aws_client_kwargs(aws))
+    return client, aws["bucket_name"], bool(aws.get("is_byoc"))
+
+
+def build_aws_ce_client(username: str) -> Tuple[Any, bool]:
+    """Return (boto3 Cost Explorer client, is_byoc)."""
+    aws = resolve_aws_credentials(username)
+    client = boto3.client("ce", **_aws_client_kwargs(aws))
+    return client, bool(aws.get("is_byoc"))
+
+
+@dataclass
+class SecureAwsStorage:
+    """Primary (+ optional replica) S3 clients for the secure vault."""
+
+    primary_client: Any
+    replica_client: Optional[Any]
+    primary_bucket: str
+    replica_bucket: Optional[str]
+    region: str
+    is_byoc: bool
+    list_prefix: str
+    access_key_id: str
+    secret_access_key: str
+    session_token: Optional[str] = None
+
+    def object_key(self, username: str, filename: str) -> str:
+        if self.is_byoc:
+            return f"secure/{username}/{filename}"
+        return f"{username}/{filename}"
+
+
+def resolve_secure_aws_storage(username: str) -> SecureAwsStorage:
+    """
+    Secure vault targets the user's BYOC bucket (prefix secure/{user}/) when connected;
+    otherwise Zenith dedicated secure + replica buckets ({user}/).
+    """
+    aws = resolve_aws_credentials(username)
+    if aws.get("is_byoc"):
+        primary = boto3.client("s3", **_aws_client_kwargs(aws))
+        return SecureAwsStorage(
+            primary_client=primary,
+            replica_client=None,
+            primary_bucket=aws["bucket_name"],
+            replica_bucket=None,
+            region=aws.get("region") or settings.PRIMARY_S3_REGION,
+            is_byoc=True,
+            list_prefix=f"secure/{username}/",
+            access_key_id=aws["access_key_id"],
+            secret_access_key=aws["secret_access_key"],
+            session_token=aws.get("session_token"),
+        )
+
+    primary = boto3.client(
+        "s3",
+        aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
+        aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
+        region_name=settings.PRIMARY_S3_REGION,
+        config=S3_CONFIG_V4,
+    )
+    replica = boto3.client(
+        "s3",
+        aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
+        aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
+        region_name=settings.REPLICA_S3_REGION,
+        config=S3_CONFIG_V4,
+    )
+    return SecureAwsStorage(
+        primary_client=primary,
+        replica_client=replica,
+        primary_bucket=settings.SECURE_S3_BUCKET_NAME,
+        replica_bucket=settings.REPLICA_S3_BUCKET_NAME,
+        region=settings.PRIMARY_S3_REGION,
+        is_byoc=False,
+        list_prefix=f"{username}/",
+        access_key_id=settings.AWS_ACCESS_KEY_ID,
+        secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
+        session_token=None,
+    )
+
+
+def build_gcp_storage_client(username: str) -> Tuple[gcp_storage.Client, str, bool]:
+    """Return (GCS client, bucket_name, is_byoc)."""
+    gcp = resolve_gcp_credentials(username)
+    if gcp.get("is_byoc"):
+        sa_json = gcp.get("service_account_json") or ""
+        if isinstance(sa_json, str):
+            sa_info = json.loads(sa_json)
+        else:
+            sa_info = sa_json
+        credentials = service_account.Credentials.from_service_account_info(sa_info)
+        client = gcp_storage.Client(
+            credentials=credentials,
+            project=sa_info.get("project_id"),
+        )
+        return client, gcp["bucket_name"], True
+
+    client = gcp_storage.Client.from_service_account_json(
+        gcp["service_account_key_path"]
+    )
+    return client, gcp["bucket_name"], False
+
+
+def build_azure_blob_service(username: str) -> Tuple[BlobServiceClient, str, bool]:
+    """Return (BlobServiceClient, container_name, is_byoc)."""
+    azure = resolve_azure_credentials(username)
+    connection_string = (
+        "DefaultEndpointsProtocol=https;"
+        f"AccountName={azure['account_name']};"
+        f"AccountKey={azure['account_key']};"
+        "EndpointSuffix=core.windows.net"
+    )
+    client = BlobServiceClient.from_connection_string(connection_string)
+    return client, azure["container_name"], bool(azure.get("is_byoc"))

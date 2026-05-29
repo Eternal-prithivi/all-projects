@@ -55,12 +55,19 @@ def check_cost_anomalies():
         for provider in providers:
             try:
                 # Fetch cost data
+                # Platform-wide anomaly scan (no per-user BYOC in scheduled task yet)
                 if provider == "aws":
-                    cost_data = get_aws_cost_and_usage(start_str, end_str, "DAILY")
+                    cost_data = get_aws_cost_and_usage(
+                        "platform_anomaly", start_str, end_str, "DAILY"
+                    )
                 elif provider == "gcp":
-                    cost_data = get_gcp_billing_data(start_str, end_str)
+                    cost_data = get_gcp_billing_data(
+                        "platform_anomaly", start_str, end_str
+                    )
                 elif provider == "azure":
-                    cost_data = get_azure_billing_data(start_str, end_str)
+                    cost_data = get_azure_billing_data(
+                        "platform_anomaly", start_str, end_str
+                    )
                 else:
                     continue
                 

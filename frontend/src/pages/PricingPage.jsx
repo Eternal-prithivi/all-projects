@@ -7,6 +7,48 @@ import { toast } from 'react-toastify';
 import { PageSkeleton } from '../components/Skeletons.jsx';
 import '../styles/pricing.css';
 
+/** Compact capability blocks — avoids tall bullet lists on wide cards */
+function getPlanBlocks(plan) {
+  const vm =
+    plan.vm_limit >= 999 ? 'Unlimited' : `${plan.vm_limit} VMs`;
+  const storage =
+    plan.storage_gb >= 1000 ? '1 TB / VM' : `${plan.storage_gb} GB / VM`;
+
+  const byPlan = {
+    free: [
+      { title: 'Compute', detail: vm },
+      { title: 'Storage', detail: storage },
+      { title: 'Monitoring', detail: 'Basic' },
+      { title: 'Support', detail: 'Community' },
+    ],
+    basic: [
+      { title: 'Compute', detail: vm },
+      { title: 'Storage', detail: storage },
+      { title: 'Cloud', detail: 'AWS · GCP · Azure' },
+      { title: 'Support', detail: 'Email · 24h' },
+    ],
+    pro: [
+      { title: 'Compute', detail: vm },
+      { title: 'Storage', detail: storage },
+      { title: 'Intelligence', detail: 'AI + cost analytics' },
+      { title: 'Support', detail: 'Priority · 4h' },
+    ],
+    enterprise: [
+      { title: 'Compute', detail: vm },
+      { title: 'Storage', detail: storage },
+      { title: 'Operations', detail: 'SLA · white-label' },
+      { title: 'Support', detail: '24/7 · dedicated AM' },
+    ],
+  };
+
+  return byPlan[plan.plan_id] ?? [
+    { title: 'Compute', detail: vm },
+    { title: 'Storage', detail: storage },
+    { title: 'Includes', detail: plan.features[0] ?? '—' },
+    { title: 'Plus', detail: plan.features[1] ?? '—' },
+  ];
+}
+
 const PricingPage = () => {
   const [plans, setPlans] = useState([]);
   const [currentSubscription, setCurrentSubscription] = useState(null);
@@ -168,55 +210,54 @@ const PricingPage = () => {
                   <div className="featured-badge">Most Popular</div>
                 )}
 
-                <div className="plan-header">
-                  {isCurrentPlan && (
-                    <span className="pricing-kicker your-plan-chip">Your plan</span>
-                  )}
-                  <h3>{plan.name}</h3>
-                  <p className="plan-description">{plan.description}</p>
+                <div className="pricing-card-top">
+                  <div className="plan-header">
+                    {isCurrentPlan && (
+                      <span className="pricing-kicker your-plan-chip">Your plan</span>
+                    )}
+                    <h3>{plan.name}</h3>
+                    <p className="plan-description">{plan.description}</p>
+                  </div>
+
+                  <div className="plan-price-block">
+                    <div className="plan-price">
+                      {plan.price_monthly === 0 ? (
+                        <>
+                          <span className="price">₹0</span>
+                          <span className="period">/forever</span>
+                        </>
+                      ) : (
+                        <>
+                          <span className="price">
+                            ₹
+                            {billingCycle === 'yearly'
+                              ? plan.price_yearly
+                              : plan.price_monthly}
+                          </span>
+                          <span className="period">
+                            /{billingCycle === 'yearly' ? 'year' : 'month'}
+                          </span>
+                        </>
+                      )}
+                    </div>
+                    {plan.price_yearly > 0 && (
+                      <p className="yearly-price">
+                        {billingCycle === 'yearly'
+                          ? `Save ₹${plan.price_monthly * 12 - plan.price_yearly} vs monthly`
+                          : `₹${plan.price_yearly}/yr · save ₹${plan.price_monthly * 12 - plan.price_yearly}`}
+                      </p>
+                    )}
+                  </div>
                 </div>
 
-                <div className="plan-price">
-                  {plan.price_monthly === 0 ? (
-                    <>
-                      <span className="price">₹0</span>
-                      <span className="period">/forever</span>
-                    </>
-                  ) : (
-                    <>
-                      <span className="price">
-                        ₹{billingCycle === 'yearly' ? plan.price_yearly : plan.price_monthly}
-                      </span>
-                      <span className="period">/{billingCycle === 'yearly' ? 'year' : 'month'}</span>
-                    </>
-                  )}
-                </div>
-
-                {plan.price_yearly > 0 && billingCycle === 'monthly' && (
-                  <div className="yearly-price">
-                    or ₹{plan.price_yearly}/year (save ₹{plan.price_monthly * 12 - plan.price_yearly})
-                  </div>
-                )}
-                {plan.price_yearly > 0 && billingCycle === 'yearly' && (
-                  <div className="yearly-price">
-                    Save ₹{plan.price_monthly * 12 - plan.price_yearly} compared to monthly
-                  </div>
-                )}
-
-                <ul className="plan-features">
-                  {plan.features.map((feature, index) => (
-                    <li key={index}>
-                      <svg className="check-icon" viewBox="0 0 20 20" fill="currentColor">
-                        <path
-                          fillRule="evenodd"
-                          d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                          clipRule="evenodd"
-                        />
-                      </svg>
-                      {feature}
-                    </li>
+                <div className="plan-feature-blocks" aria-label={`${plan.name} highlights`}>
+                  {getPlanBlocks(plan).map((block) => (
+                    <div key={block.title} className="plan-feature-block">
+                      <span className="block-title">{block.title}</span>
+                      <span className="block-detail">{block.detail}</span>
+                    </div>
                   ))}
-                </ul>
+                </div>
 
                 <div className="plan-action">
                   {isCurrentPlan ? (
@@ -246,14 +287,6 @@ const PricingPage = () => {
                   )}
                 </div>
 
-                {plan.plan_id !== 'free' && (
-                  <div className="plan-limits">
-                    <small>
-                      {plan.vm_limit === 999 ? 'Unlimited' : plan.vm_limit} VMs •{' '}
-                      {plan.storage_gb === 1000 ? '1TB' : `${plan.storage_gb}GB`} Storage
-                    </small>
-                  </div>
-                )}
               </div>
             );
           })}

@@ -1,4 +1,3 @@
-import boto3
 import re
 import requests
 import io
@@ -6,6 +5,7 @@ from pymongo import MongoClient
 from app.celery_worker import celery_app
 from app.utils.config import settings
 from app.utils.logger import setup_logger
+from app.storage.cloud_credentials import resolve_secure_aws_storage
 from app.security.encryption_handler import (
     encrypt_file_client_side,
     prepare_encrypted_file_for_storage
@@ -21,21 +21,14 @@ def process_secure_file(s3_key: str, owner_username: str, encrypt_manual: bool):
     and determine if encryption is needed. If encryption is needed,
     mark file as awaiting user's encryption choice.
     """
-    # --- DEFINITIVE FIX: Initialize ALL clients *inside* the task ---
-    # This ensures each worker process gets its own fresh, stable connection to S3 and MongoDB,
-    # which is the correct and robust way to prevent the SIGSEGV crash.
-    s3_client_primary = boto3.client(
-        's3',
-        aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
-        aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY
-    )
-    
-    # A new, isolated MongoDB client and collection is created for this task only.
+    storage = resolve_secure_aws_storage(owner_username)
+    s3_client_primary = storage.primary_client
+    bucket_name = storage.primary_bucket
+
     mongo_client = MongoClient(settings.MONGO_CONNECTION_STRING)
     db = mongo_client['CloudResourceOptimizationDB']
     files_db = db["secure_files"]
 
-    # --- FIX: Corrected the typo from s_key to s3_key ---
     logger.debug(f"Task received for s3_key='{s3_key}', owner='{owner_username}', encrypt_manual={encrypt_manual}")
     
     is_sensitive = False
@@ -50,7 +43,7 @@ def process_secure_file(s3_key: str, owner_username: str, encrypt_manual: bool):
 
         if not encrypt_manual and is_scannable:
             logger.debug("Condition met. Proceeding to download and scan file from S3")
-            response = s3_client_primary.get_object(Bucket=settings.SECURE_S3_BUCKET_NAME, Key=s3_key)
+            response = s3_client_primary.get_object(Bucket=bucket_name, Key=s3_key)
             content_bytes = response['Body'].read()
             content_str = content_bytes.decode('utf-8', errors='ignore')
 
@@ -69,21 +62,17 @@ def process_secure_file(s3_key: str, owner_username: str, encrypt_manual: bool):
 
         logger.debug(f"Status before encryption block - is_sensitive: {is_sensitive}, encrypt_manual: {encrypt_manual}")
 
-        # If manual encryption was requested, it's already set in the database - don't override
         if encrypt_manual:
             logger.info(f"File '{s3_key}' was manually marked for encryption. Status already set in DB.")
-            # Just update sensitivity based on scan, but don't change encryption status
             update_payload = {
                 "$set": {
-                    "is_sensitive": True if is_sensitive else True  # Mark as sensitive if manual encrypt
+                    "is_sensitive": True if is_sensitive else True
                 }
             }
         else:
-            # Determine if encryption is needed based on scan results
             needs_encryption = is_sensitive
             
             if needs_encryption:
-                # Mark file as awaiting user's encryption choice
                 logger.info(f"File '{s3_key}' needs encryption. Awaiting user choice.")
                 update_payload = {
                     "$set": {
@@ -95,7 +84,6 @@ def process_secure_file(s3_key: str, owner_username: str, encrypt_manual: bool):
                     }
                 }
             else:
-                # File doesn't need encryption
                 logger.info(f"File '{s3_key}' does not need encryption.")
                 update_payload = {
                     "$set": {
@@ -112,7 +100,6 @@ def process_secure_file(s3_key: str, owner_username: str, encrypt_manual: bool):
         
         logger.info(f"Finished processing {s3_key}. Sensitive: {is_sensitive}, Needs Encryption: {needs_encryption}")
         
-        # Notify user via WebSocket that processing is complete
         try:
             requests.post(f"http://localhost:8000/ws/notify/{owner_username}")
             logger.debug(f"WebSocket notification sent for user {owner_username}")
@@ -130,24 +117,12 @@ def process_secure_file(s3_key: str, owner_username: str, encrypt_manual: bool):
 def apply_encryption_to_file(s3_key: str, owner_username: str, encryption_method: str, password: str = None):
     """
     Celery task to apply encryption to a file based on user's choice.
-    
-    Args:
-        s3_key: S3 object key
-        owner_username: File owner
-        encryption_method: "server-side" or "client-side"
-        password: User's password for client-side encryption (required if client-side)
     """
-    s3_client_primary = boto3.client(
-        's3',
-        aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
-        aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY
-    )
-    s3_client_replica = boto3.client(
-        's3',
-        aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
-        aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
-        region_name=settings.REPLICA_S3_REGION
-    )
+    storage = resolve_secure_aws_storage(owner_username)
+    s3_client_primary = storage.primary_client
+    s3_client_replica = storage.replica_client
+    bucket_name = storage.primary_bucket
+    replica_bucket = storage.replica_bucket
     
     mongo_client = MongoClient(settings.MONGO_CONNECTION_STRING)
     db = mongo_client['CloudResourceOptimizationDB']
@@ -157,26 +132,23 @@ def apply_encryption_to_file(s3_key: str, owner_username: str, encryption_method
     
     try:
         if encryption_method == "server-side":
-            # Server-side encryption: AWS manages the keys
             logger.info(f"Applying server-side encryption to '{s3_key}'")
             
-            # Apply AES-256 encryption on S3
             s3_client_primary.copy_object(
-                Bucket=settings.SECURE_S3_BUCKET_NAME,
+                Bucket=bucket_name,
                 Key=s3_key,
-                CopySource={'Bucket': settings.SECURE_S3_BUCKET_NAME, 'Key': s3_key},
+                CopySource={'Bucket': bucket_name, 'Key': s3_key},
                 ServerSideEncryption='AES256',
                 MetadataDirective='REPLACE'
             )
             
-            # Replicate to backup bucket
-            s3_client_replica.copy_object(
-                Bucket=settings.REPLICA_S3_BUCKET_NAME,
-                Key=s3_key,
-                CopySource={'Bucket': settings.SECURE_S3_BUCKET_NAME, 'Key': s3_key},
-            )
+            if s3_client_replica and replica_bucket:
+                s3_client_replica.copy_object(
+                    Bucket=replica_bucket,
+                    Key=s3_key,
+                    CopySource={'Bucket': bucket_name, 'Key': s3_key},
+                )
             
-            # Update database
             files_db.update_one(
                 {"s3_key": s3_key},
                 {
@@ -192,28 +164,19 @@ def apply_encryption_to_file(s3_key: str, owner_username: str, encryption_method
             logger.info(f"Server-side encryption applied to '{s3_key}'")
             
         elif encryption_method == "client-side":
-            # Client-side encryption: User controls the key
             if not password:
                 raise ValueError("Password required for client-side encryption")
             
             logger.info(f"Applying client-side encryption to '{s3_key}'")
             
-            # Download the file from S3
-            response = s3_client_primary.get_object(
-                Bucket=settings.SECURE_S3_BUCKET_NAME,
-                Key=s3_key
-            )
+            response = s3_client_primary.get_object(Bucket=bucket_name, Key=s3_key)
             original_content = response['Body'].read()
             
-            # Encrypt the file with user's password
             encrypted_content, salt, iv = encrypt_file_client_side(original_content, password)
-            
-            # Prepare for storage (combine salt, iv, and encrypted content)
             final_encrypted_data = prepare_encrypted_file_for_storage(encrypted_content, salt, iv)
             
-            # Upload encrypted file back to S3 (replacing original)
             s3_client_primary.put_object(
-                Bucket=settings.SECURE_S3_BUCKET_NAME,
+                Bucket=bucket_name,
                 Key=s3_key,
                 Body=final_encrypted_data,
                 Metadata={
@@ -222,18 +185,17 @@ def apply_encryption_to_file(s3_key: str, owner_username: str, encryption_method
                 }
             )
             
-            # Replicate encrypted file to backup bucket
-            s3_client_replica.put_object(
-                Bucket=settings.REPLICA_S3_BUCKET_NAME,
-                Key=s3_key,
-                Body=final_encrypted_data,
-                Metadata={
-                    'encryption': 'client-side',
-                    'algorithm': 'AES-256-CBC'
-                }
-            )
+            if s3_client_replica and replica_bucket:
+                s3_client_replica.put_object(
+                    Bucket=replica_bucket,
+                    Key=s3_key,
+                    Body=final_encrypted_data,
+                    Metadata={
+                        'encryption': 'client-side',
+                        'algorithm': 'AES-256-CBC'
+                    }
+                )
             
-            # Update database
             files_db.update_one(
                 {"s3_key": s3_key},
                 {
@@ -248,7 +210,6 @@ def apply_encryption_to_file(s3_key: str, owner_username: str, encryption_method
             )
             logger.info(f"Client-side encryption applied to '{s3_key}'")
         
-        # Notify user via WebSocket
         try:
             requests.post(f"http://localhost:8000/ws/notify/{owner_username}")
             logger.debug(f"WebSocket notification sent for user {owner_username}")
@@ -257,7 +218,6 @@ def apply_encryption_to_file(s3_key: str, owner_username: str, encryption_method
             
     except Exception as e:
         logger.error(f"Error applying encryption to {s3_key}: {e}")
-        # Mark encryption as failed
         files_db.update_one(
             {"s3_key": s3_key},
             {
@@ -270,4 +230,3 @@ def apply_encryption_to_file(s3_key: str, owner_username: str, encryption_method
     finally:
         if 'mongo_client' in locals():
             mongo_client.close()
-

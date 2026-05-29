@@ -19,8 +19,7 @@ import logging
 
 from app.cost.manager import get_aws_cost_and_usage, get_gcp_billing_data, get_azure_billing_data
 from app.config.demo_mode import is_demo_mode, MockDataGenerator, log_demo_mode_call
-# from app.auth.jwthandler import get_current_user # Assuming you have JWT for auth
-# from app.models.user import User # Assuming your User model is defined
+from app.users.routes_users import get_current_user
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -49,7 +48,7 @@ def add_to_cost_cache(cache_key: str, data: Any, timestamp: float):
 
 @router.get("/aws", summary="Get AWS Cost and Usage Data")
 async def get_aws_costs(
-    # current_user: User = Depends(get_current_active_user), # Uncomment when auth is ready
+    user: dict = Depends(get_current_user),
     start_date: str = Query(..., description="Start date for the report (YYYY-MM-DD). Max 13 months ago for DAILY."),
     end_date: str = Query(..., description="End date for the report (YYYY-MM-DD). Must be after start_date."),
     granularity: str = Query("DAILY", pattern="^(DAILY|MONTHLY)$", description="Granularity of the data (DAILY or MONTHLY)."),
@@ -67,7 +66,7 @@ async def get_aws_costs(
             return {"provider": "aws", "data": mock_data, "cached": False, "demo_mode": True}
         
         # Create cache key from query parameters
-        cache_key = f"aws_{start_date}_{end_date}_{granularity}"
+        cache_key = f"{user.username}_aws_{start_date}_{end_date}_{granularity}"
         current_time = time.time()
         
         # Check cache first
@@ -90,6 +89,7 @@ async def get_aws_costs(
                 group_by_params.append({'Type': 'TAG', 'Key': tag})
 
         cost_data = get_aws_cost_and_usage(
+            user.username,
             start_date=start_date,
             end_date=end_date,
             granularity=granularity,
@@ -106,7 +106,7 @@ async def get_aws_costs(
 
 @router.get("/gcp", summary="Get GCP Billing Data")
 async def get_gcp_costs(
-    # current_user: User = Depends(get_current_active_user), # Uncomment when auth is ready
+    user: dict = Depends(get_current_user),
     start_date: str = Query(..., description="Start date for the report (YYYY-MM-DD)."),
     end_date: str = Query(..., description="End date for the report (YYYY-MM-DD). Must be after start_date.")
 ) -> Dict[str, Any]:
@@ -114,14 +114,14 @@ async def get_gcp_costs(
     Retrieves GCP Billing data.
     """
     try:
-        cost_data = get_gcp_billing_data(start_date=start_date, end_date=end_date)
+        cost_data = get_gcp_billing_data(user.username, start_date=start_date, end_date=end_date)
         return {"provider": "gcp", "data": cost_data}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch GCP costs: {e}")
 
 @router.get("/azure", summary="Get Azure Cost Data")
 async def get_azure_costs(
-    # current_user: User = Depends(get_current_active_user), # Uncomment when auth is ready
+    user: dict = Depends(get_current_user),
     start_date: str = Query(..., description="Start date for the report (YYYY-MM-DD)."),
     end_date: str = Query(..., description="End date for the report (YYYY-MM-DD). Must be after start_date.")
 ) -> Dict[str, Any]:
@@ -129,7 +129,7 @@ async def get_azure_costs(
     Retrieves Azure Cost data.
     """
     try:
-        cost_data = get_azure_billing_data(start_date=start_date, end_date=end_date)
+        cost_data = get_azure_billing_data(user.username, start_date=start_date, end_date=end_date)
         return {"provider": "azure", "data": cost_data}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch Azure costs: {e}")

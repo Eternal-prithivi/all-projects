@@ -318,9 +318,14 @@ def _perform_tier_change(
 ):
     """A helper function to perform and log the tier change for a single file."""
     filename = file_record.get("filename")
+    owner_username = file_record.get("owner_username")
     csp = file_record.get("csp", "AWS")
     object_key = file_record.get("s3_key") or file_record.get("object_key") or file_record.get("blob_name")
-    
+
+    if not owner_username:
+        logger.warning("Skipping tier change for %s: missing owner_username", filename)
+        return False
+
     change_function = tier_change_functions.get(csp)
     new_tier_api_name = TIER_MAP.get(csp, {}).get(target_tier)
 
@@ -329,7 +334,7 @@ def _perform_tier_change(
             action = "Promoting" if is_promotion else "Demoting"
             logger.info(f"{action} '{filename}' on {csp} to {target_tier.upper()} tier ({new_tier_api_name})")
             
-            change_function(object_key, new_tier_api_name)
+            change_function(owner_username, object_key, new_tier_api_name)
             
             now = datetime.now(timezone.utc)
             update_operation = {

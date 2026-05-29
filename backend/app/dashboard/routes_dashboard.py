@@ -20,12 +20,9 @@ import time
 
 logger = logging.getLogger(__name__)
 
-# Cache for AWS cost data (1 hour TTL)
-aws_cost_cache = {
-    "data": None,
-    "timestamp": 0,
-    "ttl": 3600  # 1 hour in seconds
-}
+# Per-user AWS cost cache (1 hour TTL): username -> {data, timestamp}
+aws_cost_cache: dict = {}
+CACHE_TTL = 3600
 
 # The prefix is now handled in main.py, so it's removed from here.
 router = APIRouter(
@@ -41,8 +38,9 @@ async def get_dashboard_stats(user: dict = Depends(get_current_user)):
     DB = get_database()
     
     try:
-        # Get cached monthly costs from AWS (no API call)
-        monthly_costs = aws_cost_cache.get("data", 0.0) or 0.0
+        # Get cached monthly costs for this user (no API call)
+        user_cache = aws_cost_cache.get(user.username, {})
+        monthly_costs = user_cache.get("data", 0.0) or 0.0
         
         # Get real VM count
         vm_assignments = DB["vm_assignments"]
@@ -210,15 +208,17 @@ async def refresh_aws_costs(user: dict = Depends(get_current_user)):
         start_date = (datetime.utcnow() - timedelta(days=30)).strftime("%Y-%m-%d")
         
         logger.info("Manual refresh: Fetching AWS cost data")
-        aws_data = get_aws_cost_and_usage(start_date, end_date, "DAILY")
+        aws_data = get_aws_cost_and_usage(user.username, start_date, end_date, "DAILY")
         monthly_costs = sum(
             float(item.get("Total", {}).get("UnblendedCost", {}).get("Amount", 0))
             for item in aws_data.get("ResultsByTime", [])
         )
         
-        # Update cache
-        aws_cost_cache["data"] = monthly_costs
-        aws_cost_cache["timestamp"] = time.time()
+        # Update per-user cache
+        aws_cost_cache[user.username] = {
+            "data": monthly_costs,
+            "timestamp": time.time(),
+        }
         
         logger.info(f"AWS costs refreshed: ${monthly_costs:.2f}")
         

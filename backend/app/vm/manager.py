@@ -30,6 +30,7 @@ from app.ml.repository import (
     log_workload_classification,
 )
 from app.vm.metrics_collector import VMMetricsCollector
+from app.vm.gcp_runtime import gcp_project_id, gcp_zone, _gcp_username, _resolve_byoc_compute
 import uuid
 
 # Set up logger
@@ -70,18 +71,35 @@ _image_client = None
 _machine_type_client = None
 
 def _get_instance_client():
+    username = _gcp_username.get()
+    if username:
+        ctx = _resolve_byoc_compute(username)
+        if ctx:
+            return compute_v1.InstancesClient(credentials=ctx["credentials"])
     global _instance_client
     if _instance_client is None:
         _instance_client = compute_v1.InstancesClient(credentials=credentials)
     return _instance_client
 
+
 def _get_image_client():
+    username = _gcp_username.get()
+    if username:
+        ctx = _resolve_byoc_compute(username)
+        if ctx:
+            return compute_v1.ImagesClient(credentials=ctx["credentials"])
     global _image_client
     if _image_client is None:
         _image_client = compute_v1.ImagesClient(credentials=credentials)
     return _image_client
 
+
 def _get_machine_type_client():
+    username = _gcp_username.get()
+    if username:
+        ctx = _resolve_byoc_compute(username)
+        if ctx:
+            return compute_v1.MachineTypesClient(credentials=ctx["credentials"])
     global _machine_type_client
     if _machine_type_client is None:
         _machine_type_client = compute_v1.MachineTypesClient(credentials=credentials)
@@ -126,14 +144,14 @@ def list_vms() -> List[Dict[str, Any]]:
                 "status": doc.get("vm_status", "UNKNOWN"),
                 "labels": {"cluster_type": doc.get("cluster_type", "performance")},
                 "machine_type": doc.get("machine_type", "unknown"),
-                "zone": settings.GCP_ZONE if hasattr(settings, 'GCP_ZONE') else "us-central1-a",
+                "zone": gcp_zone() if hasattr(settings, 'GCP_ZONE') else "us-central1-a",
             })
         return db_vms
     
     try:
         request = compute_v1.ListInstancesRequest(
-            project=settings.GCP_PROJECT_ID,
-            zone=settings.GCP_ZONE,
+            project=gcp_project_id(),
+            zone=gcp_zone(),
         )
         instances = _get_instance_client().list(request=request)
         
@@ -173,7 +191,7 @@ def create_vm(
 
     config = compute_v1.Instance(
         name=name,
-        machine_type=f"zones/{settings.GCP_ZONE}/machineTypes/{machine_type}",
+        machine_type=f"zones/{gcp_zone()}/machineTypes/{machine_type}",
         disks=[
             compute_v1.AttachedDisk(
                 auto_delete=True,
@@ -197,48 +215,48 @@ def create_vm(
     )
 
     request = compute_v1.InsertInstanceRequest(
-        project=settings.GCP_PROJECT_ID,
-        zone=settings.GCP_ZONE,
+        project=gcp_project_id(),
+        zone=gcp_zone(),
         instance_resource=config,
     )
 
-    logger.info(f"Creating VM '{name}' with machine type '{machine_type}' and disk size '{disk_size_gb}GB' in zone '{settings.GCP_ZONE}'")
+    logger.info(f"Creating VM '{name}' with machine type '{machine_type}' and disk size '{disk_size_gb}GB' in zone '{gcp_zone()}'")
     operation = _get_instance_client().insert(request=request)
     operation.result() # Wait for the operation to complete
 
     # Fetch details of the created VM to get its IP
-    vm_details = get_vm_details(name, settings.GCP_ZONE)
+    vm_details = get_vm_details(name, gcp_zone())
     return {"name": name, "status": "RUNNING", "details": vm_details}
 
 def start_vm(name: str) -> Dict[str, Any]:
     """Starts a VM instance."""
     request = compute_v1.StartInstanceRequest(
-        project=settings.GCP_PROJECT_ID,
-        zone=settings.GCP_ZONE,
+        project=gcp_project_id(),
+        zone=gcp_zone(),
         instance=name,
     )
     operation = _get_instance_client().start(request=request)
     operation.result()
-    vm_details = get_vm_details(name, settings.GCP_ZONE)
+    vm_details = get_vm_details(name, gcp_zone())
     return {"name": name, "status": "RUNNING", "details": vm_details}
 
 def stop_vm(name: str) -> Dict[str, Any]:
     """Stops a VM instance."""
     request = compute_v1.StopInstanceRequest(
-        project=settings.GCP_PROJECT_ID,
-        zone=settings.GCP_ZONE,
+        project=gcp_project_id(),
+        zone=gcp_zone(),
         instance=name,
     )
     operation = _get_instance_client().stop(request=request)
     operation.result()
-    vm_details = get_vm_details(name, settings.GCP_ZONE)
+    vm_details = get_vm_details(name, gcp_zone())
     return {"name": name, "status": "TERMINATED", "details": vm_details}
 
 def delete_vm(name: str) -> Dict[str, Any]:
     """Deletes a VM instance."""
     request = compute_v1.DeleteInstanceRequest(
-        project=settings.GCP_PROJECT_ID,
-        zone=settings.GCP_ZONE,
+        project=gcp_project_id(),
+        zone=gcp_zone(),
         instance=name,
     )
     operation = _get_instance_client().delete(request=request)
@@ -259,7 +277,7 @@ def get_vm_details(name: str, zone: str) -> Dict[str, Any]:
         }
 
     request = compute_v1.GetInstanceRequest(
-        project=settings.GCP_PROJECT_ID,
+        project=gcp_project_id(),
         zone=zone,
         instance=name,
     )
@@ -377,7 +395,7 @@ def assign_vm_to_user(
         
         # Get VM status from GCP
         try:
-            vm_details = get_vm_details(vm_name, settings.GCP_ZONE)
+            vm_details = get_vm_details(vm_name, gcp_zone())
             vm_status = vm_details["status"]
             vm_ip = vm_details["external_ip"]
         except Exception as e:
@@ -496,7 +514,7 @@ def migrate_user(
         raise ValueError("Must specify either target_cluster or target_vm_name")
     
     # Step 3: Start target VM if stopped
-    target_vm_details = get_vm_details(final_target_vm, settings.GCP_ZONE)
+    target_vm_details = get_vm_details(final_target_vm, gcp_zone())
     if credentials is None:
         logger.info("GCP not configured. Performing simulated VM migration.")
         target_vm_details = {
@@ -507,7 +525,7 @@ def migrate_user(
     elif target_vm_details["status"] != "RUNNING":
         logger.info(f"Starting target VM {final_target_vm}")
         start_vm(final_target_vm)
-        target_vm_details = get_vm_details(final_target_vm, settings.GCP_ZONE)
+        target_vm_details = get_vm_details(final_target_vm, gcp_zone())
     
     target_vm_ip = target_vm_details["external_ip"]
     
@@ -656,8 +674,8 @@ def get_cluster_health(cluster_type: ClusterType) -> Dict[str, Any]:
             logger.debug(f"Attempting batch fetch for cluster: {cluster_type.value}")
             response = _get_instance_client().list(
                 request=compute_v1.ListInstancesRequest(
-                    project=settings.GCP_PROJECT_ID,
-                    zone=settings.GCP_ZONE
+                    project=gcp_project_id(),
+                    zone=gcp_zone()
                 )
             )
 
@@ -691,7 +709,7 @@ def get_cluster_health(cluster_type: ClusterType) -> Dict[str, Any]:
         else:
             # Fallback: individual VM status check
             try:
-                vm_details = get_vm_details(vm_name, settings.GCP_ZONE)
+                vm_details = get_vm_details(vm_name, gcp_zone())
                 status = vm_details.get("status", "UNKNOWN")
                 logger.debug(f"Individual fetch for {vm_name}: {status}")
             except Exception as e:

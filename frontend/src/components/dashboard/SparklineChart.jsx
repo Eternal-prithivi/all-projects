@@ -1,17 +1,24 @@
 import React from 'react';
 import { AreaChart, Area, ResponsiveContainer, Tooltip, XAxis } from 'recharts';
+import { useTheme } from '../../context/ThemeContext.jsx';
 
 /**
  * Gold-gradient sparkline area chart for the dashboard.
  * Wraps Recharts AreaChart with Zenith theming.
- * 
+ *
  * @param {Array} data - Array of { name, value } objects
  * @param {number} height - Chart height in pixels (default: 120)
  * @param {boolean} showTooltip - Whether to show tooltip on hover
  * @param {boolean} showXAxis - Whether to show X axis labels
  */
 function SparklineChart({ data = [], height = 120, showTooltip = true, showXAxis = false }) {
+  const { effectiveTheme } = useTheme();
+  const isLight = effectiveTheme === 'light';
+
   if (!data || data.length === 0) return null;
+
+  const tickFill = isLight ? 'rgba(26, 26, 26, 0.45)' : 'rgba(255, 255, 255, 0.4)';
+  const activeDotStroke = isLight ? '#1a1a1a' : '#000';
 
   const CustomTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
@@ -41,11 +48,11 @@ function SparklineChart({ data = [], height = 120, showTooltip = true, showXAxis
             </linearGradient>
           </defs>
           {showXAxis && (
-            <XAxis 
-              dataKey="name" 
-              axisLine={false} 
-              tickLine={false} 
-              tick={{ fill: 'rgba(255,255,255,0.4)', fontSize: 11, fontFamily: 'Inter' }}
+            <XAxis
+              dataKey="name"
+              axisLine={false}
+              tickLine={false}
+              tick={{ fill: tickFill, fontSize: 11, fontFamily: 'Inter' }}
               dy={8}
             />
           )}
@@ -57,11 +64,11 @@ function SparklineChart({ data = [], height = 120, showTooltip = true, showXAxis
             strokeWidth={2.5}
             fill="url(#goldGradient)"
             dot={false}
-            activeDot={{ 
-              r: 5, 
-              fill: '#ffd700', 
-              stroke: '#000', 
-              strokeWidth: 2 
+            activeDot={{
+              r: 5,
+              fill: '#ffd700',
+              stroke: activeDotStroke,
+              strokeWidth: 2,
             }}
           />
         </AreaChart>

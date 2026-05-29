@@ -73,7 +73,9 @@ billing_cache = {
 }
 
 
-def fetch_real_cloud_costs(start_date: str, end_date: str, use_cache: bool = True) -> CostBreakdown:
+def fetch_real_cloud_costs(
+    username: str, start_date: str, end_date: str, use_cache: bool = True
+) -> CostBreakdown:
     """
     Fetch real costs from cloud providers for the specified date range (cached for 1 hour)
     Returns CostBreakdown with actual costs or 0.0 if provider not configured
@@ -81,7 +83,7 @@ def fetch_real_cloud_costs(start_date: str, end_date: str, use_cache: bool = Tru
     # Check cache first
     if use_cache:
         current_time = time.time()
-        cache_key = f"{start_date}_{end_date}"
+        cache_key = f"{username}_{start_date}_{end_date}"
         if billing_cache["data"] is not None and (current_time - billing_cache["timestamp"]) < billing_cache["ttl"]:
             logger.info(f"Using cached billing cost data for {cache_key}")
             return billing_cache["data"]
@@ -92,10 +94,11 @@ def fetch_real_cloud_costs(start_date: str, end_date: str, use_cache: bool = Tru
     try:
         # Fetch AWS costs
         aws_data = get_aws_cost_and_usage(
+            username,
             start_date=start_date,
             end_date=end_date,
             granularity='MONTHLY',
-            group_by=[]
+            group_by=[],
         )
         if aws_data and 'ResultsByTime' in aws_data:
             aws_total = sum(
@@ -109,7 +112,7 @@ def fetch_real_cloud_costs(start_date: str, end_date: str, use_cache: bool = Tru
     
     try:
         # Fetch GCP costs
-        gcp_data = get_gcp_billing_data(start_date=start_date, end_date=end_date)
+        gcp_data = get_gcp_billing_data(username, start_date=start_date, end_date=end_date)
         if gcp_data and 'TotalCost' in gcp_data:
             costs.gcp = round(gcp_data['TotalCost'], 2)
         elif gcp_data and gcp_data.get('status') in ['missing_config', 'missing_dependency', 'error']:
@@ -120,7 +123,7 @@ def fetch_real_cloud_costs(start_date: str, end_date: str, use_cache: bool = Tru
     
     try:
         # Fetch Azure costs
-        azure_data = get_azure_billing_data(start_date=start_date, end_date=end_date)
+        azure_data = get_azure_billing_data(username, start_date=start_date, end_date=end_date)
         if azure_data and 'TotalCost' in azure_data:
             costs.azure = round(azure_data['TotalCost'], 2)
         elif azure_data and azure_data.get('status') in ['missing_config', 'missing_dependency', 'error']:
@@ -162,7 +165,9 @@ async def get_invoices(current_user: User = Depends(get_current_user)):
         start_of_month = now.replace(day=1).strftime('%Y-%m-%d')
         end_date = now.strftime('%Y-%m-%d')
         
-        current_month_costs = fetch_real_cloud_costs(start_of_month, end_date)
+        current_month_costs = fetch_real_cloud_costs(
+            current_user.username, start_of_month, end_date
+        )
         
         return InvoicesListResponse(
             success=True,
@@ -232,7 +237,7 @@ async def generate_invoice(current_user: User = Depends(get_current_user)):
         start_of_month = now.replace(day=1).strftime('%Y-%m-%d')
         end_date = now.strftime('%Y-%m-%d')
         
-        costs = fetch_real_cloud_costs(start_of_month, end_date)
+        costs = fetch_real_cloud_costs(current_user.username, start_of_month, end_date)
         
         total = costs.aws + costs.gcp + costs.azure + costs.platform_fee
         
@@ -324,7 +329,7 @@ async def get_current_month_summary(current_user: User = Depends(get_current_use
         start_of_month = now.replace(day=1).strftime('%Y-%m-%d')
         end_date = now.strftime('%Y-%m-%d')
         
-        current_costs = fetch_real_cloud_costs(start_of_month, end_date)
+        current_costs = fetch_real_cloud_costs(current_user.username, start_of_month, end_date)
         
         total = current_costs.aws + current_costs.gcp + current_costs.azure + current_costs.platform_fee
         

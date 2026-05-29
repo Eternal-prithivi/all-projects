@@ -13,14 +13,12 @@
 #   - Change the two-step upload flow (scan → await choice → encrypt → S3)
 #   - Use the same S3 bucket as regular storage (SECURE_S3_BUCKET_NAME is separate)
 # =============================================================================
-import boto3
 from datetime import datetime
 from typing import Optional
 from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException, status
 from fastapi.responses import Response
 from pydantic import BaseModel
 from pymongo.collection import Collection
-from botocore.config import Config
 
 from app.utils.config import settings
 from app.auth.auth_utils import require_2fa
@@ -29,6 +27,7 @@ from app.database.mongo_client import mongodb_client
 from app.storage.models_storage import FileMetadata
 from app.storage.manager import list_objects_aws
 from app.storage.tasks import apply_encryption_to_file
+from app.storage.cloud_credentials import SecureAwsStorage, resolve_secure_aws_storage
 from app.security.encryption_handler import (
     decrypt_file_client_side,
     extract_encrypted_file_components,
@@ -38,24 +37,7 @@ from app.security.sensitive_file_detector import scan_file_content
 # The prefix is removed here as it is handled in main.py
 router = APIRouter(tags=["Security"])
 
-s3_config_v4 = Config(
-    signature_version='s3v4'
-)
-# S3 clients for primary and replica buckets
-s3_client_primary = boto3.client(
-    's3',
-    aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
-    aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
-    region_name=settings.PRIMARY_S3_REGION,
-    config=s3_config_v4
-)
-s3_client_replica = boto3.client(
-    's3',
-    aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
-    aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
-    region_name=settings.REPLICA_S3_REGION,
-    config=s3_config_v4
-)
+
 def get_secure_files_collection() -> Collection:
     return mongodb_client.get_collection("secure_files")
 
@@ -67,11 +49,12 @@ def _persist_sse_secure_file(
     owner_username: str,
     file_content: bytes,
     is_sensitive: bool,
+    storage: SecureAwsStorage,
     scan_reasons: Optional[list] = None,
 ) -> dict:
-    """Upload bytes to dual secure buckets with SSE-S3 and save Mongo metadata."""
-    object_key = f"{owner_username}/{filename}"
-    _put_secure_object_dual(file_content, object_key, server_side_encryption=True)
+    """Upload bytes to secure vault (BYOC bucket or platform dual buckets) with SSE-S3."""
+    object_key = storage.object_key(owner_username, filename)
+    _put_secure_object_dual(file_content, object_key, storage, server_side_encryption=True)
     file_metadata = FileMetadata(
         filename=filename,
         s3_key=object_key,
@@ -85,6 +68,8 @@ def _persist_sse_secure_file(
     )
     doc = file_metadata.model_dump()
     doc["upload_date"] = datetime.utcnow()
+    doc["cloud_bucket"] = storage.primary_bucket
+    doc["is_byoc"] = storage.is_byoc
     if scan_reasons is not None:
         doc["scan_reasons"] = scan_reasons
     files_db.update_one(
@@ -105,28 +90,34 @@ def _persist_sse_secure_file(
 def _put_secure_object_dual(
     body: bytes,
     object_key: str,
+    storage: SecureAwsStorage,
     *,
     server_side_encryption: bool = False,
     metadata: Optional[dict] = None,
 ) -> None:
-    """Write object to primary + replica secure buckets (redundancy)."""
-    put_kwargs: dict = {"Bucket": settings.SECURE_S3_BUCKET_NAME, "Key": object_key, "Body": body}
-    if server_side_encryption:
-        put_kwargs["ServerSideEncryption"] = "AES256"
-    if metadata:
-        put_kwargs["Metadata"] = metadata
-    s3_client_primary.put_object(**put_kwargs)
-
-    replica_kwargs = {
-        "Bucket": settings.REPLICA_S3_BUCKET_NAME,
+    """Write object to primary (+ replica when platform-managed vault)."""
+    put_kwargs: dict = {
+        "Bucket": storage.primary_bucket,
         "Key": object_key,
         "Body": body,
     }
     if server_side_encryption:
-        replica_kwargs["ServerSideEncryption"] = "AES256"
+        put_kwargs["ServerSideEncryption"] = "AES256"
     if metadata:
-        replica_kwargs["Metadata"] = metadata
-    s3_client_replica.put_object(**replica_kwargs)
+        put_kwargs["Metadata"] = metadata
+    storage.primary_client.put_object(**put_kwargs)
+
+    if storage.replica_client and storage.replica_bucket:
+        replica_kwargs = {
+            "Bucket": storage.replica_bucket,
+            "Key": object_key,
+            "Body": body,
+        }
+        if server_side_encryption:
+            replica_kwargs["ServerSideEncryption"] = "AES256"
+        if metadata:
+            replica_kwargs["Metadata"] = metadata
+        storage.replica_client.put_object(**replica_kwargs)
 
 
 # Request models
@@ -191,14 +182,16 @@ async def sync_secure_aws_bucket(
     records or modify S3 objects. New rows inherit encryption flags from S3 headers.
     """
     try:
-        bucket_name = settings.SECURE_S3_BUCKET_NAME
-        user_prefix = f"{user.username}/"
+        storage = resolve_secure_aws_storage(user.username)
+        bucket_name = storage.primary_bucket
+        user_prefix = storage.list_prefix
         objects = list_objects_aws(
             bucket_name=bucket_name,
             prefix=user_prefix,
-            access_key_id=settings.AWS_ACCESS_KEY_ID,
-            secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
-            region_name=settings.PRIMARY_S3_REGION,
+            access_key_id=storage.access_key_id,
+            secret_access_key=storage.secret_access_key,
+            session_token=storage.session_token,
+            region_name=storage.region,
         )
 
         inserted = 0
@@ -239,7 +232,7 @@ async def sync_secure_aws_bucket(
                 "awaiting_encryption_choice": False,
             }
             try:
-                head = s3_client_primary.head_object(
+                head = storage.primary_client.head_object(
                     Bucket=bucket_name, Key=object_key
                 )
                 encryption_flags = _encryption_flags_from_s3_head(head)
@@ -253,6 +246,8 @@ async def sync_secure_aws_bucket(
                 "owner_username": user.username,
                 "size_bytes": int(obj.get("size_bytes", 0) or 0),
                 "upload_date": upload_date,
+                "cloud_bucket": bucket_name,
+                "is_byoc": storage.is_byoc,
                 "is_sensitive": False,
                 **encryption_flags,
             }
@@ -261,13 +256,16 @@ async def sync_secure_aws_bucket(
 
         # --- Remove stale DB records for files no longer present in S3 ---
         removed = 0
+        import re
+
+        prefix_base = re.escape(user_prefix.rstrip("/"))
         stale_filter = {
             "owner_username": user.username,
-            "s3_key": {"$regex": f"^{user.username}/"},
+            "s3_key": {"$regex": f"^{prefix_base}/"},
         }
         if live_s3_keys:
             stale_filter["s3_key"] = {
-                "$regex": f"^{user.username}/",
+                "$regex": f"^{prefix_base}/",
                 "$nin": list(live_s3_keys),
             }
         stale_cursor = files_db.find(stale_filter, {"_id": 1, "filename": 1})
@@ -309,6 +307,7 @@ async def upload_secure_file(
     """
     file_content = await file.read()
     file_size = len(file_content)
+    storage = resolve_secure_aws_storage(user.username)
 
     scan = scan_file_content(file_content, file.filename)
     is_sensitive = scan.is_sensitive
@@ -321,6 +320,7 @@ async def upload_secure_file(
                 owner_username=user.username,
                 file_content=file_content,
                 is_sensitive=True,
+                storage=storage,
                 scan_reasons=scan.reasons,
             )
         except Exception as e:
@@ -370,6 +370,7 @@ async def upload_secure_file(
                 owner_username=user.username,
                 file_content=file_content,
                 is_sensitive=False,
+                storage=storage,
             )
         except Exception as e:
             raise HTTPException(
@@ -394,11 +395,13 @@ async def upload_client_encrypted(
     if len(encrypted_body) < 33:
         raise HTTPException(status_code=400, detail="Invalid encrypted payload.")
 
-    object_key = f"{user.username}/{original_filename}"
+    storage = resolve_secure_aws_storage(user.username)
+    object_key = storage.object_key(user.username, original_filename)
     try:
         _put_secure_object_dual(
             encrypted_body,
             object_key,
+            storage,
             metadata={"encryption": "client-side", "algorithm": "AES-256-CBC"},
         )
     except Exception as e:
@@ -413,6 +416,8 @@ async def upload_client_encrypted(
         "owner_username": user.username,
         "size_bytes": len(encrypted_body),
         "upload_date": datetime.utcnow(),
+        "cloud_bucket": storage.primary_bucket,
+        "is_byoc": storage.is_byoc,
         "is_sensitive": is_sensitive,
         "is_encrypted": True,
         "encryption_method": "client-side",
@@ -496,6 +501,7 @@ async def choose_encryption_method(
     if not file_content:
         raise HTTPException(status_code=400, detail="Temporary file content not found")
     
+    storage = resolve_secure_aws_storage(user.username)
     try:
         result = _persist_sse_secure_file(
             files_db,
@@ -503,6 +509,7 @@ async def choose_encryption_method(
             owner_username=user.username,
             file_content=file_content,
             is_sensitive=bool(file_doc.get("is_sensitive")),
+            storage=storage,
             scan_reasons=file_doc.get("scan_reasons"),
         )
         return {
@@ -526,13 +533,16 @@ async def generate_secure_download_url(
     Generates a pre-signed URL for securely downloading a file.
     For client-side encrypted files, returns metadata indicating password is needed.
     """
-    object_key = f"{user.username}/{filename}"
-    
-    # Get file metadata
-    file_doc = files_db.find_one({"s3_key": object_key, "owner_username": user.username})
+    storage = resolve_secure_aws_storage(user.username)
+    object_key = storage.object_key(user.username, filename)
+    file_doc = files_db.find_one(
+        {"owner_username": user.username, "$or": [{"s3_key": object_key}, {"filename": filename}]}
+    )
     if not file_doc:
         raise HTTPException(status_code=404, detail="File not found")
-    
+    object_key = file_doc.get("s3_key") or object_key
+    bucket = file_doc.get("cloud_bucket") or storage.primary_bucket
+
     # Check if file is client-side encrypted
     if file_doc.get("client_side_encrypted"):
         return {
@@ -542,9 +552,9 @@ async def generate_secure_download_url(
         }
     
     try:
-        url = s3_client_primary.generate_presigned_url(
+        url = storage.primary_client.generate_presigned_url(
             'get_object',
-            Params={'Bucket': settings.SECURE_S3_BUCKET_NAME, 'Key': object_key},
+            Params={'Bucket': bucket, 'Key': object_key},
             ExpiresIn=3600  # URL is valid for 1 hour
         )
         # The key "presigned_url" matches what the frontend expects
@@ -567,19 +577,22 @@ async def download_client_encrypted_ciphertext(
     files_db: Collection = Depends(get_secure_files_collection),
 ):
     """Return raw ciphertext for browser-side decryption (zero-knowledge)."""
-    object_key = f"{user.username}/{filename}"
-    file_doc = files_db.find_one({"s3_key": object_key, "owner_username": user.username})
+    storage = resolve_secure_aws_storage(user.username)
+    object_key = storage.object_key(user.username, filename)
+    file_doc = files_db.find_one(
+        {"owner_username": user.username, "$or": [{"s3_key": object_key}, {"filename": filename}]}
+    )
     if not file_doc:
         raise HTTPException(status_code=404, detail="File not found")
+    object_key = file_doc.get("s3_key") or object_key
+    bucket = file_doc.get("cloud_bucket") or storage.primary_bucket
     if not file_doc.get("client_side_encrypted"):
         raise HTTPException(
             status_code=400,
             detail="File is not browser-encrypted. Use the standard download URL.",
         )
     try:
-        response = s3_client_primary.get_object(
-            Bucket=settings.SECURE_S3_BUCKET_NAME, Key=object_key
-        )
+        response = storage.primary_client.get_object(Bucket=bucket, Key=object_key)
         body = response["Body"].read()
         return Response(
             content=body,
@@ -601,22 +614,24 @@ async def decrypt_and_download(
     """
     Decrypts a client-side encrypted file with user's password and returns the file directly.
     """
-    object_key = f"{user.username}/{request.filename}"
-    
-    # Get file metadata
-    file_doc = files_db.find_one({"s3_key": object_key, "owner_username": user.username})
+    storage = resolve_secure_aws_storage(user.username)
+    object_key = storage.object_key(user.username, request.filename)
+    file_doc = files_db.find_one(
+        {
+            "owner_username": user.username,
+            "$or": [{"s3_key": object_key}, {"filename": request.filename}],
+        }
+    )
     if not file_doc:
         raise HTTPException(status_code=404, detail="File not found")
-    
+    object_key = file_doc.get("s3_key") or object_key
+    bucket = file_doc.get("cloud_bucket") or storage.primary_bucket
+
     if not file_doc.get("client_side_encrypted"):
         raise HTTPException(status_code=400, detail="File is not client-side encrypted")
     
     try:
-        # Download encrypted file from S3
-        response = s3_client_primary.get_object(
-            Bucket=settings.SECURE_S3_BUCKET_NAME,
-            Key=object_key
-        )
+        response = storage.primary_client.get_object(Bucket=bucket, Key=object_key)
         encrypted_content = response['Body'].read()
         salt, iv, encrypted_data = extract_encrypted_file_components(encrypted_content)
         
@@ -661,11 +676,21 @@ async def delete_secure_file(
     """
     Deletes a file from both primary and replica S3 buckets and from MongoDB.
     """
-    object_key = f"{user.username}/{filename}"
+    storage = resolve_secure_aws_storage(user.username)
+    object_key = storage.object_key(user.username, filename)
+    file_doc = files_db.find_one(
+        {"owner_username": user.username, "$or": [{"s3_key": object_key}, {"filename": filename}]}
+    )
+    if file_doc:
+        object_key = file_doc.get("s3_key") or object_key
+    bucket = (file_doc or {}).get("cloud_bucket") or storage.primary_bucket
     try:
-        s3_client_primary.delete_object(Bucket=settings.SECURE_S3_BUCKET_NAME, Key=object_key)
-        s3_client_replica.delete_object(Bucket=settings.REPLICA_S3_BUCKET_NAME, Key=object_key)
-        files_db.delete_one({"s3_key": object_key})
+        storage.primary_client.delete_object(Bucket=bucket, Key=object_key)
+        if storage.replica_client and storage.replica_bucket:
+            storage.replica_client.delete_object(
+                Bucket=storage.replica_bucket, Key=object_key
+            )
+        files_db.delete_one({"owner_username": user.username, "s3_key": object_key})
         return
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Could not delete file: {e}")

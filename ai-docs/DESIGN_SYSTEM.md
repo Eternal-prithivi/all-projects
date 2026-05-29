@@ -111,7 +111,7 @@ Post-polish score for dashboard-focused surfaces: **86/100**.
 
 Post-production-standards pass for dashboard-adjacent surfaces: **91/100**.
 
-**Platform-wide UI/UX pass (2026-05-29):** **93/100** — Security vault, billing, admin, cost hub, and shared primitives aligned to Zenith tokens. Light theme remains **dark-first** (see §7).
+**Platform-wide UI/UX pass (2026-05-29):** **93/100** — Security vault, billing, admin, cost hub, and shared primitives aligned to Zenith tokens. **Light theme** supported for the authenticated app (see §7).
 
 Completed improvements:
 - Tightened dashboard overview hierarchy and visual polish while preserving Mission Control layout.
@@ -205,12 +205,15 @@ Files that have been upgraded to the Zenith Design System:
 
 ---
 
-## 7. Light Theme (dark-first product)
+## 7. Light Theme (authenticated app)
 
-> Zenith ships **dark by default**. `ThemeContext` supports `dark` / `light` / `auto`, but `theme-light.css` is a **partial stub** — do not promise full light parity in UI until Wave 6 (future).
+> Zenith ships **dark by default**. `ThemeContext` supports `dark` / `light` / `auto`. The **authenticated app** (dashboard, storage, VM, cost, billing, security, settings) supports full light mode via CSS variables.
 
 - **Default:** `dark` (localStorage key `zenith-theme`).
-- **Settings UI:** Prefer showing Dark + System; treat full Light as experimental until `theme-light.css` covers all upgraded surfaces.
-- When styling for light theme, override `--bg-base`, `--bg-card`, `--text-primary` in `theme-light.css` only — never per-page `:root`.
-- The gold accent (`--gold-primary: #d4af37`) works on both themes — do not change it.
-- **Do NOT** add light-theme-specific styles inline in component CSS.
+- **DOM contract:** `html[data-theme="light"]` or `html[data-theme="dark"]` — set by `ThemeContext` and a blocking script in `frontend/index.html` (prevents flash).
+- **Token cascade:** Light overrides live in `theme-light.css` under `html[data-theme="light"]` (specificity beats `:root` in `index.css`). Never add a second `:root` block in page CSS.
+- **Semantic aliases** (on `:root` and light theme): `--content-bg`, `--border-color`, `--surface-hover`, `--surface-active` — use these instead of `#1a1a1a` / `rgba(255,255,255,0.05)` fallbacks.
+- **Component overrides:** Page-specific light polish in `theme-light.css` only — not inline in JSX.
+- **Dark gold** (`--gold-primary: #d4af37`); **light gold** (`#b8860b` in `html[data-theme="light"]`) — both are intentional.
+- **Do NOT** use `html.dark` / `html.light` classes; **do NOT** hardcode `#fff` for body text (use `var(--text-primary)`).
+- Public marketing and admin consoles are still dark-first; extend light mode there only when explicitly scoped.

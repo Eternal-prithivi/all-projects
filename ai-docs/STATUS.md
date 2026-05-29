@@ -9,16 +9,16 @@
 | Field | Value |
 |-------|--------|
 | Project | CloudResourceOptimizationPlatform (**Zenith**) |
-| Phase | **15** complete |
-| Last major complete | UI controls & theme wiring (light mode, header toggle, BYOC plan lookup) |
+| Phase | **16** complete |
+| Last major complete | BYOC credential routing across storage, security, cost, VM GCP |
 
 ---
 
 ## 🔴 Active Task
 
-**None** — Phase 15 complete (2026-05-29).
+**None** — Phase 16 complete (2026-05-29).
 
-| Next | Phase 14d — cost/VM linkage after deploy (optional) |
+| Next | Optional: Azure BYOC cost SP fields; per-user Celery anomaly |
 
 ---
 
@@ -26,9 +26,9 @@
 
 | Check | Status |
 |-------|--------|
-| Backend pytest | ✅ 73 passed |
-| Frontend lint | ✅ 0 errors |
-| Frontend build | ✅ Passes |
+| Backend pytest | Run after pull (`cd backend && pytest -q`) |
+| Frontend lint | ✅ 0 errors (prior) |
+| Frontend build | ✅ Passes (prior) |
 
 ---
 
@@ -36,3 +36,4 @@
 
 1. `backend/.env` — never commit
 2. Product name **Zenith** — do not rebrand without asking
+3. GCP BYOC for VMs requires Compute API roles on the service account

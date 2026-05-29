@@ -1,6 +1,5 @@
 # backend/app/cost/manager.py
 
-import boto3
 from datetime import datetime, timedelta
 from typing import List, Dict, Any
 import os
@@ -13,6 +12,7 @@ logger = setup_logger(__name__)
 # --- AWS Cost Explorer Functions ---
 
 def get_aws_cost_and_usage(
+    username: str,
     start_date: str, # Format 'YYYY-MM-DD'
     end_date: str,   # Format 'YYYY-MM-DD'
     granularity: str = 'DAILY', # 'DAILY', 'MONTHLY'
@@ -36,14 +36,11 @@ def get_aws_cost_and_usage(
     if metrics is None:
         metrics = ['UnblendedCost']
 
-    # Initialize the AWS Cost Explorer client
-    # Use the PRIMARY_S3_REGION for general AWS services like Cost Explorer
-    client = boto3.client(
-        'ce', # 'ce' is the service name for Cost Explorer
-        aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
-        aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
-        region_name=settings.PRIMARY_S3_REGION # Use the primary region from settings
-    )
+    from app.storage.cloud_credentials import build_aws_ce_client
+
+    client, is_byoc = build_aws_ce_client(username)
+    if is_byoc:
+        logger.info("Cost Explorer: using BYOC AWS credentials for %s", username)
 
     try:
         response = client.get_cost_and_usage(
@@ -61,7 +58,7 @@ def get_aws_cost_and_usage(
         raise # Re-raise the exception to be handled by the FastAPI route
 
 # --- GCP Cost Functions with BigQuery ---
-def get_gcp_billing_data(start_date: str, end_date: str) -> Dict[str, Any]:
+def get_gcp_billing_data(username: str, start_date: str, end_date: str) -> Dict[str, Any]:
     """
     Fetches GCP billing data from BigQuery billing export.
     
@@ -92,21 +89,36 @@ def get_gcp_billing_data(start_date: str, end_date: str) -> Dict[str, Any]:
                 "currency": "USD"
             }
         
-        # Initialize BigQuery client
-        credentials_path = getattr(settings, 'GCP_SERVICE_ACCOUNT_JSON_PATH', None)
-        if credentials_path and os.path.exists(credentials_path):
-            credentials = service_account.Credentials.from_service_account_file(credentials_path)
-            client = bigquery.Client(credentials=credentials, project=settings.GCP_PROJECT_ID)
+        from app.byoc.credential_resolver import resolve_gcp_credentials
+        import json as _json
+
+        gcp = resolve_gcp_credentials(username)
+        if gcp.get("is_byoc"):
+            sa_raw = gcp.get("service_account_json") or ""
+            sa_info = _json.loads(sa_raw) if isinstance(sa_raw, str) else sa_raw
+            credentials = service_account.Credentials.from_service_account_info(sa_info)
+            gcp_project_id = sa_info.get("project_id") or settings.GCP_PROJECT_ID
+            logger.info("GCP billing: using BYOC credentials for %s", username)
         else:
-            client = bigquery.Client(project=settings.GCP_PROJECT_ID)
-        
+            credentials_path = getattr(settings, 'GCP_SERVICE_ACCOUNT_JSON_PATH', None)
+            if credentials_path and os.path.exists(credentials_path):
+                credentials = service_account.Credentials.from_service_account_file(credentials_path)
+            else:
+                credentials = None
+            gcp_project_id = settings.GCP_PROJECT_ID
+
+        if credentials:
+            client = bigquery.Client(credentials=credentials, project=gcp_project_id)
+        else:
+            client = bigquery.Client(project=gcp_project_id)
+
         # Query billing data
         query = f"""
         SELECT
             service.description as service_name,
             SUM(cost) as total_cost,
             currency
-        FROM `{settings.GCP_PROJECT_ID}.{dataset_id}.{table_id}`
+        FROM `{gcp_project_id}.{dataset_id}.{table_id}`
         WHERE DATE(_PARTITIONTIME) BETWEEN DATE('{start_date}') AND DATE('{end_date}')
         AND cost > 0
         GROUP BY service_name, currency
@@ -139,7 +151,7 @@ def get_gcp_billing_data(start_date: str, end_date: str) -> Dict[str, Any]:
         SELECT
             DATE(_PARTITIONTIME) as usage_date,
             SUM(cost) as daily_cost
-        FROM `{settings.GCP_PROJECT_ID}.{dataset_id}.{table_id}`
+        FROM `{gcp_project_id}.{dataset_id}.{table_id}`
         WHERE DATE(_PARTITIONTIME) BETWEEN DATE('{start_date}') AND DATE('{end_date}')
         GROUP BY usage_date
         ORDER BY usage_date
@@ -189,7 +201,7 @@ def get_gcp_billing_data(start_date: str, end_date: str) -> Dict[str, Any]:
         }
 
 # --- Azure Cost Functions with Consumption API ---
-def get_azure_billing_data(start_date: str, end_date: str) -> Dict[str, Any]:
+def get_azure_billing_data(username: str, start_date: str, end_date: str) -> Dict[str, Any]:
     """
     Fetches Azure billing data using Azure Consumption Management API.
     

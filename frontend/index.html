@@ -16,6 +16,23 @@
     <meta name="description" content="Zenith - Multi-cloud resource optimization and management platform" />
     <meta name="theme-color" content="#d4af37" />
     <title>Zenith Cloud Platform</title>
+    <script>
+      (function () {
+        try {
+          var pref = localStorage.getItem('zenith-theme') || 'dark';
+          var effective = pref;
+          if (pref === 'auto') {
+            effective = window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+          } else if (pref !== 'light') {
+            effective = 'dark';
+          }
+          document.documentElement.dataset.theme = effective;
+          document.documentElement.style.colorScheme = effective;
+        } catch (e) {
+          document.documentElement.dataset.theme = 'dark';
+        }
+      })();
+    </script>
   </head>
   <body style="height: 100%; margin: 0">
     <div id="root" style="height: 100%"></div>

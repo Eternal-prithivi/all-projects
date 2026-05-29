@@ -4,7 +4,7 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.76);
+  background: rgba(0, 0, 0, 0.45);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   display: flex;
@@ -16,14 +16,14 @@
 }
 
 .global-search-modal {
-  background: linear-gradient(145deg, rgba(24, 24, 24, 0.92), rgba(8, 8, 8, 0.9));
+  background: var(--bg-elevated);
   border: 1px solid var(--border-default);
   border-radius: var(--radius-xl);
   max-width: 640px;
   width: 90%;
   max-height: 60vh;
   overflow: hidden;
-  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.58), var(--shadow-gold);
+  box-shadow: var(--shadow-elevated), var(--shadow-gold);
   animation: slideDown var(--duration-normal) var(--ease-out);
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);

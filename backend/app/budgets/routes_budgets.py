@@ -171,17 +171,23 @@ async def get_budget_status():
                         
                         # Fetch AWS if not cached
                         if aws_key not in cost_data_cache:
-                            cost_data_cache[aws_key] = get_aws_cost_and_usage(start_date, end_date, "DAILY")
+                            cost_data_cache[aws_key] = get_aws_cost_and_usage(
+                                budget.user_id, start_date, end_date, "DAILY"
+                            )
                         aws_data = cost_data_cache[aws_key]
                         
                         # Fetch GCP if not cached
                         if gcp_key not in cost_data_cache:
-                            cost_data_cache[gcp_key] = get_gcp_billing_data(start_date, end_date)
+                            cost_data_cache[gcp_key] = get_gcp_billing_data(
+                                budget.user_id, start_date, end_date
+                            )
                         gcp_data = cost_data_cache[gcp_key]
                         
                         # Fetch Azure if not cached
                         if azure_key not in cost_data_cache:
-                            cost_data_cache[azure_key] = get_azure_billing_data(start_date, end_date)
+                            cost_data_cache[azure_key] = get_azure_billing_data(
+                                budget.user_id, start_date, end_date
+                            )
                         azure_data = cost_data_cache[azure_key]
                         
                         # Calculate total spend
@@ -198,7 +204,9 @@ async def get_budget_status():
                     elif budget.provider == "aws":
                         # Check if we already fetched this date range in this request
                         if cache_key not in cost_data_cache:
-                            cost_data_cache[cache_key] = get_aws_cost_and_usage(start_date, end_date, "DAILY")
+                            cost_data_cache[cache_key] = get_aws_cost_and_usage(
+                                budget.user_id, start_date, end_date, "DAILY"
+                            )
                         aws_data = cost_data_cache[cache_key]
                         current_spend = sum(float(item.get("Total", {}).get("UnblendedCost", {}).get("Amount", 0)) 
                                           for item in aws_data.get("ResultsByTime", []))
@@ -207,7 +215,9 @@ async def get_budget_status():
                         
                     elif budget.provider == "gcp":
                         if cache_key not in cost_data_cache:
-                            cost_data_cache[cache_key] = get_gcp_billing_data(start_date, end_date)
+                            cost_data_cache[cache_key] = get_gcp_billing_data(
+                                budget.user_id, start_date, end_date
+                            )
                         gcp_data = cost_data_cache[cache_key]
                         current_spend = sum(float(item.get("Total", {}).get("UnblendedCost", {}).get("Amount", 0)) 
                                           for item in gcp_data.get("data", {}).get("ResultsByTime", []))
@@ -215,7 +225,9 @@ async def get_budget_status():
                         
                     elif budget.provider == "azure":
                         if cache_key not in cost_data_cache:
-                            cost_data_cache[cache_key] = get_azure_billing_data(start_date, end_date)
+                            cost_data_cache[cache_key] = get_azure_billing_data(
+                                budget.user_id, start_date, end_date
+                            )
                         azure_data = cost_data_cache[cache_key]
                         current_spend = sum(float(item.get("Total", {}).get("UnblendedCost", {}).get("Amount", 0)) 
                                           for item in azure_data.get("data", {}).get("ResultsByTime", []))

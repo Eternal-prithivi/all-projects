@@ -33,6 +33,7 @@ from app.utils.config import settings
 from app.database.mongo_client import get_database
 from app.users.routes_users import get_current_user  # Import real auth
 from app.users.user_model import User
+from app.vm.gcp_runtime import set_gcp_username, reset_gcp_username
 from app.utils.logger import setup_logger
 from datetime import datetime
 import asyncio # For asynchronous operations
@@ -41,6 +42,15 @@ import time # For cache timing
 logger = setup_logger(__name__)
 router = APIRouter()
 DB = get_database()
+
+
+async def get_vm_user(user: User = Depends(get_current_user)):
+    """Bind GCP Compute context to the authenticated user (BYOC GCP when configured)."""
+    token = set_gcp_username(user.username)
+    try:
+        yield user
+    finally:
+        reset_gcp_username(token)
 
 # Cache for metrics to reduce GCP API calls
 metrics_cache = {}
@@ -283,7 +293,7 @@ class WorkloadAnalyzeBody(BaseModel):
 @router.post("/analyze-workload", summary="Analyze workload description (NLP)")
 async def analyze_workload_description(
     body: WorkloadAnalyzeBody,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_vm_user),
 ) -> Dict[str, Any]:
     """
     Preview NLP workload classification without provisioning a VM.
@@ -322,7 +332,7 @@ async def analyze_workload_description(
 @router.post("/request", response_model=VMAssignmentResponse, summary="Request VM Assignment")
 async def request_vm_assignment(
     request: VMRequestModel,
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_vm_user)
 ) -> VMAssignmentResponse:
     """
     Intelligent VM assignment based on workload analysis.
@@ -362,7 +372,7 @@ async def request_vm_assignment(
 @router.post("/migrate", response_model=dict)
 async def migrate_vm(
     request: VMTransferRequest,
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_vm_user)
 ):
     """
     User-initiated or admin-forced migration to another VM.
@@ -389,7 +399,7 @@ async def migrate_vm(
 @router.post("/transfer", response_model=dict, summary="Transfer VM (alias)")
 async def transfer_vm_alias(
     request: VMTransferRequest,
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_vm_user)
 ) -> Dict[str, Any]:
     """
     Compatibility wrapper for `/transfer` used by some frontend pages.
@@ -400,7 +410,7 @@ async def transfer_vm_alias(
 
 @router.get("/my-assignment", summary="Get My VM Assignment")
 async def get_my_vm_assignment(
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_vm_user)
 ) -> Dict[str, Any]:
     """
     Retrieve current active VM assignment for the authenticated user.
@@ -415,7 +425,7 @@ async def get_my_vm_assignment(
 
 @router.get("/my-assignments", summary="Get All My VM Assignments")
 async def get_all_my_vm_assignments(
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_vm_user)
 ) -> List[Dict[str, Any]]:
     """
     Retrieve all active VM assignments for the authenticated user.
@@ -428,7 +438,7 @@ async def get_all_my_vm_assignments(
 @router.post("/release/{assignment_id}", response_model=dict)
 async def release_vm(
     assignment_id: str,
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_vm_user)
 ):
     if assignment_id:
         result = release_vm_assignment(current_user.username, assignment_id)
@@ -823,7 +833,7 @@ async def predict_cluster_load(cluster_type: ClusterType) -> Dict[str, Any]:
 @router.get("/ssh-key/{assignment_id}", summary="Download SSH Private Key")
 async def download_ssh_key(
     assignment_id: str,
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_vm_user)
 ):
     """
     Download the SSH private key for a specific VM assignment.
@@ -930,7 +940,7 @@ async def download_ssh_key(
 @router.get("/ssh-instructions/{assignment_id}", summary="Get SSH Connection Instructions")
 async def get_ssh_instructions(
     assignment_id: str,
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_vm_user)
 ):
     """
     Get detailed instructions for connecting to the VM via SSH.

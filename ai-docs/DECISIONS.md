@@ -27,6 +27,7 @@
 | Working on SecurityPage.jsx? | Uses `api.js` named exports + inline `<style>`; Phase 12 encryption work per research paper | DEC-018, DEC-020 |
 | Security encryption (paper vs code)? | Phase 12: **SSE-S3** (no KMS) + **browser CSE** — see `PHASE_12_SECURITY_RESEARCH_PARITY.md` §2–§3 | DEC-020 |
 | Adding/modifying provisioning? | Terraform modules in `backend/terraform/`, API in `app/provision/`, BYOC credentials for AWS auth | DEC-019 |
+| Cloud API call for a logged-in user? | Resolve credentials via `credential_resolver` / `cloud_credentials.py` — see BYOC matrix in `AI_CONTEXT_BACKEND.md` | DEC-021 |
 
 ---
 
@@ -207,3 +208,13 @@
   - **Client-side:** Build **browser** zero-knowledge CSE (Web Crypto); do not call server-side password encryption “client-side architecture.”
 - **Consequences**: Docs and UI must say **SSE** / **SSE-S3**, not KMS. Auto-encrypt on sensitive detect uses SSE-S3. CSE requires new `clientEncryption.js` and API changes.
 - **DO NOT**: Implement KMS or require `kms_encryption.py` for Phase 12. Do not claim zero-knowledge while sending passwords to `/choose-encryption` or `/decrypt-download`.
+
+---
+
+### [DEC-021] BYOC Credential Routing Per User (Platform-Wide)
+- **Date**: 2026-05-29
+- **Status**: Accepted (implemented)
+- **Context**: After AWS BYOC connect, some features still used Zenith platform S3 keys and buckets. Users expect storage, secure vault, cost, and (where applicable) VM operations to run against **their** cloud accounts.
+- **Decision**: Centralize client construction in `app/storage/cloud_credentials.py`. All user-scoped routes pass `username` into cost/security/storage helpers. Secure AWS vault uses `secure/{username}/` prefix inside the BYOC bucket; platform users keep dedicated `SECURE_S3_BUCKET_NAME` + replica. VM GCP uses `app/vm/gcp_runtime.py` request context when BYOC GCP SA is present.
+- **Consequences**: Scheduled Celery jobs without a user context (e.g. `check_cost_anomalies`) still use platform credentials. Azure cost requires platform service principal until BYOC stores Cost Management SP fields.
+- **DO NOT**: Hardcode `settings.AWS_ACCESS_KEY_*` or `REGULAR_S3_BUCKET_NAME` in user-scoped upload/download paths. Do not assume secure vault is always a separate platform bucket when AWS BYOC is active.

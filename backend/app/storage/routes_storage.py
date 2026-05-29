@@ -37,7 +37,11 @@ from app.users.user_model import User
 from app.database.mongo_client import mongodb_client
 from app.storage.models_storage import FileMetadata
 from app.utils.logger import setup_logger
-from app.byoc.credential_resolver import resolve_aws_credentials
+from app.byoc.credential_resolver import (
+    resolve_aws_credentials,
+    resolve_azure_credentials,
+    resolve_gcp_credentials,
+)
 
 logger = setup_logger(__name__)
 router = APIRouter(tags=["Storage"])
@@ -85,12 +89,25 @@ async def upload_file_to_csp(csp: str = Form(...), storage_class: str = Form(...
         object_key = upload_function(file, user.username, file.filename, storage_class)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"File upload to {csp} failed: {str(e)}")
+    bucket_resolvers = {
+        "AWS": lambda u: resolve_aws_credentials(u)["bucket_name"],
+        "GCP": lambda u: resolve_gcp_credentials(u)["bucket_name"],
+        "Azure": lambda u: resolve_azure_credentials(u)["container_name"],
+    }
+    cloud_bucket = bucket_resolvers.get(csp, lambda _u: "")(user.username)
+
     file_metadata = FileMetadata(
-        filename=file.filename, s3_key=object_key, owner_username=user.username,
-        size_bytes=file_size, csp=csp, storage_class=storage_class
+        filename=file.filename,
+        s3_key=object_key,
+        owner_username=user.username,
+        size_bytes=file_size,
+        csp=csp,
+        storage_class=storage_class,
     )
-    files_db.insert_one(file_metadata.model_dump())
-    return {"filename": file.filename, "csp": csp, "status": "upload successful"}
+    doc = file_metadata.model_dump()
+    doc["cloud_bucket"] = cloud_bucket
+    files_db.insert_one(doc)
+    return {"filename": file.filename, "csp": csp, "status": "upload successful", "bucket": cloud_bucket}
 
 @router.get("/files")
 # ... (This function remains exactly the same)
@@ -255,7 +272,7 @@ async def generate_download_url(
         raise HTTPException(status_code=500, detail=f"No download function configured for CSP: {csp}")
 
     try:
-        url = download_function(object_key)
+        url = download_function(user.username, object_key)
         return {"presigned_url": url}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Could not generate download URL from {csp}: {e}")
@@ -274,7 +291,7 @@ async def delete_file(filename: str, user: User = Depends(get_current_user), fil
     if not delete_function:
         raise HTTPException(status_code=500, detail=f"No delete function configured for CSP: {csp}")
     try:
-        delete_function(object_key)
+        delete_function(user.username, object_key)
         files_db.delete_one({"_id": file_record["_id"]})
         return JSONResponse(status_code=status.HTTP_200_OK, content={"message": f"File '{filename}' deleted successfully from {csp}."})
     except Exception as e:
@@ -306,7 +323,7 @@ async def restore_aws_file(
 
     try:
         # Call the manager function to initiate the restore
-        restore_message = initiate_glacier_restore_aws(object_key, tier, days)
+        restore_message = initiate_glacier_restore_aws(user.username, object_key, tier, days)
         return {"message": restore_message["message"]} # Return the message from the manager function
     except HTTPException as e:
         raise e # Re-raise HTTPExceptions from manager.py

@@ -52,6 +52,9 @@ const ProfilePage = () => {
     role: 'Admin',
     profile_picture: null,
   });
+  const [showDeleteAccountModal, setShowDeleteAccountModal] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
 
   const profileValidation = useMemo(
     () => validateProfileForm({
@@ -190,37 +193,28 @@ const ProfilePage = () => {
     }
   };
 
-  const handleDeleteAccount = async () => {
-    const confirmed = window.confirm(
-      'WARNING: This will permanently delete your account and all associated data including VMs, files, and settings. This action cannot be undone. Are you absolutely sure?'
-    );
-    
-    if (!confirmed) return;
+  const closeDeleteAccountModal = () => {
+    if (isDeletingAccount) return;
+    setShowDeleteAccountModal(false);
+    setDeleteConfirmText('');
+  };
 
-    const doubleConfirm = window.confirm(
-      'This is your last chance. Type "DELETE" in the next prompt to confirm account deletion.'
-    );
-    
-    if (!doubleConfirm) return;
+  const handleConfirmDeleteAccount = async () => {
+    if (deleteConfirmText !== 'DELETE' || isDeletingAccount) return;
 
-    const finalConfirmation = prompt('Type "DELETE" (in capital letters) to permanently delete your account:');
-    
-    if (finalConfirmation !== 'DELETE') {
-      notifications.error('Account deletion cancelled - confirmation text did not match');
-      return;
-    }
-
+    setIsDeletingAccount(true);
     try {
       await apiClient.delete('/profile/account');
+      setShowDeleteAccountModal(false);
       notifications.success('Account deleted successfully. Redirecting...');
-      
-      // Log out after 2 seconds
+
       setTimeout(() => {
         logout();
         window.location.href = '/';
       }, 2000);
-    } catch (error) {
+    } catch {
       notifications.error('Failed to delete account');
+      setIsDeletingAccount(false);
     }
   };
 
@@ -516,11 +510,71 @@ const ProfilePage = () => {
                 <h4>Delete Account</h4>
                 <p>Permanently delete your account and all associated data</p>
               </div>
-              <button className="btn-danger" onClick={handleDeleteAccount}>Delete Account</button>
+              <button
+                type="button"
+                className="btn-danger"
+                onClick={() => setShowDeleteAccountModal(true)}
+              >
+                Delete Account
+              </button>
             </div>
           </div>
         </div>
       </div>
+
+      {showDeleteAccountModal && (
+        <div
+          className="delete-account-modal-overlay"
+          role="presentation"
+          onClick={closeDeleteAccountModal}
+        >
+          <div
+            className="delete-account-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="delete-account-title"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h4 id="delete-account-title">Delete account permanently?</h4>
+            <p className="delete-account-modal-warning">
+              This will permanently delete your account and all associated data including VMs,
+              files, and settings. This action cannot be undone.
+            </p>
+            <label className="delete-account-modal-label" htmlFor="delete-confirm-input">
+              Type <strong>DELETE</strong> to confirm
+            </label>
+            <input
+              id="delete-confirm-input"
+              type="text"
+              className="delete-account-modal-input"
+              value={deleteConfirmText}
+              onChange={(e) => setDeleteConfirmText(e.target.value)}
+              placeholder="DELETE"
+              autoComplete="off"
+              autoFocus
+              disabled={isDeletingAccount}
+            />
+            <div className="delete-account-modal-actions">
+              <button
+                type="button"
+                className="delete-account-modal-cancel"
+                onClick={closeDeleteAccountModal}
+                disabled={isDeletingAccount}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="delete-account-modal-confirm"
+                onClick={handleConfirmDeleteAccount}
+                disabled={deleteConfirmText !== 'DELETE' || isDeletingAccount}
+              >
+                {isDeletingAccount ? 'Deleting…' : 'Delete my account'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

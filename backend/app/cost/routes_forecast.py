@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from typing import Dict
 import numpy as np
 from datetime import datetime, timedelta
@@ -6,6 +6,7 @@ import logging
 
 from app.cost.manager import get_aws_cost_and_usage, get_gcp_billing_data, get_azure_billing_data
 from app.cost.forecasting import extract_daily_costs, forecast_costs
+from app.users.routes_users import get_current_user
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -14,7 +15,8 @@ logger = logging.getLogger(__name__)
 async def get_cost_forecast(
     provider: str,
     days_ahead: int = 30,
-    demo_mode: bool = False
+    demo_mode: bool = False,
+    user: dict = Depends(get_current_user),
 ):
     """Get cost forecast for the next N days based on historical data"""
     try:
@@ -45,11 +47,13 @@ async def get_cost_forecast(
             
             # Get historical data
             if provider == "aws":
-                historical_data = get_aws_cost_and_usage(start_str, end_str, "DAILY")
+                historical_data = get_aws_cost_and_usage(
+                    user.username, start_str, end_str, "DAILY"
+                )
             elif provider == "gcp":
-                historical_data = get_gcp_billing_data(start_str, end_str)
+                historical_data = get_gcp_billing_data(user.username, start_str, end_str)
             elif provider == "azure":
-                historical_data = get_azure_billing_data(start_str, end_str)
+                historical_data = get_azure_billing_data(user.username, start_str, end_str)
             else:
                 raise HTTPException(status_code=400, detail="Invalid provider")
             

@@ -1,7 +1,7 @@
 # AI_CONTEXT_BACKEND.md — Backend Architecture & Source Map
 
 > Read this for any backend, API, database, Celery, or ML task.
-> **Last Updated: 2026-05-25** — fully audited against live codebase.
+> **Last Updated: 2026-05-29** — BYOC credential routing matrix added.
 
 ---
 
@@ -23,7 +23,7 @@ For frontend context → read `AI_CONTEXT_FRONTEND.md`
 | **auth** | `routes_auth.py`, `routes_password_reset.py` | `auth_service.py`, `auth_utils.py`, `auth_controller.py`, `password_reset_service.py` | JWT login, register, forgot/reset password (email link + SMS OTP), recovery contacts |
 | **users** | `routes_users.py`, `routes_profile.py`, `routes_settings.py` | `user_model.py` | Profile edit, recovery contacts, settings preferences, BYOC, theme, currency, audit log |
 | **security** | `routes_security.py`, `routes_2fa.py` | `encryption_handler.py`, `tasks_alerts.py` | 2FA, secure vault, **SSE-S3** on server-side path — **Phase 12:** auto SSE, **browser CSE**, detector (`PHASE_12_SECURITY_RESEARCH_PARITY.md` §2–§3) |
-| **storage** | `routes_storage.py` | `optimizer.py`, `uploader.py`, `manager.py`, `tasks.py`, `tiering_tasks.py`, `models_storage.py` | ML ensemble analysis, multi-cloud upload/download/delete, nightly lifecycle tiering |
+| **storage** | `routes_storage.py` | `cloud_credentials.py`, `optimizer.py`, `uploader.py`, `manager.py`, `tasks.py`, `tiering_tasks.py`, `models_storage.py` | ML ensemble analysis, multi-cloud upload/download/delete, nightly lifecycle tiering; **BYOC** via `credential_resolver` |
 | **vm** | `routes_vm.py`, `routes_admin_cleanup.py` | `manager.py`, `nlp_workload.py`, `models.py`, `metrics_collector.py`, `migration_recommender.py`, `workload_guidance.py`, `tasks.py` | NLP workload classification → five-cluster assignment, VM lifecycle, metrics, migration |
 | **cost** | `routes_cost.py`, `routes_forecast.py`, `routes_anomaly.py`, `routes_export.py` | `manager.py`, `forecasting.py`, `tasks_anomaly.py` | Decay-weighted linear regression forecast, Z-score anomaly detection, CSV export |
 | **ml** | `routes_feedback.py` | `storage_ensemble.py`, `feedback.py`, `retraining.py`, `repository.py`, `models.py`, `acceptance.py`, `sample_datasets.py`, `tasks_feedback.py` | RF+XGBoost ensemble, feedback outcome evaluation, guarded self-retraining |
@@ -157,6 +157,27 @@ celery -A app.celery_worker worker --loglevel=info   # Terminal 3
 celery -A app.celery_worker beat --loglevel=info     # Terminal 4
 python -m pytest -q                                   # 34 tests
 ```
+
+---
+
+## BYOC credential routing (2026-05-29)
+
+When a user connects BYOC for a CSP, **that user's** API operations should use their credentials and bucket/account where noted below.
+
+| Feature | AWS BYOC | GCP BYOC | Azure BYOC | Notes |
+|---------|----------|----------|------------|-------|
+| Storage upload/download/sync | Yes | Yes | Yes | `cloud_credentials.py` + `uploader.py` / `manager.py` |
+| Secure vault (2FA) | Yes (`secure/{user}/` prefix in user bucket) | N/A (AWS-only vault) | N/A | Platform dual-bucket when no AWS BYOC |
+| Cost Explorer / billing APIs | Yes | Yes (BigQuery export in user's project) | Platform SP only* | Azure BYOC stores storage keys only |
+| Dashboard cost refresh | Yes | — | — | Per-user cache |
+| VM cluster (Compute) | N/A | Yes** | N/A | Uses BYOC SA when `get_vm_user` context set |
+| Terraform provision | Yes | — | — | `provision/byoc_credentials.py` (DEC-019) |
+| Zenith subscription billing | — | — | — | Razorpay/invoices — not customer cloud |
+
+\* Azure cost still uses platform service principal until BYOC stores Cost Management credentials.  
+\** GCP BYOC SA must include Compute roles; storage-only SAs will fail VM APIs.
+
+Helpers: `app/storage/cloud_credentials.py`, `app/aws/cost_explorer.py`, `app/aws/s3_operations.py`.
 
 ---
 

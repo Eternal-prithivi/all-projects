@@ -1,32 +1,22 @@
 # This file contains the specialized functions for accessing and managing files on each CSP.
 
 import boto3
-from google.cloud import storage as gcp_storage
-from azure.storage.blob import BlobServiceClient
 from datetime import datetime, timedelta
 from botocore.config import Config
-from fastapi import HTTPException, status # <--- ADD THIS IMPORT!
+from fastapi import HTTPException, status
+from app.byoc.credential_resolver import resolve_azure_credentials
+from app.storage.cloud_credentials import (
+    S3_CONFIG_V4,
+    build_aws_s3_client,
+    build_azure_blob_service,
+    build_gcp_storage_client,
+)
 from app.utils.config import settings
 from app.utils.logger import setup_logger
 
 logger = setup_logger(__name__)
 
 # --- AWS Specialist Functions ---
-
-# Create a common S3 configuration for Signature Version 4
-s3_config_v4 = Config(
-    signature_version='s3v4'
-)
-
-# Centralized AWS S3 client for ALL regular storage operations
-# This client should be configured once and used by all AWS functions in this file.
-s3_client_regular = boto3.client(
-    's3',
-    aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
-    aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
-    region_name=settings.PRIMARY_S3_REGION, # <--- Use PRIMARY_S3_REGION here
-    config=s3_config_v4
-)
 
 def list_objects_aws(
     *,
@@ -49,7 +39,7 @@ def list_objects_aws(
         aws_secret_access_key=secret_access_key,
         aws_session_token=session_token,
         region_name=region_name or settings.PRIMARY_S3_REGION,
-        config=s3_config_v4,
+        config=S3_CONFIG_V4,
     )
 
     results: list[dict] = []
@@ -82,26 +72,21 @@ def list_objects_aws(
 
     return results
 
-def delete_from_aws(object_key: str):
-    """Deletes an object from the configured AWS S3 bucket."""
-    # Use the centralized s3_client_regular
-    # You were initializing a new client and using settings.S3_BUCKET_NAME
-    s3_client_regular.delete_object(Bucket=settings.REGULAR_S3_BUCKET_NAME, Key=object_key) # <--- Use REGULAR_S3_BUCKET_NAME
-    logger.info(f"Deleted {object_key} from AWS S3")
+def delete_from_aws(username: str, object_key: str):
+    """Deletes an object from the user's resolved AWS S3 bucket."""
+    s3_client, bucket_name, _ = build_aws_s3_client(username)
+    s3_client.delete_object(Bucket=bucket_name, Key=object_key)
+    logger.info(f"Deleted {object_key} from AWS S3 bucket {bucket_name}")
 
 
-def get_download_url_from_aws(object_key: str) -> str:
+def get_download_url_from_aws(username: str, object_key: str) -> str:
     """
     Generates a pre-signed download URL for an object in AWS S3.
     Includes logic to check for Glacier and handle restoration status.
     """
     try:
-        # Use the centralized s3_client_regular
-        # Get object metadata to check storage class and restore status
-        response = s3_client_regular.head_object(
-            Bucket=settings.REGULAR_S3_BUCKET_NAME, # <--- Use REGULAR_S3_BUCKET_NAME
-            Key=object_key
-        )
+        s3_client, bucket_name, _ = build_aws_s3_client(username)
+        response = s3_client.head_object(Bucket=bucket_name, Key=object_key)
         storage_class = response.get('StorageClass')
         restore_status = response.get('Restore') # e.g., 'ongoing-request="false", expiry-date="Mon, 27 Nov 2023 00:00:00 GMT"'
 
@@ -125,10 +110,10 @@ def get_download_url_from_aws(object_key: str) -> str:
                 )
         
         # If not Glacier, or if Glacier and already restored, proceed to generate URL
-        url = s3_client_regular.generate_presigned_url(
-            'get_object',
-            Params={'Bucket': settings.REGULAR_S3_BUCKET_NAME, 'Key': object_key}, # <--- Use REGULAR_S3_BUCKET_NAME
-            ExpiresIn=3600 # URL valid for 1 hour
+        url = s3_client.generate_presigned_url(
+            "get_object",
+            Params={"Bucket": bucket_name, "Key": object_key},
+            ExpiresIn=3600,
         )
         return url
     except HTTPException:
@@ -140,21 +125,20 @@ def get_download_url_from_aws(object_key: str) -> str:
         )
 
 # --- NEW: Function to initiate Glacier restore on AWS ---
-def initiate_glacier_restore_aws(object_key: str, tier: str = 'Standard', days: int = 7):
+def initiate_glacier_restore_aws(username: str, object_key: str, tier: str = "Standard", days: int = 7):
     """
     Initiates a restore request for an object in Glacier or Deep Archive storage class.
     Tier can be 'Expedited', 'Standard', or 'Bulk'.
     """
     try:
-        s3_client_regular.restore_object(
-            Bucket=settings.REGULAR_S3_BUCKET_NAME, # <--- Use REGULAR_S3_BUCKET_NAME
+        s3_client, bucket_name, _ = build_aws_s3_client(username)
+        s3_client.restore_object(
+            Bucket=bucket_name,
             Key=object_key,
             RestoreRequest={
-                'Days': days, # How long the restored copy will be available (1-30 days)
-                'GlacierJobParameters': {
-                    'Tier': tier # 'Expedited', 'Standard', or 'Bulk'
-                }
-            }
+                "Days": days,
+                "GlacierJobParameters": {"Tier": tier},
+            },
         )
         return {"message": f"Restore initiated for '{object_key}' with {tier} tier. It will be available for {days} days."}
     except Exception as e:
@@ -164,121 +148,85 @@ def initiate_glacier_restore_aws(object_key: str, tier: str = 'Standard', days: 
         )
 
 
-def upload_to_aws(file, username: str, filename: str, storage_class: str):
-    """Uploads a file to AWS S3 with a specified storage class."""
-    object_key = f"{username}/{filename}"
-    try:
-        s3_client_regular.upload_fileobj(
-            file.file,
-            settings.REGULAR_S3_BUCKET_NAME, # <--- Use REGULAR_S3_BUCKET_NAME
-            object_key,
-            ExtraArgs={'StorageClass': storage_class}
-        )
-        return object_key
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to upload '{filename}' to AWS S3: {e}"
-        )
-
-
-def change_tier_on_aws(object_key: str, new_tier: str):
+def change_tier_on_aws(username: str, object_key: str, new_tier: str):
     """Changes the storage class of an object in AWS S3."""
-    # Use the centralized s3_client_regular
-    # You were initializing a new client and using settings.S3_BUCKET_NAME
     try:
-        s3_client_regular.copy_object(
-            Bucket=settings.REGULAR_S3_BUCKET_NAME, # <--- Use REGULAR_S3_BUCKET_NAME
+        s3_client, bucket_name, _ = build_aws_s3_client(username)
+        s3_client.copy_object(
+            Bucket=bucket_name,
             Key=object_key,
-            CopySource={'Bucket': settings.REGULAR_S3_BUCKET_NAME, 'Key': object_key}, # <--- Use REGULAR_S3_BUCKET_NAME
+            CopySource={"Bucket": bucket_name, "Key": object_key},
             StorageClass=new_tier,
-            MetadataDirective='COPY' # This ensures metadata is preserved
+            MetadataDirective="COPY",
         )
-        logger.info(f"Tiered {object_key} to {new_tier} on AWS S3")
+        logger.info(f"Tiered {object_key} to {new_tier} on AWS S3 bucket {bucket_name}")
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to change tier for '{object_key}' to '{new_tier}' on AWS S3: {e}"
+            detail=f"Failed to change tier for '{object_key}' to '{new_tier}' on AWS S3: {e}",
         )
 
 
 # --- GCP Specialist Functions ---
 
-def delete_from_gcp(object_key: str):
-    """Deletes an object from the configured GCP Cloud Storage bucket."""
-    storage_client = gcp_storage.Client.from_service_account_json(
-        settings.GCP_SERVICE_ACCOUNT_JSON_PATH
-    )
-    bucket = storage_client.bucket(settings.GCP_BUCKET_NAME)
-    blob = bucket.blob(object_key)
-    blob.delete()
-    logger.info(f"Deleted {object_key} from GCP Cloud Storage")
+def delete_from_gcp(username: str, object_key: str):
+    """Deletes an object from the user's resolved GCP bucket."""
+    storage_client, bucket_name, _ = build_gcp_storage_client(username)
+    bucket = storage_client.bucket(bucket_name)
+    bucket.blob(object_key).delete()
+    logger.info(f"Deleted {object_key} from GCP bucket {bucket_name}")
 
-def get_download_url_from_gcp(object_key: str) -> str:
+
+def get_download_url_from_gcp(username: str, object_key: str) -> str:
     """Generates a pre-signed download URL for an object in GCP Cloud Storage."""
-    storage_client = gcp_storage.Client.from_service_account_json(
-        settings.GCP_SERVICE_ACCOUNT_JSON_PATH
-    )
-    bucket = storage_client.bucket(settings.GCP_BUCKET_NAME)
-    blob = bucket.blob(object_key)
-    url = blob.generate_signed_url(expiration=timedelta(hours=1))
-    return url
+    storage_client, bucket_name, _ = build_gcp_storage_client(username)
+    blob = storage_client.bucket(bucket_name).blob(object_key)
+    return blob.generate_signed_url(expiration=timedelta(hours=1))
 
-# --- NEW: Function to change storage tier on GCP ---
-def change_tier_on_gcp(object_key: str, new_tier: str):
+
+def change_tier_on_gcp(username: str, object_key: str, new_tier: str):
     """Changes the storage class of an object in GCP Cloud Storage."""
-    storage_client = gcp_storage.Client.from_service_account_json(
-        settings.GCP_SERVICE_ACCOUNT_JSON_PATH
-    )
-    bucket = storage_client.bucket(settings.GCP_BUCKET_NAME)
-    blob = bucket.blob(object_key)
+    storage_client, bucket_name, _ = build_gcp_storage_client(username)
+    blob = storage_client.bucket(bucket_name).blob(object_key)
     blob.update_storage_class(new_tier)
-    logger.info(f"Tiered {object_key} to {new_tier} on GCP Cloud Storage")
+    logger.info(f"Tiered {object_key} to {new_tier} on GCP bucket {bucket_name}")
 
 
 # --- Azure Specialist Functions ---
 
-def delete_from_azure(object_key: str):
-    """Deletes an object from the configured Azure Blob Storage container."""
-    connection_string = (
-        f"DefaultEndpointsProtocol=https;AccountName={settings.AZURE_STORAGE_ACCOUNT_NAME};"
-        f"AccountKey={settings.AZURE_STORAGE_ACCOUNT_KEY};EndpointSuffix=core.windows.net"
-    )
-    blob_service_client = BlobServiceClient.from_connection_string(connection_string)
-    blob_client = blob_service_client.get_blob_client(
-        container=settings.AZURE_CONTAINER_NAME, blob=object_key
-    )
-    blob_client.delete_blob()
-    logger.info(f"Deleted {object_key} from Azure Blob Storage")
+def delete_from_azure(username: str, object_key: str):
+    """Deletes an object from the user's resolved Azure container."""
+    blob_service_client, container_name, _ = build_azure_blob_service(username)
+    blob_service_client.get_blob_client(container=container_name, blob=object_key).delete_blob()
+    logger.info(f"Deleted {object_key} from Azure container {container_name}")
 
-def get_download_url_from_azure(object_key: str) -> str:
+
+def get_download_url_from_azure(username: str, object_key: str) -> str:
     """Generates a pre-signed download URL for an object in Azure Blob Storage."""
-    from azure.storage.blob import generate_blob_sas, BlobSasPermissions
-    
-    sas_token = generate_blob_sas(
-        account_name=settings.AZURE_STORAGE_ACCOUNT_NAME,
-        container_name=settings.AZURE_CONTAINER_NAME,
-        blob_name=object_key,
-        account_key=settings.AZURE_STORAGE_ACCOUNT_KEY,
-        permission=BlobSasPermissions(read=True),
-        expiry=datetime.utcnow() + timedelta(hours=1)
-    )
-    url = (
-        f"https://{settings.AZURE_STORAGE_ACCOUNT_NAME}.blob.core.windows.net/"
-        f"{settings.AZURE_CONTAINER_NAME}/{object_key}?{sas_token}"
-    )
-    return url
+    from azure.storage.blob import BlobSasPermissions, generate_blob_sas
 
-# --- NEW: Function to change storage tier on Azure ---
-def change_tier_on_azure(object_key: str, new_tier: str):
+    azure = resolve_azure_credentials(username)
+    container_name = azure["container_name"]
+    account_name = azure["account_name"]
+    account_key = azure["account_key"]
+
+    sas_token = generate_blob_sas(
+        account_name=account_name,
+        container_name=container_name,
+        blob_name=object_key,
+        account_key=account_key,
+        permission=BlobSasPermissions(read=True),
+        expiry=datetime.utcnow() + timedelta(hours=1),
+    )
+    return (
+        f"https://{account_name}.blob.core.windows.net/"
+        f"{container_name}/{object_key}?{sas_token}"
+    )
+
+
+def change_tier_on_azure(username: str, object_key: str, new_tier: str):
     """Changes the access tier of an object in Azure Blob Storage."""
-    connection_string = (
-        f"DefaultEndpointsProtocol=https;AccountName={settings.AZURE_STORAGE_ACCOUNT_NAME};"
-        f"AccountKey={settings.AZURE_STORAGE_ACCOUNT_KEY};EndpointSuffix=core.windows.net"
-    )
-    blob_service_client = BlobServiceClient.from_connection_string(connection_string)
-    blob_client = blob_service_client.get_blob_client(
-        container=settings.AZURE_CONTAINER_NAME, blob=object_key
-    )
+    blob_service_client, container_name, _ = build_azure_blob_service(username)
+    blob_client = blob_service_client.get_blob_client(container=container_name, blob=object_key)
     blob_client.set_standard_blob_tier(new_tier)
-    logger.info(f"Tiered {object_key} to {new_tier} on Azure Blob Storage")
+    logger.info(f"Tiered {object_key} to {new_tier} on Azure container {container_name}")

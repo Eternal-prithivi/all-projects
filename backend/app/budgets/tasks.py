@@ -61,9 +61,11 @@ def check_budget_alerts():
             current_spend = 0.0
             try:
                 if budget.provider == "all":
-                    aws_data = get_aws_cost_and_usage(start_date, end_date, "DAILY")
-                    gcp_data = get_gcp_billing_data(start_date, end_date)
-                    azure_data = get_azure_billing_data(start_date, end_date)
+                    aws_data = get_aws_cost_and_usage(
+                        budget.user_id, start_date, end_date, "DAILY"
+                    )
+                    gcp_data = get_gcp_billing_data(budget.user_id, start_date, end_date)
+                    azure_data = get_azure_billing_data(budget.user_id, start_date, end_date)
                     
                     current_spend += sum(float(item.get("Total", {}).get("UnblendedCost", {}).get("Amount", 0)) 
                                        for item in aws_data.get("ResultsByTime", []))
@@ -72,15 +74,17 @@ def check_budget_alerts():
                     current_spend += sum(float(item.get("Total", {}).get("UnblendedCost", {}).get("Amount", 0)) 
                                        for item in azure_data.get("data", {}).get("ResultsByTime", []))
                 elif budget.provider == "aws":
-                    aws_data = get_aws_cost_and_usage(start_date, end_date, "DAILY")
+                    aws_data = get_aws_cost_and_usage(
+                        budget.user_id, start_date, end_date, "DAILY"
+                    )
                     current_spend = sum(float(item.get("Total", {}).get("UnblendedCost", {}).get("Amount", 0)) 
                                       for item in aws_data.get("ResultsByTime", []))
                 elif budget.provider == "gcp":
-                    gcp_data = get_gcp_billing_data(start_date, end_date)
+                    gcp_data = get_gcp_billing_data(budget.user_id, start_date, end_date)
                     current_spend = sum(float(item.get("Total", {}).get("UnblendedCost", {}).get("Amount", 0)) 
                                       for item in gcp_data.get("data", {}).get("ResultsByTime", []))
                 elif budget.provider == "azure":
-                    azure_data = get_azure_billing_data(start_date, end_date)
+                    azure_data = get_azure_billing_data(budget.user_id, start_date, end_date)
                     current_spend = sum(float(item.get("Total", {}).get("UnblendedCost", {}).get("Amount", 0)) 
                                       for item in azure_data.get("data", {}).get("ResultsByTime", []))
             except Exception as cost_error:

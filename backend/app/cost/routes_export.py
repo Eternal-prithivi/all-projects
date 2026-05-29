@@ -5,7 +5,7 @@ import io
 from datetime import datetime
 import logging
 
-from app.auth.auth_utils import get_current_user
+from app.users.routes_users import get_current_user
 from app.cost.manager import get_aws_cost_and_usage, get_gcp_billing_data, get_azure_billing_data
 
 router = APIRouter()
@@ -44,17 +44,18 @@ async def export_cost_report(
     provider: Literal["aws", "gcp", "azure"],
     start_date: str,
     end_date: str,
-    format: Literal["csv", "json"] = "csv"
+    format: Literal["csv", "json"] = "csv",
+    user: dict = Depends(get_current_user),
 ):
     """Export cost data as CSV or JSON"""
     try:
         # Fetch cost data
         if provider == "aws":
-            cost_data = get_aws_cost_and_usage(start_date, end_date, "DAILY")
+            cost_data = get_aws_cost_and_usage(user.username, start_date, end_date, "DAILY")
         elif provider == "gcp":
-            cost_data = get_gcp_billing_data(start_date, end_date)
+            cost_data = get_gcp_billing_data(user.username, start_date, end_date)
         elif provider == "azure":
-            cost_data = get_azure_billing_data(start_date, end_date)
+            cost_data = get_azure_billing_data(user.username, start_date, end_date)
         else:
             raise HTTPException(status_code=400, detail="Invalid provider")
         

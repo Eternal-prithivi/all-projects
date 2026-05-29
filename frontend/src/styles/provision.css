@@ -24,7 +24,7 @@
 .provision-page h1 {
   font-size: 1.75rem;
   font-weight: 700;
-  color: var(--text-primary, #fff);
+  color: var(--text-primary);
   margin-bottom: 0.25rem;
 }
 
@@ -106,7 +106,7 @@
 .wizard-step.completed .wizard-step-number {
   border-color: #27ae60;
   background: #27ae60;
-  color: #fff;
+  color: var(--text-primary);
 }
 
 .wizard-step-label {
@@ -117,7 +117,7 @@
 }
 
 .wizard-step.active .wizard-step-label {
-  color: var(--text-primary, #fff);
+  color: var(--text-primary);
 }
 
 .wizard-step-connector {
@@ -192,7 +192,7 @@
 .template-card h3 {
   font-size: 1.05rem;
   font-weight: 600;
-  color: var(--text-primary, #fff);
+  color: var(--text-primary);
   margin-bottom: 0.5rem;
 }
 
@@ -276,7 +276,7 @@
 .module-toggle-info h4 {
   font-size: 0.9rem;
   font-weight: 600;
-  color: var(--text-primary, #fff);
+  color: var(--text-primary);
   margin-bottom: 0.15rem;
 }
 
@@ -313,7 +313,7 @@
   border-radius: 10px;
   border: 1px solid rgba(255,255,255,0.1);
   background: rgba(255,255,255,0.05);
-  color: var(--text-primary, #fff);
+  color: var(--text-primary);
   font-size: 0.9rem;
   transition: border-color 0.2s;
   outline: none;
@@ -327,7 +327,7 @@
 
 .config-field select option {
   background: var(--bg-elevated);
-  color: #fff;
+  color: var(--text-primary);
 }
 
 /* ── Policy Check Results (Step 3) ── */
@@ -338,7 +338,7 @@
 .policy-results h3 {
   font-size: 1.1rem;
   font-weight: 600;
-  color: var(--text-primary, #fff);
+  color: var(--text-primary);
   margin-bottom: 1rem;
   display: flex;
   align-items: center;
@@ -390,7 +390,7 @@
 .policy-item-name {
   font-weight: 600;
   font-size: 0.85rem;
-  color: var(--text-primary, #fff);
+  color: var(--text-primary);
 }
 
 .policy-item-desc {
@@ -424,7 +424,7 @@
 .cost-table td {
   padding: 0.65rem 1rem;
   font-size: 0.88rem;
-  color: var(--text-primary, #fff);
+  color: var(--text-primary);
   border-top: 1px solid rgba(255,255,255,0.05);
 }
 
@@ -517,7 +517,7 @@
 
 .btn-provision.secondary {
   background: rgba(255,255,255,0.08);
-  color: var(--text-primary, #fff);
+  color: var(--text-primary);
   border: 1px solid rgba(255,255,255,0.12);
 }
 
@@ -545,7 +545,7 @@
 .deployments-section h2 {
   font-size: 1.3rem;
   font-weight: 700;
-  color: var(--text-primary, #fff);
+  color: var(--text-primary);
   margin-bottom: 1.25rem;
 }
 
@@ -573,7 +573,7 @@
 .deployment-info h4 {
   font-size: 0.95rem;
   font-weight: 600;
-  color: var(--text-primary, #fff);
+  color: var(--text-primary);
   margin-bottom: 0.25rem;
 }
 
@@ -644,7 +644,7 @@
 .section-header h3 {
   font-size: 1.1rem;
   font-weight: 600;
-  color: var(--text-primary, #fff);
+  color: var(--text-primary);
   margin-bottom: 0.25rem;
 }
 
