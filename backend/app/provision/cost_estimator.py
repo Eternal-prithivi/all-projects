@@ -78,16 +78,24 @@ PAID_INSTANCE_COSTS: dict[str, str] = {
 }
 
 
+_INFRACOST_AVAILABLE: bool | None = None
+
+
 def check_infracost_installed() -> bool:
-    """Check if the Infracost CLI is available."""
+    """Check if the Infracost CLI is available (cached after first check)."""
+    global _INFRACOST_AVAILABLE
+    if _INFRACOST_AVAILABLE is not None:
+        return _INFRACOST_AVAILABLE
     try:
         result = subprocess.run(
             ["infracost", "--version"],
-            capture_output=True, timeout=5,
+            capture_output=True,
+            timeout=3,
         )
-        return result.returncode == 0
+        _INFRACOST_AVAILABLE = result.returncode == 0
     except (FileNotFoundError, subprocess.TimeoutExpired):
-        return False
+        _INFRACOST_AVAILABLE = False
+    return _INFRACOST_AVAILABLE
 
 
 def estimate_with_infracost(workspace_dir: str) -> CostEstimate:
@@ -218,11 +226,17 @@ def estimate_from_config(config: dict[str, Any]) -> CostEstimate:
     )
 
 
-def estimate_cost(config: dict[str, Any], workspace_dir: str | None = None) -> CostEstimate:
+def estimate_cost(
+    config: dict[str, Any],
+    workspace_dir: str | None = None,
+    *,
+    use_infracost: bool = True,
+) -> CostEstimate:
     """
-    Estimate cost — tries Infracost first, falls back to built-in table.
+    Estimate cost — built-in table by default (instant).
+    Infracost only when workspace_dir is set (terraform plan path).
     """
-    if workspace_dir and check_infracost_installed():
+    if use_infracost and workspace_dir and check_infracost_installed():
         result = estimate_with_infracost(workspace_dir)
         if result.available:
             return result

@@ -24,6 +24,27 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
+# Cached once per process — avoids spawning `opa version` on every review request
+_OPA_CLI_AVAILABLE: bool | None = None
+
+
+def is_opa_cli_available() -> bool:
+    """Return whether OPA CLI is installed (cached after first check)."""
+    global _OPA_CLI_AVAILABLE
+    if _OPA_CLI_AVAILABLE is not None:
+        return _OPA_CLI_AVAILABLE
+    try:
+        result = subprocess.run(
+            ["opa", "version"],
+            capture_output=True,
+            text=True,
+            timeout=3,
+        )
+        _OPA_CLI_AVAILABLE = result.returncode == 0
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        _OPA_CLI_AVAILABLE = False
+    return _OPA_CLI_AVAILABLE
+
 
 @dataclass
 class OPAResult:
@@ -60,21 +81,8 @@ class OPAEngine:
         self.policy_file = self.policies_dir / "aws_security.rego"
 
     def is_opa_available(self) -> bool:
-        """Check whether the OPA CLI binary is installed and reachable.
-
-        Returns:
-            True if ``opa version`` exits with code 0, False otherwise.
-        """
-        try:
-            result = subprocess.run(
-                ["opa", "version"],
-                capture_output=True,
-                text=True,
-                timeout=10,
-            )
-            return result.returncode == 0
-        except (FileNotFoundError, subprocess.TimeoutExpired):
-            return False
+        """Check whether the OPA CLI binary is installed and reachable."""
+        return is_opa_cli_available()
 
     def evaluate(self, config: dict[str, Any]) -> OPAResult:
         """Evaluate an infrastructure config dict against the Rego policy file.
@@ -135,7 +143,7 @@ class OPAEngine:
                 input=json.dumps(config),
                 capture_output=True,
                 text=True,
-                timeout=30,
+                timeout=8,
             )
 
             if proc.returncode != 0:

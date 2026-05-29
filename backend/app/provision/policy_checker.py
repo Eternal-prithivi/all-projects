@@ -141,20 +141,24 @@ def evaluate_opa_policies(config: dict[str, Any]) -> PolicyCheckResult:
     return result
 
 
-def full_policy_check(config: dict[str, Any]) -> PolicyCheckResult:
+def full_policy_check(
+    config: dict[str, Any],
+    *,
+    include_opa: bool = False,
+) -> PolicyCheckResult:
     """
-    Run both YAML and OPA policy checks and merge results.
+    Run YAML policy checks (fast). OPA is optional — slow CLI subprocesses.
     """
     yaml_result = evaluate_yaml_policies(config)
-    opa_result = evaluate_opa_policies(config)
+    if not include_opa:
+        return yaml_result
 
-    merged = PolicyCheckResult(
+    opa_result = evaluate_opa_policies(config)
+    return PolicyCheckResult(
         blocks=yaml_result.blocks + opa_result.blocks,
         warnings=yaml_result.warnings + opa_result.warnings,
         can_deploy=(yaml_result.can_deploy and opa_result.can_deploy),
     )
-
-    return merged
 
 
 def get_yaml_rules() -> list[dict[str, Any]]:

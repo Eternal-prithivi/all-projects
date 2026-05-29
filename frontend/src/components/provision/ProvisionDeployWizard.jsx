@@ -127,24 +127,6 @@ export default function ProvisionDeployWizard({ userPermissions, terraformOk, on
     setConfig(prev => ({ ...prev, [key]: value }));
   };
 
-  // ── Step 3: Run policy check + cost estimate ──
-  const runReview = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const [policyRes, costRes] = await Promise.all([
-        api.post('/provision/policy-check', config),
-        api.post('/provision/estimate', config),
-      ]);
-      setPolicyResult(policyRes.data);
-      setCostEstimate(costRes.data);
-    } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to run review');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   // ── Step 4: Run plan ──
   const runPlan = async () => {
     setLoading(true);
@@ -188,11 +170,49 @@ export default function ProvisionDeployWizard({ userPermissions, terraformOk, on
   };
 
   const nextStep = () => {
-    if (step === 2) runReview();
-    if (step === 3) runPlan();
+    if (step === 2) {
+      if (!policyResult?.can_deploy) return;
+      setStep(3);
+      runPlan();
+      return;
+    }
     setStep((s) => Math.min(s + 1, 3));
   };
-  const prevStep = () => setStep((s) => Math.max(s - 1, 0));
+
+  const prevStep = () => {
+    if (step === 2) {
+      setPolicyResult(null);
+      setCostEstimate(null);
+    }
+    setStep((s) => Math.max(s - 1, 0));
+  };
+
+  // Auto-run review when user reaches the Review step (no extra click)
+  useEffect(() => {
+    if (step !== 2) return;
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const [policyRes, costRes] = await Promise.all([
+          api.post('/provision/policy-check', config),
+          api.post('/provision/estimate', config),
+        ]);
+        if (cancelled) return;
+        setPolicyResult(policyRes.data);
+        setCostEstimate(costRes.data);
+      } catch (err) {
+        if (!cancelled) {
+          setError(err.response?.data?.detail || 'Failed to run review');
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- run once per visit to Review
+  }, [step]);
 
   useEffect(() => {
     if (terminalRef.current) {

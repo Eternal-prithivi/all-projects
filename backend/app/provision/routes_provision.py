@@ -206,7 +206,7 @@ async def run_policy_check(
     _enforce_permission(user, ProvisionAction.PLAN)
     config_dict = config.model_dump()
     _apply_template_defaults(config_dict)
-    result = full_policy_check(config_dict)
+    result = full_policy_check(config_dict, include_opa=False)
     return result.model_dump()
 
 
@@ -215,11 +215,11 @@ async def run_cost_estimate(
     config: ProvisionConfig,
     user: dict = Depends(get_current_user),
 ):
-    """Get cost estimation for a given config."""
+    """Get cost estimation for a given config (instant lookup table)."""
     _enforce_permission(user, ProvisionAction.PLAN)
     config_dict = config.model_dump()
     _apply_template_defaults(config_dict)
-    result = estimate_cost(config_dict)
+    result = estimate_cost(config_dict, use_infracost=False)
     return result.model_dump()
 
 
@@ -243,11 +243,9 @@ async def run_plan(
     config_dict = config.model_dump()
     _apply_template_defaults(config_dict)
 
-    # Step 1: Policy check
-    policy_result = full_policy_check(config_dict)
-
-    # Step 2: Cost estimate
-    cost_result = estimate_cost(config_dict)
+    # Step 1–2: Fast review (YAML policies + lookup table; no OPA/Infracost yet)
+    policy_result = full_policy_check(config_dict, include_opa=False)
+    cost_result = estimate_cost(config_dict, use_infracost=False)
 
     # Step 3: Create workspace + write tfvars
     deployment_id = f"{user.username}-{int(time.time())}"
