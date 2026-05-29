@@ -1,14 +1,7 @@
 # Phase 12 — Security Research Paper Parity
 
-> **Status:** Core complete (2026-05-29). Optional: production geo IP service SLA, new-device email alerts.
-
-## Current session
-
-**Status:** COMPLETE (2026-05-29) — no active Phase 12 work.
-
-**Summary:** Auto SSE-S3, browser CSE, sensitive scan, session geo + fingerprint, benchmark dataset/script. Next agent: start a new task in `SCRATCHPAD.md` + `STATUS.md` at PRE; do not reopen Phase 12 unless user requests.
-
----
+> **Status:** Core complete (2026-05-29). Optional: production geo IP service SLA, new-device email alerts.  
+> **Live task / resume:** `STATUS.md` + `SCRATCHPAD.md` only — do not duplicate session state here.
 
 ## Acceptance criteria
 

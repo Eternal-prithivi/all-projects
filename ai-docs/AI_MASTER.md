@@ -89,29 +89,10 @@ Once you know **what** you will do (from user message, plan, or resume state), u
 | `STATUS.md` | `Phase` row if phase changed; **Active task** = name, `IN PROGRESS`, started timestamp, scope / do-not / done-when |
 | `PROGRESS.md` | Same under `## 🔴 Active Task` (never leave this section empty while work is in flight) |
 | `SCRATCHPAD.md` | `## 🔄 Current Resume State`: status `IN PROGRESS`, plan, files to touch, every step `NOT YET DONE` |
-| **Phase / theme doc** | See table below — add or update **Current session** block so phase work is visible outside STATUS |
 
-**Phase / theme doc (PRE — pick one):**
+**Do not create new tracking MD files** for continuity (no duplicate session logs in phase specs, audits, or prompt packs). Phase docs (`PHASE_*`, `UI_UX_AUDIT_*`) are **read-only specs** at PRE unless the user asked you to edit that deliverable.
 
-| Work type | File to update at PRE |
-|-----------|------------------------|
-| Phase 12 security | `PHASE_12_SECURITY_RESEARCH_PARITY.md` → `## Current session` |
-| UI/UX waves | `UI_UX_AUDIT_2026.md` → active wave / checklist |
-| Future phases | `PHASE_<N>_*.md` when it exists; else `STATUS.md` Identity `Spec` row |
-| No phase file yet | `STATUS.md` only — still mandatory: STATUS + PROGRESS + SCRATCHPAD |
-
-**`## Current session` template** (append or replace in phase doc):
-
-```markdown
-## Current session
-**Status:** IN PROGRESS (started: YYYY-MM-DD HH:MM)
-**Task:** [one line]
-**Scope / Done when:** [one line each]
-**Steps:** (mirror SCRATCHPAD — all NOT YET DONE at PRE)
-- [ ] Step 1 — NOT YET DONE
-```
-
-During EXECUTE: mark steps `DONE` in `SCRATCHPAD` (and phase doc if used) as you finish them — do not batch all doc updates to POST only.
+During EXECUTE: mark steps `DONE` in `SCRATCHPAD` as you finish them — do not batch all doc updates to POST only.
 
 **Example SCRATCHPAD step list:**
 
@@ -135,7 +116,7 @@ Output this block once per session (or once per new task):
 Phase:            [from STATUS.md]
 Active task:      [name + IN PROGRESS or resuming]
 Scope / Done when:[one line each]
-Docs updated:     STATUS + PROGRESS + SCRATCHPAD + [phase/theme doc or "none"] — [Done | Skipped — resuming]
+Docs updated:     STATUS + PROGRESS + SCRATCHPAD — [Done | Skipped — resuming]
 Continuity:       [SCRATCHPAD has live steps | Fixed stale IN PROGRESS]
 Tier B loaded:    [files read, or "none needed"]
 Conflicts:        [None | describe — see AI_RULES conflict protocol]
@@ -207,7 +188,6 @@ Run in order. Do not end the session with an incomplete checklist.
 | `STATUS.md` | Task status, what’s done / open, refresh health row if you ran tests |
 | `PROGRESS.md` | Match STATUS; update Phase checklist `[x]` / `[ ]` |
 | `SCRATCHPAD.md` | If **complete**: `Status: COMPLETE`, clear step list, refresh **Last Known Good State**. If **partial**: update steps (`DONE` / `NOT YET DONE`) |
-| Phase/theme doc | Close `## Current session` (COMPLETE summary or remove block) |
 | `PROGRESS_HISTORY.md` | Append long “what was completed” narrative **only here** — never in chat or `PROGRESS.md` |
 | `AUDIT_LOG.md` | **Append only** at session end (≤5 bullets). **Never read** at startup. Archive if >12 entries → `AUDIT_LOG_ARCHIVE_2026.md` |
 
@@ -251,20 +231,18 @@ Never commit: `backend/.env`, `node_modules/`, `*.backup`.
 
 ## Session starter (paste for new chats)
 
-**Full copy-paste templates (PDF + Markdown):** `ai-docs/ZENITH_AI_SESSION_PROMPTS.pdf` · `ai-docs/ZENITH_AI_SESSION_PROMPTS.md`
+Optional longer examples: `ai-docs/ZENITH_AI_SESSION_PROMPTS.pdf` (reference only — **do not create** a parallel `.md` prompt file).
 
 ```
 Zenith — follow ai-docs/AI_MASTER.md (PRE → EXECUTE → POST → git push).
 
 Read Tier A: STATUS.md + SCRATCHPAD.md.
-PRE: update STATUS + PROGRESS + SCRATCHPAD (+ phase doc) before code.
+PRE: update STATUS + PROGRESS + SCRATCHPAD before code.
 POST: commit + push when anything changed.
 
 Task: [describe]
 Scope: [...] | Do NOT touch: [...] | Done when: [...]
 ```
-
-Full templates: `ai-docs/ZENITH_AI_SESSION_PROMPTS.md`
 
 ---
 

@@ -14,7 +14,7 @@
 
 ## PRE-PHASE (before product code)
 
-**Full** (features, multi-file, API, security, ML): after scope is clear, update `STATUS.md` + `PROGRESS.md` + `SCRATCHPAD.md` + phase/theme doc (`PHASE_*`, `UI_UX_AUDIT_2026`, etc.) with `IN PROGRESS` and `NOT YET DONE` steps. **Do not defer these writes to POST.** Output `📋 PRE-PHASE COMPLETE`.
+**Full** (features, multi-file, API, security, ML): after scope is clear, update **only** `STATUS.md` + `PROGRESS.md` + `SCRATCHPAD.md` with `IN PROGRESS` and `NOT YET DONE` steps. **Do not defer these writes to POST.** Do not add new tracking MD files. Output `📋 PRE-PHASE COMPLETE`.
 
 **Lightweight** (one-file typo/format/tiny fix): Tier A only, one chat line `Lightweight: …`, skip claim rewrite if task unchanged — see `AI_MASTER.md`.
 
@@ -24,7 +24,7 @@
 
 ## POST-PHASE (before stop)
 
-**Full:** tests/lint → finalize `STATUS` + `PROGRESS` + `SCRATCHPAD` (+ phase doc) → append `PROGRESS_HISTORY` → append `AUDIT_LOG` (≤5 bullets) → **`git commit` + `git push`** if anything changed. Chat reply ≤5 bullets + git result.
+**Full:** tests/lint → finalize `STATUS` + `PROGRESS` + `SCRATCHPAD` → append `PROGRESS_HISTORY` → append `AUDIT_LOG` (≤5 bullets) → **`git commit` + `git push`** if anything changed. Chat reply ≤5 bullets + git result.
 
 **Lightweight:** lint/test if needed; commit/push only if you changed files; skip `AUDIT_LOG` / `PROGRESS_HISTORY` unless user asked.
 

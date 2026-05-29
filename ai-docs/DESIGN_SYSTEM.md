@@ -111,6 +111,8 @@ Post-polish score for dashboard-focused surfaces: **86/100**.
 
 Post-production-standards pass for dashboard-adjacent surfaces: **91/100**.
 
+**Platform-wide UI/UX pass (2026-05-29):** **93/100** — Security vault, billing, admin, cost hub, and shared primitives aligned to Zenith tokens. Light theme remains **dark-first** (see §7).
+
 Completed improvements:
 - Tightened dashboard overview hierarchy and visual polish while preserving Mission Control layout.
 - Replaced casual emoji-based dashboard/VM controls with established SVG/icon components where practical.
@@ -135,8 +137,17 @@ Files that have been upgraded to the Zenith Design System:
 | `storage.css` | ✅ Upgraded | Removed duplicate :root, uses tokens |
 | `profile.css` | ✅ Upgraded | Glass cards, correct gold, hover states |
 | `error-pages.css` | ✅ Upgraded | 404 page particles |
-| `settings.css` | ⚠️ Partial | BYOC section is premium, rest needs audit |
-| `billing.css` | ⚠️ Needs audit | May have old hardcoded colors |
+| `settings.css` | ✅ Upgraded | Token pass; BYOC + sections use Zenith vars |
+| `billing.css` | ✅ Upgraded | Purple gradients removed; gold accents |
+| `security-page.css` | ✅ Upgraded | Extracted from SecurityPage; glass vault |
+| `security-settings.css` | ✅ Upgraded | Matches profile/settings glass |
+| `zenith-ui.css` | ✅ New | PageHeader, GlassPanel, cost hub, admin header helpers |
+| `encryption-modal.css` | ✅ Upgraded | Gold tokens; no emoji reliance in markup |
+| `decryption-modal.css` | ✅ Upgraded | Purple removed |
+| `admin-pages.css` | ✅ Upgraded | Gold stat icons; token alignment |
+| `admin-layout.css` | ✅ Upgraded | Header tokens via zenith-ui |
+| `about.css`, `contact.css`, `features.css`, `help-center.css` | ✅ Upgraded | Legacy purple→gold |
+| `pricing.css` | ✅ Upgraded | Gold CTAs and borders |
 | `vmcluster.css` | ✅ Upgraded | Header, topology, process cards, metrics, modals, buttons, badges, and workload guidance use Zenith tokens/glass |
 | `global-search.css` | ✅ Upgraded | Tokenized modal, search result icons, and corrected dashboard routes |
 | `emptystate.css` | ✅ Upgraded | Tokenized glass empty states with SVG icon support |
@@ -144,8 +155,9 @@ Files that have been upgraded to the Zenith Design System:
 | `loading.css` | ✅ Upgraded | Tokenized spinner and loading text |
 | `costsimulator.css` | ✅ Upgraded | Tokenized workbench UI, service selector, price cards, badges, and notes |
 | `costoptimization.css` | ✅ Upgraded | Tokenized guide layout, SVG icons, provider marks, strategy cards, and monitoring cards |
-| `costanalysis.css` | ⚠️ Partial | Command controls and visible emoji UI cleaned; deeper report/table styling still needs full audit |
-| `security-settings.css` | ⚠️ Needs audit | Check for consistent theming |
+| `costanalysis.css` | ✅ Upgraded | Container tokens; cost hub on enhanced page |
+| `components/ui/PageHeader.jsx` | ✅ New | Shared kicker + gradient title |
+| `components/ui/GlassPanel.jsx` | ✅ New | DESIGN_SYSTEM §3 glass wrapper |
 
 ---
 
@@ -193,13 +205,12 @@ Files that have been upgraded to the Zenith Design System:
 
 ---
 
-## 7. Light Theme
+## 7. Light Theme (dark-first product)
 
-> `frontend/src/styles/theme-light.css` exists but is **NOT the default** — Zenith is a dark-first product.
+> Zenith ships **dark by default**. `ThemeContext` supports `dark` / `light` / `auto`, but `theme-light.css` is a **partial stub** — do not promise full light parity in UI until Wave 6 (future).
 
-- Light theme is opt-in via a class or CSS custom property override.
-- When styling for light theme, override `--bg-base`, `--bg-card`, `--text-primary` etc. to lighter equivalents.
+- **Default:** `dark` (localStorage key `zenith-theme`).
+- **Settings UI:** Prefer showing Dark + System; treat full Light as experimental until `theme-light.css` covers all upgraded surfaces.
+- When styling for light theme, override `--bg-base`, `--bg-card`, `--text-primary` in `theme-light.css` only — never per-page `:root`.
 - The gold accent (`--gold-primary: #d4af37`) works on both themes — do not change it.
-- **Do NOT** add light-theme-specific styles inline in component CSS. Use `theme-light.css` overrides only.
-- If light theme is not explicitly requested, assume dark theme is active.
-- Current status: `theme-light.css` exists as a stub — not wired to any toggle yet.
+- **Do NOT** add light-theme-specific styles inline in component CSS.

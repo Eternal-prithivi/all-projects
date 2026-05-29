@@ -50,7 +50,7 @@ For backend context → read `AI_CONTEXT_BACKEND.md`
 | Route | Page File | Notes |
 |-------|----------|----|
 | `/dashboard` | `DashboardPage.jsx` | Bento grid, Mission Control layout, greeting |
-| `/dashboard/costs` | `CostAnalysisPage.jsx` | |
+| `/dashboard/costs` | `CostAnalysisEnhancedPage.jsx` | Cost hub sub-nav (simulator, optimization, billing) |
 | `/dashboard/simulator` | `CostSimulatorPage.jsx` | |
 | `/dashboard/optimization` | `CostOptimizationPage.jsx` | |
 | `/dashboard/billing` | `BillingPage.jsx` | |

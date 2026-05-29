@@ -73,7 +73,7 @@
 | Architecture dispute | `DECISIONS.md` (Before You Code checklist) |
 | Hard constraints | `AI_RULES.md` |
 | Phase 12 detail | `PHASE_12_SECURITY_RESEARCH_PARITY.md` |
-| Session prompt templates | `ZENITH_AI_SESSION_PROMPTS.pdf` or `.md` |
+| Session starter (optional) | `AI_MASTER.md` → Session starter; optional PDF `ZENITH_AI_SESSION_PROMPTS.pdf` |
 | Human runbooks | `docs/` (use `@` one file at a time) |
 | Completed session write-ups | `PROGRESS_HISTORY.md` — **append only, never read at startup** |
 | Past sessions | `AUDIT_LOG.md` — **append only at POST-PHASE** · never read at startup · archive → `AUDIT_LOG_ARCHIVE_2026.md` |

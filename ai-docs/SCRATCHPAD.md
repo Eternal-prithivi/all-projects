@@ -120,4 +120,4 @@ If another agent picks this up: start from the first NOT YET DONE step.
 
 > 📌 **Drift Reminder:** Check `AUDIT_LOG.md` entry count since last `[DRIFT AUDIT]` tag. If 5+ sessions have passed, run the drift checklist above before starting work.
 
-_Last updated: 2026-05-29 — protocol: PRE writes first; POST + git push mandatory (AI_MASTER 2026-05-29b)_
+_Last updated: 2026-05-29 — continuity: STATUS + PROGRESS + SCRATCHPAD only (AI_MASTER)_
