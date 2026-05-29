@@ -38,7 +38,7 @@ export default function ProvisionPage() {
           api.get('/provision/status').catch(() => ({ data: {} })),
         ]);
         if (cancelled) return;
-        setAwsByocConnected(!!byocRes.data?.aws?.connected);
+        setAwsByocConnected(!!byocRes.data?.connections?.aws?.connected);
         if (permRes.data) setUserPermissions(permRes.data);
         setTerraformOk(statusRes.data?.terraform_installed ?? false);
         if (statusRes.data?.user_permissions) setUserPermissions(statusRes.data.user_permissions);
