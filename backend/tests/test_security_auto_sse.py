@@ -13,17 +13,22 @@ def test_scan_detects_api_key():
     assert "credential_keywords" in result.reasons
 
 
-@patch("app.security.routes_security._put_secure_object_dual")
+@patch("app.security.routes_security.put_secure_object_dual")
 def test_persist_sse_secure_file_sets_metadata(mock_put):
     from app.security.routes_security import _persist_sse_secure_file
 
     files_db = MagicMock()
+    storage = MagicMock()
+    storage.object_key.return_value = "alice/test.txt"
+    storage.primary_bucket = "secure-b"
+    storage.is_byoc = False
     result = _persist_sse_secure_file(
         files_db,
         filename="test.txt",
         owner_username="alice",
         file_content=b"api_key=xyz",
         is_sensitive=True,
+        storage=storage,
         scan_reasons=["credential_keywords"],
     )
     assert result["status"] == "auto_encrypted_sse"

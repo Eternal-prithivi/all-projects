@@ -24,7 +24,7 @@ def sanitize_username_for_bucket(username: str) -> str:
 
 
 def suggest_aws_bucket_names(username: str) -> Dict[str, str]:
-    """Globally unique-ish suggested names (user must still create buckets in AWS)."""
+    """Globally unique-ish suggested names (Zenith can create these on connect)."""
     suffix = uuid.uuid4().hex[:6]
     base = sanitize_username_for_bucket(username)
     return {
@@ -139,6 +139,140 @@ def check_bucket_access(
         return "forbidden"
 
 
+def _apply_bucket_baseline(
+    client,
+    bucket_name: str,
+) -> None:
+    """Match provision Terraform S3 module: block public access, AES256, versioning."""
+    client.put_public_access_block(
+        Bucket=bucket_name,
+        PublicAccessBlockConfiguration={
+            "BlockPublicAcls": True,
+            "IgnorePublicAcls": True,
+            "BlockPublicPolicy": True,
+            "RestrictPublicBuckets": True,
+        },
+    )
+    client.put_bucket_encryption(
+        Bucket=bucket_name,
+        ServerSideEncryptionConfiguration={
+            "Rules": [
+                {
+                    "ApplyServerSideEncryptionByDefault": {"SSEAlgorithm": "AES256"},
+                }
+            ]
+        },
+    )
+    client.put_bucket_versioning(
+        Bucket=bucket_name,
+        VersioningConfiguration={"Status": "Enabled"},
+    )
+
+
+def create_s3_bucket(
+    access_key_id: str,
+    secret_access_key: str,
+    bucket_name: str,
+    region: str,
+    session_token: Optional[str] = None,
+) -> Tuple[bool, str]:
+    """
+    Create bucket in the user's account with baseline security settings.
+    Returns (success, message). Idempotent if bucket already exists and is accessible.
+    """
+    fmt_err = validate_bucket_name_format(bucket_name)
+    if fmt_err:
+        return False, fmt_err
+
+    status = check_bucket_access(
+        access_key_id, secret_access_key, bucket_name, region, session_token
+    )
+    if status == "accessible":
+        return True, "Bucket already exists."
+    if status == "forbidden":
+        return (
+            False,
+            f"Cannot create '{bucket_name}': access denied or name taken globally.",
+        )
+
+    client = _s3_client_from_keys(
+        access_key_id, secret_access_key, region, session_token
+    )
+    try:
+        if region == "us-east-1":
+            client.create_bucket(Bucket=bucket_name)
+        else:
+            client.create_bucket(
+                Bucket=bucket_name,
+                CreateBucketConfiguration={"LocationConstraint": region},
+            )
+    except ClientError as e:
+        code = e.response.get("Error", {}).get("Code", "")
+        if code in ("BucketAlreadyOwnedByYou",):
+            pass
+        elif code in ("BucketAlreadyExists",):
+            return (
+                False,
+                f"Bucket name '{bucket_name}' is already taken by another AWS account.",
+            )
+        else:
+            return False, f"CreateBucket failed: {str(e)[:160]}"
+
+    try:
+        _apply_bucket_baseline(client, bucket_name)
+    except ClientError as e:
+        return (
+            False,
+            f"Bucket '{bucket_name}' was created but securing it failed: {str(e)[:120]}. "
+            "Add s3:PutBucketPublicAccessBlock, PutEncryptionConfiguration, PutBucketVersioning to IAM.",
+        )
+
+    verify = check_bucket_access(
+        access_key_id, secret_access_key, bucket_name, region, session_token
+    )
+    if verify != "accessible":
+        return False, f"Bucket '{bucket_name}' was created but is not accessible yet."
+    return True, f"Bucket '{bucket_name}' created in {region}."
+
+
+def ensure_aws_buckets_exist(
+    access_key_id: str,
+    secret_access_key: str,
+    buckets: List[Tuple[str, str]],
+    session_token: Optional[str] = None,
+) -> Tuple[bool, str]:
+    """Create any missing buckets, then verify all are accessible."""
+    created: List[str] = []
+    for bucket_name, region in buckets:
+        status = check_bucket_access(
+            access_key_id, secret_access_key, bucket_name, region, session_token
+        )
+        if status == "accessible":
+            continue
+        if status != "available":
+            if status == "invalid":
+                return False, f"Invalid bucket name: '{bucket_name}'."
+            return (
+                False,
+                f"Cannot use bucket '{bucket_name}' in {region}. Check IAM permissions.",
+            )
+        ok, message = create_s3_bucket(
+            access_key_id, secret_access_key, bucket_name, region, session_token
+        )
+        if not ok:
+            return False, message
+        created.append(bucket_name)
+
+    ok, message = test_aws_buckets_access(
+        access_key_id, secret_access_key, buckets, session_token
+    )
+    if not ok:
+        return False, message
+    if created:
+        return True, f"Created {len(created)} bucket(s): {', '.join(created)}. {message}"
+    return True, message
+
+
 def test_aws_buckets_access(
     access_key_id: str,
     secret_access_key: str,
@@ -154,8 +288,7 @@ def test_aws_buckets_access(
             if status == "available":
                 return (
                     False,
-                    f"Bucket '{bucket_name}' was not found in {region}. "
-                    "Create it in AWS first, then connect.",
+                    f"Bucket '{bucket_name}' was not found in {region}.",
                 )
             if status == "invalid":
                 return False, f"Invalid bucket name: '{bucket_name}'."

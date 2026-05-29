@@ -39,26 +39,41 @@ def get_aws_byoc_record(username: str) -> Optional[Dict[str, Any]]:
     )
 
 
+def normalize_aws_byoc_layout(record: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Canonical BYOC bucket layout from Mongo record (supports legacy single-bucket rows).
+    """
+    storage = (record.get("storage_bucket_name") or record.get("bucket_name") or "").strip()
+    secure = (record.get("secure_bucket_name") or storage).strip()
+    replica = (record.get("replica_bucket_name") or "").strip()
+    primary_region = (
+        record.get("primary_region")
+        or record.get("region")
+        or creds_region(record)
+    )
+    replica_region = record.get("replica_region") or "us-east-1"
+    dual_write = record.get("secure_dual_write")
+    if dual_write is None:
+        dual_write = bool(replica)
+    if not replica:
+        dual_write = False
+    return {
+        "storage_bucket_name": storage,
+        "secure_bucket_name": secure,
+        "replica_bucket_name": replica,
+        "primary_region": primary_region,
+        "replica_region": replica_region,
+        "secure_dual_write": bool(dual_write),
+        "uses_dedicated_secure_bucket": bool(secure and secure != storage),
+    }
+
+
 def get_aws_bucket_layout(username: str) -> Optional[Dict[str, Any]]:
     """Resolved bucket names and regions for AWS BYOC."""
     record = get_aws_byoc_record(username)
     if not record:
         return None
-    storage = record.get("storage_bucket_name") or record.get("bucket_name") or ""
-    secure = record.get("secure_bucket_name") or storage
-    return {
-        "storage_bucket_name": storage,
-        "secure_bucket_name": secure,
-        "replica_bucket_name": record.get("replica_bucket_name") or "",
-        "primary_region": record.get("primary_region")
-        or record.get("region")
-        or settings.PRIMARY_S3_REGION,
-        "replica_region": record.get("replica_region") or "us-east-1",
-        "secure_dual_write": record.get("secure_dual_write", True),
-        "uses_dedicated_secure_bucket": bool(
-            record.get("secure_bucket_name") and secure != storage
-        ),
-    }
+    return normalize_aws_byoc_layout(record)
 
 
 def get_user_cloud_credentials(username: str, csp: str) -> Optional[Dict[str, Any]]:
@@ -270,16 +285,8 @@ def get_byoc_status(username: str) -> Dict[str, Any]:
             "connected_at": record.get("created_at", None) if record else None,
         }
         if record and csp == "AWS":
-            storage = record.get("storage_bucket_name") or record.get("bucket_name") or ""
-            entry.update({
-                "storage_bucket_name": storage,
-                "secure_bucket_name": record.get("secure_bucket_name") or storage,
-                "replica_bucket_name": record.get("replica_bucket_name") or "",
-                "primary_region": record.get("primary_region") or creds_region(record),
-                "replica_region": record.get("replica_region") or "us-east-1",
-                "secure_dual_write": record.get("secure_dual_write", True),
-                "bucket_name": storage,
-            })
+            layout = normalize_aws_byoc_layout(record)
+            entry.update({**layout, "bucket_name": layout["storage_bucket_name"]})
         status[csp.lower()] = entry
     return status
 

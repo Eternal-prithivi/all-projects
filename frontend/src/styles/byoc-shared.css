@@ -74,6 +74,10 @@
   color: var(--success);
 }
 
+.byoc-bucket-check--created {
+  color: var(--success);
+}
+
 .byoc-bucket-check--forbidden,
 .byoc-bucket-check--invalid {
   color: var(--danger, #f87171);

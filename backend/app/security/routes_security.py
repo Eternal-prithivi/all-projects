@@ -27,7 +27,12 @@ from app.database.mongo_client import mongodb_client
 from app.storage.models_storage import FileMetadata
 from app.storage.manager import list_objects_aws
 from app.storage.tasks import apply_encryption_to_file
-from app.storage.cloud_credentials import SecureAwsStorage, resolve_secure_aws_storage
+from app.storage.cloud_credentials import (
+    SecureAwsStorage,
+    delete_secure_object_dual,
+    put_secure_object_dual,
+    resolve_secure_aws_storage,
+)
 from app.security.encryption_handler import (
     decrypt_file_client_side,
     extract_encrypted_file_components,
@@ -54,7 +59,9 @@ def _persist_sse_secure_file(
 ) -> dict:
     """Upload bytes to secure vault (BYOC bucket or platform dual buckets) with SSE-S3."""
     object_key = storage.object_key(owner_username, filename)
-    _put_secure_object_dual(file_content, object_key, storage, server_side_encryption=True)
+    put_secure_object_dual(
+        storage, object_key, file_content, server_side_encryption=True
+    )
     file_metadata = FileMetadata(
         filename=filename,
         s3_key=object_key,
@@ -85,39 +92,6 @@ def _persist_sse_secure_file(
         "is_sensitive": is_sensitive,
         "message": "Sensitive data detected — file protected automatically with SSE-S3 (primary + replica).",
     }
-
-
-def _put_secure_object_dual(
-    body: bytes,
-    object_key: str,
-    storage: SecureAwsStorage,
-    *,
-    server_side_encryption: bool = False,
-    metadata: Optional[dict] = None,
-) -> None:
-    """Write object to primary (+ replica when platform-managed vault)."""
-    put_kwargs: dict = {
-        "Bucket": storage.primary_bucket,
-        "Key": object_key,
-        "Body": body,
-    }
-    if server_side_encryption:
-        put_kwargs["ServerSideEncryption"] = "AES256"
-    if metadata:
-        put_kwargs["Metadata"] = metadata
-    storage.primary_client.put_object(**put_kwargs)
-
-    if storage.replica_client and storage.replica_bucket:
-        replica_kwargs = {
-            "Bucket": storage.replica_bucket,
-            "Key": object_key,
-            "Body": body,
-        }
-        if server_side_encryption:
-            replica_kwargs["ServerSideEncryption"] = "AES256"
-        if metadata:
-            replica_kwargs["Metadata"] = metadata
-        storage.replica_client.put_object(**replica_kwargs)
 
 
 # Request models
@@ -398,10 +372,10 @@ async def upload_client_encrypted(
     storage = resolve_secure_aws_storage(user.username)
     object_key = storage.object_key(user.username, original_filename)
     try:
-        _put_secure_object_dual(
-            encrypted_body,
-            object_key,
+        put_secure_object_dual(
             storage,
+            object_key,
+            encrypted_body,
             metadata={"encryption": "client-side", "algorithm": "AES-256-CBC"},
         )
     except Exception as e:
@@ -683,13 +657,8 @@ async def delete_secure_file(
     )
     if file_doc:
         object_key = file_doc.get("s3_key") or object_key
-    bucket = (file_doc or {}).get("cloud_bucket") or storage.primary_bucket
     try:
-        storage.primary_client.delete_object(Bucket=bucket, Key=object_key)
-        if storage.replica_client and storage.replica_bucket:
-            storage.replica_client.delete_object(
-                Bucket=storage.replica_bucket, Key=object_key
-            )
+        delete_secure_object_dual(storage, object_key)
         files_db.delete_one({"owner_username": user.username, "s3_key": object_key})
         return
     except Exception as e:

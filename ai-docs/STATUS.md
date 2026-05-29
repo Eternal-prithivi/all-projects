@@ -9,17 +9,16 @@
 | Field | Value |
 |-------|--------|
 | Project | CloudResourceOptimizationPlatform (**Zenith**) |
-| Phase | **17** in progress |
-| Last major complete | Phase 16 — BYOC credential routing (storage, security, cost, VM GCP) |
+| Phase | **17** |
+| Last major | AWS BYOC wizard, auto-create buckets, secure dual-write |
 
 ---
 
 ## 🔴 Active Task
 
-**Phase 17 — AWS BYOC two-step connect (three buckets)**
+**None** — push local Phase 17 bundle to `stage` when ready.
 
-| Done | Two-step Settings wizard (verify → buckets), `/byoc/verify-credentials`, `/byoc/check-bucket-name`, `/byoc/storage-targets`, three-bucket connect + resolver, Storage/Security destination banners |
-| Next | Phase 2: replica dual-write hardening, CloudFormation template, bucket migration UI |
+| Deferred | CloudFormation stack, bucket migration UI |
 
 ---
 
@@ -27,8 +26,8 @@
 
 | Check | Status |
 |-------|--------|
-| Backend pytest | Run after pull (`cd backend && pytest -q`) |
-| Frontend build | Run `cd frontend && npm run build` after pull |
+| Backend pytest | `cd backend && pytest -q` |
+| Frontend build | `cd frontend && npm run build` |
 
 ---
 
@@ -36,4 +35,3 @@
 
 1. `backend/.env` — never commit
 2. Product name **Zenith** — do not rebrand without asking
-3. GCP BYOC for VMs requires Compute API roles on the service account

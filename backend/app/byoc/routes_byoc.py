@@ -32,6 +32,8 @@ from app.byoc.aws_bucket_helpers import (
     REPLICA_REGION_DEFAULT,
     assume_role_temp_credentials,
     check_bucket_access,
+    create_s3_bucket,
+    ensure_aws_buckets_exist,
     suggest_aws_bucket_names,
     test_aws_buckets_access,
     validate_bucket_name_format,
@@ -90,11 +92,15 @@ IAM_POLICY_TEMPLATES = {
                         "Sid": "ZenithBYOCBuckets",
                         "Effect": "Allow",
                         "Action": [
+                            "s3:CreateBucket",
                             "s3:PutObject",
                             "s3:GetObject",
                             "s3:DeleteObject",
                             "s3:ListBucket",
-                            "s3:GetBucketLocation"
+                            "s3:GetBucketLocation",
+                            "s3:PutBucketPublicAccessBlock",
+                            "s3:PutEncryptionConfiguration",
+                            "s3:PutBucketVersioning"
                         ],
                         "Resource": [
                             "arn:aws:s3:::YOUR_STORAGE_BUCKET",
@@ -114,9 +120,8 @@ IAM_POLICY_TEMPLATES = {
                 "Check 'Require external ID' and enter: {external_id}",
                 "Click Next → Create a policy with the permissions JSON below (replace YOUR_STORAGE_BUCKET, YOUR_SECURE_BUCKET, YOUR_REPLICA_BUCKET)",
                 "Attach the policy → Name the role 'ZenithBYOC' → Create",
-                "Create three S3 buckets in AWS (storage + secure in your primary region; replica in us-east-1)",
                 "Copy the Role ARN (e.g., arn:aws:iam::123456789012:role/ZenithBYOC)",
-                "Paste the Role ARN in Step 1, then configure bucket names in Step 2"
+                "Paste the Role ARN in Step 1 — Zenith will create your S3 buckets in Step 2"
             ]
         }
     },
@@ -218,12 +223,45 @@ class BYOCVerifyCredentialsRequest(BaseModel):
 
 
 class BYOCCheckBucketRequest(BaseModel):
-    """Check a single bucket name with user's credentials."""
+    """Check or create a single bucket with user's credentials."""
     bucket_name: str
     region: str = "ap-south-1"
-    access_key_id: str
-    secret_access_key: str
+    connection_method: str = "access_keys"
+    access_key_id: Optional[str] = None
+    secret_access_key: Optional[str] = None
+    role_arn: Optional[str] = None
     session_token: Optional[str] = None
+    create_if_missing: bool = False
+
+
+def _resolve_aws_session_creds(
+    username: str,
+    connection_method: str,
+    primary_region: str,
+    access_key_id: Optional[str],
+    secret_access_key: Optional[str],
+    role_arn: Optional[str],
+) -> tuple[str, str, Optional[str]]:
+    """Return (access_key_id, secret_access_key, session_token) for AWS API calls."""
+    method = (connection_method or "access_keys").lower()
+    if method == "iam_role":
+        if not role_arn:
+            raise HTTPException(status_code=400, detail="role_arn is required for IAM role.")
+        ext_id = get_or_create_external_id(username)
+        ok, message, temp = assume_role_temp_credentials(role_arn, ext_id, primary_region)
+        if not ok or not temp:
+            raise HTTPException(status_code=400, detail=message)
+        return (
+            temp["access_key_id"],
+            temp["secret_access_key"],
+            temp.get("session_token"),
+        )
+    if not access_key_id or not secret_access_key:
+        raise HTTPException(
+            status_code=400,
+            detail="access_key_id and secret_access_key are required.",
+        )
+    return access_key_id, secret_access_key, None
 
 
 def _resolve_aws_storage_bucket(request: BYOCConnectRequest) -> str:
@@ -527,26 +565,60 @@ async def verify_credentials(
     }
 
 
-@router.post("/check-bucket-name", summary="Check S3 bucket name availability/access")
+@router.post("/check-bucket-name", summary="Check or create S3 bucket")
 async def check_bucket_name(
     request: BYOCCheckBucketRequest,
     user: User = Depends(get_current_user),
 ):
-    """Check bucket format and HeadBucket status using provided credentials."""
+    """Check bucket format; optionally create when name is free (create_if_missing)."""
     check_byoc_eligibility(user.username)
     fmt = validate_bucket_name_format(request.bucket_name)
     if fmt:
         return {"bucket_name": request.bucket_name, "status": "invalid", "message": fmt}
 
-    status = check_bucket_access(
+    region = request.region or "ap-south-1"
+    access_key_id, secret_access_key, session_token = _resolve_aws_session_creds(
+        user.username,
+        request.connection_method,
+        region,
         request.access_key_id,
         request.secret_access_key,
-        request.bucket_name,
-        request.region,
-        request.session_token,
+        request.role_arn,
     )
+    if request.session_token:
+        session_token = request.session_token
+
+    status = check_bucket_access(
+        access_key_id,
+        secret_access_key,
+        request.bucket_name,
+        region,
+        session_token,
+    )
+
+    if status == "available" and request.create_if_missing:
+        ok, create_message = create_s3_bucket(
+            access_key_id,
+            secret_access_key,
+            request.bucket_name,
+            region,
+            session_token,
+        )
+        if not ok:
+            return {
+                "bucket_name": request.bucket_name,
+                "status": "forbidden",
+                "message": create_message,
+            }
+        return {
+            "bucket_name": request.bucket_name,
+            "status": "accessible",
+            "message": create_message,
+            "created": True,
+        }
+
     messages = {
-        "available": "Name is free in your account — create this bucket in AWS before connecting.",
+        "available": "Name is available — Zenith will create this bucket when you connect.",
         "accessible": "Bucket exists and your credentials can access it.",
         "forbidden": "Bucket unavailable or access denied (name may be taken globally).",
         "invalid": "Invalid bucket name format.",
@@ -555,6 +627,7 @@ async def check_bucket_name(
         "bucket_name": request.bucket_name,
         "status": status,
         "message": messages.get(status, ""),
+        "created": False,
     }
 
 
@@ -636,30 +709,26 @@ async def connect_cloud(request: BYOCConnectRequest, user: User = Depends(get_cu
             if not request.role_arn:
                 raise HTTPException(status_code=400, detail="IAM Role method requires role_arn.")
             ext_id = get_or_create_external_id(user.username)
-            ok, message, temp = assume_role_temp_credentials(
-                request.role_arn, ext_id, primary_region
-            )
-            if not ok:
-                raise HTTPException(status_code=400, detail=message)
-            access_key_id = temp["access_key_id"]
-            secret_access_key = temp["secret_access_key"]
-            session_token = temp["session_token"]
             credentials_to_encrypt = {
                 "role_arn": request.role_arn,
                 "external_id": ext_id,
                 "region": primary_region,
             }
         else:
-            if not request.access_key_id or not request.secret_access_key:
-                raise HTTPException(
-                    status_code=400,
-                    detail="Access Keys method requires access_key_id and secret_access_key.",
-                )
             credentials_to_encrypt = {
                 "access_key_id": request.access_key_id,
                 "secret_access_key": request.secret_access_key,
                 "region": primary_region,
             }
+
+        access_key_id, secret_access_key, session_token = _resolve_aws_session_creds(
+            user.username,
+            request.connection_method,
+            primary_region,
+            request.access_key_id,
+            request.secret_access_key,
+            request.role_arn,
+        )
 
         buckets_to_test = [
             (storage_bucket, primary_region),
@@ -668,7 +737,7 @@ async def connect_cloud(request: BYOCConnectRequest, user: User = Depends(get_cu
         if request.secure_dual_write and replica_bucket:
             buckets_to_test.append((replica_bucket, replica_region))
 
-        ok, bucket_message = test_aws_buckets_access(
+        ok, bucket_message = ensure_aws_buckets_exist(
             access_key_id,
             secret_access_key,
             buckets_to_test,
@@ -694,9 +763,13 @@ async def connect_cloud(request: BYOCConnectRequest, user: User = Depends(get_cu
             secure_bucket,
             replica_bucket,
         )
+        connect_message = "AWS account connected. Storage and Security will use your buckets."
+        if bucket_message and "Created" in bucket_message:
+            connect_message = f"{connect_message} {bucket_message}"
+
         return {
             "success": True,
-            "message": "AWS account connected. Storage and Security will use your buckets.",
+            "message": connect_message,
             "csp": "AWS",
             "connection_method": request.connection_method,
             "storage_bucket_name": storage_bucket,

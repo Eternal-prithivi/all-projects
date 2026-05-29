@@ -74,6 +74,77 @@ class SecureAwsStorage:
             return f"secure/{username}/{filename}"
         return f"{username}/{filename}"
 
+    @property
+    def dual_write_enabled(self) -> bool:
+        return bool(self.replica_client and self.replica_bucket)
+
+
+def put_secure_object_dual(
+    storage: SecureAwsStorage,
+    object_key: str,
+    body: bytes,
+    *,
+    server_side_encryption: bool = False,
+    metadata: Optional[dict] = None,
+) -> None:
+    """Write to primary secure bucket and replica when BYOC/platform dual-write is on."""
+    put_kwargs: dict = {
+        "Bucket": storage.primary_bucket,
+        "Key": object_key,
+        "Body": body,
+    }
+    if server_side_encryption:
+        put_kwargs["ServerSideEncryption"] = "AES256"
+    if metadata:
+        put_kwargs["Metadata"] = metadata
+    storage.primary_client.put_object(**put_kwargs)
+
+    if not storage.dual_write_enabled:
+        return
+
+    replica_kwargs: dict = {
+        "Bucket": storage.replica_bucket,
+        "Key": object_key,
+        "Body": body,
+    }
+    if server_side_encryption:
+        replica_kwargs["ServerSideEncryption"] = "AES256"
+    if metadata:
+        replica_kwargs["Metadata"] = metadata
+    storage.replica_client.put_object(**replica_kwargs)
+
+
+def copy_secure_object_to_replica(
+    storage: SecureAwsStorage,
+    object_key: str,
+    *,
+    server_side_encryption: bool = False,
+) -> None:
+    """Copy an object from primary secure bucket to replica (cross-region when configured)."""
+    if not storage.dual_write_enabled:
+        return
+    copy_source = f"{storage.primary_bucket}/{object_key}"
+    kwargs: dict = {
+        "Bucket": storage.replica_bucket,
+        "Key": object_key,
+        "CopySource": copy_source,
+    }
+    if server_side_encryption:
+        kwargs["ServerSideEncryption"] = "AES256"
+        kwargs["MetadataDirective"] = "REPLACE"
+    storage.replica_client.copy_object(**kwargs)
+
+
+def delete_secure_object_dual(storage: SecureAwsStorage, object_key: str) -> None:
+    """Delete from primary and replica secure buckets."""
+    storage.primary_client.delete_object(
+        Bucket=storage.primary_bucket, Key=object_key
+    )
+    if storage.dual_write_enabled:
+        storage.replica_client.delete_object(
+            Bucket=storage.replica_bucket, Key=object_key
+        )
+
 
 def resolve_secure_aws_storage(username: str) -> SecureAwsStorage:
     """

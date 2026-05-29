@@ -247,13 +247,16 @@ const SettingsPage = () => {
   };
 
   const handleCheckAwsBucket = async (field, bucketName, region) => {
-    if (!bucketName || byocMethod !== 'access_keys') return;
+    if (!bucketName || !awsCredentialsVerified) return;
     try {
       const response = await apiClient.post('/byoc/check-bucket-name', {
         bucket_name: bucketName,
         region: region || awsForm.region,
+        connection_method: byocMethod,
         access_key_id: awsForm.access_key_id,
         secret_access_key: awsForm.secret_access_key,
+        role_arn: awsForm.role_arn,
+        create_if_missing: true,
       });
       setBucketCheckStatus((prev) => ({
         ...prev,
@@ -295,7 +298,7 @@ const SettingsPage = () => {
       resetAwsConnectFlow();
       setByocTestResult({
         success: true,
-        message: response.data.message || 'Connected successfully.',
+        message: response.data.message || response.data.bucket_message || 'Connected successfully.',
       });
       fetchByocStatus();
     } catch (error) {
@@ -651,8 +654,8 @@ const SettingsPage = () => {
                     {csp === 'AWS' && awsConnectStep === 2 && (
                       <div className="byoc-fields">
                         <p className="byoc-field-hint">
-                          Create these S3 buckets in your AWS account (primary region: {awsForm.region}).
-                          Replica bucket should be in <strong>US East (N. Virginia)</strong>.
+                          Confirm bucket names below. Zenith will create any that do not exist yet in your AWS account
+                          (primary region: {awsForm.region}; replica in <strong>US East (N. Virginia)</strong>).
                         </p>
                         {[
                           { field: 'storage_bucket_name', label: 'Storage bucket', region: awsForm.region },

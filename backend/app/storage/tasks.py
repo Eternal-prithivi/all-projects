@@ -5,7 +5,11 @@ from pymongo import MongoClient
 from app.celery_worker import celery_app
 from app.utils.config import settings
 from app.utils.logger import setup_logger
-from app.storage.cloud_credentials import resolve_secure_aws_storage
+from app.storage.cloud_credentials import (
+    copy_secure_object_to_replica,
+    put_secure_object_dual,
+    resolve_secure_aws_storage,
+)
 from app.security.encryption_handler import (
     encrypt_file_client_side,
     prepare_encrypted_file_for_storage
@@ -120,10 +124,8 @@ def apply_encryption_to_file(s3_key: str, owner_username: str, encryption_method
     """
     storage = resolve_secure_aws_storage(owner_username)
     s3_client_primary = storage.primary_client
-    s3_client_replica = storage.replica_client
     bucket_name = storage.primary_bucket
-    replica_bucket = storage.replica_bucket
-    
+
     mongo_client = MongoClient(settings.MONGO_CONNECTION_STRING)
     db = mongo_client['CloudResourceOptimizationDB']
     files_db = db["secure_files"]
@@ -137,17 +139,13 @@ def apply_encryption_to_file(s3_key: str, owner_username: str, encryption_method
             s3_client_primary.copy_object(
                 Bucket=bucket_name,
                 Key=s3_key,
-                CopySource={'Bucket': bucket_name, 'Key': s3_key},
-                ServerSideEncryption='AES256',
-                MetadataDirective='REPLACE'
+                CopySource={"Bucket": bucket_name, "Key": s3_key},
+                ServerSideEncryption="AES256",
+                MetadataDirective="REPLACE",
             )
-            
-            if s3_client_replica and replica_bucket:
-                s3_client_replica.copy_object(
-                    Bucket=replica_bucket,
-                    Key=s3_key,
-                    CopySource={'Bucket': bucket_name, 'Key': s3_key},
-                )
+            copy_secure_object_to_replica(
+                storage, s3_key, server_side_encryption=True
+            )
             
             files_db.update_one(
                 {"s3_key": s3_key},
@@ -175,26 +173,15 @@ def apply_encryption_to_file(s3_key: str, owner_username: str, encryption_method
             encrypted_content, salt, iv = encrypt_file_client_side(original_content, password)
             final_encrypted_data = prepare_encrypted_file_for_storage(encrypted_content, salt, iv)
             
-            s3_client_primary.put_object(
-                Bucket=bucket_name,
-                Key=s3_key,
-                Body=final_encrypted_data,
-                Metadata={
-                    'encryption': 'client-side',
-                    'algorithm': 'AES-256-CBC'
-                }
+            put_secure_object_dual(
+                storage,
+                s3_key,
+                final_encrypted_data,
+                metadata={
+                    "encryption": "client-side",
+                    "algorithm": "AES-256-CBC",
+                },
             )
-            
-            if s3_client_replica and replica_bucket:
-                s3_client_replica.put_object(
-                    Bucket=replica_bucket,
-                    Key=s3_key,
-                    Body=final_encrypted_data,
-                    Metadata={
-                        'encryption': 'client-side',
-                        'algorithm': 'AES-256-CBC'
-                    }
-                )
             
             files_db.update_one(
                 {"s3_key": s3_key},
