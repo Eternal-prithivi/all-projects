@@ -1,7 +1,8 @@
 # PROGRESS.md — Task Tracker
 
 > **Startup:** read `STATUS.md` only (not this file unless updating active task).
-> **Full POST-PHASE:** update with `STATUS.md`. **Lightweight fix:** skip if active task unchanged.
+> **Full PRE-PHASE:** fill `## 🔴 Active Task` before code (never leave empty while work is in flight).
+> **Full POST-PHASE:** finalize with `STATUS.md`, then commit + push. **Lightweight fix:** skip if active task unchanged.
 > Narratives → `PROGRESS_HISTORY.md` only (never duplicate here or in chat).
 > Last Updated: 2026-05-29
 
@@ -50,7 +51,11 @@ Scope: [...] | Do NOT touch: [...] | Done when: [...]
 | 4 | 🔲 partial | Storage sync ✅; cost/VM/admin items remain |
 | 5–10 | ✅ | ML foundation → hardening, demo runbook |
 | 11–11b | ✅ | Terraform provision, OPA, drift, RBAC, audit |
-| **12** | **🔲 active** | SSE-S3 + browser CSE + detection + sessions |
+| **12** | **✅** | SSE-S3 + browser CSE + auto SSE + sessions + benchmarks |
+
+### ✅ UI/UX platform polish (2026-05-29) — complete
+
+Waves 0–5 done: Security vault CSS extraction, billing/admin/public token pass, cost hub sub-nav, `PageHeader`/`GlassPanel`, `DESIGN_SYSTEM.md` → 93/100. Details: `UI_UX_AUDIT_2026.md`.
 
 ### Phase 12 checklist
 
@@ -58,16 +63,16 @@ Scope: [...] | Do NOT touch: [...] | Done when: [...]
 - [x] `sensitive_file_detector.py` + upload encrypt flow
 - [x] SSE-S3 dual-bucket + UI badges SSE / CSE
 - [x] Secure vault AWS sync
-- [ ] Auto SSE-S3 when sensitive (no modal for default path)
-- [ ] Session geolocation + device fingerprint
-- [ ] Detector benchmark tests
+- [x] Auto SSE-S3 when sensitive (no modal for default path)
+- [x] Session geolocation + device fingerprint
+- [x] Detector benchmark tests + labeled dataset
 - [ ] KMS — **out of scope**
 
 ### Product readiness (post–Phase 12)
 
-- [ ] Backend re-validation schemas for all forms
-- [ ] CI/CD (pytest + eslint + build)
-- [ ] Expanded integration tests
+- [ ] Backend re-validation schemas for all forms (partial — auth/forms done)
+- [x] CI/CD (pytest + eslint + build) — `.github/workflows/ci.yml`
+- [x] Expanded tests (46 pytest: session, BYOC, storage, security, benchmark)
 
 ---
 

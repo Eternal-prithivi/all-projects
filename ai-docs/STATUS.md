@@ -1,7 +1,7 @@
 # STATUS.md — Live Project Snapshot (read every session)
 
-> **Always-read bootstrap (~3KB).** Update at session end together with `PROGRESS.md` and `SCRATCHPAD.md`.
-> Protocol (PRE → EXECUTE → POST): `AI_MASTER.md` · History: `PROGRESS_HISTORY.md` · Rules: `AI_RULES.md`
+> **Always-read bootstrap (~3KB).** Update at **PRE** (claim task, `IN PROGRESS`) and **POST** (COMPLETE, health) with `PROGRESS.md` and `SCRATCHPAD.md` — not only after coding.
+> Protocol (PRE → EXECUTE → POST → git push): `AI_MASTER.md` · History: `PROGRESS_HISTORY.md` · Rules: `AI_RULES.md`
 
 **Last Updated:** 2026-05-29
 
@@ -12,7 +12,7 @@
 | Field | Value |
 |-------|--------|
 | Project | CloudResourceOptimizationPlatform (**Zenith**) |
-| Phase | **12 IN PROGRESS** — Security research paper parity (SSE-S3 + browser CSE) |
+| Phase | **12 COMPLETE** — Security research paper parity (SSE-S3 + browser CSE + auto SSE + sessions) |
 | Last major complete | Phase 11 — Terraform provisioning + Phase 11b (OPA, drift, RBAC) |
 | Budget | Zero-cost / student free-tier only |
 | Spec | `ai-docs/PHASE_12_SECURITY_RESEARCH_PARITY.md` |
@@ -21,13 +21,12 @@
 
 ## 🔴 Active Task
 
-**Phase 12: Security Research Paper Parity**
+**Post–Phase 12: Professional ops (CI, tests, handoff docs)**
 
 | | |
 |--|--|
-| Status | **IN PROGRESS** (since 2026-05-29) |
-| Done | Browser CSE (`clientEncryption.js`), sensitive scan, encrypt modal, SSE-S3 dual-bucket upload, secure vault AWS sync |
-| Open | Session geo/fingerprint, detection benchmark suite, auto SSE without modal for sensitive default |
+| Status | **COMPLETE** (2026-05-29 gap execution) |
+| Done | Auto SSE-S3, session geo + fingerprint, detector benchmark, CI workflow, expanded pytest (46), demo runbook |
 | Resume | See `SCRATCHPAD.md` → Current Resume State |
 
 ---
@@ -47,7 +46,7 @@
 
 | Check | Status |
 |-------|--------|
-| Backend pytest | 34 passed (re-run: `cd backend && .venv/bin/python -m pytest -q`) |
+| Backend pytest | 46 passed (re-run: `cd backend && .venv/bin/python -m pytest -q`) |
 | Frontend lint | 0 errors (`cd frontend && npm run lint`) |
 | Frontend build | Passes (`npm run build`) |
 | MongoDB | Connected (Atlas) |
@@ -55,12 +54,12 @@
 
 ---
 
-## Next Backlog (after Phase 12)
+## Next Backlog (optional)
 
-1. Session geolocation + device fingerprint
-2. Sensitive-file detector benchmark tests
-3. CI/CD (GitHub Actions) — see `PROFESSIONAL_IMPROVEMENTS.md`
-4. Backend test expansion (admin, BYOC, storage)
+1. New-device login email alerts
+2. Production ML artifact hot-swap after real feedback volume
+3. Full GCP live demo (see `docs/GCP_DEMO_SETUP.md`)
+4. Onboarding tour (`PROFESSIONAL_IMPROVEMENTS.md`)
 
 ---
 
@@ -69,6 +68,7 @@
 | Need | Read |
 |------|------|
 | Frontend/UI | `AI_CONTEXT_FRONTEND.md`, `DESIGN_SYSTEM.md` |
+| UI/UX audit + wave log | `UI_UX_AUDIT_2026.md` (on demand — **platform polish complete 2026-05-29**) |
 | Backend/API/ML | `AI_CONTEXT_BACKEND.md` |
 | Architecture dispute | `DECISIONS.md` (Before You Code checklist) |
 | Hard constraints | `AI_RULES.md` |

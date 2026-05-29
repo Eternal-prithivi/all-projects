@@ -66,11 +66,11 @@ If 5+ sessions since last drift audit (or none ever), run the checklist below.
 
 | Check | Status |
 |-------|--------|
-| Backend tests | ✅ 34 passed (`backend/.venv/bin/python -m pytest -q`) |
+| Backend tests | ✅ 46 passed (`backend/.venv/bin/python -m pytest -q`) |
 | Frontend build | ✅ Passes (`npm run build`) |
 | Frontend lint | ✅ 0 errors (warnings pre-existing) |
-| Phase | 12 IN PROGRESS — browser CSE + SSE-S3 core paths implemented |
-| Last verified feature | Security upload encrypt flow + sensitive detector (2026-05-29) |
+| Phase | 12 COMPLETE — gap execution (auto SSE, sessions, CI, benchmarks) |
+| Last verified feature | Phase 12 + Phase 13 ops (2026-05-29) |
 
 **Re-verify:** `cd backend && .venv/bin/python -m pytest -q` · `cd frontend && npm run lint && npm run build`
 
@@ -78,20 +78,13 @@ If 5+ sessions since last drift audit (or none ever), run the checklist below.
 
 ## 🔄 Current Resume State
 
-**Status:** IN PROGRESS — Phase 12 (browser CSE + SSE flow implemented 2026-05-29).
+**Status:** IDLE — no active task (last completed: Post–Phase 12 professional ops, 2026-05-29).
 
-**Resume here:**
-1. Manual test: Security page upload file with `password=xxx` → Encrypt this → Client-side → download with password.
-2. Optional: auto SSE on sensitive without modal (`routes_security.py` upload path).
-3. Session geo + fingerprint (`routes_auth.py`).
-4. Run `pytest backend/tests/test_sensitive_file_detector.py`.
+**Next agent:** On a new task, replace this section in **PRE-PHASE** (before any product code) using the template below. Do not leave this block empty or stale `IN PROGRESS` when starting work.
 
-**Implemented files:**
-- `frontend/src/utils/clientEncryption.js`, `EncryptSensitivePromptModal.jsx`
-- `backend/app/security/sensitive_file_detector.py`, routes: upload-client-encrypted, download-ciphertext
-- `SecurityPage.jsx`, `api.js`, `EncryptionChoiceModal.jsx`
-
-**Not done:** KMS (intentionally out of scope).
+**Last completed summary:**
+- Auto SSE-S3, session geo + fingerprint, detector benchmark, CI (`.github/workflows/ci.yml`), demo runbook, expanded pytest (46).
+- See `ai-docs/PHASE_12_SECURITY_RESEARCH_PARITY.md` and `STATUS.md` backlog for optional follow-ups.
 
 ---
 
@@ -127,4 +120,4 @@ If another agent picks this up: start from the first NOT YET DONE step.
 
 > 📌 **Drift Reminder:** Check `AUDIT_LOG.md` entry count since last `[DRIFT AUDIT]` tag. If 5+ sessions have passed, run the drift checklist above before starting work.
 
-_Last updated: 2026-05-25_
+_Last updated: 2026-05-29 — protocol: PRE writes first; POST + git push mandatory (AI_MASTER 2026-05-29b)_

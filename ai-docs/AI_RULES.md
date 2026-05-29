@@ -68,7 +68,8 @@
 | ❌ Do not paste long session narratives in chat | ≤5 bullets to user; detail → `PROGRESS_HISTORY.md` |
 | ❌ Do not duplicate narratives in `PROGRESS.md` | Active task + checklist only |
 | ✅ Use **Lightweight PRE/POST** for one-file trivial fixes | See `AI_MASTER.md` — skip claim rewrite + skip audit/history |
-| ✅ `git commit` / `git push` only when user asks or at milestone | Not after every AI session |
+| ✅ **PRE writes tracking docs before code** | `STATUS` + `PROGRESS` + `SCRATCHPAD` (+ phase doc) — not only at session end |
+| ✅ **`git commit` + `git push` after Full POST** | When product code or `ai-docs/` changed — backup to GitHub; skip only if user said no push or no changes |
 
 ---
 
@@ -242,10 +243,12 @@ npm run build                   # Vite production build — must pass
 
 **Full POST-PHASE** (normal tasks):
 - [ ] No `.env` files committed
-- [ ] `STATUS.md` + `PROGRESS.md` updated
+- [ ] `STATUS.md` + `PROGRESS.md` updated (match PRE claim → COMPLETE or partial resume)
+- [ ] Phase/theme doc `## Current session` closed or cleared
 - [ ] Long narrative → `PROGRESS_HISTORY.md` (not chat / not PROGRESS)
 - [ ] `AUDIT_LOG.md` entry appended (≤5 bullets) — append only, never required to read
-- [ ] `SCRATCHPAD.md` cleared or updated with resume state
+- [ ] `SCRATCHPAD.md` = `COMPLETE` or explicit `NOT YET DONE` resume steps
+- [ ] `git commit` + `git push` (branch e.g. `stage`) — report hash in chat
 - [ ] Chat summary ≤5 bullets
 
 **Lightweight POST-PHASE** (trivial one-file fix): lint/test if needed; skip AUDIT_LOG + PROGRESS_HISTORY unless user asked

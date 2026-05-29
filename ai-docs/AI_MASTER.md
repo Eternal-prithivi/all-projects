@@ -21,12 +21,23 @@
 ## Lifecycle (always in order)
 
 ```
-PRE-PHASE  →  load context, claim task in docs, confirm — NO product code yet
+PRE-PHASE  →  load context, understand scope, WRITE tracking docs — NO product code yet
 EXECUTE    →  implement scoped work; follow AI_RULES.md when in doubt
-POST-PHASE →  tests/lint, update docs, audit log — before you stop
+POST-PHASE →  tests/lint, finalize docs, audit log, commit + push — before you stop
 ```
 
 **Golden rule:** No edits to `backend/`, `frontend/`, or `docs/` implementation files until PRE-PHASE is complete.
+
+### Continuity at both boundaries (mandatory)
+
+| Mistake | Fix |
+|---------|-----|
+| Updating `STATUS` / `SCRATCHPAD` / `PROGRESS` **only after** coding | **PRE writes first** (claim + plan + `NOT YET DONE` steps). **POST finalizes** (COMPLETE, health, history). |
+| Empty or template-only `SCRATCHPAD` → Current Resume State while coding | Fill resume state **before** first product-code edit. |
+| `STATUS` says one task, `SCRATCHPAD` says another (or stale `IN PROGRESS` when work is done) | Reconcile in **PRE** before EXECUTE; never start with drift. |
+| Session ends without GitHub backup | **Full POST** → `git commit` + `git push` when anything changed (see Git below). |
+
+**Rule:** Another agent reading Tier A only must know **what you are doing right now** without opening chat or the plan file.
 
 ---
 
@@ -67,15 +78,40 @@ Do NOT touch: [explicit exclusions]
 Done when:   [measurable finish line]
 ```
 
-### 3. Claim the task in docs (mandatory before code)
+### 3. Understand scope, then claim in docs (mandatory before code)
 
-Update these **before** touching product code:
+Once you know **what** you will do (from user message, plan, or resume state), update tracking docs **immediately** — do **not** wait until POST or session end.
 
-| File | What to write |
-|------|----------------|
-| `STATUS.md` | Active task name, `IN PROGRESS`, started timestamp, scope / do-not / done-when |
-| `PROGRESS.md` | Same under `## 🔴 Active Task` |
-| `SCRATCHPAD.md` | `## 🔄 Current Resume State`: plan, files to touch, steps as `NOT YET DONE` |
+**Order:** reconcile drift → write claim → output `📋 PRE-PHASE COMPLETE` → only then EXECUTE.
+
+| File | What to write (at PRE — before code) |
+|------|--------------------------------------|
+| `STATUS.md` | `Phase` row if phase changed; **Active task** = name, `IN PROGRESS`, started timestamp, scope / do-not / done-when |
+| `PROGRESS.md` | Same under `## 🔴 Active Task` (never leave this section empty while work is in flight) |
+| `SCRATCHPAD.md` | `## 🔄 Current Resume State`: status `IN PROGRESS`, plan, files to touch, every step `NOT YET DONE` |
+| **Phase / theme doc** | See table below — add or update **Current session** block so phase work is visible outside STATUS |
+
+**Phase / theme doc (PRE — pick one):**
+
+| Work type | File to update at PRE |
+|-----------|------------------------|
+| Phase 12 security | `PHASE_12_SECURITY_RESEARCH_PARITY.md` → `## Current session` |
+| UI/UX waves | `UI_UX_AUDIT_2026.md` → active wave / checklist |
+| Future phases | `PHASE_<N>_*.md` when it exists; else `STATUS.md` Identity `Spec` row |
+| No phase file yet | `STATUS.md` only — still mandatory: STATUS + PROGRESS + SCRATCHPAD |
+
+**`## Current session` template** (append or replace in phase doc):
+
+```markdown
+## Current session
+**Status:** IN PROGRESS (started: YYYY-MM-DD HH:MM)
+**Task:** [one line]
+**Scope / Done when:** [one line each]
+**Steps:** (mirror SCRATCHPAD — all NOT YET DONE at PRE)
+- [ ] Step 1 — NOT YET DONE
+```
+
+During EXECUTE: mark steps `DONE` in `SCRATCHPAD` (and phase doc if used) as you finish them — do not batch all doc updates to POST only.
 
 **Example SCRATCHPAD step list:**
 
@@ -99,7 +135,8 @@ Output this block once per session (or once per new task):
 Phase:            [from STATUS.md]
 Active task:      [name + IN PROGRESS or resuming]
 Scope / Done when:[one line each]
-Docs updated:     STATUS + PROGRESS + SCRATCHPAD — [Done | Skipped — resuming]
+Docs updated:     STATUS + PROGRESS + SCRATCHPAD + [phase/theme doc or "none"] — [Done | Skipped — resuming]
+Continuity:       [SCRATCHPAD has live steps | Fixed stale IN PROGRESS]
 Tier B loaded:    [files read, or "none needed"]
 Conflicts:        [None | describe — see AI_RULES conflict protocol]
 ─────────────────────────────────────────
@@ -170,6 +207,7 @@ Run in order. Do not end the session with an incomplete checklist.
 | `STATUS.md` | Task status, what’s done / open, refresh health row if you ran tests |
 | `PROGRESS.md` | Match STATUS; update Phase checklist `[x]` / `[ ]` |
 | `SCRATCHPAD.md` | If **complete**: `Status: COMPLETE`, clear step list, refresh **Last Known Good State**. If **partial**: update steps (`DONE` / `NOT YET DONE`) |
+| Phase/theme doc | Close `## Current session` (COMPLETE summary or remove block) |
 | `PROGRESS_HISTORY.md` | Append long “what was completed” narrative **only here** — never in chat or `PROGRESS.md` |
 | `AUDIT_LOG.md` | **Append only** at session end (≤5 bullets). **Never read** at startup. Archive if >12 entries → `AUDIT_LOG_ARCHIVE_2026.md` |
 
@@ -184,21 +222,30 @@ Run in order. Do not end the session with an incomplete checklist.
 - Summarize in **≤5 bullets** for the user.
 - Do **not** paste session narratives — they belong in `PROGRESS_HISTORY.md`.
 
-### 5. Git (optional — not every session)
+### 5. Git + GitHub (mandatory at Full POST-PHASE)
 
-**Default: no commit, no push** unless the user says e.g. “commit”, “push”, or “end of phase / ready for backup”.
+**When to commit and push:** After every **Full POST-PHASE** where you changed product code, `ai-docs/`, or project `docs/` — **even if the user did not say “push.”** This backs up work to GitHub and preserves continuity for the next session.
+
+**Skip commit/push only if:**
+- **Lightweight POST** and no meaningful file changes, or
+- User explicitly says **“no commit”** / **“no push”** for this session.
+
+**Do not end a feature or phase task without push** unless push failed (report error + leave `SCRATCHPAD` with exact resume steps).
 
 ```bash
-git add ai-docs/ backend/ frontend/src/ docs/ render.yaml PROFESSIONAL_IMPROVEMENTS.md
+git status
+git add ai-docs/ backend/ frontend/src/ docs/ .github/ render.yaml PROFESSIONAL_IMPROVEMENTS.md
 git diff --cached --name-only | grep -E '\.env|secret|zenith-backend' && echo '⛔ STOP' || echo '✅ OK'
 git commit -m 'feat|fix|docs: summary
 
 - change 1
 - change 2'
-git push origin stage   # never --force
+git push origin stage   # never --force; use current branch if not stage
 ```
 
 Never commit: `backend/.env`, `node_modules/`, `*.backup`.
+
+**POST chat block must include:** `Git: pushed <branch> @ <short-hash>` or `Git: failed — [reason]`.
 
 ---
 
@@ -207,13 +254,17 @@ Never commit: `backend/.env`, `node_modules/`, `*.backup`.
 **Full copy-paste templates (PDF + Markdown):** `ai-docs/ZENITH_AI_SESSION_PROMPTS.pdf` · `ai-docs/ZENITH_AI_SESSION_PROMPTS.md`
 
 ```
-Zenith — follow ai-docs/AI_MASTER.md (PRE → EXECUTE → POST).
+Zenith — follow ai-docs/AI_MASTER.md (PRE → EXECUTE → POST → git push).
 
 Read Tier A: STATUS.md + SCRATCHPAD.md.
+PRE: update STATUS + PROGRESS + SCRATCHPAD (+ phase doc) before code.
+POST: commit + push when anything changed.
 
 Task: [describe]
 Scope: [...] | Do NOT touch: [...] | Done when: [...]
 ```
+
+Full templates: `ai-docs/ZENITH_AI_SESSION_PROMPTS.md`
 
 ---
 
@@ -242,6 +293,7 @@ PDFs (project root): full report + Phase 12 security paper — use when spec is 
 3. **Brand: Zenith / ZenithApp** — do not rename without user approval.
 4. **POST-PHASE before stop** — SCRATCHPAD must say `COMPLETE` or show exact resume steps; never leave silent `IN PROGRESS` when work is done.
 5. **No startup reads** of `AUDIT_LOG.md` or `PROGRESS_HISTORY.md` — Tier A is `STATUS` + `SCRATCHPAD` only.
-6. **Git** — commit/push only when the user asks or at a agreed milestone — not after every AI stop.
+6. **Git** — after **Full POST-PHASE**, commit and push to GitHub when anything changed (unless user said no push).
+7. **Continuity** — PRE claims in docs before code; never leave `SCRATCHPAD` empty or stale during EXECUTE.
 
-*Protocol version: 2026-05-29 · Live data always wins over this file — trust `STATUS.md`.*
+*Protocol version: 2026-05-29b · Live data always wins over this file — trust `STATUS.md`.*

@@ -14,19 +14,21 @@
 
 ## PRE-PHASE (before product code)
 
-**Full** (features, multi-file, API, security, ML): update `STATUS.md` + `PROGRESS.md` + `SCRATCHPAD.md`, output `📋 PRE-PHASE COMPLETE`.
+**Full** (features, multi-file, API, security, ML): after scope is clear, update `STATUS.md` + `PROGRESS.md` + `SCRATCHPAD.md` + phase/theme doc (`PHASE_*`, `UI_UX_AUDIT_2026`, etc.) with `IN PROGRESS` and `NOT YET DONE` steps. **Do not defer these writes to POST.** Output `📋 PRE-PHASE COMPLETE`.
 
 **Lightweight** (one-file typo/format/tiny fix): Tier A only, one chat line `Lightweight: …`, skip claim rewrite if task unchanged — see `AI_MASTER.md`.
+
+**Continuity:** never EXECUTE with empty/stale `SCRATCHPAD` or empty `PROGRESS` active task while work is in flight.
 
 ---
 
 ## POST-PHASE (before stop)
 
-**Full:** tests/lint → `STATUS` + `PROGRESS` + `SCRATCHPAD` → append `PROGRESS_HISTORY` (long narrative) → append `AUDIT_LOG` (≤5 bullets). Chat reply ≤5 bullets.
+**Full:** tests/lint → finalize `STATUS` + `PROGRESS` + `SCRATCHPAD` (+ phase doc) → append `PROGRESS_HISTORY` → append `AUDIT_LOG` (≤5 bullets) → **`git commit` + `git push`** if anything changed. Chat reply ≤5 bullets + git result.
 
-**Lightweight:** lint/test if needed only; skip `AUDIT_LOG` and `PROGRESS_HISTORY` unless user asked.
+**Lightweight:** lint/test if needed; commit/push only if you changed files; skip `AUDIT_LOG` / `PROGRESS_HISTORY` unless user asked.
 
-**Git:** commit/push **only when user asks** or at phase/milestone — not every session.
+**Git:** mandatory after Full POST when code or `ai-docs/` changed — user does not need to say “push” each time. Skip only if user said “no push” or no file changes.
 
 ---
 

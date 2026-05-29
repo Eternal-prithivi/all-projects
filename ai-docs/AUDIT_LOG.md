@@ -23,6 +23,21 @@ Notes: [one line optional]
 ## Session Log (recent only)
 
 ---
+SESSION_ID: 20260529-220000
+Date: 2026-05-29
+Agent: Cursor Composer
+Task: Agent protocol — PRE continuity + mandatory git push
+Changes:
+  - AI_MASTER.md — continuity table; PRE writes phase doc; POST git mandatory (2026-05-29b)
+  - .cursorrules, AI_RULES.md — aligned PRE-first + push after Full POST
+  - ZENITH_AI_SESSION_PROMPTS.md — new copy-paste templates
+  - SCRATCHPAD.md — fixed stale IN PROGRESS; IDLE + LKGS 46 tests
+  - PHASE_12 — Current session COMPLETE block
+Outcome: Done
+Notes: Gap-execution product code still uncommitted on disk — push in separate commit when ready.
+---
+
+---
 SESSION_ID: 20260529-200000
 Date: 2026-05-29
 Agent: Cursor Auto
@@ -162,6 +177,19 @@ Notes: [DRIFT AUDIT] — First formal drift audit. All 22 reported gaps verified
 
 
 ---
+
+---
+SESSION_ID: 20260529-uiux
+Date: 2026-05-29
+Agent: Cursor
+Task: Zenith UI/UX audit + Waves 0–5 (platform design upgrade)
+Changes:
+  - `security-page.css` + SecurityPage inline CSS removed; encryption modals tokenized
+  - billing/admin/public CSS purple→gold; removed duplicate `CostAnalysisPage.jsx`
+  - `PageHeader`, `GlassPanel`, `zenith-ui.css`, cost hub on Cost Analysis
+  - `UI_UX_AUDIT_2026.md`, `DESIGN_SYSTEM.md` §5/§7 updated (93/100)
+Outcome: Done
+Notes: `npm run lint` 0 errors, `npm run build` passes. Light theme documented dark-first stub.
 
 ---
 SESSION_ID: 20260525-180900
