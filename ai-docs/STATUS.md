@@ -9,16 +9,28 @@
 | Field | Value |
 |-------|--------|
 | Project | CloudResourceOptimizationPlatform (**Zenith**) |
-| Phase | **17** |
-| Last major | AWS BYOC wizard, auto-create buckets, secure dual-write |
+| Phase | **18** — Enterprise public pages & trust |
+| Last major | Phase 18a–18c pages + platform status API |
 
 ---
 
 ## 🔴 Active Task
 
-**None** — push local Phase 17 bundle to `stage` when ready.
+**None** — Phase 18a–18c **COMPLETE** (2026-05-29). Phase 18d partially done (`/docs` hub).
 
-| Deferred | CloudFormation stack, bucket migration UI |
+| Deferred (18d) | `/dashboard/notifications`, org/team, SSO |
+| Other deferred | CloudFormation stack, bucket migration UI |
+
+---
+
+## Phase 18 roadmap
+
+| Phase | Priority | Status |
+|-------|----------|--------|
+| **18a** | High — trust & cookies | ✅ |
+| **18b** | High — status, verify-email, maintenance gate | ✅ |
+| **18c** | Medium — public pricing, billing returns, session-expired | ✅ |
+| **18d** | Low — docs hub ✅; notifications, org, SSO | Planned |
 
 ---
 
@@ -26,8 +38,8 @@
 
 | Check | Status |
 |-------|--------|
-| Backend pytest | `cd backend && pytest -q` |
-| Frontend build | `cd frontend && npm run build` |
+| Frontend build | ✅ pass (2026-05-29) |
+| Backend pytest | Run with Mongo: `cd backend && pytest -q` |
 
 ---
 
@@ -35,3 +47,4 @@
 
 1. `backend/.env` — never commit
 2. Product name **Zenith** — do not rebrand without asking
+3. Email verify tokens: set `email_verify_token` on user at registration when enabling `require_email_verification`

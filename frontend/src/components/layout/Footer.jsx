@@ -21,7 +21,8 @@ function Footer() {
             <div className="footer-link-column">
               <h4>Product</h4>
               <Link to="/features">Features</Link>
-              <Link to="/#pricing">Pricing</Link>
+              <Link to="/pricing">Pricing</Link>
+              <Link to="/docs">Documentation</Link>
               <Link to="/dashboard">Dashboard</Link>
             </div>
             <div className="footer-link-column">
@@ -29,11 +30,15 @@ function Footer() {
               <Link to="/about">About</Link>
               <Link to="/contact">Contact</Link>
               <Link to="/help">Help Center</Link>
+              <Link to="/status">System Status</Link>
+              <Link to="/trust">Trust Center</Link>
             </div>
             <div className="footer-link-column">
               <h4>Legal</h4>
               <Link to="/legal/terms">Terms</Link>
               <Link to="/legal/privacy">Privacy</Link>
+              <Link to="/legal/cookies">Cookies</Link>
+              <Link to="/legal/dpa">DPA</Link>
             </div>
           </div>
 

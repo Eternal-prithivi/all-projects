@@ -45,6 +45,7 @@ from app.payments import routes_payments
 from app.byoc import routes_byoc
 from app.ml import routes_feedback
 from app.provision import routes_provision
+from app.platform import routes_platform
 from app.database.mongo_client import mongodb_client
 from app.utils.config import settings
 import os
@@ -166,6 +167,7 @@ app.include_router(routes_payments.router, prefix="/api/payments", tags=["Paymen
 app.include_router(routes_byoc.router, prefix="/api/byoc", tags=["BYOC"])
 app.include_router(routes_feedback.router, prefix="/api/ml", tags=["ML Feedback"])
 app.include_router(routes_provision.router, prefix="/api/provision", tags=["Provisioning"])
+app.include_router(routes_platform.router, prefix="/api/platform", tags=["Platform"])
 
 @app.get("/", tags=["Root"])
 def read_root():

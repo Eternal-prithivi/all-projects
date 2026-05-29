@@ -6,7 +6,45 @@
 
 ## 🔴 Active Task
 
-**None** — Phase 15 **COMPLETE** (2026-05-29).
+**None** — Phase 18a–18c **COMPLETE**.
+
+---
+
+## Phase 18 — Enterprise pages
+
+### 18a — High (trust & compliance) — ✅
+
+| Item | Route |
+|------|-------|
+| Trust center | `/trust` |
+| Cookie policy | `/legal/cookies` |
+| DPA | `/legal/dpa` |
+| Cookie consent | `CookieConsent` in `App.jsx` |
+
+### 18b — High (identity & ops) — ✅
+
+| Item | Route / API |
+|------|-------------|
+| Status page | `/status` |
+| Platform API | `GET /api/platform/status` |
+| Maintenance gate | `MaintenanceGate` → `/503` |
+| Email verification | `/verify-email`, `POST /api/auth/verify-email` |
+
+### 18c — Medium — ✅
+
+| Item | Route |
+|------|-------|
+| Public pricing | `/pricing` |
+| Session expired | `/session-expired` |
+| Payment success / cancel | `/billing/success`, `/billing/cancel` |
+
+### 18d — Low — PARTIAL
+
+| Item | Status |
+|------|--------|
+| Docs hub | ✅ `/docs` |
+| Notifications page | [ ] |
+| Org / team / SSO | [ ] deferred |
 
 ---
 
@@ -14,14 +52,6 @@
 
 | Phase | Status |
 |-------|--------|
-| 14c | ✅ Governance UI, BYOC gate |
-| **15** | **✅** Theme sync, header toggle, BYOC subscription lookup fix |
-
-### Phase 15 delivered
-
-- [x] `ThemeSync` loads saved theme from `/api/settings/` on login
-- [x] Settings theme select auto-persists; header sun/moon quick toggle
-- [x] Dashboard shell uses CSS tokens (sidebar/header) for light mode
-- [x] ToastContainer follows `effectiveTheme`
-- [x] BYOC eligibility queries `username` OR `user_id` in subscriptions
-- [x] `test_settings_preferences.py` (4 tests); pytest **73** total
+| **18** | ✅ 18a–18c; 18d partial |
+| 17 | ✅ Multi-bucket BYOC (local) |
+| 15 | ✅ Theme sync, BYOC subscription lookup |

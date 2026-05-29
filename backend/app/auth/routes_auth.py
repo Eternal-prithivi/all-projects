@@ -12,7 +12,7 @@
 #   - Remove rate limiter decorators — prevents brute force attacks
 #   - Apply registration password strength rules to the login endpoint
 # =============================================================================
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi import APIRouter, Depends, HTTPException, status, Request, Query
 from fastapi.security import OAuth2PasswordRequestForm
 from pymongo.collection import Collection
 from datetime import datetime, timedelta, timezone
@@ -152,3 +152,28 @@ def login_for_access_token_route(
     access_token = create_access_token(data={"sub": user_in_db.username})
     logger.info(f"User '{form_data.username}' logged in successfully")
     return Token(access_token=access_token, token_type="bearer")
+
+
+@router.post("/verify-email")
+def verify_email_route(
+    token: str = Query(..., min_length=8, max_length=128),
+    db: Collection = Depends(get_users_collection),
+):
+    """
+    Confirm email from registration link. Token is stored on user at signup when enabled.
+    """
+    user = db.find_one({"email_verify_token": token})
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired verification link.",
+        )
+    db.update_one(
+        {"_id": user["_id"]},
+        {
+            "$set": {"email_verified": True, "email_verified_at": datetime.utcnow()},
+            "$unset": {"email_verify_token": ""},
+        },
+    )
+    logger.info("Email verified for user '%s'", user.get("username"))
+    return StandardResponse.success(message="Email verified successfully. You can sign in now.")

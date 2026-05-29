@@ -7,6 +7,17 @@
 
 ---
 
+**Phase 18: Enterprise public pages** — COMPLETE 2026-05-29 (18a–18c + docs hub)
+
+- Tracking: phased plan in `STATUS.md` / `PROGRESS.md` per enterprise page audit
+- **18a:** `TrustCenterPage`, `CookiePolicyPage`, `DpaPage`, `CookieConsent`, footer legal links
+- **18b:** `StatusPage`, `VerifyEmailPage`, `MaintenanceGate`, `GET /api/platform/status`, `POST /api/auth/verify-email`
+- **18c:** `PublicPricingPage` + `marketingPricing.js`, billing success/cancel, `SessionExpiredPage`
+- **18d (partial):** `DocsHubPage` → Swagger + Help
+- `App.jsx` wraps `MaintenanceGate` + `CookieConsent`; frontend build pass
+
+---
+
 **Phase 15: UI controls & theme wiring** — COMPLETE 2026-05-29
 
 - Theme: `ThemeSync` on login, Settings auto-save, header toggle, `toggleTheme` in context

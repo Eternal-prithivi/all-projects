@@ -1,0 +1,59 @@
+.docs-hub {
+  max-width: 880px;
+  margin: 0 auto;
+  padding: 6rem 2rem 4rem;
+}
+
+.docs-hub__header h1 {
+  font-family: 'Outfit', sans-serif;
+  font-size: 2rem;
+  margin: 0 0 0.35rem;
+  color: #f5f5f5;
+}
+
+.docs-hub__header p {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.docs-hub__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1.25rem;
+  margin-top: 2rem;
+}
+
+.docs-hub__card {
+  display: block;
+  padding: 1.5rem;
+  border-radius: 16px;
+  background: rgba(14, 14, 18, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  text-decoration: none;
+  color: inherit;
+  transition: border-color 0.3s ease, transform 0.3s ease;
+}
+
+.docs-hub__card:hover {
+  border-color: rgba(212, 175, 55, 0.35);
+  transform: translateY(-4px);
+}
+
+.docs-hub__icon {
+  font-size: 1.5rem;
+  color: #d4af37;
+  margin-bottom: 0.75rem;
+}
+
+.docs-hub__card h2 {
+  margin: 0 0 0.5rem;
+  font-size: 1.1rem;
+  color: #f5f5f5;
+}
+
+.docs-hub__card p {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.6);
+}

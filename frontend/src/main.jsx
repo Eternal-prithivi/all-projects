@@ -69,6 +69,16 @@ const AdminSystemPage = lazy(() => import("./pages/admin/AdminSystemPage.jsx"));
 const AdminSettingsPage = lazy(() => import("./pages/admin/AdminSettingsPage.jsx"));
 const AdminTestPage = lazy(() => import("./pages/admin/AdminTestPage.jsx"));
 const AdminProvisionRolesPage = lazy(() => import("./pages/admin/AdminProvisionRolesPage.jsx"));
+const TrustCenterPage = lazy(() => import("./pages/TrustCenterPage.jsx"));
+const CookiePolicyPage = lazy(() => import("./pages/CookiePolicyPage.jsx"));
+const DpaPage = lazy(() => import("./pages/DpaPage.jsx"));
+const StatusPage = lazy(() => import("./pages/StatusPage.jsx"));
+const VerifyEmailPage = lazy(() => import("./pages/VerifyEmailPage.jsx"));
+const PublicPricingPage = lazy(() => import("./pages/PublicPricingPage.jsx"));
+const SessionExpiredPage = lazy(() => import("./pages/SessionExpiredPage.jsx"));
+const BillingSuccessPage = lazy(() => import("./pages/BillingSuccessPage.jsx"));
+const BillingCancelPage = lazy(() => import("./pages/BillingCancelPage.jsx"));
+const DocsHubPage = lazy(() => import("./pages/DocsHubPage.jsx"));
 
 const router = createBrowserRouter([
   {
@@ -90,6 +100,16 @@ const router = createBrowserRouter([
       { path: "/help", element: <Suspense fallback={<LazyLoadFallback />}><HelpCenterPage /></Suspense> },
       { path: "/legal/terms", element: <Suspense fallback={<LazyLoadFallback />}><TermsOfServicePage /></Suspense> },
       { path: "/legal/privacy", element: <Suspense fallback={<LazyLoadFallback />}><PrivacyPolicyPage /></Suspense> },
+      { path: "/legal/cookies", element: <Suspense fallback={<LazyLoadFallback />}><CookiePolicyPage /></Suspense> },
+      { path: "/legal/dpa", element: <Suspense fallback={<LazyLoadFallback />}><DpaPage /></Suspense> },
+      { path: "/trust", element: <Suspense fallback={<LazyLoadFallback />}><TrustCenterPage /></Suspense> },
+      { path: "/status", element: <Suspense fallback={<LazyLoadFallback />}><StatusPage /></Suspense> },
+      { path: "/verify-email", element: <Suspense fallback={<LazyLoadFallback />}><VerifyEmailPage /></Suspense> },
+      { path: "/pricing", element: <Suspense fallback={<LazyLoadFallback />}><PublicPricingPage /></Suspense> },
+      { path: "/docs", element: <Suspense fallback={<LazyLoadFallback />}><DocsHubPage /></Suspense> },
+      { path: "/session-expired", element: <Suspense fallback={<LazyLoadFallback />}><SessionExpiredPage /></Suspense> },
+      { path: "/billing/success", element: <Suspense fallback={<LazyLoadFallback />}><BillingSuccessPage /></Suspense> },
+      { path: "/billing/cancel", element: <Suspense fallback={<LazyLoadFallback />}><BillingCancelPage /></Suspense> },
 
       // --- Protected Routes (lazy loaded) ---
       {

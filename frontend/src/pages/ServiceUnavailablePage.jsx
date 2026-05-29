@@ -27,7 +27,9 @@ const ServiceUnavailablePage = () => {
           <p>Recommended:</p>
           <ul>
             <li>Retry in a few minutes</li>
-            <li>Check your status page or announcements</li>
+            <li>
+              Check our <Link to="/status">status page</Link> or announcements
+            </li>
             <li>Reach out if you have urgent needs</li>
           </ul>
         </div>

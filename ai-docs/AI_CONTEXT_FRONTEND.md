@@ -1,7 +1,7 @@
 # AI_CONTEXT_FRONTEND.md — Frontend Architecture & Source Map
 
 > Read this for any frontend, UI, CSS, component, or routing task.
-> **Last Updated: 2026-05-25** — fully audited against live codebase.
+> **Last Updated: 2026-05-29** — Phase 18 enterprise public pages.
 
 ---
 
@@ -40,10 +40,21 @@ For backend context → read `AI_CONTEXT_BACKEND.md`
 | `/help` | `HelpCenterPage.jsx` — 26 FAQs, search, 6 categories |
 | `/legal/terms` | `TermsOfServicePage.jsx` |
 | `/legal/privacy` | `PrivacyPolicyPage.jsx` |
+| `/legal/cookies` | `CookiePolicyPage.jsx` |
+| `/legal/dpa` | `DpaPage.jsx` |
+| `/trust` | `TrustCenterPage.jsx` |
+| `/status` | `StatusPage.jsx` — polls `GET /api/platform/status` |
+| `/verify-email` | `VerifyEmailPage.jsx` — `POST /api/auth/verify-email?token=` |
+| `/pricing` | `PublicPricingPage.jsx` — shared `data/marketingPricing.js` |
+| `/docs` | `DocsHubPage.jsx` — links to Swagger + Help |
+| `/session-expired` | `SessionExpiredPage.jsx` |
+| `/billing/success`, `/billing/cancel` | `BillingSuccessPage.jsx`, `BillingCancelPage.jsx` |
 | `/access-denied` | `AccessDeniedPage.jsx` |
 | `/500` | `ServerErrorPage.jsx` |
 | `/503` | `ServiceUnavailablePage.jsx` |
 | `*` | `NotFoundPage.jsx` — animated 404 with particles |
+
+**Global shell:** `App.jsx` mounts `CookieConsent` + `MaintenanceGate` (redirects to `/503` when `maintenance_mode`).
 
 ### Pages — Dashboard (`/dashboard/*`, protected by `<ProtectedRoute>`)
 
@@ -66,7 +77,8 @@ For backend context → read `AI_CONTEXT_BACKEND.md`
 
 | Route | Page File |
 |-------|----------|
-| `/admin` | `AdminDashboardPage.jsx` |
+| `/admin` | `AdminOverviewPage.jsx` |
+| `/admin/provision-roles` | `AdminProvisionRolesPage.jsx` |
 | `/admin/users` | `AdminUsersPage.jsx` |
 | `/admin/analytics` | `AdminAnalyticsPage.jsx` |
 | `/admin/payments` | `AdminPaymentsPage.jsx` |

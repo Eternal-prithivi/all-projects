@@ -1,0 +1,109 @@
+.status-page {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 6rem 2rem 4rem;
+}
+
+.status-page__header h1 {
+  font-family: 'Outfit', sans-serif;
+  font-size: 2rem;
+  margin: 0 0 0.35rem;
+  color: #f5f5f5;
+}
+
+.status-page__header p {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.status-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  margin: 2rem 0;
+  padding: 1.25rem 1.35rem;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.status-banner--ok {
+  background: rgba(39, 174, 96, 0.12);
+  border-color: rgba(39, 174, 96, 0.35);
+}
+
+.status-banner--warn {
+  background: rgba(241, 196, 15, 0.1);
+  border-color: rgba(241, 196, 15, 0.3);
+}
+
+.status-banner__icon {
+  font-size: 1.5rem;
+  color: #d4af37;
+  margin-top: 0.15rem;
+}
+
+.status-banner strong {
+  display: block;
+  color: #f5f5f5;
+  margin-bottom: 0.25rem;
+}
+
+.status-banner__meta {
+  margin: 0;
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.status-services {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.status-services li {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.85rem 1.1rem;
+  background: rgba(14, 14, 18, 0.6);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.status-services li:last-child {
+  border-bottom: none;
+}
+
+.status-services__name {
+  text-transform: capitalize;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.status-services__state {
+  font-size: 0.8rem;
+  text-transform: capitalize;
+  padding: 0.2rem 0.55rem;
+  border-radius: 6px;
+}
+
+.status-services__state--operational {
+  background: rgba(39, 174, 96, 0.2);
+  color: #6ee7a0;
+}
+
+.status-services__state--degraded,
+.status-services__state--maintenance {
+  background: rgba(241, 196, 15, 0.15);
+  color: #f1c40f;
+}
+
+.status-page__footer-note {
+  margin-top: 2rem;
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.status-page__footer-note a {
+  color: #ffe566;
+}

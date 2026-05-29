@@ -148,6 +148,16 @@ Database: `CloudResourceOptimizationDB`
 
 ---
 
+## Platform (public)
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| GET | `/api/platform/status` | Maintenance flag, DB health, `overall` status (no auth) |
+
+Auth: `POST /api/auth/verify-email?token=` — marks `email_verified` when `email_verify_token` matches user.
+
+---
+
 ## 🔧 How to Run Backend
 
 ```bash

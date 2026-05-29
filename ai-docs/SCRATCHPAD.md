@@ -1,11 +1,11 @@
 # SCRATCHPAD.md
 
-**Status:** Phase 17 complete locally (pending push)
+**Status:** COMPLETE (2026-05-29)
 
-**Done:**
-- Two-step BYOC + three buckets + routing + banners
-- CreateBucket on connect / blur (`ensure_aws_buckets_exist`)
-- Replica schema normalization (`normalize_aws_byoc_layout`)
-- Secure dual-write helpers (API + Celery) for BYOC replica bucket
+**Phase 18:** Enterprise pages 18a–18c + docs hub. Frontend build pass.
 
-**Deferred:** CloudFormation one-click, bucket migration UI
+**LKGS:** New routes in `main.jsx`; `GET /api/platform/status`; trust/cookie/DPA/status/verify-email/pricing/billing return pages; `CookieConsent` + `MaintenanceGate`.
+
+**Next:** 18d notifications page; wire `email_verify_token` on register when admin enables verification; Razorpay redirect URLs to `/billing/success`.
+
+**Deferred:** SSO, org/team, CloudFormation UI, bucket migration UI

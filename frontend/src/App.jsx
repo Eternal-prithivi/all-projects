@@ -1,11 +1,15 @@
 import React from "react";
 import { Outlet } from "react-router-dom";
+import CookieConsent from "./components/CookieConsent.jsx";
+import MaintenanceGate from "./components/MaintenanceGate.jsx";
 
 function App() {
-  // Use a style prop to ensure the app container fills its parent
   return (
     <div style={{ height: "100%" }}>
-      <Outlet />
+      <MaintenanceGate>
+        <Outlet />
+      </MaintenanceGate>
+      <CookieConsent />
     </div>
   );
 }
