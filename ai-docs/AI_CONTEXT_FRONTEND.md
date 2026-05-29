@@ -72,6 +72,10 @@ For backend context → read `AI_CONTEXT_BACKEND.md`
 | `/dashboard/security-settings` | `SecuritySettingsPage.jsx` | |
 | `/dashboard/profile` | `ProfilePage.jsx` | |
 | `/dashboard/settings` | `SettingsPage.jsx` | Includes "Restart Tour" in Preferences |
+| `/dashboard/notifications` | `NotificationsPage.jsx` | Persisted notification history |
+| `/dashboard/team` | `TeamPage.jsx` | Org create, invites, members |
+| `/invite/:token` | `AcceptInvitePage.jsx` | Accept team invite |
+| `/auth/sso/callback` | `SsoCallbackPage.jsx` | OAuth redirect handler |
 
 ### Pages — Admin (`/admin/*`, role-guarded)
 

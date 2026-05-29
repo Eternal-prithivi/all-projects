@@ -32,6 +32,11 @@ function Sidebar({ user }) {
       </svg>
     ), label: 'Infrastructure' },
     { to: '/dashboard/costs', icon: <IconBarChart className="rail-icon" />, label: 'Cost Analysis' },
+    { to: '/dashboard/team', icon: (
+      <svg className="rail-icon" width="20" height="20" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+        <path d="M10 10a3 3 0 100-6 3 3 0 000 6zm-7 7a7 7 0 1114 0H3z"/>
+      </svg>
+    ), label: 'Team' },
     { to: '/dashboard/billing', icon: (
       <svg className="rail-icon" width="20" height="20" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
         <path d="M4 4a2 2 0 00-2 2v1h16V6a2 2 0 00-2-2H4z"/>

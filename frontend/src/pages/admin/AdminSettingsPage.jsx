@@ -200,6 +200,60 @@ const AdminSettingsPage = () => {
               )}
             </button>
           </div>
+
+          <div className="setting-toggle">
+            <div className="toggle-info">
+              <h3>Google SSO</h3>
+              <p>Allow sign-in with Google (requires OAuth env vars on server)</p>
+            </div>
+            <button
+              className="toggle-button"
+              onClick={() => handleToggle('sso_google_enabled')}
+            >
+              {settings.sso_google_enabled ? (
+                <FaToggleOn className="toggle-icon active" />
+              ) : (
+                <FaToggleOff className="toggle-icon" />
+              )}
+            </button>
+          </div>
+
+          <div className="setting-toggle">
+            <div className="toggle-info">
+              <h3>Enterprise OIDC</h3>
+              <p>Redirect login to your IdP issuer URL</p>
+            </div>
+            <button
+              className="toggle-button"
+              onClick={() => handleToggle('sso_oidc_enabled')}
+            >
+              {settings.sso_oidc_enabled ? (
+                <FaToggleOn className="toggle-icon active" />
+              ) : (
+                <FaToggleOff className="toggle-icon" />
+              )}
+            </button>
+          </div>
+
+          {settings.sso_oidc_enabled && (
+            <div className="setting-item" style={{ marginTop: '1rem' }}>
+              <label>OIDC issuer / login URL</label>
+              <input
+                type="url"
+                value={settings.sso_oidc_issuer || ''}
+                onChange={(e) => handleInputChange('sso_oidc_issuer', e.target.value)}
+                className="setting-input"
+                placeholder="https://login.microsoftonline.com/..."
+              />
+              <label style={{ marginTop: '0.75rem' }}>Display name</label>
+              <input
+                type="text"
+                value={settings.sso_oidc_display_name || ''}
+                onChange={(e) => handleInputChange('sso_oidc_display_name', e.target.value)}
+                className="setting-input"
+              />
+            </div>
+          )}
         </div>
       </div>
 

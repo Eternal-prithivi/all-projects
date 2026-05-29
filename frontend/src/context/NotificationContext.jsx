@@ -1,16 +1,6 @@
-// =============================================================================
-// CONTEXT: NotificationContext.jsx  (95 lines)
-// PURPOSE: Real-time notification state — WebSocket connection to /ws/status
-//   - Provides: notifications[], addNotification(), markRead(), unreadCount
-//   - WebSocket URL: ws://localhost:8000/ws/status?token={token} (dev)
-//   - On "job_complete" message: refreshes relevant page data via context callbacks
-// USED BY: NotificationBell.jsx (display), SecurityPage.jsx (file job completion)
-// DO NOT:
-//   - Open additional WebSocket connections in individual pages — use this context
-//   - Store notifications in localStorage — they're session-only in-memory state
-//   - Change the "job_complete" message format without updating SecurityPage.jsx ws handler
-// =============================================================================
-import React, { createContext, useContext, useState, useCallback } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import { useAuth } from './AuthContext.jsx';
+import { apiClient } from '../api';
 
 const NotificationContext = createContext();
 
@@ -22,68 +12,145 @@ export const useNotificationCenter = () => {
   return context;
 };
 
+const mapServerItem = (item) => ({
+  id: item.id,
+  title: item.title,
+  message: item.message,
+  type: item.type || 'info',
+  link: item.link,
+  read: Boolean(item.read),
+  timestamp: item.created_at ? new Date(item.created_at) : new Date(),
+});
+
 export const NotificationProvider = ({ children }) => {
+  const { token } = useAuth();
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
 
-  // Add a new notification to the center
-  const addNotification = useCallback((notification) => {
-    const newNotification = {
-      id: notification.id || Date.now() + Math.random(), // Use provided ID or generate one
-      timestamp: new Date(),
-      read: false,
-      ...notification,
-    };
+  const refreshFromServer = useCallback(async () => {
+    if (!token) return;
+    const res = await apiClient.get('/notifications');
+    const items = (res.data.notifications || []).map(mapServerItem);
+    setNotifications(items);
+    setUnreadCount(res.data.unread_count ?? 0);
+  }, [token]);
 
-    setNotifications(prev => [newNotification, ...prev]); // Newest first
-    setUnreadCount(prev => prev + 1);
+  useEffect(() => {
+    if (token) {
+      refreshFromServer().catch(() => {});
+    } else {
+      setNotifications([]);
+      setUnreadCount(0);
+    }
+  }, [token, refreshFromServer]);
 
-    return newNotification.id;
-  }, []);
+  const addNotification = useCallback(
+    async (notification) => {
+      const local = {
+        id: notification.id || `local-${Date.now()}`,
+        timestamp: new Date(),
+        read: false,
+        ...notification,
+      };
 
-  // Update an existing notification
-  const updateNotification = useCallback((id, updates) => {
-    setNotifications(prev => 
-      prev.map(notif => 
-        notif.id === id ? { ...notif, ...updates } : notif
-      )
-    );
-  }, []);
+      setNotifications((prev) => [local, ...prev]);
+      setUnreadCount((prev) => prev + 1);
 
-  // Mark notification as read
-  const markAsRead = useCallback((id) => {
-    setNotifications(prev => 
-      prev.map(notif => 
-        notif.id === id ? { ...notif, read: true } : notif
-      )
-    );
-    setUnreadCount(prev => Math.max(0, prev - 1));
-  }, []);
-
-  // Mark all as read
-  const markAllAsRead = useCallback(() => {
-    setNotifications(prev => 
-      prev.map(notif => ({ ...notif, read: true }))
-    );
-    setUnreadCount(0);
-  }, []);
-
-  // Delete a notification
-  const deleteNotification = useCallback((id) => {
-    setNotifications(prev => {
-      const notif = prev.find(n => n.id === id);
-      if (notif && !notif.read) {
-        setUnreadCount(count => Math.max(0, count - 1));
+      if (token && notification.persist !== false) {
+        try {
+          const res = await apiClient.post('/notifications', {
+            title: notification.title || 'Notification',
+            message: notification.message || '',
+            type: notification.type || 'info',
+            link: notification.link,
+          });
+          const serverId = res.data.id;
+          if (serverId) {
+            setNotifications((prev) =>
+              prev.map((n) => (n.id === local.id ? { ...n, id: serverId } : n))
+            );
+          }
+        } catch {
+          /* keep local copy */
+        }
       }
-      return prev.filter(n => n.id !== id);
-    });
+
+      return local.id;
+    },
+    [token]
+  );
+
+  const updateNotification = useCallback((id, updates) => {
+    setNotifications((prev) =>
+      prev.map((notif) => (notif.id === id ? { ...notif, ...updates } : notif))
+    );
   }, []);
 
-  // Clear all notifications
-  const clearAll = useCallback(() => {
+  const markAsRead = useCallback(
+    async (id) => {
+      setNotifications((prev) =>
+        prev.map((notif) => {
+          if (notif.id === id && !notif.read) {
+            setUnreadCount((c) => Math.max(0, c - 1));
+            return { ...notif, read: true };
+          }
+          return notif;
+        })
+      );
+      if (token && id && !String(id).startsWith('local-')) {
+        try {
+          await apiClient.patch(`/notifications/${id}/read`);
+        } catch {
+          /* ignore */
+        }
+      }
+    },
+    [token]
+  );
+
+  const markAllAsRead = useCallback(async () => {
+    setNotifications((prev) => prev.map((notif) => ({ ...notif, read: true })));
+    setUnreadCount(0);
+    if (token) {
+      try {
+        await apiClient.post('/notifications/mark-all-read');
+      } catch {
+        /* ignore */
+      }
+    }
+  }, [token]);
+
+  const deleteNotification = useCallback(
+    async (id) => {
+      setNotifications((prev) => {
+        const notif = prev.find((n) => n.id === id);
+        if (notif && !notif.read) {
+          setUnreadCount((count) => Math.max(0, count - 1));
+        }
+        return prev.filter((n) => n.id !== id);
+      });
+      if (token && id && !String(id).startsWith('local-')) {
+        try {
+          await apiClient.delete(`/notifications/${id}`);
+        } catch {
+          /* ignore */
+        }
+      }
+    },
+    [token]
+  );
+
+  const clearAll = useCallback(async () => {
     setNotifications([]);
     setUnreadCount(0);
-  }, []);
+    if (token) {
+      try {
+        await apiClient.delete('/notifications');
+      } catch {
+        /* ignore */
+      }
+    }
+  }, [token]);
 
   const value = {
     notifications,
@@ -94,6 +161,7 @@ export const NotificationProvider = ({ children }) => {
     markAllAsRead,
     deleteNotification,
     clearAll,
+    refreshFromServer,
   };
 
   return (
@@ -104,4 +172,3 @@ export const NotificationProvider = ({ children }) => {
 };
 
 export default NotificationContext;
-

@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { useNotificationCenter } from '../context/NotificationContext';
 import '../styles/notification-bell.css';
 
@@ -165,11 +166,11 @@ const NotificationBell = () => {
             )}
           </div>
 
-          {notifications.length > 5 && (
+          {notifications.length > 0 && (
             <div className="notification-dropdown-footer">
-              <button className="view-all-btn">
+              <Link to="/dashboard/notifications" className="view-all-btn" onClick={() => setIsOpen(false)}>
                 View all notifications
-              </button>
+              </Link>
             </div>
           )}
         </div>

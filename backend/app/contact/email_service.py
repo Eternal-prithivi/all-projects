@@ -185,6 +185,52 @@ Reply to this email to respond to {submission['name']}
             logger.error(f"Failed to send email notification: {str(e)}")
             return False
 
+    def send_verification_email(
+        self,
+        *,
+        to_email: str,
+        username: str,
+        verify_link: str,
+    ) -> bool:
+        """Send email address verification link after registration."""
+        if not self.sender_email or not self.sender_password:
+            logger.warning("Email credentials not configured, skipping verification email")
+            return False
+
+        try:
+            msg = MIMEMultipart("alternative")
+            msg["Subject"] = "Verify your Zenith email"
+            msg["From"] = self.sender_email
+            msg["To"] = to_email
+
+            html_body = f"""
+            <html>
+              <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 560px;">
+                <h2 style="color: #b8860b;">Verify your email</h2>
+                <p>Hello {username},</p>
+                <p>Thanks for signing up for Zenith. Confirm your email to activate your account.</p>
+                <p style="margin: 24px 0;">
+                  <a href="{verify_link}"
+                     style="background: #d4af37; color: #111; padding: 12px 24px; text-decoration: none;
+                            border-radius: 8px; font-weight: bold;">Verify email</a>
+                </p>
+                <p style="font-size: 12px; color: #666;">Or copy this link:<br>{verify_link}</p>
+              </body>
+            </html>
+            """
+            msg.attach(MIMEText(html_body, "html"))
+
+            with smtplib.SMTP(self.smtp_server, self.smtp_port) as server:
+                server.starttls()
+                server.login(self.sender_email, self.sender_password)
+                server.send_message(msg)
+
+            logger.info("Verification email sent to %s", to_email)
+            return True
+        except Exception as e:
+            logger.error("Failed to send verification email: %s", str(e))
+            return False
+
     def send_password_reset(
         self,
         *,

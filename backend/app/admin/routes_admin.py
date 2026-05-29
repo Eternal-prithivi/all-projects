@@ -911,6 +911,10 @@ async def get_admin_settings(admin_user = Depends(verify_admin)):
                 "default_storage_gb": settings.get("default_storage_gb", 10),
                 "email_notifications_enabled": settings.get("email_notifications_enabled", True),
                 "require_email_verification": settings.get("require_email_verification", False),
+                "sso_google_enabled": settings.get("sso_google_enabled", False),
+                "sso_oidc_enabled": settings.get("sso_oidc_enabled", False),
+                "sso_oidc_issuer": settings.get("sso_oidc_issuer", ""),
+                "sso_oidc_display_name": settings.get("sso_oidc_display_name", "Enterprise SSO"),
                 "session_timeout_hours": settings.get("session_timeout_hours", 24),
                 "max_login_attempts": settings.get("max_login_attempts", 5)
             },
@@ -936,6 +940,10 @@ class PlatformSettings(BaseModel):
     default_storage_gb: Optional[int] = None
     email_notifications_enabled: Optional[bool] = None
     require_email_verification: Optional[bool] = None
+    sso_google_enabled: Optional[bool] = None
+    sso_oidc_enabled: Optional[bool] = None
+    sso_oidc_issuer: Optional[str] = None
+    sso_oidc_display_name: Optional[str] = None
     session_timeout_hours: Optional[int] = None
     max_login_attempts: Optional[int] = None
 
@@ -966,6 +974,14 @@ async def update_admin_settings(
             update_data["email_notifications_enabled"] = settings_update.email_notifications_enabled
         if settings_update.require_email_verification is not None:
             update_data["require_email_verification"] = settings_update.require_email_verification
+        if settings_update.sso_google_enabled is not None:
+            update_data["sso_google_enabled"] = settings_update.sso_google_enabled
+        if settings_update.sso_oidc_enabled is not None:
+            update_data["sso_oidc_enabled"] = settings_update.sso_oidc_enabled
+        if settings_update.sso_oidc_issuer is not None:
+            update_data["sso_oidc_issuer"] = settings_update.sso_oidc_issuer
+        if settings_update.sso_oidc_display_name is not None:
+            update_data["sso_oidc_display_name"] = settings_update.sso_oidc_display_name
         if settings_update.session_timeout_hours is not None:
             update_data["session_timeout_hours"] = settings_update.session_timeout_hours
         if settings_update.max_login_attempts is not None:

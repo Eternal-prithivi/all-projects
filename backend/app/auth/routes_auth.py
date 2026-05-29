@@ -12,6 +12,8 @@
 #   - Remove rate limiter decorators — prevents brute force attacks
 #   - Apply registration password strength rules to the login endpoint
 # =============================================================================
+import secrets
+
 from fastapi import APIRouter, Depends, HTTPException, status, Request, Query
 from fastapi.security import OAuth2PasswordRequestForm
 from pymongo.collection import Collection
@@ -30,6 +32,7 @@ from app.auth.auth_utils import get_password_hash, verify_password, mark_2fa_unv
 from app.utils.config import settings
 from app.utils.logger import setup_logger
 from app.utils.responses import StandardResponse, ErrorResponses
+from app.contact.email_service import EmailService
 
 # Set up logger
 logger = setup_logger(__name__)
@@ -40,6 +43,14 @@ limiter = Limiter(key_func=get_remote_address)
 # --- MODIFIED LINE ---
 # Removed the prefix="/auth" as it's already defined in main.py
 router = APIRouter(tags=["Authentication"])
+
+
+def _email_verification_required(db) -> bool:
+    from app.database.mongo_client import get_database
+
+    settings_doc = get_database()["platform_settings"].find_one({"_id": "platform_config"})
+    return bool(settings_doc and settings_doc.get("require_email_verification"))
+
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     to_encode = data.copy()
@@ -60,13 +71,36 @@ def register_user_route(request: Request, user: UserCreate, db: Collection = Dep
     try:
         hashed_password = get_password_hash(user.password)
         user_in_db = UserInDB(**user.model_dump(), hashed_password=hashed_password)
-        db.insert_one(user_in_db.model_dump())
-        
+        doc = user_in_db.model_dump()
+        require_verify = _email_verification_required(db)
+        if require_verify:
+            token = secrets.token_urlsafe(32)
+            doc["email_verified"] = False
+            doc["email_verify_token"] = token
+        else:
+            doc["email_verified"] = True
+        db.insert_one(doc)
+
+        if require_verify:
+            verify_link = f"{settings.FRONTEND_URL.rstrip('/')}/verify-email?token={token}"
+            EmailService().send_verification_email(
+                to_email=user.email,
+                username=user.username,
+                verify_link=verify_link,
+            )
+
         logger.info(f"User '{user.username}' registered successfully")
         return StandardResponse.success(
-            data={"username": user.username},
-            message=f"User {user.username} registered successfully",
-            status_code=201
+            data={
+                "username": user.username,
+                "email_verification_required": require_verify,
+            },
+            message=(
+                "Registration successful. Check your email to verify your account."
+                if require_verify
+                else f"User {user.username} registered successfully"
+            ),
+            status_code=201,
         )
     except Exception as e:
         logger.error(f"Registration error for '{user.username}': {str(e)}")
@@ -88,7 +122,13 @@ def login_for_access_token_route(
     if not user_dict or not verify_password(form_data.password, user_dict["hashed_password"]):
         logger.warning("Failed login attempt for username: %r", username)
         raise ErrorResponses.unauthorized("Incorrect username or password")
-    
+
+    if _email_verification_required(db) and not user_dict.get("email_verified", True):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Please verify your email before signing in.",
+        )
+
     user_in_db = UserInDB(**user_dict)
 
     # --- NEW LINE ADDED ---

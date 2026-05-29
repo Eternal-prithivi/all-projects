@@ -156,6 +156,12 @@ Database: `CloudResourceOptimizationDB`
 
 Auth: `POST /api/auth/verify-email?token=` — marks `email_verified` when `email_verify_token` matches user.
 
+**Notifications** (`/api/notifications`): list, create, mark read, delete — `user_notifications` collection.
+
+**Organizations** (`/api/organizations`): create org, members, invites, accept invite — single org per user.
+
+**SSO** (`/api/auth/sso`): `GET providers`, `GET google/login`, `GET google/callback` — needs `GOOGLE_OAUTH_*` + `PUBLIC_API_URL` env.
+
 ---
 
 ## 🔧 How to Run Backend

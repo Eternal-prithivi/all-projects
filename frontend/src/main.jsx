@@ -79,6 +79,10 @@ const SessionExpiredPage = lazy(() => import("./pages/SessionExpiredPage.jsx"));
 const BillingSuccessPage = lazy(() => import("./pages/BillingSuccessPage.jsx"));
 const BillingCancelPage = lazy(() => import("./pages/BillingCancelPage.jsx"));
 const DocsHubPage = lazy(() => import("./pages/DocsHubPage.jsx"));
+const NotificationsPage = lazy(() => import("./pages/NotificationsPage.jsx"));
+const TeamPage = lazy(() => import("./pages/TeamPage.jsx"));
+const AcceptInvitePage = lazy(() => import("./pages/AcceptInvitePage.jsx"));
+const SsoCallbackPage = lazy(() => import("./pages/SsoCallbackPage.jsx"));
 
 const router = createBrowserRouter([
   {
@@ -110,6 +114,8 @@ const router = createBrowserRouter([
       { path: "/session-expired", element: <Suspense fallback={<LazyLoadFallback />}><SessionExpiredPage /></Suspense> },
       { path: "/billing/success", element: <Suspense fallback={<LazyLoadFallback />}><BillingSuccessPage /></Suspense> },
       { path: "/billing/cancel", element: <Suspense fallback={<LazyLoadFallback />}><BillingCancelPage /></Suspense> },
+      { path: "/auth/sso/callback", element: <Suspense fallback={<LazyLoadFallback />}><SsoCallbackPage /></Suspense> },
+      { path: "/invite/:token", element: <Suspense fallback={<LazyLoadFallback />}><AcceptInvitePage /></Suspense> },
 
       // --- Protected Routes (lazy loaded) ---
       {
@@ -132,6 +138,8 @@ const router = createBrowserRouter([
               { path: "profile", element: <Suspense fallback={<LazyLoadFallback />}><ProfilePage /></Suspense> },
               { path: "settings", element: <Suspense fallback={<LazyLoadFallback />}><SettingsPage /></Suspense> },
               { path: "provision", element: <Suspense fallback={<LazyLoadFallback />}><ProvisionPage /></Suspense> },
+              { path: "notifications", element: <Suspense fallback={<LazyLoadFallback />}><NotificationsPage /></Suspense> },
+              { path: "team", element: <Suspense fallback={<LazyLoadFallback />}><TeamPage /></Suspense> },
             ],
           },
           {

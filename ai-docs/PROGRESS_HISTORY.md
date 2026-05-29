@@ -7,6 +7,17 @@
 
 ---
 
+**Phase 18d: Notifications, team, SSO, email verify** — COMPLETE 2026-05-29
+
+- `/dashboard/notifications` + persisted `/api/notifications`
+- `/dashboard/team` + `/api/organizations` (create org, invites, accept)
+- `/invite/:token` public accept flow
+- Google SSO (`/api/auth/sso`) + OIDC issuer redirect; admin toggles
+- Register sends verification email when `require_email_verification` enabled; login blocked until verified
+- `NotificationContext` syncs with API; bell links to full page
+
+---
+
 **Phase 18: Enterprise public pages** — COMPLETE 2026-05-29 (18a–18c + docs hub)
 
 - Tracking: phased plan in `STATUS.md` / `PROGRESS.md` per enterprise page audit

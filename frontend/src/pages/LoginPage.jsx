@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { loginUser, getApiErrorMessage } from '../api';
 import { useAuth } from '../context/AuthContext.jsx';
 import { getValidationErrorMessage, validateLoginForm } from '../utils/formValidation.js';
 import { getDeviceFingerprint } from '../utils/deviceFingerprint.js';
 import '../styles/auth.css';
+import '../styles/auth-polish.css';
 
 function LoginPage() {
   const [username, setUsername] = useState('');
@@ -12,7 +13,16 @@ function LoginPage() {
   const [error, setError] = useState('');
   const [fieldErrors, setFieldErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
+  const [ssoProviders, setSsoProviders] = useState([]);
   const { login, isAuthenticated } = useAuth();
+
+  const apiRoot = useMemo(
+    () =>
+      import.meta.env.MODE === 'production'
+        ? 'https://zenith-backend-707i.onrender.com'
+        : 'http://localhost:8000',
+    []
+  );
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -25,6 +35,17 @@ function LoginPage() {
       navigate(from, { replace: true });
     }
   }, [isAuthenticated, navigate, from]);
+
+  useEffect(() => {
+    fetch(`${apiRoot}/api/auth/sso/providers`)
+      .then((r) => r.json())
+      .then((data) => setSsoProviders(data.providers || []))
+      .catch(() => setSsoProviders([]));
+  }, [apiRoot]);
+
+  const startSso = (providerId) => {
+    window.location.href = `${apiRoot}/api/auth/sso/${providerId}/login`;
+  };
 
   const validation = validateLoginForm({ username, password });
   const isSubmitDisabled = isLoading || !validation.isValid;
@@ -182,6 +203,24 @@ function LoginPage() {
 
             {error && <p className="auth-error" id="login-error" role="alert">{error}</p>}
           </form>
+
+          {ssoProviders.length > 0 && (
+            <div className="auth-sso">
+              <p className="auth-sso__divider">or continue with</p>
+              <div className="auth-sso__buttons">
+                {ssoProviders.map((p) => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    className="auth-sso__btn"
+                    onClick={() => startSso(p.id)}
+                  >
+                    {p.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div className="auth-footer-link">
             <p>Protected by enterprise-grade encryption</p>

@@ -19,6 +19,10 @@ class UserInDB(User):
     two_fa_enabled: bool = Field(False)
     two_fa_verified: bool = Field(False)
     role: str = Field(default="user")  # user or admin
+    email_verified: bool = Field(default=True)
+    email_verify_token: Optional[str] = None
+    google_id: Optional[str] = None
+    sso_provider: Optional[str] = None
 
 class Token(BaseModel):
     access_token: str

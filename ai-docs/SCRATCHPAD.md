@@ -2,10 +2,8 @@
 
 **Status:** COMPLETE (2026-05-29)
 
-**Phase 18:** Enterprise pages 18a–18c + docs hub. Frontend build pass.
+**Phase 18d delivered:** notifications API/page, organizations/team, SSO (Google + OIDC redirect), email verification on register, admin SSO toggles.
 
-**LKGS:** New routes in `main.jsx`; `GET /api/platform/status`; trust/cookie/DPA/status/verify-email/pricing/billing return pages; `CookieConsent` + `MaintenanceGate`.
+**LKGS:** Frontend build pass; pushed to `stage`.
 
-**Next:** 18d notifications page; wire `email_verify_token` on register when admin enables verification; Razorpay redirect URLs to `/billing/success`.
-
-**Deferred:** SSO, org/team, CloudFormation UI, bucket migration UI
+**Next:** CloudFormation UI, bucket migration, wire Razorpay to `/billing/success`.

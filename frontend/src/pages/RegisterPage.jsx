@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { registerUser } from '../api';
 import { getValidationErrorMessage, validateRegisterForm } from '../utils/formValidation.js';
 import '../styles/auth.css';
+import '../styles/auth-polish.css';
 
 function RegisterPage() {
+  const navigate = useNavigate();
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -32,7 +34,13 @@ function RegisterPage() {
     try {
       const userData = { username, email, password };
       const response = await registerUser(userData);
-      setMessage(response.message);
+      const payload = response?.data?.data || response?.data || response;
+      if (payload?.email_verification_required) {
+        setMessage(response.message || 'Check your email to verify your account before signing in.');
+        setTimeout(() => navigate('/verify-email'), 2000);
+      } else {
+        setMessage(response.message);
+      }
     } catch (err) {
       setError(err.detail || 'An error occurred during registration.');
     } finally {
