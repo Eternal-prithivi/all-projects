@@ -13,7 +13,11 @@
 #   - Return hashed_password in any profile response
 # =============================================================================
 
+import csv
+import io
+
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi.responses import Response
 from pydantic import BaseModel, EmailStr
 from typing import Optional, List
 from datetime import datetime
@@ -70,6 +74,7 @@ class SessionResponse(BaseModel):
     ip: str
     last_active: datetime
     current: bool
+    device_fingerprint_short: Optional[str] = None
 
 
 class ActivityLogResponse(BaseModel):
@@ -391,7 +396,8 @@ async def get_active_sessions(current_user: User = Depends(get_current_user)):
                 location=location,
                 ip=ip,
                 last_active=session.get("last_active", session.get("created_at", datetime.utcnow())),
-                current=session.get("is_current", False)
+                current=session.get("is_current", False),
+                device_fingerprint_short=session.get("device_fingerprint_short"),
             ))
         
         return session_list
@@ -544,3 +550,52 @@ async def get_activity_log(
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch activity log: {str(e)}")
+
+
+@router.get("/activity/export")
+async def export_activity_log_csv(
+    period_days: int = 30,
+    category: str = "all",
+    current_user: User = Depends(get_current_user),
+):
+    """Export user activity / security audit log as CSV."""
+    from app.utils.audit_log import build_activity_query, dedupe_audit_entries, filter_by_category
+
+    try:
+        period_days = max(7, min(period_days, 90))
+        activity_collection = DB["activity_log"]
+        query = build_activity_query(current_user.username, days=period_days)
+        raw = list(activity_collection.find(query).sort("timestamp", -1).limit(2000))
+        deduped = dedupe_audit_entries(raw, window_minutes=30)
+        filtered = filter_by_category(deduped, category.lower())
+
+        output = io.StringIO()
+        writer = csv.DictWriter(
+            output,
+            fieldnames=["timestamp", "action", "description", "category", "ip"],
+        )
+        writer.writeheader()
+        for doc in filtered:
+            action = doc.get("action", "")
+            writer.writerow(
+                {
+                    "timestamp": (
+                        doc.get("timestamp").isoformat()
+                        if isinstance(doc.get("timestamp"), datetime)
+                        else str(doc.get("timestamp", ""))
+                    ),
+                    "action": action,
+                    "description": doc.get("description", ""),
+                    "category": categorize_audit_action(action),
+                    "ip": doc.get("ip", ""),
+                }
+            )
+
+        filename = f"zenith_activity_{current_user.username}_{datetime.utcnow().strftime('%Y%m%d')}.csv"
+        return Response(
+            content=output.getvalue(),
+            media_type="text/csv",
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to export activity log: {str(e)}")

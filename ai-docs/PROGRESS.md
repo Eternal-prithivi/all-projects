@@ -31,7 +31,7 @@ Scope: [...] | Do NOT touch: [...] | Done when: [...]
 
 ## 🔴 Active Task
 
-**None** — Enterprise dashboard UI/UX pass 3 **COMPLETE** (2026-05-29). See `PROGRESS_HISTORY.md` and `UI_UX_AUDIT_2026.md` Pass 3.
+**None** — Enterprise dashboard UI/UX pass 5 **COMPLETE** (2026-05-29). See `PROGRESS_HISTORY.md` and `UI_UX_AUDIT_2026.md` Pass 5.
 
 ---
 

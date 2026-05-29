@@ -6,6 +6,7 @@ import {
   FaSearch, FaCheck, FaBan, FaClock, FaUserPlus, FaFileDownload, FaFilePdf
 } from 'react-icons/fa';
 import { exportToCSV, prepareUsersForExport, exportUsersToPDF } from '../../utils/exportUtils';
+import PageHeader from '../../components/ui/PageHeader.jsx';
 
 const AdminUsersPage = () => {
   const [users, setUsers] = useState([]);
@@ -81,12 +82,13 @@ const AdminUsersPage = () => {
 
   return (
     <div className="admin-users-page">
-      <div className="admin-page-header">
-        <div>
-          <h1>User Management</h1>
-          <p>Manage platform users and their accounts</p>
-        </div>
-        <div style={{ display: 'flex', gap: '10px' }}>
+      <PageHeader
+        className="zenith-page-header--row"
+        kicker="Admin"
+        title="User Management"
+        subtitle="Manage platform users and their accounts"
+      >
+        <div className="zenith-page-header-actions" style={{ display: 'flex', gap: '10px' }}>
           <button onClick={handleExportCSV} className="btn-export" aria-label="Export users data to CSV file">
             <FaFileDownload /> Export CSV
           </button>
@@ -94,7 +96,7 @@ const AdminUsersPage = () => {
             <FaFilePdf /> Export PDF
           </button>
         </div>
-      </div>
+      </PageHeader>
 
       {/* Search Bar */}
       <div className="admin-search-section">

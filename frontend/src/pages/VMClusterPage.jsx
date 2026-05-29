@@ -21,6 +21,7 @@ import { useNotifications } from "../hooks/useNotifications";
 import { useAuth } from "../context/AuthContext.jsx";
 import LoadingSpinner from "../components/LoadingSpinner.jsx";
 import EmptyState from "../components/EmptyState.jsx";
+import PageHeader from "../components/ui/PageHeader.jsx";
 import { VMClusterSkeleton } from "../components/Skeletons.jsx";
 import WorkloadGuidancePanel from "../components/vm/WorkloadGuidancePanel.jsx";
 import {
@@ -497,19 +498,17 @@ ${instructions.troubleshooting.map((item) => `
 
   return (
     <div className="vm-container">
-      {/* Header */}
-      <div className="vm-header">
-        <div>
-          <h2>VM Cluster Management</h2>
-          <p className="vm-subtitle">
-            Intelligent workload assignment with auto-scaling and migration
-          </p>
-        </div>
-        <div className="live-indicator">
+      <PageHeader
+        className="zenith-page-header--row"
+        kicker="Compute"
+        title="VM Cluster Management"
+        subtitle="Intelligent workload assignment with auto-scaling and migration"
+      >
+        <div className="zenith-page-header-actions live-indicator">
           <span className="live-dot"></span>
           <span className="live-text">Live</span>
         </div>
-      </div>
+      </PageHeader>
 
       {/* VM Process Flow */}
       <div className="vm-process-info">

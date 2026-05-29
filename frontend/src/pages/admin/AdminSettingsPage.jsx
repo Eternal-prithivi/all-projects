@@ -6,6 +6,7 @@ import {
   FaCog, FaToggleOn, FaToggleOff, FaServer, 
   FaDatabase, FaEnvelope, FaClock, FaShieldAlt 
 } from 'react-icons/fa';
+import PageHeader from '../../components/ui/PageHeader.jsx';
 
 const AdminSettingsPage = () => {
   const [loading, setLoading] = useState(true);
@@ -71,10 +72,11 @@ const AdminSettingsPage = () => {
 
   return (
     <div className="admin-settings">
-      <div className="admin-page-header">
-        <h1>Platform Settings</h1>
-        <p>Configure platform-wide settings and preferences</p>
-      </div>
+      <PageHeader
+        kicker="Admin"
+        title="Platform Settings"
+        subtitle="Configure platform-wide settings and preferences"
+      />
 
       {/* Statistics */}
       {statistics && (

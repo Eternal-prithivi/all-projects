@@ -26,6 +26,8 @@ import {
 } from "../api";
 import "../styles/storage.css";
 import PageHeader from "../components/ui/PageHeader.jsx";
+import EmptyState from "../components/EmptyState.jsx";
+import { IconHardDrive } from "../components/dashboard/Icons.jsx";
 
 // --- API FUNCTIONS (Missing from api.js) ---
 import { apiClient } from "../api";
@@ -367,6 +369,12 @@ function StoragePage() {
         </div>
         {isLoading ? (
           <TableSkeleton rows={5} columns={5} />
+        ) : files.length === 0 ? (
+          <EmptyState
+            icon={<IconHardDrive aria-hidden="true" />}
+            title="No files yet"
+            message="Upload a file above to see it listed here with storage class and actions."
+          />
         ) : (
           <table className="file-table">
             <thead>
@@ -379,8 +387,7 @@ function StoragePage() {
               </tr>
             </thead>
             <tbody>
-              {files.length > 0 ? (
-                files.map((file) => (
+              {files.map((file) => (
                   <tr key={file.filename}>
                     <td>{file.filename}</td>
                     <td>{(file.size_bytes / 1024).toFixed(2)}</td>
@@ -420,14 +427,7 @@ function StoragePage() {
                       </button>
                     </td>
                   </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan="5" style={{ textAlign: "center" }}>
-                    No files uploaded yet.
-                  </td>
-                </tr>
-              )}
+                ))}
             </tbody>
           </table>
         )}

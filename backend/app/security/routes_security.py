@@ -60,6 +60,48 @@ def get_secure_files_collection() -> Collection:
     return mongodb_client.get_collection("secure_files")
 
 
+def _persist_sse_secure_file(
+    files_db: Collection,
+    *,
+    filename: str,
+    owner_username: str,
+    file_content: bytes,
+    is_sensitive: bool,
+    scan_reasons: Optional[list] = None,
+) -> dict:
+    """Upload bytes to dual secure buckets with SSE-S3 and save Mongo metadata."""
+    object_key = f"{owner_username}/{filename}"
+    _put_secure_object_dual(file_content, object_key, server_side_encryption=True)
+    file_metadata = FileMetadata(
+        filename=filename,
+        s3_key=object_key,
+        owner_username=owner_username,
+        size_bytes=len(file_content),
+        is_sensitive=is_sensitive,
+        is_encrypted=True,
+        encryption_method="server-side",
+        encryption_status="encrypted",
+        client_side_encrypted=False,
+    )
+    doc = file_metadata.model_dump()
+    doc["upload_date"] = datetime.utcnow()
+    if scan_reasons is not None:
+        doc["scan_reasons"] = scan_reasons
+    files_db.update_one(
+        {"filename": filename, "owner_username": owner_username},
+        {"$set": doc, "$unset": {"temp_file_content": "", "awaiting_encryption_choice": ""}},
+        upsert=True,
+    )
+    return {
+        "filename": filename,
+        "needs_encryption": False,
+        "status": "auto_encrypted_sse",
+        "encryption_method": "server-side",
+        "is_sensitive": is_sensitive,
+        "message": "Sensitive data detected — file protected automatically with SSE-S3 (primary + replica).",
+    }
+
+
 def _put_secure_object_dual(
     body: bytes,
     object_key: str,
@@ -258,19 +300,37 @@ async def upload_secure_file(
     user: UserInDB = Depends(require_2fa),
     files_db: Collection = Depends(get_secure_files_collection),
     encrypt_manual: bool = Form(False),
+    always_ask_encryption: bool = Form(False),
     file: UploadFile = File(...)
 ):
     """
     Step 1: Scan file for sensitive data BEFORE uploading to S3.
-    If encryption needed, register awaiting state and prompt UI to encrypt (SSE or browser CSE).
+    Sensitive files auto-encrypt with SSE-S3 unless user forces manual encryption choice.
     """
     file_content = await file.read()
     file_size = len(file_content)
 
     scan = scan_file_content(file_content, file.filename)
     is_sensitive = scan.is_sensitive
+
+    if is_sensitive and not encrypt_manual and not always_ask_encryption:
+        try:
+            return _persist_sse_secure_file(
+                files_db,
+                filename=file.filename,
+                owner_username=user.username,
+                file_content=file_content,
+                is_sensitive=True,
+                scan_reasons=scan.reasons,
+            )
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Auto SSE-S3 upload failed: {str(e)}",
+            ) from e
+
     needs_encryption = is_sensitive or encrypt_manual
-    
+
     if needs_encryption:
         # Store file temporarily in database (not S3 yet) and ask user for encryption choice
         temp_file_doc = {
@@ -303,34 +363,19 @@ async def upload_secure_file(
             "status": "awaiting_encryption_choice",
         }
     else:
-        object_key = f"{user.username}/{file.filename}"
         try:
-            _put_secure_object_dual(file_content, object_key, server_side_encryption=True)
+            return _persist_sse_secure_file(
+                files_db,
+                filename=file.filename,
+                owner_username=user.username,
+                file_content=file_content,
+                is_sensitive=False,
+            )
         except Exception as e:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"Upload failed: {str(e)}",
-            )
-
-        file_metadata = FileMetadata(
-            filename=file.filename,
-            s3_key=object_key,
-            owner_username=user.username,
-            size_bytes=file_size,
-            is_sensitive=False,
-            is_encrypted=True,
-            encryption_method="server-side",
-            encryption_status="encrypted",
-            client_side_encrypted=False,
-        )
-        files_db.insert_one(file_metadata.model_dump())
-
-        return {
-            "filename": file.filename,
-            "needs_encryption": False,
-            "status": "uploaded",
-            "encryption_method": "server-side",
-        }
+            ) from e
 
 
 @router.post("/upload-client-encrypted", status_code=status.HTTP_200_OK)
@@ -451,54 +496,24 @@ async def choose_encryption_method(
     if not file_content:
         raise HTTPException(status_code=400, detail="Temporary file content not found")
     
-    object_key = f"{user.username}/{request.filename}"
-    
     try:
-        _put_secure_object_dual(file_content, object_key, server_side_encryption=True)
-        files_db.update_one(
-            {"filename": request.filename, "owner_username": user.username},
-            {
-                "$set": {
-                    "s3_key": object_key,
-                    "is_encrypted": True,
-                    "encryption_method": "server-side",
-                    "encryption_status": "encrypted",
-                    "awaiting_encryption_choice": False,
-                    "client_side_encrypted": False,
-                },
-                "$unset": {"temp_file_content": "", "scan_reasons": ""},
-            },
+        result = _persist_sse_secure_file(
+            files_db,
+            filename=request.filename,
+            owner_username=user.username,
+            file_content=file_content,
+            is_sensitive=bool(file_doc.get("is_sensitive")),
+            scan_reasons=file_doc.get("scan_reasons"),
         )
         return {
             "message": "Server-side encryption (SSE-S3) applied successfully",
             "filename": request.filename,
             "encryption_method": "server-side",
+            "status": result.get("status", "uploaded"),
         }
-    
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Encryption failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Encryption failed: {str(e)}") from e
 
-
-@router.get("/list-secure")
-async def list_secure_files(
-    user: UserInDB = Depends(require_2fa),
-    files_db: Collection = Depends(get_secure_files_collection)
-):
-    """
-    Lists file metadata from the secure_files collection in MongoDB.
-    """
-    user_files = files_db.find({"owner_username": user.username})
-
-    files_list = []
-    for file in user_files:
-        files_list.append({
-            "filename": file.get("filename"),
-            "upload_date": file.get("upload_date"),
-            "size_bytes": file.get("size_bytes"),
-            "is_sensitive": file.get("is_sensitive"),
-            "is_encrypted": file.get("is_encrypted", False)
-        })
-    return files_list
 
 # --- FIX: ADD THIS MISSING DOWNLOAD ENDPOINT ---
 @router.get("/download/{filename}")

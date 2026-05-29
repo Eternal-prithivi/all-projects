@@ -9,6 +9,7 @@ import {
   validatePasswordChangeForm,
 } from '../utils/formValidation';
 import '../styles/security-settings.css';
+import PageHeader from '../components/ui/PageHeader.jsx';
 
 const formatRelativeTime = (timestamp) => {
   const date = new Date(timestamp);
@@ -150,10 +151,11 @@ const SecuritySettingsPage = () => {
 
   return (
     <div className="security-settings-page">
-      <div className="security-header">
-        <h2>Security Settings</h2>
-        <p>Password, two-factor authentication, and sign-in overview</p>
-      </div>
+      <PageHeader
+        kicker="Account security"
+        title="Security Settings"
+        subtitle="Password, two-factor authentication, and sign-in overview"
+      />
 
       <div className="security-bento">
         <div className="security-card">

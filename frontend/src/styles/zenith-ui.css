@@ -37,6 +37,19 @@
   max-width: 52rem;
 }
 
+/* Header row with optional action (VM live badge, billing CTA) */
+.zenith-page-header--row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: var(--space-md);
+}
+
+.zenith-page-header--row .zenith-page-header-actions {
+  flex-shrink: 0;
+}
+
 .zenith-glass-panel {
   background: var(--bg-card);
   backdrop-filter: blur(20px);

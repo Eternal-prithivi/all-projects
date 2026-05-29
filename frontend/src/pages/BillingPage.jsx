@@ -17,7 +17,7 @@ import { toast } from 'react-toastify';
 import { useNavigate } from 'react-router-dom';
 import { PageSkeleton } from '../components/Skeletons.jsx';
 import '../styles/billing.css';
-import CostHubNav from '../components/dashboard/CostHubNav.jsx';
+import PageHeader from '../components/ui/PageHeader.jsx';
 
 function BillingPage() {
   const [subscription, setSubscription] = useState(() => {
@@ -256,23 +256,22 @@ function BillingPage() {
 
   return (
     <div className="billing-page">
-      <div className="billing-header">
-        <div className="billing-heading-copy">
-          <span className="billing-kicker">Finance center</span>
-          <h1>Billing & Payments</h1>
-          <p>Manage your subscription, cloud spend, and renewal timing in one place.</p>
-        </div>
+      <PageHeader
+        className="zenith-page-header--row billing-page-header"
+        kicker="Finance center"
+        title="Billing & Payments"
+        subtitle="Manage your subscription, cloud spend, and renewal timing in one place."
+      >
         {subscription?.plan_id !== 'free' && (
-          <button 
-            className="btn-upgrade-plan-header"
+          <button
+            type="button"
+            className="zenith-page-header-actions btn-upgrade-plan-header"
             onClick={() => navigate('/dashboard/pricing')}
           >
             View All Plans
           </button>
         )}
-      </div>
-
-      <CostHubNav />
+      </PageHeader>
 
       <div className="billing-overview-grid">
         {billingOverview.map((item) => (

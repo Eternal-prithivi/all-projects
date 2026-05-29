@@ -65,8 +65,8 @@ def is_allowed_origin(origin: str) -> bool:
     if not origin:
         return False
     
-    # Allow localhost
-    if origin.startswith("http://localhost:"):
+    # Allow local dev (Vite may use localhost or 127.0.0.1)
+    if origin.startswith("http://localhost:") or origin.startswith("http://127.0.0.1:"):
         return True
     
     # Allow all Vercel preview and production URLs
@@ -95,6 +95,11 @@ def is_allowed_origin(origin: str) -> bool:
     
     return False
 
+# Headers allowed on cross-origin requests (login sends X-Device-Fingerprint)
+_CORS_ALLOW_HEADERS = (
+    "Content-Type, Authorization, Accept, Origin, User-Agent, X-Device-Fingerprint"
+)
+
 # Custom CORS middleware to handle dynamic Vercel URLs
 class DynamicCORSMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
@@ -110,7 +115,7 @@ class DynamicCORSMiddleware(BaseHTTPMiddleware):
                 response.headers["Access-Control-Allow-Origin"] = origin
                 response.headers["Access-Control-Allow-Credentials"] = "true"
                 response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS, PATCH"
-                response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, Accept, Origin, User-Agent"
+                response.headers["Access-Control-Allow-Headers"] = _CORS_ALLOW_HEADERS
                 response.headers["Access-Control-Max-Age"] = "86400"
             
             return response
@@ -123,7 +128,7 @@ class DynamicCORSMiddleware(BaseHTTPMiddleware):
             response.headers["Access-Control-Allow-Origin"] = origin
             response.headers["Access-Control-Allow-Credentials"] = "true"
             response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS, PATCH"
-            response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, Accept, Origin, User-Agent"
+            response.headers["Access-Control-Allow-Headers"] = _CORS_ALLOW_HEADERS
         
         return response
 

@@ -2,7 +2,8 @@ import React from 'react';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { getDownloadUrl, deleteFile } from '../../api.js';
 // This is the corrected import path
-import { IconDownload, IconTrash } from '../dashboard/Icons.jsx';
+import { IconDownload, IconTrash, IconHardDrive } from '../dashboard/Icons.jsx';
+import EmptyState from '../EmptyState.jsx';
 import '../../styles/file-list.css';
 
 function formatBytes(bytes, decimals = 2) {
@@ -38,7 +39,13 @@ function FileList({ files, onFileDeleted }) {
   };
 
   if (!files || files.length === 0) {
-    return <p className="empty-message">No files uploaded yet.</p>;
+    return (
+      <EmptyState
+        icon={<IconHardDrive aria-hidden="true" />}
+        title="No files yet"
+        message="Upload a file above to see it listed here with storage class and actions."
+      />
+    );
   }
 
   return (

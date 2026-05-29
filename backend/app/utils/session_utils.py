@@ -1,5 +1,8 @@
 """Helpers for login sessions and client metadata."""
 
+import json
+import urllib.error
+import urllib.request
 from typing import Optional
 
 
@@ -45,3 +48,31 @@ def parse_user_agent(user_agent: Optional[str]) -> str:
         return f"{browser} on Linux"
 
     return browser
+
+
+def resolve_geo_location(ip: str) -> str:
+    """Best-effort city/country from IP (free tier ip-api.com). Falls back gracefully."""
+    if not ip or ip in ("Unknown", "127.0.0.1", "::1", "localhost"):
+        return "Local network"
+    if ip.startswith("192.168.") or ip.startswith("10.") or ip.startswith("172."):
+        return "Local network"
+    try:
+        url = f"http://ip-api.com/json/{ip}?fields=status,country,city"
+        with urllib.request.urlopen(url, timeout=2.5) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+        if data.get("status") == "success":
+            city = (data.get("city") or "").strip()
+            country = (data.get("country") or "").strip()
+            parts = [p for p in (city, country) if p]
+            if parts:
+                return ", ".join(parts)
+    except (urllib.error.URLError, TimeoutError, json.JSONDecodeError, ValueError):
+        pass
+    return "Unknown location"
+
+
+def fingerprint_display(device_fingerprint: Optional[str]) -> Optional[str]:
+    """Short label for UI (first 8 hex chars of SHA-256)."""
+    if not device_fingerprint or len(device_fingerprint) < 8:
+        return None
+    return device_fingerprint[:8].upper()

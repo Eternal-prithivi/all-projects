@@ -69,8 +69,8 @@ If 5+ sessions since last drift audit (or none ever), run the checklist below.
 | Backend tests | ✅ 46 passed (`backend/.venv/bin/python -m pytest -q`) |
 | Frontend build | ✅ Passes (`npm run build`) |
 | Frontend lint | ✅ 0 errors (warnings pre-existing) |
-| Phase | 13 — dashboard UI/UX pass 3 complete |
-| Last verified feature | Enterprise dashboard polish (2026-05-29) |
+| Phase | 13 — dashboard UI/UX pass 5 complete |
+| Last verified feature | Admin headers + cost modals + onboarding tokens (2026-05-29) |
 
 **Re-verify:** `cd backend && .venv/bin/python -m pytest -q` · `cd frontend && npm run lint && npm run build`
 
@@ -80,13 +80,13 @@ If 5+ sessions since last drift audit (or none ever), run the checklist below.
 
 **Status:** COMPLETE (2026-05-29)
 
-**Task:** Enterprise dashboard UI/UX audit + fixes (pass 3)
+**Task:** Enterprise dashboard UI/UX pass 5 (final polish)
 
 **Summary:**
-- Documented 8 enterprise gaps in `UI_UX_AUDIT_2026.md` Pass 3
-- Expanded `dashboard-polish.css` (kickers, back links, gold CTA text, cost layout)
-- `PageHeader` on Storage, Settings, Profile; cost containers `min-height: auto`
-- Billing empty-state SVG gold; storage title gradient
+- `PageHeader` on all admin sub-pages + diagnostics; overview kicker tokens
+- `costanalysis.css` budget/anomaly panels tokenized; gold CTA dark text
+- `onboarding.css` welcome + tour tooltips use `--bg-elevated` / `--gold-*`
+- CostHubNav scoped to Cost Analysis only
 - pytest 46, lint 0 errors, build OK
 
 ---

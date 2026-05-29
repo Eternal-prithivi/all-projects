@@ -80,6 +80,34 @@
 
 ---
 
+## Pass 4 — Rating follow-up (2026-05-29)
+
+| # | Gap (from ~7.5 rating) | Fix |
+|---|------------------------|-----|
+| 1 | PageHeader missing on VM / Provision / Security / Billing | Added on all four |
+| 2 | Billing vertical density | Tighter `--space-lg` section margins |
+| 3 | White text on gold CTAs | `billing.css` gold buttons → `--bg-base` text |
+| 4 | Inconsistent empty lists | Shared `EmptyState` on Storage, Security, FileList, SecureFileList |
+| 5 | VM header one-off chrome | Replaced with `PageHeader` + live badge |
+
+**Target score after pass 4:** ~**8 / 10** enterprise dashboard.
+
+---
+
+## Pass 5 — Final polish (2026-05-29)
+
+| # | Gap | Fix |
+|---|-----|-----|
+| 1 | Admin pages inconsistent headers | `PageHeader` on Users, Payments, Analytics, System, Settings, Diagnostics |
+| 2 | Cost budget/anomaly modals hardcoded grays | `costanalysis.css` → `--bg-card`, `--border-default`, `--gold-primary` |
+| 3 | Onboarding tour purple-tinted panels | `onboarding.css` welcome + Joyride tooltips → design tokens |
+| 4 | CostHubNav only on Cost Analysis | Removed from Billing/Simulator/Optimization; React import fixed |
+| 5 | Admin overview kicker drift | `admin-pages.css` gold kicker aligned to dashboard |
+
+**Target score after pass 5:** ~**8.5 / 10** enterprise dashboard.
+
+---
+
 ## Wave file lists
 
 ### Wave 1 — Security

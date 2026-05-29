@@ -14,8 +14,8 @@ import React, { useState, useEffect } from 'react';
 import { apiClient } from '../api.js';
 import { useNotifications } from "../hooks/useNotifications";
 import { useNavigate } from 'react-router-dom';
-import CostHubNav from '../components/dashboard/CostHubNav.jsx';
 import PageHeader from '../components/ui/PageHeader.jsx';
+import CostHubNav from '../components/dashboard/CostHubNav.jsx';
 import {
   IconAlert,
   IconActivity,
@@ -396,7 +396,6 @@ const CostAnalysisEnhancedPage = () => {
         subtitle="Monitor and optimize your multi-cloud spending"
       />
       <CostHubNav />
-
       {/* Anomaly Alerts Banner */}
       {anomalySummary && anomalySummary.total_unacknowledged > 0 && (
         <div className="anomaly-banner">

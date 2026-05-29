@@ -17,7 +17,8 @@ CREDIT_CARD_PATTERN = re.compile(r"\b(?:\d[ -]*?){13,16}\b")
 SECRET_KEYWORDS_PATTERN = re.compile(
     r"(?i)\b("
     r"password|secret|key|pwd|token|credentials|api[_-]?key|apikeys|"
-    r"private[_-]?key|auth[_-]?token|access[_-]?key|client[_-]?secret"
+    r"private[_-]?key|auth[_-]?token|access[_-]?key|client[_-]?secret|"
+    r"aws[_-]?secret[_-]?access[_-]?key|aws_access_key"
     r")\b"
 )
 EMAIL_PATTERN = re.compile(

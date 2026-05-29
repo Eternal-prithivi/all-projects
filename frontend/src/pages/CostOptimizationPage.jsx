@@ -16,7 +16,6 @@ import {
   IconZap,
 } from '../components/dashboard/Icons.jsx';
 import '../styles/costoptimization.css';
-import CostHubNav from '../components/dashboard/CostHubNav.jsx';
 
 const providerTips = [
   {
@@ -103,8 +102,6 @@ const CostOptimizationPage = () => {
         </h1>
         <p>Strategies to reduce cloud spending across AWS, GCP, and Azure.</p>
       </div>
-
-      <CostHubNav />
 
       <section className="tips-section" aria-labelledby="provider-savings-heading">
         <h2 id="provider-savings-heading">Provider-Specific Savings</h2>

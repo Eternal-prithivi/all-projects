@@ -15,6 +15,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import api from '../api';
 import '../styles/provision.css';
+import PageHeader from '../components/ui/PageHeader.jsx';
 
 // ── Templates & Modules data (also returned by API, but hardcoded for instant render) ──
 
@@ -330,8 +331,11 @@ export default function ProvisionPage() {
   // ════════════════════════════════════════════════
   return (
     <div className="provision-page">
-      <h1>Infrastructure Provisioning</h1>
-      <p className="page-subtitle">Deploy AWS resources using Terraform — governed by policy, estimated for cost.</p>
+      <PageHeader
+        kicker="Infrastructure"
+        title="Infrastructure Provisioning"
+        subtitle="Deploy AWS resources using Terraform — governed by policy, estimated for cost."
+      />
 
       {/* Status Bar */}
       <div className="provision-status-bar">

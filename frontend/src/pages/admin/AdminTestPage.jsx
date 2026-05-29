@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import api from '../../api';
 import { useAuth } from '../../context/AuthContext';
+import '../../styles/admin-pages.css';
+import PageHeader from '../../components/ui/PageHeader.jsx';
 
 const AdminTestPage = () => {
   const { user } = useAuth();
@@ -48,36 +50,26 @@ const AdminTestPage = () => {
   };
 
   return (
-    <div style={{ padding: '20px', color: '#fff' }}>
-      <h1>Admin Portal Diagnostics</h1>
-      
-      <button 
+    <div className="admin-test-page">
+      <PageHeader
+        kicker="Admin"
+        title="Portal Diagnostics"
+        subtitle="Run quick checks against auth and admin API endpoints"
+      />
+      <button
+        type="button"
         onClick={runTests}
         disabled={loading}
-        style={{
-          padding: '10px 20px',
-          background: '#ffd700',
-          color: '#000',
-          border: 'none',
-          borderRadius: '5px',
-          cursor: loading ? 'not-allowed' : 'pointer',
-          fontSize: '16px',
-          fontWeight: 'bold'
-        }}
+        className="btn-export"
+        aria-label="Run admin diagnostic tests"
       >
         {loading ? 'Running Tests...' : 'Run Diagnostic Tests'}
       </button>
 
       {Object.keys(testResults).length > 0 && (
-        <div style={{ marginTop: '20px' }}>
-          <h2>Test Results:</h2>
-          <pre style={{ 
-            background: '#1a1a2e', 
-            padding: '15px', 
-            borderRadius: '5px',
-            overflow: 'auto',
-            maxHeight: '600px'
-          }}>
+        <div className="admin-test-page__results-wrap">
+          <h2>Test Results</h2>
+          <pre className="admin-test-page__results">
             {JSON.stringify(testResults, null, 2)}
           </pre>
         </div>

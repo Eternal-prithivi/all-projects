@@ -7,6 +7,7 @@ import {
   IconAlert,
   IconLock,
 } from "../dashboard/Icons.jsx";
+import EmptyState from "../EmptyState.jsx";
 import "../../styles/file-list.css";
 
 function formatBytes(bytes, decimals = 2) {
@@ -48,7 +49,11 @@ function SecureFileList({ files, onFileDeleted }) {
 
   if (!files || files.length === 0) {
     return (
-      <p className="empty-message">No secure files have been uploaded yet.</p>
+      <EmptyState
+        icon={<IconLock aria-hidden="true" />}
+        title="No secure files yet"
+        message="Upload a file to the vault. Sensitive content can be auto-protected with SSE-S3 or browser encryption."
+      />
     );
   }
 

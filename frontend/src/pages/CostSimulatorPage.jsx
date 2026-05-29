@@ -23,7 +23,6 @@ import {
   IconTarget,
 } from '../components/dashboard/Icons.jsx';
 import '../styles/costsimulator.css';
-import CostHubNav from '../components/dashboard/CostHubNav.jsx';
 
 const ProviderLogo = ({ provider }) => {
   const logoMap = {
@@ -268,8 +267,6 @@ const CostSimulatorPage = () => {
           )}
         </div>
       </div>
-
-      <CostHubNav />
 
       {/* Service Type Selector */}
       <div className="service-selector">

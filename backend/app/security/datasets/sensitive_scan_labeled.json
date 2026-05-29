@@ -1,0 +1,16 @@
+[
+  {"id": "clean_1", "text": "Quarterly sales summary for the marketing team.", "expect_sensitive": false, "tags": ["clean"]},
+  {"id": "clean_2", "text": "Meeting notes: discuss roadmap and UI polish.", "expect_sensitive": false, "tags": ["clean"]},
+  {"id": "clean_3", "text": "The weather in Mumbai was pleasant last week.", "expect_sensitive": false, "tags": ["clean"]},
+  {"id": "card_1", "text": "Card number 4532015112830366 expires 12/28", "expect_sensitive": true, "tags": ["credit_card"]},
+  {"id": "card_2", "text": "4111-1111-1111-1111", "expect_sensitive": true, "tags": ["credit_card"]},
+  {"id": "secret_1", "text": "api_key=sk-live-abc123notreal", "expect_sensitive": true, "tags": ["credential"]},
+  {"id": "secret_2", "text": "password: MyStr0ng!Pass", "expect_sensitive": true, "tags": ["credential"]},
+  {"id": "secret_3", "text": "export AWS_SECRET_ACCESS_KEY=AKIAIOSFODNN7EXAMPLE", "expect_sensitive": true, "tags": ["credential"]},
+  {"id": "email_1", "text": "Contact admin@company.com for access.", "expect_sensitive": true, "tags": ["email"]},
+  {"id": "ip_1", "text": "SSH to 192.168.0.44 on port 22", "expect_sensitive": true, "tags": ["private_ip"]},
+  {"id": "ip_2", "text": "Database host 10.0.0.15 internal only", "expect_sensitive": true, "tags": ["private_ip"]},
+  {"id": "combo_1", "text": "user@corp.com logged in from 172.16.5.9 with api_key=abc", "expect_sensitive": true, "tags": ["email", "private_ip", "credential"]},
+  {"id": "edge_1", "text": "public website https://example.com/docs", "expect_sensitive": false, "tags": ["clean"]},
+  {"id": "edge_2", "text": "invoice total 1200 USD paid", "expect_sensitive": false, "tags": ["clean"]}
+]

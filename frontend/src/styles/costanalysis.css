@@ -177,10 +177,10 @@
 
 .fetch-button {
   padding: 0.7rem 1.4rem;
-  background: #2a2a2a;
+  background: var(--bg-card-hover);
   border: 1px solid #d4af37;
   border-radius: 6px;
-  color: #d4af37;
+  color: var(--gold-primary);
   font-size: 0.95rem;
   font-weight: 600;
   cursor: pointer;
@@ -188,8 +188,8 @@
 }
 
 .fetch-button:hover:not(:disabled) {
-  background: #d4af37;
-  color: #000;
+  background: var(--gold-primary);
+  color: var(--bg-base);
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(212, 175, 55, 0.3);
 }
@@ -297,7 +297,7 @@
 .cost-breakdown h2 {
   font-size: 1.5rem;
   margin-bottom: 1.5rem;
-  color: #e0e0e0;
+  color: var(--text-secondary);
 }
 
 .breakdown-table {
@@ -334,7 +334,7 @@
 }
 
 .service-name {
-  color: #e0e0e0;
+  color: var(--text-secondary);
   font-weight: 500;
 }
 
@@ -377,7 +377,7 @@
 .time-series h2 {
   font-size: 1.5rem;
   margin-bottom: 1.5rem;
-  color: #e0e0e0;
+  color: var(--text-secondary);
 }
 
 .time-series-list {
@@ -393,7 +393,7 @@
   display: flex;
   justify-content: space-between;
   padding: 0.6rem 0.9rem;
-  background: #2a2a2a;
+  background: var(--bg-card-hover);
   border-radius: 6px;
   border: 1px solid var(--border-default);
   transition: background 0.25s ease, border-color 0.25s ease;
@@ -424,7 +424,7 @@
 .provider-message h2 {
   font-size: 1.8rem;
   margin-bottom: 1rem;
-  color: #e0e0e0;
+  color: var(--text-secondary);
 }
 
 .provider-message .status-message {
@@ -516,7 +516,7 @@
 
 .no-data h3 {
   font-size: 1.5rem;
-  color: #e0e0e0;
+  color: var(--text-secondary);
   margin-bottom: 0.5rem;
 }
 
@@ -564,7 +564,7 @@
 .optimization-tips h2 {
   font-size: 1.5rem;
   margin-bottom: 1.5rem;
-  color: #e0e0e0;
+  color: var(--text-secondary);
 }
 
 .tips-grid {
@@ -574,7 +574,7 @@
 }
 
 .tip-card {
-  background: #2a2a2a;
+  background: var(--bg-card-hover);
   border: 1px solid var(--border-default);
   border-radius: 8px;
   padding: 1.25rem 1.1rem;
@@ -669,10 +669,10 @@
 
 /* Budget Alerts Styles */
 .budgets-section {
-  background: #1a1a1a;
+  background: var(--bg-card);
   padding: 2rem;
   border-radius: 12px;
-  border: 1px solid #2a2a2a;
+  border: 1px solid var(--border-default);
   margin-bottom: 2rem;
 }
 
@@ -685,15 +685,15 @@
 
 .section-header h3 {
   font-size: 1.5rem;
-  color: #d4af37;
+  color: var(--gold-primary);
 }
 
 .create-budget-btn {
   padding: 0.75rem 1.5rem;
-  background: #d4af37;
+  background: var(--gold-primary);
   border: none;
   border-radius: 8px;
-  color: #000;
+  color: var(--bg-base);
   font-weight: bold;
   cursor: pointer;
   transition: all 0.3s ease;
@@ -708,7 +708,7 @@
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: 1rem;
-  background: #0d0d0d;
+  background: var(--bg-elevated);
   padding: 1.5rem;
   border-radius: 8px;
   margin-bottom: 1.5rem;
@@ -717,10 +717,10 @@
 .budget-form input,
 .budget-form select {
   padding: 0.75rem;
-  background: #2a2a2a;
+  background: var(--bg-card-hover);
   border: 1px solid var(--border-default);
   border-radius: 6px;
-  color: #e0e0e0;
+  color: var(--text-secondary);
   font-size: 1rem;
 }
 
@@ -772,10 +772,10 @@
 }
 
 .budget-card {
-  background: #0d0d0d;
+  background: var(--bg-elevated);
   padding: 1.5rem;
   border-radius: 10px;
-  border: 2px solid #2a2a2a;
+  border: 2px solid var(--border-default);
   transition: all 0.3s ease;
 }
 
@@ -795,7 +795,7 @@
 }
 
 .budget-header h4 {
-  color: #d4af37;
+  color: var(--gold-primary);
   font-size: 1.2rem;
 }
 
@@ -825,7 +825,7 @@
 .budget-amount {
   font-size: 1.5rem;
   font-weight: bold;
-  color: #e0e0e0;
+  color: var(--text-secondary);
   margin-bottom: 0.5rem;
 }
 
@@ -835,7 +835,7 @@
 }
 
 .budget-progress {
-  background: #2a2a2a;
+  background: var(--bg-card-hover);
   height: 10px;
   border-radius: 5px;
   overflow: hidden;
@@ -864,19 +864,19 @@
 
 .date-presets button {
   padding: 0.5rem 1rem;
-  background: #2a2a2a;
+  background: var(--bg-card-hover);
   border: 1px solid var(--border-default);
   border-radius: 6px;
-  color: #d4af37;
+  color: var(--gold-primary);
   cursor: pointer;
   transition: all 0.3s ease;
   font-size: 0.9rem;
 }
 
 .date-presets button:hover {
-  background: #d4af37;
-  color: #000;
-  border-color: #d4af37;
+  background: var(--gold-primary);
+  color: var(--bg-base);
+  border-color: var(--gold-primary);
 }
 
 /* Action Buttons */
@@ -924,7 +924,7 @@
 
 /* Forecast Panel */
 .forecast-panel {
-  background: #1a1a1a;
+  background: var(--bg-card);
   padding: 2rem;
   border-radius: 12px;
   border: 2px solid #d4af37;
@@ -939,7 +939,7 @@
 }
 
 .forecast-header h3 {
-  color: #d4af37;
+  color: var(--gold-primary);
   font-size: 1.5rem;
 }
 
@@ -963,7 +963,7 @@
 }
 
 .forecast-card {
-  background: #0d0d0d;
+  background: var(--bg-elevated);
   padding: 1.5rem;
   border-radius: 10px;
   text-align: center;
@@ -979,7 +979,7 @@
 .forecast-value {
   font-size: 1.8rem;
   font-weight: bold;
-  color: #d4af37;
+  color: var(--gold-primary);
 }
 
 /* Anomaly Alerts */
@@ -1021,7 +1021,7 @@
 }
 
 .anomalies-panel {
-  background: #1a1a1a;
+  background: var(--bg-card);
   padding: 2rem;
   border-radius: 12px;
   border: 2px solid #dc3545;
@@ -1040,10 +1040,10 @@
 }
 
 .anomaly-card {
-  background: #0d0d0d;
+  background: var(--bg-elevated);
   padding: 1.5rem;
   border-radius: 10px;
-  border: 2px solid #2a2a2a;
+  border: 2px solid var(--border-default);
 }
 
 .anomaly-card.critical {
@@ -1062,10 +1062,10 @@
 }
 
 .anomaly-provider {
-  background: #2a2a2a;
+  background: var(--bg-card-hover);
   padding: 0.25rem 0.75rem;
   border-radius: 4px;
-  color: #d4af37;
+  color: var(--gold-primary);
   font-size: 0.9rem;
   font-weight: bold;
 }
@@ -1085,7 +1085,7 @@
 
 .anomaly-severity.warning {
   background: #ffc107;
-  color: #000;
+  color: var(--bg-base);
 }
 
 .anomaly-details {
@@ -1093,7 +1093,7 @@
 }
 
 .anomaly-details p {
-  color: #999;
+  color: var(--text-muted);
   margin-bottom: 0.5rem;
 }
 
@@ -1120,7 +1120,7 @@
   gap: 0.5rem;
   height: 300px;
   padding: 1rem;
-  background: #0d0d0d;
+  background: var(--bg-elevated);
   border-radius: 8px;
   overflow-x: auto;
 }
@@ -1164,25 +1164,25 @@
 }
 
 .cost-table thead {
-  background: #0d0d0d;
+  background: var(--bg-elevated);
 }
 
 .cost-table th {
   padding: 1rem;
   text-align: left;
-  color: #d4af37;
+  color: var(--gold-primary);
   font-weight: 600;
-  border-bottom: 2px solid #2a2a2a;
+  border-bottom: 2px solid var(--border-default);
 }
 
 .cost-table td {
   padding: 0.75rem 1rem;
-  border-bottom: 1px solid #1a1a1a;
-  color: #e0e0e0;
+  border-bottom: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
 }
 
 .cost-table tbody tr:hover {
-  background: #0d0d0d;
+  background: var(--bg-elevated);
 }
 
 .cost-table tbody tr:last-child td {
@@ -1201,7 +1201,7 @@
 .cost-value {
   font-size: 1.8rem;
   font-weight: bold;
-  color: #d4af37;
+  color: var(--gold-primary);
 }
 
 .summary-icon {
@@ -1215,10 +1215,10 @@
 .cost-filters input[type="date"],
 .cost-filters select {
   padding: 0.65rem 0.9rem;
-  background: #2a2a2a;
+  background: var(--bg-card-hover);
   border: 1px solid var(--border-default);
   border-radius: 6px;
-  color: #e0e0e0;
+  color: var(--text-secondary);
   font-size: 0.95rem;
   transition: border-color 0.25s ease;
   width: 100%;
@@ -1227,7 +1227,7 @@
 .cost-filters input[type="date"]:focus,
 .cost-filters select:focus {
   outline: none;
-  border-color: #d4af37;
+  border-color: var(--gold-primary);
 }
 
 /* Responsive Adjustments for New Features */

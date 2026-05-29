@@ -81,11 +81,12 @@ def login_for_access_token_route(
 ):
     from app.database.mongo_client import get_database
     
-    logger.info(f"Login attempt for username: {form_data.username}")
-    
-    user_dict = db.find_one({"username": form_data.username})
+    username = (form_data.username or "").strip()
+    logger.info("Login attempt for username: %r", username)
+
+    user_dict = db.find_one({"username": username})
     if not user_dict or not verify_password(form_data.password, user_dict["hashed_password"]):
-        logger.warning(f"Failed login attempt for username: {form_data.username}")
+        logger.warning("Failed login attempt for username: %r", username)
         raise ErrorResponses.unauthorized("Incorrect username or password")
     
     user_in_db = UserInDB(**user_dict)
@@ -96,11 +97,18 @@ def login_for_access_token_route(
     # resources during this new session.
     mark_2fa_unverified(user_in_db.username)
 
-    from app.utils.session_utils import get_client_ip, parse_user_agent
+    from app.utils.session_utils import (
+        get_client_ip,
+        parse_user_agent,
+        resolve_geo_location,
+        fingerprint_display,
+    )
     from uuid import uuid4
 
     client_ip = get_client_ip(request)
     device_label = parse_user_agent(request.headers.get("user-agent"))
+    device_fingerprint = (request.headers.get("x-device-fingerprint") or "").strip() or None
+    location_label = resolve_geo_location(client_ip)
 
     try:
         DB = get_database()
@@ -116,8 +124,10 @@ def login_for_access_token_route(
             "_id": session_id,
             "username": user_in_db.username,
             "device": device_label,
-            "location": "Local network",
+            "location": location_label,
             "ip_address": client_ip,
+            "device_fingerprint": device_fingerprint,
+            "device_fingerprint_short": fingerprint_display(device_fingerprint),
             "created_at": datetime.utcnow(),
             "last_active": datetime.utcnow(),
             "is_current": True,
@@ -131,10 +141,14 @@ def login_for_access_token_route(
             "timestamp": datetime.utcnow(),
             "ip": client_ip,
         })
-
-        access_token = create_access_token(data={"sub": user_in_db.username})
-        logger.info(f"User '{form_data.username}' logged in successfully")
-        return Token(access_token=access_token, token_type="bearer")
     except Exception as e:
-        logger.error(f"Login error for '{form_data.username}': {str(e)}")
-        raise ErrorResponses.internal_error("Login failed. Please try again.")
+        # Session/activity tracking must not block authentication
+        logger.warning(
+            "Login session tracking failed for '%s' (continuing): %s",
+            form_data.username,
+            e,
+        )
+
+    access_token = create_access_token(data={"sub": user_in_db.username})
+    logger.info(f"User '{form_data.username}' logged in successfully")
+    return Token(access_token=access_token, token_type="bearer")

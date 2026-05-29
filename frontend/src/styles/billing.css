@@ -6,12 +6,16 @@
   margin: 0 auto;
 }
 
+.billing-page-header {
+  margin-bottom: var(--space-lg);
+}
+
 .billing-header {
-  margin-bottom: 24px;
+  margin-bottom: var(--space-lg);
   display: flex;
   justify-content: space-between;
   align-items: flex-end;
-  gap: 24px;
+  gap: var(--space-md);
   flex-wrap: wrap;
 }
 
@@ -50,7 +54,7 @@
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 16px;
-  margin-bottom: 24px;
+  margin-bottom: var(--space-lg);
 }
 
 .billing-overview-card {
@@ -113,7 +117,7 @@
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 18px;
   padding: 24px;
-  margin-bottom: 24px;
+  margin-bottom: var(--space-lg);
   box-shadow: 0 14px 32px rgba(0, 0, 0, 0.16);
 }
 
@@ -121,7 +125,7 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 24px;
+  margin-bottom: var(--space-md);
 }
 
 .section-header h2 {
@@ -388,8 +392,8 @@
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, var(--gold-primary) 0%, var(--gold-light) 100%);
-  color: #fff;
+  background: linear-gradient(135deg, var(--gold-dark) 0%, var(--gold-primary) 100%);
+  color: var(--bg-base);
   border: none;
   padding: 12px 24px;
   border-radius: 8px;
@@ -899,8 +903,8 @@
 }
 
 .btn-upgrade-plan {
-  background: linear-gradient(135deg, #66ea7e 0%, #4ba276 100%);
-  color: #fff;
+  background: linear-gradient(135deg, var(--success) 0%, #16a34a 100%);
+  color: var(--bg-base);
   flex: 1;
 }
 
@@ -1045,8 +1049,8 @@
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, var(--gold-primary) 0%, var(--gold-light) 100%);
-  color: #fff;
+  background: linear-gradient(135deg, var(--gold-dark) 0%, var(--gold-primary) 100%);
+  color: var(--bg-base);
   padding: 12px 24px;
   border-radius: 8px;
   font-size: 14px;
@@ -1354,8 +1358,8 @@
 }
 
 .btn-upgrade-plan-header {
-  background: linear-gradient(135deg, var(--gold-primary) 0%, var(--gold-light) 100%);
-  color: #fff;
+  background: linear-gradient(135deg, var(--gold-dark) 0%, var(--gold-primary) 100%);
+  color: var(--bg-base);
   padding: 12px 24px;
   border-radius: 8px;
   font-size: 14px;

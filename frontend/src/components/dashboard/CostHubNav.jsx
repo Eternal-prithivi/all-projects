@@ -1,6 +1,7 @@
+import React from 'react';
 import { NavLink } from 'react-router-dom';
 
-/** Shared sub-nav for all /dashboard cost-related pages */
+/** Sub-nav for Cost Analysis hub only — related tools linked from sidebar elsewhere */
 export default function CostHubNav() {
   return (
     <nav className="zenith-cost-hub" aria-label="Cost tools">

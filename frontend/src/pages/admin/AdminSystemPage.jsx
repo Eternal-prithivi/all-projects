@@ -3,6 +3,7 @@ import api from '../../api';
 import { toast } from 'react-toastify';
 import '../../styles/admin-pages.css';
 import { FaServer, FaDatabase, FaCheckCircle, FaExclamationTriangle } from 'react-icons/fa';
+import PageHeader from '../../components/ui/PageHeader.jsx';
 
 const AdminSystemPage = () => {
   const [systemHealth, setSystemHealth] = useState(null);
@@ -42,10 +43,11 @@ const AdminSystemPage = () => {
 
   return (
     <div className="admin-system-page">
-      <div className="admin-page-header">
-        <h1>System Health</h1>
-        <p>Monitor platform infrastructure and database status</p>
-      </div>
+      <PageHeader
+        kicker="Admin"
+        title="System Health"
+        subtitle="Monitor platform infrastructure and database status"
+      />
 
       <div className="health-grid">
         {/* Database Health */}

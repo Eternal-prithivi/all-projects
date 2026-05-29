@@ -41,6 +41,9 @@ import {
   downloadClientCiphertext,
 } from "../api";
 import "../styles/security-page.css";
+import PageHeader from "../components/ui/PageHeader.jsx";
+import EmptyState from "../components/EmptyState.jsx";
+import { IconLock } from "../components/dashboard/Icons.jsx";
 
 // --- MAIN COMPONENT ---
 
@@ -464,6 +467,11 @@ function SecurityPage() {
   // 3. Default return: main security page content (file upload, enable/disable button, file list)
   return (
     <div className="security-page page-container">
+        <PageHeader
+          kicker="Secure vault"
+          title="Security Center"
+          subtitle="Scan, encrypt, and manage sensitive files with SSE-S3 or browser-side encryption."
+        />
         <div className="page-card">
           <div className="page-header-row">
             <div>
@@ -589,6 +597,13 @@ function SecurityPage() {
               {isSyncing ? "Syncing..." : "Sync with Bucket (AWS)"}
             </button>
           </div>
+          {!secureFiles || secureFiles.length === 0 ? (
+            <EmptyState
+              icon={<IconLock aria-hidden="true" />}
+              title="No secure files yet"
+              message="Upload a file to the vault. Sensitive content can be auto-protected with SSE-S3 or browser encryption."
+            />
+          ) : (
           <table className="file-table">
             <thead>
               <tr>
@@ -600,8 +615,7 @@ function SecurityPage() {
               </tr>
             </thead>
             <tbody>
-              {secureFiles && secureFiles.length > 0 ? (
-                secureFiles.map((f) => {
+              {secureFiles.map((f) => {
                   const showEncryptionChoice = f.awaiting_encryption_choice && f.encryption_status === 'awaiting_choice';
                   return (
                     <tr key={f.filename}>
@@ -631,16 +645,10 @@ function SecurityPage() {
                       </td>
                     </tr>
                   );
-                })
-              ) : (
-                <tr>
-                  <td colSpan="5" style={{ textAlign: "center" }}>
-                    No secure files have been uploaded yet.
-                  </td>
-                </tr>
-              )}
+                })}
             </tbody>
           </table>
+          )}
         </div>
         
         {showEncryptPrompt && pendingFileMeta && (

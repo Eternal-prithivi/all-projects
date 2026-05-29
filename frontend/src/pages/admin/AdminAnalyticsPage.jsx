@@ -4,6 +4,7 @@ import { toast } from 'react-toastify';
 import '../../styles/admin-pages.css';
 import { FaChartLine, FaUsers, FaServer, FaDollarSign, FaFileDownload, FaFilePdf } from 'react-icons/fa';
 import { exportToCSV, prepareAnalyticsForExport, exportAnalyticsToPDF } from '../../utils/exportUtils';
+import PageHeader from '../../components/ui/PageHeader.jsx';
 
 const AdminAnalyticsPage = () => {
   const [loading, setLoading] = useState(true);
@@ -59,12 +60,13 @@ const AdminAnalyticsPage = () => {
 
   return (
     <div className="admin-analytics">
-      <div className="admin-page-header">
-        <div>
-          <h1>Platform Analytics</h1>
-          <p>Detailed insights into platform performance</p>
-        </div>
-        <div style={{ display: 'flex', gap: '10px' }}>
+      <PageHeader
+        className="zenith-page-header--row"
+        kicker="Admin"
+        title="Platform Analytics"
+        subtitle="Detailed insights into platform performance"
+      >
+        <div className="zenith-page-header-actions" style={{ display: 'flex', gap: '10px' }}>
           <button onClick={handleExportCSV} className="btn-export" aria-label="Export analytics data to CSV file">
             <FaFileDownload /> Export CSV
           </button>
@@ -72,7 +74,7 @@ const AdminAnalyticsPage = () => {
             <FaFilePdf /> Export PDF
           </button>
         </div>
-      </div>
+      </PageHeader>
 
       {/* Revenue Trends */}
       <div className="analytics-section">

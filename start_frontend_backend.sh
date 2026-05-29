@@ -1,113 +1,64 @@
 #!/bin/bash
+# Start FastAPI backend + Vite frontend only.
 
-# Colors for output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-CYAN='\033[0;36m'
-NC='\033[0m' # No Color
-GREEN_UL='\033[4;32m'
-RED_UL='\033[4;31m'
+set -e
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/scripts/dev-common.sh"
 
-PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-BACKEND_DIR="$PROJECT_ROOT/backend"
-FRONTEND_DIR="$PROJECT_ROOT/frontend"
-VENV_DIR="$PROJECT_ROOT/venv"
-UVICORN_BIN="$VENV_DIR/bin/uvicorn"
-LOG_DIR="$PROJECT_ROOT/logs"
-mkdir -p "$LOG_DIR"
-BACKEND_LOG="$LOG_DIR/backend.log"
-FRONTEND_LOG="$LOG_DIR/frontend.log"
-> "$BACKEND_LOG"
-> "$FRONTEND_LOG"
+BACKEND_PID=""
+FRONTEND_PID=""
 
-tail_with_prefix() {
-    local log_file=$1
-    local prefix=$2
-    local color=$3
-    tail -f "$log_file" 2>/dev/null | while IFS= read -r line; do
-        echo -e "${color}[${prefix}]${NC} $line"
-    done &
-}
-
-stop_pid() {
-    local pid="${1:-}"
-    if [ -n "$pid" ]; then
-        kill "$pid" 2>/dev/null || true
-    fi
-}
+zenith_init_logs
+BACKEND_LOG="${LOG_DIR}/backend.log"
+FRONTEND_LOG="${LOG_DIR}/frontend.log"
+: > "$BACKEND_LOG"
+: > "$FRONTEND_LOG"
 
 cleanup() {
-    local status=$?
-    trap - SIGINT SIGTERM EXIT
-    echo -e "\n${RED}🛑 Shutting down frontend and backend...${NC}"
-    pkill -P $$ 2>/dev/null || true
-    echo -e "${YELLOW}Stopping Backend API...${NC}"
-    stop_pid "$BACKEND_PID"
-    echo -e "${YELLOW}Stopping Frontend...${NC}"
-    stop_pid "$FRONTEND_PID"
-    echo -e "${GREEN_UL}✅ Frontend and Backend stopped${NC}"
-    exit "$status"
+  local status=$?
+  set +e
+  trap - SIGINT SIGTERM EXIT
+  echo -e "\n${RED}🛑 Shutting down frontend and backend...${NC}"
+  zenith_kill_script_children
+  zenith_stop_pid "$BACKEND_PID"
+  zenith_stop_pid "$FRONTEND_PID"
+  zenith_stop_port "$FRONTEND_PORT"
+  zenith_stop_port "$BACKEND_PORT"
+  echo -e "${GREEN_UL}✅ Frontend and Backend stopped${NC}"
+  exit "$status"
 }
 trap cleanup SIGINT SIGTERM EXIT
 
 echo -e "${CYAN}╔════════════════════════════════════════════════════════════╗${NC}"
-echo -e "${CYAN}║   Cloud Resource Platform - Start Frontend & Backend      ║${NC}"
+echo -e "${CYAN}║   Zenith — Start Frontend & Backend                       ║${NC}"
 echo -e "${CYAN}╚════════════════════════════════════════════════════════════╝${NC}"
 echo ""
-echo -e "${CYAN}🚀 Starting frontend and backend...${NC}"
 
-if [ ! -x "$UVICORN_BIN" ]; then
-    echo -e "${RED_UL}❌ Missing executable: $UVICORN_BIN${NC}"
-    echo -e "${YELLOW}Run: $PROJECT_ROOT/venv/bin/python -m pip install -r $BACKEND_DIR/requirements.txt${NC}"
-    exit 1
-fi
-if ! command -v npm > /dev/null 2>&1; then
-    echo -e "${RED_UL}❌ npm not found. Install Node.js before starting the frontend.${NC}"
-    exit 1
-fi
+zenith_ensure_python_tooling
+zenith_ensure_npm
 
-# Start Backend API
-cd "$BACKEND_DIR"
-echo -e "${GREEN}[1/2] Starting Backend API (port 8000)...${NC}"
-"$UVICORN_BIN" app.main:app --reload > "$BACKEND_LOG" 2>&1 &
+echo -e "${GREEN}[1/2] Starting Backend API (port ${BACKEND_PORT})...${NC}"
+(cd "$BACKEND_DIR" && "$UVICORN_BIN" app.main:app --reload --port "$BACKEND_PORT") >"$BACKEND_LOG" 2>&1 &
 BACKEND_PID=$!
-sleep 2
-if ps -p $BACKEND_PID > /dev/null; then
-    echo -e "${GREEN_UL}✅ Backend API started (PID: $BACKEND_PID)${NC}"
-else
-    echo -e "${RED_UL}❌ Backend API failed to start. Check logs: $BACKEND_LOG${NC}"
-    exit 1
-fi
+zenith_wait_for_service "$BACKEND_PID" "$BACKEND_LOG" "Backend API" || exit 1
+echo -e "${GREEN_UL}✅ Backend API started (PID: ${BACKEND_PID})${NC}"
 
-# Start Frontend
-cd "$FRONTEND_DIR"
-echo -e "${GREEN}[2/2] Starting Frontend (port 5173)...${NC}"
-npm run dev -- --port 5173 --strictPort > "$FRONTEND_LOG" 2>&1 &
+echo -e "${GREEN}[2/2] Starting Frontend (port ${FRONTEND_PORT})...${NC}"
+(cd "$FRONTEND_DIR" && npm run dev -- --port "$FRONTEND_PORT" --strictPort) >"$FRONTEND_LOG" 2>&1 &
 FRONTEND_PID=$!
 sleep 3
-if ps -p $FRONTEND_PID > /dev/null; then
-    echo -e "${GREEN_UL}✅ Frontend started (PID: $FRONTEND_PID)${NC}"
-else
-    echo -e "${RED_UL}❌ Frontend failed to start. Check logs: $FRONTEND_LOG${NC}"
-    exit 1
+if ! zenith_process_running "$FRONTEND_PID" && ! zenith_port_in_use "$FRONTEND_PORT"; then
+  echo -e "${RED_UL}❌ Frontend failed to start. Check logs: ${FRONTEND_LOG}${NC}"
+  exit 1
 fi
+echo -e "${GREEN_UL}✅ Frontend started (port ${FRONTEND_PORT})${NC}"
 
 echo ""
-echo -e "${CYAN}╔════════════════════════════════════════════════════════════╗${NC}"
-echo -e "${CYAN}║   Frontend & Backend Started Successfully! 🎉             ║${NC}"
-echo -e "${CYAN}╚════════════════════════════════════════════════════════════╝${NC}"
+echo -e "${CYAN}Backend:  http://localhost:${BACKEND_PORT}${NC}"
+echo -e "${CYAN}Frontend: http://localhost:${FRONTEND_PORT}${NC}"
+echo -e "${GREEN}📊 Live Logs (Ctrl+C to stop):${NC}"
 echo ""
-echo -e "${CYAN}Backend URL:  ${NC}http://localhost:8000"
-echo -e "${CYAN}Frontend URL: ${NC}http://localhost:5173"
-echo -e "${CYAN}Log Files:    ${NC}$BACKEND_LOG, $FRONTEND_LOG"
-echo -e "${CYAN}Process IDs:  ${NC}$BACKEND_PID (backend), $FRONTEND_PID (frontend)"
-echo ""
-echo -e "${CYAN}═══════════════════════════════════════════════════════════${NC}"
-echo -e "${GREEN}📊 Live Logs (Ctrl+C to stop both):${NC}"
-echo -e "${CYAN}═══════════════════════════════════════════════════════════${NC}"
-echo ""
-tail_with_prefix "$BACKEND_LOG" "BACKEND" "$BLUE"
-tail_with_prefix "$FRONTEND_LOG" "FRONTEND" "$CYAN"
+
+zenith_tail_with_prefix "$BACKEND_LOG" "BACKEND" "$BLUE" 1
+zenith_tail_with_prefix "$FRONTEND_LOG" "FRONTEND" "$CYAN" 0
+
 wait
