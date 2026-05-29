@@ -246,6 +246,14 @@ def write_tfvars(workspace_dir: str, config: dict[str, Any]) -> str:
 
     Returns the path to the written file.
     """
+    from app.provision.config_normalize import normalize_provision_config
+
+    try:
+        normalize_provision_config(config)
+    except ValueError:
+        pass  # routes should have validated already
+
+    bucket_name = (config.get("bucket_name") or "").strip()
     lines: list[str] = [
         f'aws_region = "{config.get("aws_region", "ap-south-1")}"',
         "",
@@ -260,7 +268,7 @@ def write_tfvars(workspace_dir: str, config: dict[str, Any]) -> str:
         f'instance_type = "{config.get("instance_type", "t2.micro")}"',
         f'instance_name = "{config.get("instance_name", "main-instance")}"',
         f'ami_id        = "{config.get("ami_id", "")}"',
-        f'bucket_name   = "{config.get("bucket_name", "")}"',
+        f'bucket_name   = "{bucket_name}"',
         f'dynamodb_table_name = "{config.get("dynamodb_table_name", "")}"',
         f'role_name     = "{config.get("role_name", "app-role")}"',
         f'alarm_email   = "{config.get("alarm_email", "")}"',

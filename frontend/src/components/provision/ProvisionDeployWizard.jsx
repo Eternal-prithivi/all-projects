@@ -361,8 +361,17 @@ export default function ProvisionDeployWizard({ userPermissions, terraformOk, on
                   type="text"
                   value={config.bucket_name}
                   onChange={e => updateConfig('bucket_name', e.target.value)}
-                  placeholder="zenith-my-bucket-2026"
+                  onBlur={e => {
+                    const sanitized = e.target.value.trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9.-]/g, '').replace(/-+/g, '-').replace(/^[-.]+|[-.]+$/g, '').slice(0, 63);
+                    if (sanitized !== config.bucket_name) {
+                      updateConfig('bucket_name', sanitized);
+                    }
+                  }}
+                  placeholder="my-testing-bucket-for-zenith"
+                  pattern="[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]"
+                  title="Lowercase letters, numbers, dots, and hyphens only (3–63 characters)"
                 />
+                <p className="config-field-hint">Use lowercase only — no spaces or uppercase (e.g. my-zenith-bucket-2026).</p>
               </div>
             )}
 

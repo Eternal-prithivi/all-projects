@@ -12,7 +12,9 @@ from datetime import datetime
 from enum import Enum
 from typing import Any, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+
+from app.provision.config_normalize import sanitize_s3_bucket_name
 
 
 class ProvisionTemplate(str, Enum):
@@ -73,6 +75,13 @@ class ProvisionConfig(BaseModel):
 
     # S3 config
     bucket_name: str = ""
+
+    @field_validator("bucket_name", mode="before")
+    @classmethod
+    def _sanitize_bucket_name(cls, value: object) -> str:
+        if value is None:
+            return ""
+        return sanitize_s3_bucket_name(str(value))
 
     # IAM config
     role_name: str = "app-role"

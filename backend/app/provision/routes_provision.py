@@ -54,6 +54,7 @@ from app.provision.terraform_runner import (
     write_tfvars,
     get_terraform_version,
 )
+from app.provision.config_normalize import normalize_provision_config
 from app.provision.policy_checker import full_policy_check, get_yaml_rules
 from app.provision.cost_estimator import estimate_cost
 from app.provision.drift_detector import detect_drift, remediate_drift
@@ -205,7 +206,7 @@ async def run_policy_check(
     """Run policy engine against a config WITHOUT deploying."""
     _enforce_permission(user, ProvisionAction.PLAN)
     config_dict = config.model_dump()
-    _apply_template_defaults(config_dict)
+    _prepare_provision_config(config_dict)
     result = full_policy_check(config_dict, include_opa=False)
     return result.model_dump()
 
@@ -218,7 +219,7 @@ async def run_cost_estimate(
     """Get cost estimation for a given config (instant lookup table)."""
     _enforce_permission(user, ProvisionAction.PLAN)
     config_dict = config.model_dump()
-    _apply_template_defaults(config_dict)
+    _prepare_provision_config(config_dict)
     result = estimate_cost(config_dict, use_infracost=False)
     return result.model_dump()
 
@@ -241,7 +242,7 @@ async def run_plan(
         raise HTTPException(status_code=503, detail="Terraform CLI is not installed on this server.")
 
     config_dict = config.model_dump()
-    _apply_template_defaults(config_dict)
+    _prepare_provision_config(config_dict)
 
     # Step 1–2: Fast review (YAML policies + lookup table; no OPA/Infracost yet)
     policy_result = full_policy_check(config_dict, include_opa=False)
@@ -672,6 +673,15 @@ def _apply_template_defaults(config: dict) -> None:
             for flag, value in tmpl["services"].items():
                 config[flag] = value
             break
+
+
+def _prepare_provision_config(config: dict) -> None:
+    """Template defaults + validated resource names for Terraform."""
+    _apply_template_defaults(config)
+    try:
+        normalize_provision_config(config)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
 
 
 def _save_deployment(
