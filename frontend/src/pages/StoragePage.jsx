@@ -434,7 +434,7 @@ function StoragePage() {
           <div className="modal-content">
             <p>Are you sure you want to delete '{fileToDelete}'?</p>
             <div className="modal-buttons">
-              <button onClick={confirmDelete} className="modal-btn confirm">
+              <button onClick={confirmDelete} className="modal-btn danger">
                 Yes, Delete
               </button>
               <button

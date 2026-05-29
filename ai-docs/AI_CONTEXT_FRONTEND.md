@@ -57,7 +57,7 @@ For backend context → read `AI_CONTEXT_BACKEND.md`
 | `/dashboard/pricing` | `PricingPage.jsx` | |
 | `/dashboard/storage` | `StoragePage.jsx` | Uses `AuthContext` — tanjiro mock removed ✅ |
 | `/dashboard/vmcluster` | `VMClusterPage.jsx` | |
-| `/dashboard/security` | `SecurityPage.jsx` | ⚠️ Uses own inline `fetch()` — intentional, do NOT refactor |
+| `/dashboard/security` | `SecurityPage.jsx` | 2FA vault + `syncAwsSecureBucket()` via `api.js` named exports |
 | `/dashboard/security-settings` | `SecuritySettingsPage.jsx` | |
 | `/dashboard/profile` | `ProfilePage.jsx` | |
 | `/dashboard/settings` | `SettingsPage.jsx` | Includes "Restart Tour" in Preferences |
@@ -179,9 +179,9 @@ function MyPage() {
 ```
 `api.js` automatically adds `Authorization: Bearer <token>` header via interceptor.
 
-### SecurityPage Exception
-`SecurityPage.jsx` uses its own inline `fetch()` with manual auth headers.
-This is intentional — **do not refactor it** unless user explicitly requests.
+### SecurityPage Pattern
+`SecurityPage.jsx` imports named helpers from `api.js` (including `syncAwsSecureBucket`) and uses inline `<style>` for page layout.
+Do not refactor to a shared CSS file unless the user explicitly requests it.
 
 ### New Page Checklist
 1. Create `frontend/src/pages/MyNewPage.jsx`
@@ -198,7 +198,7 @@ This is intentional — **do not refactor it** unless user explicitly requests.
 
 | Issue | Location | Status |
 |-------|----------|--------|
-| `SecurityPage.jsx` inline `fetch()` | `pages/SecurityPage.jsx` | Intentional — do NOT change |
+| `SecurityPage.jsx` inline `<style>` block | `pages/SecurityPage.jsx` | Intentional page-scoped CSS — do NOT extract without request |
 | `settings.css` partially upgraded | `styles/settings.css` | Rest needs audit |
 | `billing.css` not audited | `styles/billing.css` | May have old hardcoded colors |
 | `costanalysis.css` partially upgraded | `styles/costanalysis.css` | Deeper table/report styling needs work |

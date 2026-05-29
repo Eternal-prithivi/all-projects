@@ -7,7 +7,7 @@
 # DEPENDS ON:  auth_utils.require_2fa() (NOT get_current_user — 2FA required)
 #              encryption_handler.py (AES-256 client-side), boto3 (SSE server-side)
 # MOUNTED AT:  /api/security → upload-secure, list-secure, choose-encryption,
-#              download/{filename}, decrypt-download, delete/{filename}
+#              download/{filename}, decrypt-download, delete/{filename}, sync/aws
 # DO NOT:
 #   - Swap require_2fa() for get_current_user() — this vault needs 2FA verified
 #   - Change the two-step upload flow (scan → await choice → encrypt → S3)
@@ -29,6 +29,7 @@ from app.auth.auth_utils import require_2fa
 from app.users.user_model import UserInDB
 from app.database.mongo_client import mongodb_client
 from app.storage.models_storage import FileMetadata
+from app.storage.manager import list_objects_aws
 from app.storage.tasks import apply_encryption_to_file
 from app.security.encryption_handler import (
     decrypt_file_client_side,
@@ -70,6 +71,133 @@ class EncryptionChoiceRequest(BaseModel):
 class DecryptionRequest(BaseModel):
     filename: str
     password: str  # User's password for decryption
+
+
+class SecureSyncResponse(BaseModel):
+    inserted: int
+    already_present: int
+    skipped_non_user_prefix: int
+    total_objects_seen: int
+    bucket_name: str
+    scanned_prefix: str
+
+
+def _encryption_flags_from_s3_head(head: dict) -> dict:
+    """Infer secure-file encryption metadata from S3 object headers."""
+    metadata = head.get("Metadata") or {}
+    if metadata.get("encryption") == "client-side":
+        return {
+            "is_encrypted": True,
+            "encryption_method": "client-side",
+            "encryption_status": "encrypted",
+            "client_side_encrypted": True,
+            "awaiting_encryption_choice": False,
+        }
+    if head.get("ServerSideEncryption"):
+        return {
+            "is_encrypted": True,
+            "encryption_method": "server-side",
+            "encryption_status": "encrypted",
+            "client_side_encrypted": False,
+            "awaiting_encryption_choice": False,
+        }
+    return {
+        "is_encrypted": False,
+        "encryption_method": "none",
+        "encryption_status": "none",
+        "client_side_encrypted": False,
+        "awaiting_encryption_choice": False,
+    }
+
+
+@router.post("/sync/aws", response_model=SecureSyncResponse)
+async def sync_secure_aws_bucket(
+    user: UserInDB = Depends(require_2fa),
+    files_db: Collection = Depends(get_secure_files_collection),
+):
+    """
+    On-demand reconcile of the secure S3 vault into MongoDB (free-tier friendly).
+
+    Scans SECURE_S3_BUCKET_NAME under the user's prefix only. Does not delete DB
+    records or modify S3 objects. New rows inherit encryption flags from S3 headers.
+    """
+    try:
+        bucket_name = settings.SECURE_S3_BUCKET_NAME
+        user_prefix = f"{user.username}/"
+        objects = list_objects_aws(
+            bucket_name=bucket_name,
+            prefix=user_prefix,
+            access_key_id=settings.AWS_ACCESS_KEY_ID,
+            secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
+            region_name=settings.PRIMARY_S3_REGION,
+        )
+
+        inserted = 0
+        already_present = 0
+        skipped_non_user_prefix = 0
+
+        for obj in objects:
+            object_key = obj.get("object_key") or ""
+            if not object_key.startswith(user_prefix):
+                skipped_non_user_prefix += 1
+                continue
+
+            filename = object_key[len(user_prefix) :]
+            if not filename or filename.endswith("/"):
+                continue
+
+            existing = files_db.find_one(
+                {
+                    "owner_username": user.username,
+                    "$or": [{"s3_key": object_key}, {"filename": filename}],
+                },
+                {"_id": 1},
+            )
+            if existing:
+                already_present += 1
+                continue
+
+            encryption_flags = {
+                "is_encrypted": False,
+                "encryption_method": "none",
+                "encryption_status": "none",
+                "client_side_encrypted": False,
+                "awaiting_encryption_choice": False,
+            }
+            try:
+                head = s3_client_primary.head_object(
+                    Bucket=bucket_name, Key=object_key
+                )
+                encryption_flags = _encryption_flags_from_s3_head(head)
+            except Exception:
+                pass
+
+            upload_date = obj.get("last_modified") or datetime.utcnow()
+            doc = {
+                "filename": filename,
+                "s3_key": object_key,
+                "owner_username": user.username,
+                "size_bytes": int(obj.get("size_bytes", 0) or 0),
+                "upload_date": upload_date,
+                "is_sensitive": False,
+                **encryption_flags,
+            }
+            files_db.insert_one(doc)
+            inserted += 1
+
+        return SecureSyncResponse(
+            inserted=inserted,
+            already_present=already_present,
+            skipped_non_user_prefix=skipped_non_user_prefix,
+            total_objects_seen=len(objects),
+            bucket_name=bucket_name,
+            scanned_prefix=user_prefix,
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to sync secure AWS bucket: {str(e)}",
+        )
 
 
 @router.post("/upload-secure", status_code=status.HTTP_200_OK)

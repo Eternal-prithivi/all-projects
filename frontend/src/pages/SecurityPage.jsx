@@ -4,8 +4,8 @@
 // PURPOSE: 2FA management (enable/disable/verify) + secure file vault
 //          (upload with auto sensitive-scan, two-step encryption choice, download, delete)
 // API: Uses functions from ../api.js (status2FA, enable2FA, finalize2FA, verify2FA,
-//      disable2FA, listSecureFiles, deleteSecureFile, uploadSecureFile, chooseEncryption,
-//      decryptAndDownload) — NOT raw fetch() — imports from api.js named exports
+//      disable2FA, listSecureFiles, deleteSecureFile, uploadSecureFile, syncAwsSecureBucket,
+//      chooseEncryption, decryptAndDownload) — NOT raw fetch() — imports from api.js named exports
 // STATE: twoFAStatus, secureFiles (cached in sessionStorage), encryption/decryption modals
 // BACKEND: /api/2fa/*, /api/security/* (require_2fa guard — 2FA must be verified)
 // DO NOT:
@@ -29,6 +29,7 @@ import {
   deleteSecureFile,
   getSecureDownloadUrl,
   uploadSecureFile,
+  syncAwsSecureBucket,
   chooseEncryption,
   decryptAndDownload
 } from "../api";
@@ -41,6 +42,7 @@ function SecurityPage() {
   const [file, setFile] = useState(null);
   const [encrypt, setEncrypt] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
   const [secureFiles, setSecureFiles] = useState(() => {
     try { return JSON.parse(sessionStorage.getItem('cache_secureFiles')) || []; } catch { return []; }
   });
@@ -173,6 +175,25 @@ function SecurityPage() {
     }
   };
   const handleFileChange = (e) => setFile(e.target.files[0]);
+
+  const handleSyncWithSecureBucket = async () => {
+    if (!token || !canAccessSecureArea) return;
+    setIsSyncing(true);
+    try {
+      const result = await syncAwsSecureBucket(token);
+      const scanned = result.scanned_prefix
+        ? `prefix '${result.scanned_prefix}'`
+        : "the secure vault";
+      notifications.success(
+        `Secure sync complete. Added ${result.inserted} new file(s) from AWS after scanning ${scanned}.`
+      );
+      await fetchSecureFiles();
+    } catch (err) {
+      notifications.error(err.detail || err.message || "Secure vault sync failed.");
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
   const handleUpload = async () => {
     if (!file || !token) return;
@@ -326,6 +347,9 @@ function SecurityPage() {
     /* File table styles */
     .files-section { background: var(--content-bg); border: 1px solid var(--border-color); border-radius: 12px; padding: 2rem; margin-top: 2rem; }
     .section-title { font-size: 1.75rem; font-weight: 600; color: #fff; margin-top: 0; margin-bottom: 1.5rem; border-bottom: 1px solid var(--border-color); padding-bottom: 1rem; }
+    .list-header { display: flex; align-items: flex-end; justify-content: space-between; gap: 1rem; flex-wrap: wrap; margin-bottom: 1.5rem; }
+    .list-header .section-title { margin-bottom: 0; flex: 1; min-width: 200px; }
+    .btn.sync-btn { flex-shrink: 0; white-space: nowrap; }
     .file-table { width: 100%; border-collapse: collapse; }
     .file-table thead th { background: #111; color: var(--text-secondary); font-weight: 600; text-align: left; padding: 1rem; border-bottom: 2px solid var(--border-color); text-transform: uppercase; font-size: 0.85rem; letter-spacing: 0.5px; }
     .file-table tbody td { padding: 1rem; border-bottom: 1px solid var(--border-color); color: var(--text-primary); }
@@ -652,7 +676,17 @@ function SecurityPage() {
         </div>
         {/* Secure Files Table */}
         <div className="files-section">
-          <h3 className="section-title">Your Secure Files</h3>
+          <div className="list-header">
+            <h3 className="section-title">Your Secure Files</h3>
+            <button
+              type="button"
+              className="btn sync-btn"
+              onClick={handleSyncWithSecureBucket}
+              disabled={isSyncing}
+            >
+              {isSyncing ? "Syncing..." : "Sync with Bucket (AWS)"}
+            </button>
+          </div>
           <table className="file-table">
             <thead>
               <tr>

@@ -1,7 +1,7 @@
 # PROGRESS.md — Task Tracker (Zenith / CloudResourceOptimizationPlatform)
 
 > Updated at the end of every AI session. Never leave this stale.
-> Last Updated: 2026-05-25 (Antigravity — workflow optimisation session)
+> Last Updated: 2026-05-29 (Phase 12 planning — research paper gap analysis)
 
 ---
 
@@ -38,6 +38,25 @@ What was completed:
 ---
 
 ## 🔴 Active Task
+
+**Phase 12: Security Research Paper Parity (Hybrid Encryption & Threat Detection)**
+
+Status: **NOT STARTED** | Planned: 2026-05-29 | Agent: —
+
+**Scope:** Implement gaps vs `research paper Major 6 pages-2.pdf` — KMS auto-encryption, browser zero-knowledge CSE, full sensitive-data detector, session fingerprint/geo, CRR alignment.  
+**Spec:** `ai-docs/PHASE_12_SECURITY_RESEARCH_PARITY.md` (full checklist E1–E7, D1–D6, A1–A3, S1–S3, R1–R3).  
+**Do NOT touch:** Unrelated ML/storage/terraform modules unless required for security pipeline.  
+**Done when:** Phase 12 done criteria in spec are all checked; demo KMS + CSE samples; pytest detection benchmark passes.
+
+**Prerequisite (complete):** Secure vault AWS sync on Security page (2026-05-29).
+
+---
+
+**Secure vault AWS sync (Security page parity with Storage)** — COMPLETE 2026-05-29
+
+- ✅ `POST /api/security/sync/aws`, `syncAwsSecureBucket()`, Security page sync button
+
+---
 
 **Phase 11b: Terraform Integration — Missing Components (OPA Engine, Drift Remediation, RBAC, Audit Logging)**
 
@@ -308,6 +327,15 @@ Status: **COMPLETE** | Started: 2026-05-25 21:25 IST | Finished: 2026-05-25 21:3
 - [x] Dashboard integration (currency symbol, date format from preferences)
 - [x] Backend endpoint (`GET /settings/preferences-summary`)
 
+### Phase 12: Security Research Paper Parity 🔲 NEXT (see `PHASE_12_SECURITY_RESEARCH_PARITY.md`)
+- [ ] AWS **SSE-KMS** (replace SSE-S3-only); implement `kms_encryption.py`
+- [ ] **Auto-encrypt** sensitive uploads with KMS (paper Table 2 — no forced choice modal for default path)
+- [ ] **Browser zero-knowledge CSE** (Web Crypto; password never sent to server)
+- [ ] `sensitive_file_detector.py` — CC, PII, private IP ranges + benchmark tests (Table 1)
+- [ ] Session **geolocation** + device fingerprint (replace `"Local network"` placeholder)
+- [ ] **S3 CRR** or documented cross-region replica strategy (vs dual `put_object` only)
+- [ ] Security page UI badges (KMS / CSE / None) aligned with Figure 2
+
 ### Phase 4: Remaining Platform Features 🔲 IN PROGRESS
 - [x] **Storage Sync (AWS):** "Sync with Bucket" button — `s3.list_objects_v2()` → reconcile with MongoDB (free-tier friendly, no SNS/SQS).
 - [ ] **Cost Module:** Cost anomaly detection, multi-cloud aggregation, forecasts.
@@ -331,7 +359,7 @@ Status: **COMPLETE** | Started: 2026-05-25 21:25 IST | Finished: 2026-05-25 21:3
 | **§4.1 NLP** (Phase 6) | `workload_description` → cluster + confidence 0–100 | Auto-assign if ≥85%; training samples word_count ≥10; code: `workload_analyzer.py`, logs `ml_workload_descriptions` |
 | **§4.2 Ensemble** (Phase 7) | file metadata → tier + CSP + `expert_votes[]` | Weights 30/35/35; targets 89.3% ensemble; code: `optimizer.py` + `ml/repository.py`, logs `ml_predictions` |
 | **§4.3 Lifecycle** | file inventory → tier transitions | 30d hot→warm, 90d warm→cold, promotion >2 accesses in 5d; code: `tiering_tasks.py` |
-| **§4.4 Security** | — | 2FA vault, sessions, audit log — largely done |
+| **§4.4 Security** | — | 2FA + vault UI exist; **Phase 12** required for paper parity (KMS auto-encrypt, browser CSE, detector, geo) — see `PHASE_12_SECURITY_RESEARCH_PARITY.md` |
 | **§4.5 Feedback** (Phase 8) | predictions → outcome | Eval 7–30d; feedback_score ≥0.5; deploy if +1% abs or +2% rel gain |
 
 **ML code paths:** `backend/app/ml/models.py`, `acceptance.py`, `repository.py` · **Collections:** `ml_predictions`, `ml_workload_descriptions`
@@ -381,7 +409,7 @@ Status: **COMPLETE** | Started: 2026-05-25 21:25 IST | Finished: 2026-05-25 21:3
 | Storage | Rule-based file analysis (scoring → tier + CSP) | ✅ Code exists | `storage/optimizer.py` |
 | Storage | Multi-cloud upload (AWS, GCP, Azure) | ✅ Code exists | `storage/uploader.py` |
 | Storage | File listing, download, delete | ✅ Code exists | `storage/routes_storage.py`, `storage/manager.py` |
-| Security | Secure file upload (2FA + scan + encrypt + replicate) | ✅ Code exists | `security/routes_security.py`, `storage/tasks.py` |
+| Security | Secure vault UI + 2FA + partial encrypt/scan/replicate/sync | ⚠️ Partial — **Phase 12** for paper parity (KMS, browser CSE, detector) | `security/routes_security.py`, `PHASE_12_SECURITY_RESEARCH_PARITY.md` |
 | Celery | process_secure_file + nightly tiering | ✅ Code exists | `storage/tasks.py`, `storage/tiering_tasks.py` |
 | WebSocket | Real-time notifications | ✅ Code exists | `websockets/routes_ws.py` |
 | Config | pydantic_settings + MongoDB client | ✅ Code exists | `utils/config.py`, `database/mongo_client.py` |

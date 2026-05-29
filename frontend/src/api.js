@@ -4,7 +4,8 @@
 //   - apiClient: Axios instance with base URL + Authorization interceptor (auto-attaches token)
 //   - Named exports for every API call: listFiles, getDownloadUrl, deleteFile, uploadFile,
 //     syncAwsBucket, getCurrentUser, status2FA, enable2FA, finalize2FA, verify2FA, disable2FA,
-//     listSecureFiles, deleteSecureFile, uploadSecureFile, chooseEncryption, decryptAndDownload, etc.
+//     listSecureFiles, deleteSecureFile, uploadSecureFile, syncAwsSecureBucket,
+//     chooseEncryption, decryptAndDownload, etc.
 // BASE URL: http://localhost:8000 (dev) | https://zenith-backend-707i.onrender.com (prod)
 // USED BY: Every page component — import { functionName } from '../api'
 // EXCEPTIONS:
@@ -238,6 +239,19 @@ export const deleteSecureFile = async (filename, token) => {
     await apiClient.delete(`/security/delete/${filename}`, {
       headers: { Authorization: `Bearer ${token}` },
     });
+  } catch (error) {
+    throw error.response?.data || error;
+  }
+};
+
+export const syncAwsSecureBucket = async (token) => {
+  try {
+    const response = await apiClient.post(
+      "/security/sync/aws",
+      {},
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    return response.data;
   } catch (error) {
     throw error.response?.data || error;
   }

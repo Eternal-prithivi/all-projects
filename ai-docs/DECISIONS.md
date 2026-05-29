@@ -24,7 +24,8 @@
 | Structural backend changes? | Controller → Service → DB pattern — match existing modules | DEC-001 |
 | Deploying to production? | Not yet — restrict CORS first, rotate `.env` credentials | DEC-006 |
 | Renaming "Zenith" or changing branding? | DON'T — 2FA issuer, API title, sidebar all use "Zenith"/"ZenithApp" | DEC-010 |
-| Working on SecurityPage.jsx? | It intentionally uses inline `fetch()` — do NOT refactor to `api.js` unless user asks | DEC-018 |
+| Working on SecurityPage.jsx? | Uses `api.js` named exports + inline `<style>`; Phase 12 encryption work per research paper | DEC-018, DEC-020 |
+| Security encryption (paper vs code)? | Phase 12: KMS auto-encrypt + browser CSE — see `PHASE_12_SECURITY_RESEARCH_PARITY.md` | DEC-020 |
 | Adding/modifying provisioning? | Terraform modules in `backend/terraform/`, API in `app/provision/`, BYOC credentials for AWS auth | DEC-019 |
 
 ---
@@ -194,3 +195,13 @@
 - **Dependencies**: Terraform CLI (checked on server startup — returns 503 if missing). Infracost CLI (optional — falls back to built-in lookup table). OPA CLI (optional — YAML rules run regardless).
 - **Consequences**: The original `aws-provision-using-terraform` project remains standalone. The Terraform files inside Zenith are a copy, not a submodule. Policy rules can be independently updated. The provisioning page is at `/dashboard/provision`.
 - **DO NOT**: Run `terraform apply` without a prior successful policy check. Do NOT store AWS credentials in MongoDB — they're resolved per-request via BYOC and passed as env vars.
+
+---
+
+### [DEC-020] Phase 12 — Security Research Paper as Acceptance Source
+- **Date**: 2026-05-29
+- **Status**: Planned (not implemented)
+- **Context**: The 6-page research paper (`research paper Major 6 pages-2.pdf`) describes hybrid encryption (SSE-KMS + zero-knowledge CSE), automated sensitive-data detection, CRR, and session fingerprinting. The live Security page implements a **subset**: choice modal, SSE-S3 (`AES256`), server-side PBKDF2+CSE (password on wire), basic regex scan, dual-bucket upload. Empty stubs: `kms_encryption.py`, `sensitive_file_detector.py`.
+- **Decision**: **Phase 12** is the next implementation phase. Acceptance criteria live in `ai-docs/PHASE_12_SECURITY_RESEARCH_PARITY.md`. Do not mark §4.4 Security “complete” in PROGRESS until Phase 12 done criteria are met.
+- **Consequences**: New security work must align with paper Tables 1–2 and Figure 2 (auto KMS on detection, optional CSE in browser). Free-tier KMS and CRR constraints apply (`AI_RULES.md`).
+- **DO NOT**: Claim zero-knowledge CSE while encrypting on the server with a plaintext password. Do not document “KMS” while only using SSE-S3.

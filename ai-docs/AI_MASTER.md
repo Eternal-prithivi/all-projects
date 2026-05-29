@@ -132,10 +132,10 @@ git push origin stage
 | Cloud Targets | AWS (primary), GCP, Azure — multi-cloud storage + compute          |
 | Database      | MongoDB Atlas (`CloudResourceOptimizationDB`)                      |
 | Task Queue    | Celery + CloudAMQP (RabbitMQ)                                     |
-| Phase         | **PHASE 11 COMPLETE** — Terraform infrastructure provisioning integration (7 AWS modules, policy engine, drift detection, 4-step wizard). |
+| Phase         | **PHASE 11 COMPLETE** — Terraform provisioning. **NEXT: PHASE 12** — Security research paper parity (hybrid KMS/CSE encryption, detection, session audit). See `ai-docs/PHASE_12_SECURITY_RESEARCH_PARITY.md`. |
 | Budget        | **ZERO-COST** — Student project. Free-tier only. See `AI_RULES.md` for details. |
-| Reference Doc | `Major Project latest22- Report-5.pdf` (97-page report describes full intended system) |
-| Last Updated  | 2026-05-25                                                        |
+| Reference Doc | `Major Project latest22- Report-5.pdf` (full system); `research paper Major 6 pages-2.pdf` (security architecture — Phase 12 source of truth) |
+| Last Updated  | 2026-05-29                                                        |
 
 ### Quick Tech Facts
 - **Frontend:** React 19 + Vite 7, 60+ pages, glassmorphic Mission Control dashboard
@@ -191,7 +191,9 @@ All AI context files live in the **`ai-docs/`** folder at the project root:
 | `ai-docs/AUDIT_LOG.md`             | Per-session activity log (append-only, immutable) |
 | `ai-docs/DECISIONS.md`             | Architecture decisions — Before You Code checklist at top |
 | `ai-docs/DESIGN_SYSTEM.md`         | Styling rules, design tokens, Mission Control layout — read before any UI work |
+| `ai-docs/PHASE_12_SECURITY_RESEARCH_PARITY.md` | **Next phase** — security paper gaps (KMS, browser CSE, detection, CRR, session geo) |
 | `Major Project latest22- Report-5.pdf` | Full project report (97 pages) — stays in project root |
+| `research paper Major 6 pages-2.pdf` | 6-page security research paper — Phase 12 acceptance criteria |
 
 ---
 

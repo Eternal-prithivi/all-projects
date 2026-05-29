@@ -23,6 +23,37 @@ Notes: [anything important for the next agent]
 ## Session Log (2026-05-25 onwards)
 
 ---
+SESSION_ID: 20260529-140000
+Date: 2026-05-29
+Agent: Cursor Auto
+Task: Phase 12 planning — research paper vs Security page gap analysis
+Changes:
+  - ai-docs/PHASE_12_SECURITY_RESEARCH_PARITY.md — created (full gap list, done criteria, file map)
+  - ai-docs/AI_MASTER.md — Phase 12 as next; research paper reference added
+  - ai-docs/PROGRESS.md — Active task = Phase 12 NOT STARTED; §4.4 corrected; Phase 12 backlog section
+  - ai-docs/AI_CONTEXT_BACKEND.md — security stubs + encryption accuracy notes
+  - ai-docs/SCRATCHPAD.md — resume state points to Phase 12
+Outcome: Done (planning); implementation pending Phase 12
+Notes: Paper requires KMS+GCM auto path and browser CSE; code uses SSE-S3 and server-side CSE with password on wire. kms_encryption.py and sensitive_file_detector.py are empty.
+---
+
+---
+SESSION_ID: 20260529-120000
+Date: 2026-05-29
+Agent: Cursor Auto
+Task: Secure vault AWS sync on Security page (parity with Storage sync)
+Changes:
+  - backend/app/security/routes_security.py — POST /sync/aws, SecureSyncResponse, S3 head encryption inference
+  - frontend/src/api.js — syncAwsSecureBucket()
+  - frontend/src/pages/SecurityPage.jsx — sync button, handler, list-header layout
+  - ai-docs/AI_CONTEXT_BACKEND.md — security sync/aws route + flow
+  - ai-docs/AI_CONTEXT_FRONTEND.md — SecurityPage api.js pattern corrected
+  - ai-docs/PROGRESS.md, SCRATCHPAD.md — task marked complete
+Outcome: Done
+Notes: Requires 2FA verified (require_2fa). Scans SECURE_S3_BUCKET_NAME only; does not delete DB rows.
+---
+
+---
 SESSION_ID: 20260525-000001
 Date: 2026-05-25
 Agent: GitHub Copilot (GPT-5.4 mini)
