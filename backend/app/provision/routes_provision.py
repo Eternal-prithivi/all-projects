@@ -85,21 +85,9 @@ def _resolve_byoc_credentials(user: Any, region: str = "ap-south-1") -> dict:
     Returns dict with AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, etc.
     Returns empty dict if BYOC is not configured.
     """
-    try:
-        from app.byoc.credential_resolver import resolve_credentials
-        creds = resolve_credentials(user.username, provider="aws")
-        if creds:
-            result = {
-                "AWS_ACCESS_KEY_ID": creds.get("access_key_id", ""),
-                "AWS_SECRET_ACCESS_KEY": creds.get("secret_access_key", ""),
-                "AWS_DEFAULT_REGION": region,
-            }
-            if creds.get("session_token"):
-                result["AWS_SESSION_TOKEN"] = creds["session_token"]
-            return result
-    except Exception as e:
-        logger.warning(f"BYOC credential resolution failed for {user.username}: {e}")
-    return {}
+    from app.provision.byoc_credentials import resolve_byoc_terraform_env
+
+    return resolve_byoc_terraform_env(user.username, region)
 
 
 def _get_deployments_collection():

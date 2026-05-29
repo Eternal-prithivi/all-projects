@@ -180,6 +180,24 @@ def resolve_azure_credentials(username: str) -> Dict[str, str]:
     }
 
 
+def resolve_credentials(username: str, provider: str = "aws") -> Optional[Dict[str, Any]]:
+    """
+    Resolve credentials for infrastructure provisioning (Terraform subprocess).
+
+    Returns None when BYOC is not configured for the provider. Does not include
+    platform fallback credentials — callers may use server env when this returns None.
+    """
+    if provider.lower() != "aws":
+        return None
+    from app.provision.byoc_credentials import (
+        resolve_byoc_terraform_env,
+        terraform_env_to_api_credentials,
+    )
+
+    env = resolve_byoc_terraform_env(username)
+    return terraform_env_to_api_credentials(env)
+
+
 def get_byoc_status(username: str) -> Dict[str, Any]:
     """
     Get BYOC status for all CSPs for a user.

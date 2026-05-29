@@ -23,6 +23,19 @@ Notes: [one line optional]
 ## Session Log (recent only)
 
 ---
+SESSION_ID: 20260529-260000
+Date: 2026-05-29
+Agent: Cursor Composer
+Task: Phase 14b — Provision P0 implementation
+Changes:
+  - byoc_credentials.py + BYOC-gated scheduled drift in tasks.py
+  - 21 provision unit tests (67 pytest total)
+  - CI terraform-validate job; provision.css design tokens
+Outcome: Done
+Notes: resolve_credentials() added; pushed stage
+---
+
+---
 SESSION_ID: 20260529-250000
 Date: 2026-05-29
 Agent: Cursor Composer

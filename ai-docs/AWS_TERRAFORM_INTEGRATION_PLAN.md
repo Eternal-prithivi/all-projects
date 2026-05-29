@@ -156,7 +156,7 @@ flowchart LR
 | Phase | Scope | Est. effort |
 |-------|--------|-------------|
 | **14a** (this doc) | Feasibility + adopt/skip matrix | ✅ Done |
-| **14b** | P0: tests + BYOC drift + validate CI | 2–3 days |
+| **14b** | P0: tests + BYOC drift + validate CI | ✅ Complete 2026-05-29 |
 | **14c** | P1: audit/RBAC UI + drift panel + PageHeader | 2–3 days |
 | **14d** | P1: cost/VM linkage after deploy | 3–5 days |
 | **14e** | P2: SSE stream, alerts | optional |

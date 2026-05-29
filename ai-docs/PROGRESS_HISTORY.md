@@ -7,6 +7,17 @@
 
 ---
 
+**Phase 14b: Provision P0 (tests, BYOC drift, CI validate)** — COMPLETE 2026-05-29
+
+- ✅ `app/provision/byoc_credentials.py` — BYOC-only Terraform env (no platform fallback for scheduled drift)
+- ✅ `tasks.py` — scheduled drift resolves owner `user_id` BYOC; skips with audit record when missing
+- ✅ `credential_resolver.resolve_credentials()` — fixed missing symbol for provision routes
+- ✅ Tests: `test_provision_policy`, `_cost`, `_rbac`, `_tasks`, `_terraform`, `_byoc` (21 tests; 67 total)
+- ✅ CI: `terraform-validate` job (`init -backend=false` + `validate`)
+- ✅ `provision.css` — `--gold-primary`, `--bg-elevated`, `--border-subtle` tokens
+
+---
+
 **Phase 14: AWS Terraform integration feasibility plan** — COMPLETE 2026-05-29
 
 - Audited Zenith (`backend/terraform/`, `app/provision/`, `ProvisionPage.jsx`) vs standalone `aws using terraform` (Phases 1–16, 308 tests, Next.js ops UI).

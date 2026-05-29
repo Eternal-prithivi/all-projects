@@ -12,7 +12,7 @@
 //   - Remove cost estimation — users need to know charges before deploying
 //   - Skip the plan step — always preview before applying
 // =============================================================================
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import api from '../api';
 import '../styles/provision.css';
 import PageHeader from '../components/ui/PageHeader.jsx';

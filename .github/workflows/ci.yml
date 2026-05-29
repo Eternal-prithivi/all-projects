@@ -26,6 +26,21 @@ jobs:
       - name: Pytest
         run: python -m pytest -q
 
+  terraform-validate:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend/terraform
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.10.0"
+      - name: Terraform init (local backend for CI)
+        run: terraform init -backend=false
+      - name: Terraform validate
+        run: terraform validate
+
   frontend:
     runs-on: ubuntu-latest
     defaults:

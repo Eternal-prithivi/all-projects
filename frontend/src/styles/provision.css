@@ -41,8 +41,8 @@
   gap: 1rem;
   margin-bottom: 2rem;
   padding: 0.75rem 1.25rem;
-  background: rgba(255,255,255,0.04);
-  border: 1px solid rgba(255,255,255,0.08);
+  background: var(--bg-elevated, rgba(255,255,255,0.04));
+  border: 1px solid var(--border-subtle, rgba(255,255,255,0.08));
   border-radius: 12px;
   font-size: 0.85rem;
   color: var(--text-secondary, rgba(255,255,255,0.6));
@@ -55,8 +55,8 @@
   flex-shrink: 0;
 }
 
-.provision-status-bar .status-dot.online { background: #27ae60; box-shadow: 0 0 6px rgba(39,174,96,0.5); }
-.provision-status-bar .status-dot.offline { background: #e74c3c; box-shadow: 0 0 6px rgba(231,76,60,0.5); }
+.provision-status-bar .status-dot.online { background: var(--success, #27ae60); box-shadow: 0 0 6px rgba(39,174,96,0.5); }
+.provision-status-bar .status-dot.offline { background: var(--danger, #e74c3c); box-shadow: 0 0 6px rgba(231,76,60,0.5); }
 
 /* ── Wizard Steps ── */
 .wizard-steps {
@@ -65,8 +65,8 @@
   gap: 0;
   margin-bottom: 2rem;
   padding: 1rem 1.5rem;
-  background: rgba(255,255,255,0.03);
-  border: 1px solid rgba(255,255,255,0.06);
+  background: var(--bg-elevated, rgba(255,255,255,0.03));
+  border: 1px solid var(--border-subtle, rgba(255,255,255,0.06));
   border-radius: 14px;
 }
 
@@ -171,7 +171,7 @@
 .template-card:hover::before { opacity: 1; }
 
 .template-card.selected {
-  border-color: #D4A843;
+  border-color: var(--gold-primary, #D4A843);
   background: rgba(212,168,67,0.08);
   box-shadow: 0 0 20px rgba(212,168,67,0.15);
 }
@@ -186,7 +186,7 @@
   font-size: 1.5rem;
   margin-bottom: 1rem;
   background: rgba(212,168,67,0.1);
-  color: #D4A843;
+  color: var(--gold-primary, #D4A843);
 }
 
 .template-card h3 {
@@ -254,7 +254,7 @@
 }
 
 .module-toggle.enabled .module-toggle-switch {
-  background: #D4A843;
+  background: var(--gold-primary, #D4A843);
 }
 
 .module-toggle-switch::after {
@@ -321,7 +321,7 @@
 
 .config-field input:focus,
 .config-field select:focus {
-  border-color: #D4A843;
+  border-color: var(--gold-primary, #D4A843);
   box-shadow: 0 0 0 3px rgba(212,168,67,0.15);
 }
 
@@ -498,7 +498,7 @@
 }
 
 .btn-provision.primary {
-  background: linear-gradient(135deg, #D4A843, #b8912e);
+  background: linear-gradient(135deg, var(--gold-primary, #D4A843), var(--gold-dark, #b8912e));
   color: #000;
   box-shadow: 0 4px 14px rgba(212,168,67,0.3);
 }
@@ -627,7 +627,7 @@
   width: 20px;
   height: 20px;
   border: 2px solid rgba(255,255,255,0.15);
-  border-top-color: #D4A843;
+  border-top-color: var(--gold-primary, #D4A843);
   border-radius: 50%;
   animation: provisionSpin 0.8s linear infinite;
 }
