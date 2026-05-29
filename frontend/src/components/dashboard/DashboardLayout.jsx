@@ -23,6 +23,7 @@ import QuickActions from "../QuickActions.jsx";
 import KeyboardShortcuts from "../KeyboardShortcuts.jsx";
 import GlobalSearch from "../GlobalSearch.jsx";
 import OnboardingTour from "../OnboardingTour.jsx";
+import { useTheme } from "../../context/ThemeContext.jsx";
 import "../../styles/dashboard.css";
 import "../../styles/cards.css";
 import "../../styles/dashboard-polish.css";
@@ -31,6 +32,7 @@ import "../../styles/toast-custom.css";
 
 function DashboardLayout() {
   const { user } = useAuth();
+  const { effectiveTheme } = useTheme();
   const navigate = useNavigate();
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
@@ -128,7 +130,7 @@ function DashboardLayout() {
           pauseOnFocusLoss={false}
           draggable={false}
           pauseOnHover
-          theme="dark"
+          theme={effectiveTheme === 'light' ? 'light' : 'dark'}
           limit={5}
           enableMultiContainer={false}
           containerId="main-toast-container"

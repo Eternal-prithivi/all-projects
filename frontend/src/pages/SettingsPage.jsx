@@ -102,10 +102,16 @@ const SettingsPage = () => {
         maintenanceUpdates: data.notifications.maintenance_updates,
       });
       
+      const serverTheme = data.preferences?.theme;
+      if (serverTheme && ['dark', 'light', 'auto'].includes(serverTheme)) {
+        setTheme(serverTheme);
+      }
+
       setPreferences(prev => ({
         ...prev,
         ...data.preferences,
-        theme: theme, // Always use ThemeContext as source of truth
+        dateFormat: data.preferences?.date_format || data.preferences?.dateFormat || prev.dateFormat,
+        theme: serverTheme && ['dark', 'light', 'auto'].includes(serverTheme) ? serverTheme : theme,
       }));
     } catch (error) {
       console.error('Failed to fetch settings:', error);
@@ -230,15 +236,21 @@ const SettingsPage = () => {
 
   const handlePreferenceChange = (e) => {
     const { name, value } = e.target;
-    
-    setPreferences({
-      ...preferences,
-      [name]: value
-    });
+    const nextPreferences = { ...preferences, [name]: value };
+    setPreferences(nextPreferences);
 
-    // Apply theme change immediately through ThemeContext
+    // Apply theme immediately and persist so reload/login stay in sync
     if (name === 'theme') {
       setTheme(value);
+      apiClient.put('/settings/preferences', {
+        theme: value,
+        language: nextPreferences.language,
+        timezone: nextPreferences.timezone,
+        date_format: nextPreferences.dateFormat,
+        currency: nextPreferences.currency,
+      }).catch(() => {
+        notifications.error('Theme updated locally but failed to save to account');
+      });
     }
   };
 

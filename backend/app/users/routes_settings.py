@@ -118,6 +118,9 @@ async def update_notifications(
         raise HTTPException(status_code=500, detail=f"Failed to update notifications: {str(e)}")
 
 
+VALID_THEMES = frozenset({"dark", "light", "auto"})
+
+
 @router.put("/preferences")
 async def update_preferences(
     preferences: PreferencesSettings,
@@ -125,6 +128,12 @@ async def update_preferences(
 ):
     """Update user preferences"""
     try:
+        if preferences.theme not in VALID_THEMES:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid theme. Must be one of: {', '.join(sorted(VALID_THEMES))}",
+            )
+
         users_collection = DB["users"]
         
         users_collection.update_one(
@@ -138,6 +147,8 @@ async def update_preferences(
         )
         
         return {"success": True, "message": "Preferences updated"}
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to update preferences: {str(e)}")
 

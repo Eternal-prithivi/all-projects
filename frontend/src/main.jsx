@@ -21,6 +21,7 @@ import ProtectedRoute from "./components/ProtectedRoute.jsx";
 import { AuthProvider } from "./context/AuthContext.jsx";
 import { ThemeProvider } from "./context/ThemeContext.jsx";
 import { PreferencesProvider } from "./context/PreferencesContext.jsx";
+import ThemeSync from "./components/ThemeSync.jsx";
 import ErrorBoundary from "./components/ErrorBoundary.jsx";
 import LazyLoadFallback from "./components/LazyLoadFallback.jsx";
 import "./index.css";
@@ -141,13 +142,14 @@ const router = createBrowserRouter([
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
     <ErrorBoundary>
-      <ThemeProvider>
-        <AuthProvider>
+      <AuthProvider>
+        <ThemeProvider>
+          <ThemeSync />
           <PreferencesProvider>
             <RouterProvider router={router} />
           </PreferencesProvider>
-        </AuthProvider>
-      </ThemeProvider>
+        </ThemeProvider>
+      </AuthProvider>
     </ErrorBoundary>
   </React.StrictMode>
 );

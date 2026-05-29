@@ -7,6 +7,15 @@
 
 ---
 
+**Phase 15: UI controls & theme wiring** — COMPLETE 2026-05-29
+
+- Theme: `ThemeSync` on login, Settings auto-save, header toggle, `toggleTheme` in context
+- CSS: sidebar/header use design tokens; expanded `theme-light.css` for dashboard shell
+- BYOC: subscription lookup accepts `username` or `user_id` (fixes enterprise grants)
+- Tests: `test_settings_preferences.py`; invalid theme returns 400; **73 pytest** pass
+
+---
+
 **Phase 14c: Provision governance UI (Zenith-scoped)** — COMPLETE 2026-05-29
 
 - ✅ Provision page tabs: Deployments & drift, Activity (audit), Policies, New stack (optional wizard)

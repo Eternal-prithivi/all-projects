@@ -86,8 +86,16 @@ export const ThemeProvider = ({ children }) => {
     }
   }, []);
 
+  /** Flip between dark and light (skips auto). For header quick toggle. */
+  const toggleTheme = useCallback(() => {
+    setThemeState((current) => {
+      const resolved = resolveEffective(current);
+      return resolved === 'light' ? 'dark' : 'light';
+    });
+  }, []);
+
   return (
-    <ThemeContext.Provider value={{ theme, effectiveTheme, setTheme }}>
+    <ThemeContext.Provider value={{ theme, effectiveTheme, setTheme, toggleTheme }}>
       {children}
     </ThemeContext.Provider>
   );

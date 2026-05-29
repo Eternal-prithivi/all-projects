@@ -2,12 +2,11 @@
 
 **Status:** COMPLETE (2026-05-29)
 
-**Task:** Phase 14c — Provision governance UI (Zenith-scoped)
+**Task:** Phase 15 — UI controls & API wiring audit
 
 **Summary:**
-- Provision reframed: BYOC only in Settings; tabs for manage/drift, activity, policies, optional deploy wizard
-- No duplicate AWS connect UI on Provision page
-- Admin provision roles at `/admin/provision-roles`
-- pytest 69, build OK
+- Light/dark theme: API sync, header toggle, tokenized dashboard shell, toast theme
+- Settings theme saves on change; BYOC plan lookup fixed for `user_id`/`username`
+- pytest 73, lint 0 errors, build OK
 
 **Next:** Phase 14d optional (cost/VM links after deploy)

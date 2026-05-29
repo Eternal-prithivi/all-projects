@@ -6,7 +6,7 @@
 
 ## 🔴 Active Task
 
-**None** — Phase 14c **COMPLETE** (2026-05-29).
+**None** — Phase 15 **COMPLETE** (2026-05-29).
 
 ---
 
@@ -14,14 +14,14 @@
 
 | Phase | Status |
 |-------|--------|
-| 14b | ✅ P0 tests, BYOC drift, TF CI |
-| **14c** | **✅** Governance UI, BYOC gate, no duplicate connect |
+| 14c | ✅ Governance UI, BYOC gate |
+| **15** | **✅** Theme sync, header toggle, BYOC subscription lookup fix |
 
-### Phase 14c delivered
+### Phase 15 delivered
 
-- [x] Tabbed Provision: Deployments, Activity, Policies, New stack (optional)
-- [x] No BYOC on Provision — gate → Settings only
-- [x] Drift history panel on deployment detail
-- [x] Admin `/admin/provision-roles`
-- [x] `GET /provision/policy-rules`
-- [x] Sidebar label → Infrastructure
+- [x] `ThemeSync` loads saved theme from `/api/settings/` on login
+- [x] Settings theme select auto-persists; header sun/moon quick toggle
+- [x] Dashboard shell uses CSS tokens (sidebar/header) for light mode
+- [x] ToastContainer follows `effectiveTheme`
+- [x] BYOC eligibility queries `username` OR `user_id` in subscriptions
+- [x] `test_settings_preferences.py` (4 tests); pytest **73** total

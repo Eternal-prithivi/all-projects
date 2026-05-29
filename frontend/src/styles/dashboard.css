@@ -43,7 +43,7 @@
    ======================================== */
 .dashboard-header {
   padding: 0.6rem 2rem;
-  background: rgba(3, 3, 3, 0.7);
+  background: var(--bg-elevated);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   border-bottom: 1px solid var(--border-subtle);
@@ -173,6 +173,28 @@
 }
 
 .header-help-btn:hover {
+  background: rgba(212, 175, 55, 0.08);
+  border-color: var(--gold-border);
+  color: var(--gold-primary);
+  transform: scale(1.05);
+}
+
+.header-theme-btn {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all var(--duration-normal) var(--ease-out);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.header-theme-btn:hover {
   background: rgba(212, 175, 55, 0.08);
   border-color: var(--gold-border);
   color: var(--gold-primary);

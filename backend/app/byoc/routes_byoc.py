@@ -191,7 +191,9 @@ class BYOCTestResult(BaseModel):
 
 def check_byoc_eligibility(username: str):
     """Check if user's plan supports BYOC (Pro or Enterprise only)."""
-    sub = subscriptions_collection.find_one({"username": username})
+    sub = subscriptions_collection.find_one(
+        {"$or": [{"username": username}, {"user_id": username}]}
+    )
     plan = sub.get("plan_id", "free") if sub else "free"
     
     if plan not in ("pro", "enterprise"):
@@ -331,7 +333,9 @@ async def get_status(user: User = Depends(get_current_user)):
     """Get BYOC connection status for all cloud providers."""
     status_data = get_byoc_status(user.username)
     
-    sub = subscriptions_collection.find_one({"username": user.username})
+    sub = subscriptions_collection.find_one(
+        {"$or": [{"username": user.username}, {"user_id": user.username}]}
+    )
     plan = sub.get("plan_id", "free") if sub else "free"
     
     return {

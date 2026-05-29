@@ -232,6 +232,19 @@ Notes: [DRIFT AUDIT] — First formal drift audit. All 22 reported gaps verified
 ---
 
 ---
+SESSION_ID: 20260529-phase15
+Date: 2026-05-29
+Agent: Cursor
+Task: Phase 15 — UI controls & theme/API wiring audit
+Changes:
+  - ThemeSync + AuthProvider order; header theme button; Settings theme auto-save
+  - dashboard/sidebar token backgrounds; theme-light dashboard overrides; toast theme
+  - BYOC subscription `$or` lookup; settings theme validation + HTTPException passthrough
+  - test_settings_preferences.py (73 pytest total)
+Outcome: Done
+Notes: Lint 0 errors, build OK. Full-page light mode still partial on legacy CSS (billing/cost hardcoded).
+
+---
 SESSION_ID: 20260529-uiux
 Date: 2026-05-29
 Agent: Cursor

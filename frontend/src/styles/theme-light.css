@@ -138,6 +138,39 @@
   backdrop-filter: blur(12px);
 }
 
+[data-theme="light"] .dashboard-page {
+  background-color: var(--bg-base);
+  color: var(--text-primary);
+}
+
+[data-theme="light"] .dashboard-breadcrumbs-wrapper {
+  background-color: var(--bg-surface);
+}
+
+[data-theme="light"] .dashboard-content {
+  background-image: radial-gradient(circle at 80% 10%, rgba(184, 134, 11, 0.06) 0%, transparent 40%);
+}
+
+[data-theme="light"] .header-search-trigger,
+[data-theme="light"] .header-help-btn,
+[data-theme="light"] .header-theme-btn {
+  background: rgba(0, 0, 0, 0.03);
+  border-color: var(--border-default);
+  color: var(--text-secondary);
+}
+
+[data-theme="light"] .header-search-trigger:hover,
+[data-theme="light"] .header-help-btn:hover,
+[data-theme="light"] .header-theme-btn:hover {
+  background: rgba(184, 134, 11, 0.08);
+  color: var(--gold-primary);
+}
+
+[data-theme="light"] .header-search-trigger kbd {
+  background: rgba(0, 0, 0, 0.04);
+  color: var(--text-muted);
+}
+
 [data-theme="light"] .header-search input {
   background: var(--bg-input);
   border-color: var(--border-default);
