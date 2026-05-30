@@ -1,7 +1,7 @@
 # =============================================================================
 # MODULE: mongo_client.py
 # PURPOSE: Singleton MongoDB connection — every route uses this to get collections
-# DATABASE: CloudResourceOptimizationDB on MongoDB Atlas
+# DATABASE: name from settings.MONGO_DB_NAME (see backend/.env)
 # NOTE: Connection is lazy so Uvicorn can bind and pass Render's HTTP health
 #       check before Atlas/index setup finishes (avoids 5s timeout on cold start).
 # =============================================================================
@@ -16,7 +16,6 @@ from app.utils.logger import setup_logger
 
 logger = setup_logger(__name__)
 
-_DB_NAME = "CloudResourceOptimizationDB"
 _MONGO_TIMEOUT_MS = 8000
 
 
@@ -42,7 +41,7 @@ class MongoDB:
                     connectTimeoutMS=_MONGO_TIMEOUT_MS,
                 )
                 self.client.admin.command("ping")
-                self.db = self.client[_DB_NAME]
+                self.db = self.client[settings.MONGO_DB_NAME]
                 print("✅ Successfully connected to MongoDB.")
                 if not self._indexes_ensured:
                     self._indexes_ensured = True
