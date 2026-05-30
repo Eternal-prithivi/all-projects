@@ -25,9 +25,11 @@ import ThemeSync from "./components/ThemeSync.jsx";
 import ErrorBoundary from "./components/ErrorBoundary.jsx";
 import LazyLoadFallback from "./components/LazyLoadFallback.jsx";
 import "./index.css";
-import { initSentry } from "./lib/sentry.js";
 
-initSentry();
+// Optional Sentry — only load the chunk when DSN is configured (avoids dev errors without npm install)
+if (import.meta.env.VITE_SENTRY_DSN) {
+  import("./lib/sentry-init.js");
+}
 
 // Eager load: Critical pages needed immediately
 import HomePage from "./pages/HomePage.jsx";

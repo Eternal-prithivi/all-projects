@@ -28,6 +28,7 @@ function LoginPage() {
 
   // Get the redirect path from location state, default to /dashboard
   const from = location.state?.from || '/dashboard';
+  const returningToAdmin = typeof from === 'string' && from.startsWith('/admin');
 
   // If already logged in, redirect
   useEffect(() => {
@@ -132,6 +133,11 @@ function LoginPage() {
           <div className="auth-form-header">
             <h2>Sign in</h2>
             <p>Don't have an account? <Link to="/register">Create one free</Link></p>
+            {returningToAdmin && (
+              <p className="auth-hint" role="status">
+                Sign in with an <strong>admin</strong> account to open the admin portal. After login you will return to {from}.
+              </p>
+            )}
           </div>
 
           <form onSubmit={handleSubmit} aria-label="Login form">

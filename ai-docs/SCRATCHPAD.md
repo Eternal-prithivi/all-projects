@@ -4,7 +4,7 @@
 
 **Phase 19 done:** CORS, DEPLOYMENT_SECRETS, CREDENTIAL_ROTATION, CLOUD_COST_GUARDRAILS, Sentry optional, uptime.yml, admin audit export, platform status GCP, vitest+CI.
 
-**Git:** Pushed `153a519` (roadmap + prior work). Phase 19 commit pending push after `npm ci` / pytest.
+**Git:** Phase 19 on `stage`; local follow-ups (Sentry wiring, admin auth UX, test button removed) may need commit/push when you resume.
 
 **LKGS:** Phase 19 complete; no API keys needed except optional Sentry DSN.
 

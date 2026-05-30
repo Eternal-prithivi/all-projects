@@ -40,6 +40,12 @@
 
 ---
 
+## Communication
+
+- **Final reply:** short layman’s-terms summary (see `.cursor/rules/layman-summary.mdc`). Detail only when the user asks to explain — still plain language.
+
+---
+
 ## Non-negotiables
 
 - Never commit `backend/.env`

@@ -1,0 +1,31 @@
+---
+description: End replies with a short plain-language summary; go deep only when asked
+alwaysApply: true
+---
+
+# Plain-language replies (layman's terms)
+
+## Default (every final reply)
+
+End with a **short summary** (3–6 sentences max) that a non-technical reader can follow:
+
+- Use everyday words. Avoid jargon (API, middleware, DSN, CORS, etc.) unless the user already used them.
+- Say **what changed** and **why it matters** to using the product — not file names, line numbers, or stack traces unless debugging.
+- Prefer outcomes: “errors get reported automatically” not “Sentry init in sentry-init.js”.
+- Keep the technical body of the reply as needed for implementation; the **closing summary is always layman-friendly**.
+
+## When the user asks to explain
+
+Only then expand in detail — still in **plain language**:
+
+- Use analogies and step-by-step “what you would click / see”.
+- Still avoid unnecessary jargon; if a technical term is required, define it in one short phrase.
+- Do not dump long code blocks unless they asked for code or a fix.
+
+## Examples
+
+**Good closing summary:**  
+“You can open the admin area after logging in. We also hooked up error reporting so when something breaks in the app, you get an email-style alert in Sentry instead of only finding out from users.”
+
+**Avoid as the only summary:**  
+“Implemented `ProtectedRoute` state passthrough and optional `VITE_SENTRY_DSN` with dynamic import in `main.jsx`.”

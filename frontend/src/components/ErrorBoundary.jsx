@@ -1,5 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import { reportError } from '../lib/sentry-report.js';
 import '../styles/error-pages.css';
 
 class ErrorBoundary extends React.Component {
@@ -17,15 +18,12 @@ class ErrorBoundary extends React.Component {
     return { hasError: true };
   }
 
-  componentDidCatch(_error, errorInfo) {
-    // Log error to console or error reporting service
-    console.error('Error caught by boundary:', _error, errorInfo);
-    
-    // You can also log to an error reporting service like Sentry
-    // logErrorToService(error, errorInfo);
-    
+  componentDidCatch(error, errorInfo) {
+    console.error('Error caught by boundary:', error, errorInfo);
+    reportError(error, errorInfo);
+
     this.setState({
-      error: _error,
+      error,
       errorInfo,
     });
   }

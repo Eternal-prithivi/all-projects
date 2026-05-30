@@ -52,12 +52,15 @@ export const AuthProvider = ({ children }) => {
           // Cache user data for instant navigation
           sessionStorage.setItem('cachedUser', JSON.stringify(userData));
         } catch (error) {
+          const status = error?.response?.status;
           console.error("❌ AuthContext: Failed to fetch user", error);
-          // If token is invalid, log the user out
-          setToken(null);
-          setUser(null);
-          localStorage.removeItem('authToken');
-          sessionStorage.removeItem('cachedUser');
+          // Only clear session when the token is rejected — not on network blips
+          if (status === 401 || status === 403) {
+            setToken(null);
+            setUser(null);
+            localStorage.removeItem('authToken');
+            sessionStorage.removeItem('cachedUser');
+          }
         } finally {
           setLoading(false);
           fetchedRef.current = true;

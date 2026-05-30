@@ -14,7 +14,7 @@
 import React from 'react';
 import { NavLink, Link } from 'react-router-dom';
 import { IconDashboard, IconBarChart, IconHardDrive, IconServer, IconShield } from './Icons.jsx';
-import { FaQuestionCircle } from 'react-icons/fa';
+import { FaQuestionCircle, FaUserShield } from 'react-icons/fa';
 import '../../styles/sidebar.css';
 
 function Sidebar({ user }) {
@@ -76,6 +76,16 @@ function Sidebar({ user }) {
 
       {/* Bottom section */}
       <div className="rail-bottom">
+        {user?.role === 'admin' && (
+          <NavLink
+            to="/admin"
+            className={({ isActive }) => `rail-link ${isActive ? 'active' : ''}`}
+            aria-label="Admin portal"
+          >
+            <span className="rail-link-icon"><FaUserShield className="rail-icon" /></span>
+            <span className="rail-link-label">Admin</span>
+          </NavLink>
+        )}
         <NavLink
           to="/help"
           className={({ isActive }) => `rail-link ${isActive ? 'active' : ''}`}

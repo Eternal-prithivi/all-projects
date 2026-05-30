@@ -1,9 +1,10 @@
 import React from 'react';
 import { useAuth } from '../context/AuthContext.jsx';
-import { Navigate, Outlet } from 'react-router-dom';
+import { Navigate, Outlet, useLocation } from 'react-router-dom';
 
 const ProtectedRoute = () => {
   const { isAuthenticated, loading } = useAuth();
+  const location = useLocation();
 
   // Show loading while checking authentication
   if (loading) {
@@ -32,7 +33,13 @@ const ProtectedRoute = () => {
   }
 
   if (!isAuthenticated) {
-    return <Navigate to="/login" replace />;
+    return (
+      <Navigate
+        to="/login"
+        replace
+        state={{ from: `${location.pathname}${location.search}` }}
+      />
+    );
   }
 
   return <Outlet />;
