@@ -250,6 +250,15 @@ def on_startup():
 
     def _warm_dependencies() -> None:
         mongodb_client.connect()
+        try:
+            from app.provision.routes_provision import recover_plans_interrupted_by_restart
+
+            n = recover_plans_interrupted_by_restart()
+            if n:
+                print(f"⚠️  Marked {n} interrupted terraform plan(s) as failed after restart.")
+        except Exception as exc:
+            print(f"⚠️  Plan recovery skipped: {exc}")
+
         from app.provision.terraform_runner import (
             check_terraform_installed,
             get_terraform_version,

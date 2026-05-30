@@ -299,6 +299,23 @@ async def get_plan_status(
     plan_error = doc.get("plan_error") or ""
     plan_stage = doc.get("plan_stage") or ("plan" if done else "background")
 
+    # Stale planning row (server died mid-plan, thread lost)
+    updated_at = doc.get("updated_at")
+    if (
+        not done
+        and status_value == DeploymentStatus.PLANNING.value
+        and updated_at
+        and isinstance(updated_at, datetime)
+        and updated_at < datetime.utcnow() - timedelta(minutes=8)
+    ):
+        done = True
+        success = False
+        plan_error = plan_error or (
+            "Plan timed out or the server restarted during terraform. "
+            "Check Render is Live, open /health, then run a new plan."
+        )
+        plan_stage = "interrupted"
+
     return {
         "deployment_id": deployment_id,
         "status": status_value,
@@ -681,6 +698,35 @@ def _get_deployment_for_user(deployment_id: str, username: str) -> Optional[dict
     return _get_deployments_collection().find_one(
         {"deployment_name": deployment_id, "user_id": username}
     )
+
+
+def recover_plans_interrupted_by_restart(max_age_minutes: int = 3) -> int:
+    """
+    Mark in-flight plans as failed after a Render/process restart.
+
+    Background terraform threads do not survive deploys or OOM kills; without this,
+    the UI polls forever on status=planning.
+    """
+    cutoff = datetime.utcnow() - timedelta(minutes=max_age_minutes)
+    result = _get_deployments_collection().update_many(
+        {
+            "status": DeploymentStatus.PLANNING.value,
+            "updated_at": {"$lt": cutoff},
+        },
+        {
+            "$set": {
+                "status": DeploymentStatus.PLAN_FAILED.value,
+                "plan_stage": "interrupted",
+                "plan_error": (
+                    "Terraform plan was interrupted when the server restarted "
+                    "(common on Render free tier during terraform init/plan). "
+                    "Wait until the service is Live, then start a new plan."
+                ),
+                "updated_at": datetime.utcnow(),
+            }
+        },
+    )
+    return result.modified_count
 
 
 def _update_plan_progress(deployment_id: str, stage: str, message: str) -> None:
