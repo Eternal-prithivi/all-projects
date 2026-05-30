@@ -23,6 +23,17 @@ Notes: [one line optional]
 ## Session Log (recent only)
 
 ---
+SESSION_ID: 20260530-scheduled-drift-boto3
+Date: 2026-05-30
+Agent: Cursor Composer
+Task: Scheduled Celery drift for Boto3 deployments
+Changes:
+  - tasks.py routes scheduled_drift_check via deployment_engine → detect_drift_boto3
+  - test_provision_tasks.py +2 cases (boto3 path, missing TF workspace)
+Outcome: Done
+Notes: Matches on-demand drift API behavior.
+
+---
 SESSION_ID: 20260530-boto3-parity
 Date: 2026-05-30
 Agent: Cursor Composer
