@@ -284,11 +284,13 @@ export default function ProvisionDeployWizard({ terraformOk, onDeployed }) {
         return;
       }
 
-      // Immediate result (legacy / fast failure)
+      // Immediate result: either fast path (boto3) success/failure, or legacy fast failure.
       setPlanOutput(res.data.plan_output || '');
-      if (!res.data.success) {
+      if (res.data.success) {
+        setPlanReady(true);
+      } else {
         const stage = res.data.stage ? `${res.data.stage}: ` : '';
-        const detail = res.data.error || res.data.plan_output || 'Terraform plan failed';
+        const detail = res.data.error || res.data.plan_output || 'Plan failed';
         setError(stage + detail);
       }
     } catch (err) {

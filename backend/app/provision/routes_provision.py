@@ -64,6 +64,12 @@ from app.provision.audit_logger import (
     get_deployment_audit_log,
     get_user_audit_log,
 )
+from app.provision.boto3_deployer import (
+    is_fast_path_config,
+    plan_fast,
+    apply_fast,
+    destroy_fast,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -202,12 +208,14 @@ async def run_plan(
     """
     Start terraform plan — returns immediately; init/plan run in a background thread.
   Poll GET /plan/status/{deployment_id} for the result (avoids Render HTTP 502 timeouts).
+    Simple templates (static-site, serverless-db) skip Terraform and use boto3 directly.
     """
-    if not check_terraform_installed():
-        raise HTTPException(status_code=503, detail="Terraform CLI is not installed on this server.")
-
     config_dict = config.model_dump()
     _prepare_provision_config(config_dict)
+
+    # Only the terraform path requires the CLI; fast-path (boto3) does not.
+    if not is_fast_path_config(config_dict) and not check_terraform_installed():
+        raise HTTPException(status_code=503, detail="Terraform CLI is not installed on this server.")
 
     policy_result = full_policy_check(config_dict, include_opa=False)
     cost_result = estimate_cost(config_dict, use_infracost=False)
@@ -238,6 +246,44 @@ async def run_plan(
             "success": False,
             "stage": "credentials",
             "error": msg,
+            "policy_check": policy_result.model_dump(),
+            "cost_estimate": cost_result.model_dump(),
+        }
+
+    # ── Fast path: simple templates skip Terraform entirely (boto3 direct) ──
+    # Required because Render free tier (0.1 CPU / 512MB) cannot reliably run
+    # `terraform plan` with the AWS provider — multi-minute hangs / OOM kills.
+    if is_fast_path_config(config_dict):
+        fast_result = plan_fast(config_dict, aws_creds)
+        status = DeploymentStatus.AWAITING_APPLY if fast_result["success"] else DeploymentStatus.PLAN_FAILED
+        _save_deployment(
+            user.username, deployment_id, config_dict, "fast-path",
+            status, policy_result, cost_result,
+            plan_output=fast_result["output"] or fast_result.get("error", ""),
+        )
+        _get_deployments_collection().update_one(
+            {"deployment_name": deployment_id},
+            {"$set": {
+                "plan_error": fast_result.get("error") or "",
+                "plan_stage": "plan",
+                "has_plan_changes": fast_result.get("has_changes", False),
+                "fast_path": True,
+            }},
+        )
+        log_provision_action(
+            action="plan", actor=user.username, deployment_id=deployment_id,
+            status="success" if fast_result["success"] else "failed",
+            details={"fast_path": True, "template": config_dict.get("template")},
+            error=fast_result.get("error"),
+        )
+        return {
+            "success": fast_result["success"],
+            "status": "done",
+            "deployment_id": deployment_id,
+            "stage": "plan",
+            "fast_path": True,
+            "plan_output": fast_result["output"],
+            "error": fast_result.get("error"),
             "policy_check": policy_result.model_dump(),
             "cost_estimate": cost_result.model_dump(),
         }
@@ -358,20 +404,51 @@ async def run_apply(
     if policy_check.get("blocks"):
         raise HTTPException(status_code=400, detail="Cannot apply — policy check has blocking violations.")
 
-    workspace = deployment.get("terraform_workspace", "")
-    if not workspace:
-        raise HTTPException(status_code=500, detail="Workspace path missing from deployment record.")
-
+    config_dict = deployment.get("config", {}) or {}
     aws_creds = _resolve_byoc_credentials(
-        user, deployment.get("config", {}).get("aws_region", "ap-south-1")
+        user, config_dict.get("aws_region", "ap-south-1")
     )
-    runner = TerraformRunner(workspace, aws_creds)
 
-    # Update status to APPLYING
     collection.update_one(
         {"deployment_name": deployment_id},
         {"$set": {"status": DeploymentStatus.APPLYING, "updated_at": datetime.utcnow()}},
     )
+
+    # ── Fast path: simple templates use boto3 directly (no terraform) ──
+    if deployment.get("fast_path") or is_fast_path_config(config_dict):
+        apply_result = apply_fast(config_dict, aws_creds)
+        resources = apply_result.get("resources", []) if apply_result["success"] else []
+        new_status = DeploymentStatus.DEPLOYED if apply_result["success"] else DeploymentStatus.APPLY_FAILED
+        collection.update_one(
+            {"deployment_name": deployment_id},
+            {"$set": {
+                "status": new_status,
+                "apply_output": apply_result.get("output", ""),
+                "resources_count": len(resources),
+                "fast_path": True,
+                "updated_at": datetime.utcnow(),
+            }},
+        )
+        log_provision_action(
+            action="apply", actor=user.username, deployment_id=deployment_id,
+            status="success" if apply_result["success"] else "failed",
+            details={"resources_count": len(resources), "fast_path": True},
+            error=apply_result.get("error"),
+        )
+        return {
+            "success": apply_result["success"],
+            "status": new_status,
+            "resources_count": len(resources),
+            "output": apply_result.get("output", ""),
+            "error": apply_result.get("error"),
+            "fast_path": True,
+        }
+
+    workspace = deployment.get("terraform_workspace", "")
+    if not workspace:
+        raise HTTPException(status_code=500, detail="Workspace path missing from deployment record.")
+
+    runner = TerraformRunner(workspace, aws_creds)
 
     apply_result = runner.apply()
 
@@ -422,18 +499,22 @@ async def run_destroy(
             detail=f"Cannot destroy — deployment status is '{deployment.get('status')}'.",
         )
 
-    workspace = deployment.get("terraform_workspace", "")
+    config_dict = deployment.get("config", {}) or {}
     aws_creds = _resolve_byoc_credentials(
-        user, deployment.get("config", {}).get("aws_region", "ap-south-1")
+        user, config_dict.get("aws_region", "ap-south-1")
     )
-    runner = TerraformRunner(workspace, aws_creds)
 
     collection.update_one(
         {"deployment_name": deployment_id},
         {"$set": {"status": DeploymentStatus.DESTROYING, "updated_at": datetime.utcnow()}},
     )
 
-    destroy_result = runner.destroy()
+    if deployment.get("fast_path") or is_fast_path_config(config_dict):
+        destroy_result = destroy_fast(config_dict, aws_creds)
+    else:
+        workspace = deployment.get("terraform_workspace", "")
+        runner = TerraformRunner(workspace, aws_creds)
+        destroy_result = runner.destroy()
 
     new_status = DeploymentStatus.DESTROYED if destroy_result["success"] else DeploymentStatus.DESTROY_FAILED
 
