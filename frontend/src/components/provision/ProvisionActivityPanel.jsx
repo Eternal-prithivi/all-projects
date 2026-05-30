@@ -58,7 +58,7 @@ export default function ProvisionActivityPanel() {
     <div className="provision-activity-panel">
       <div className="section-header">
         <h3>Provision activity</h3>
-        <p>Audit trail for Terraform operations on your account.</p>
+        <p>Audit trail for infrastructure plan, apply, destroy, and drift on your account.</p>
       </div>
       <div className="provision-activity-list">
         {events.map((ev, i) => (

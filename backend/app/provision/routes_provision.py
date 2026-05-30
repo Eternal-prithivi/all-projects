@@ -775,7 +775,7 @@ async def remediate_deployment_drift(
     user: dict = Depends(get_current_user),
 ):
     """
-    Remediate drift by re-applying Terraform configuration.
+    Remediate drift by re-applying the deployment engine (Boto3 or Terraform).
 
     By default runs in check-only mode (shows plan without applying).
     Set check_only=false in the request body to actually apply.

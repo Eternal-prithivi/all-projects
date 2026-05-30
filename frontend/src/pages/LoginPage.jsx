@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { Link, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
+import { resetSessionExpiredGuard } from '../utils/sessionExpiry.js';
 import { loginUser, getApiErrorMessage } from '../api';
 import { useAuth } from '../context/AuthContext.jsx';
 import { getValidationErrorMessage, validateLoginForm } from '../utils/formValidation.js';
@@ -20,9 +21,17 @@ function LoginPage() {
   const apiRoot = useMemo(() => getApiRoot(), []);
   const navigate = useNavigate();
   const location = useLocation();
+  const [searchParams] = useSearchParams();
+
+  const sessionExpiredBanner = searchParams.get('session') === 'expired';
 
   // Get the redirect path from location state, default to /dashboard
-  const from = location.state?.from || '/dashboard';
+  const fromParam = searchParams.get('from');
+  const fromState = location.state?.from;
+  const from =
+    (fromParam && decodeURIComponent(fromParam)) ||
+    fromState ||
+    '/dashboard';
   const returningToAdmin = typeof from === 'string' && from.startsWith('/admin');
 
   // If already logged in, redirect
@@ -31,6 +40,12 @@ function LoginPage() {
       navigate(from, { replace: true });
     }
   }, [isAuthenticated, navigate, from]);
+
+  useEffect(() => {
+    if (sessionExpiredBanner) {
+      resetSessionExpiredGuard();
+    }
+  }, [sessionExpiredBanner]);
 
   useEffect(() => {
     fetch(`${apiRoot}/api/auth/sso/providers`)
@@ -125,6 +140,22 @@ function LoginPage() {
       {/* Right: Form Panel */}
       <div className="auth-form-panel">
         <div className="auth-form-wrapper">
+          {sessionExpiredBanner && (
+            <div
+              className="auth-error"
+              role="status"
+              style={{
+                marginBottom: '1rem',
+                padding: '12px 14px',
+                borderRadius: '8px',
+                background: 'rgba(212, 175, 55, 0.12)',
+                border: '1px solid rgba(212, 175, 55, 0.35)',
+                color: 'var(--text-primary, #f5f5f5)',
+              }}
+            >
+              Your session has ended. Please sign in again to continue.
+            </div>
+          )}
           <div className="auth-form-header">
             <h2>Sign in</h2>
             <p>Don't have an account? <Link to="/register">Create one free</Link></p>

@@ -18,6 +18,7 @@
 // =============================================================================
 import axios from "axios";
 import { getApiBaseUrl } from "./config/apiBase.js";
+import { shouldHandle401, triggerSessionExpired } from "./utils/sessionExpiry.js";
 
 const API_BASE_URL = getApiBaseUrl();
 
@@ -40,6 +41,17 @@ apiClient.interceptors.request.use(
     return config;
   },
   (error) => {
+    return Promise.reject(error);
+  }
+);
+
+apiClient.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    const status = error?.response?.status;
+    if (status === 401 && shouldHandle401(error.config)) {
+      triggerSessionExpired();
+    }
     return Promise.reject(error);
   }
 );

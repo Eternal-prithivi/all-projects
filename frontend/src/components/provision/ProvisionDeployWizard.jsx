@@ -272,7 +272,7 @@ export default function ProvisionDeployWizard({ terraformOk, userProvisionEngine
           if (st.data.done) {
             if (!st.data.success) {
               const stage = st.data.stage ? `${st.data.stage}: ` : '';
-              setError(stage + (st.data.error || st.data.plan_output || 'Terraform plan failed'));
+              setError(stage + (st.data.error || st.data.plan_output || `${engineLabel} plan failed`));
             } else {
               setPlanReady(true);
             }
@@ -318,7 +318,7 @@ export default function ProvisionDeployWizard({ terraformOk, userProvisionEngine
         setPlanOutput(prev => prev + '\n\n✅ Apply complete! ' + res.data.resources_count + ' resources created.');
         onDeployed?.();
       } else {
-        setError(res.data.error || 'Terraform apply failed');
+        setError(res.data.error || `${engineLabel} apply failed`);
         setPlanOutput(prev => prev + '\n\n❌ Apply failed: ' + (res.data.error || 'unknown error'));
       }
     } catch (err) {
@@ -720,7 +720,7 @@ export default function ProvisionDeployWizard({ terraformOk, userProvisionEngine
       {step === 3 && (
         <div>
           <div className="section-header">
-            <h3>Terraform Plan & Apply</h3>
+            <h3>{engineLabel} plan &amp; apply</h3>
             <p>Review the execution plan, then apply to create real AWS resources.</p>
           </div>
 

@@ -13,7 +13,8 @@
 //   - Call getCurrentUser() from pages directly — let AuthContext manage it
 // =============================================================================
 import React, { createContext, useState, useContext, useEffect, useRef } from 'react';
-import { getCurrentUser } from '../api'; // Import the API function
+import { getCurrentUser } from '../api';
+import { resetSessionExpiredGuard, triggerSessionExpired } from '../utils/sessionExpiry.js';
 
 const AuthContext = createContext(null);
 
@@ -55,7 +56,11 @@ export const AuthProvider = ({ children }) => {
           const status = error?.response?.status;
           console.error("❌ AuthContext: Failed to fetch user", error);
           // Only clear session when the token is rejected — not on network blips
-          if (status === 401 || status === 403) {
+          if (status === 401) {
+            setToken(null);
+            setUser(null);
+            triggerSessionExpired();
+          } else if (status === 403) {
             setToken(null);
             setUser(null);
             localStorage.removeItem('authToken');
@@ -76,6 +81,7 @@ export const AuthProvider = ({ children }) => {
   }, [token]);
 
   const login = (newToken) => {
+    resetSessionExpiredGuard();
     setToken(newToken);
     localStorage.setItem('authToken', newToken);
   };

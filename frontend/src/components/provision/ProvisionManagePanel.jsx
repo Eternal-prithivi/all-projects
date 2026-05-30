@@ -1,6 +1,12 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../../api';
+import {
+  getEngineLabel,
+  getLoadingMessage,
+  getProvisionEngine,
+  getRemediateConfirmMessage,
+} from '../../utils/provisionEngine.js';
 
 const getStatusClass = (status) => {
   if (status === 'deployed') return 'deployed';
@@ -24,15 +30,6 @@ const formatWhen = (dep) => {
   } catch {
     return '';
   }
-};
-
-const LOADING_MESSAGES = {
-  drift: 'Checking drift against your AWS account… Terraform is comparing live state to your stack. This can take up to a minute.',
-  'remediate-preview': 'Running Terraform plan to preview fixes…',
-  'remediate-apply': 'Applying Terraform to restore desired state…',
-  destroy: 'Destroying infrastructure…',
-  detail: 'Loading deployment details…',
-  delete: 'Updating deployment list…',
 };
 
 function DeploymentRow({
@@ -90,8 +87,20 @@ export default function ProvisionManagePanel({ onDeploymentsChange }) {
   const [loadingAction, setLoadingAction] = useState(null);
   const [error, setError] = useState(null);
   const [output, setOutput] = useState('');
+  const [actionEngine, setActionEngine] = useState('boto3');
 
   const isBusy = Boolean(loadingAction);
+
+  const findDeployment = useCallback(
+    (deploymentName) =>
+      [...recent, ...history].find((d) => d.deployment_name === deploymentName),
+    [recent, history]
+  );
+
+  const detailEngine = useMemo(
+    () => (detail ? getProvisionEngine(detail) : actionEngine),
+    [detail, actionEngine]
+  );
 
   const loadDeployments = useCallback(async () => {
     try {
@@ -179,6 +188,8 @@ export default function ProvisionManagePanel({ onDeploymentsChange }) {
   };
 
   const runDriftCheck = async (depId) => {
+    const dep = findDeployment(depId) || detail;
+    setActionEngine(getProvisionEngine(dep));
     setLoadingAction('drift');
     setError(null);
     setOutput('');
@@ -195,7 +206,10 @@ export default function ProvisionManagePanel({ onDeploymentsChange }) {
   };
 
   const runRemediate = async (depId, checkOnly) => {
-    if (!checkOnly && !window.confirm('Run terraform apply to restore desired state?')) return;
+    const dep = findDeployment(depId) || detail;
+    const engine = getProvisionEngine(dep);
+    setActionEngine(engine);
+    if (!checkOnly && !window.confirm(getRemediateConfirmMessage(engine))) return;
     setLoadingAction(checkOnly ? 'remediate-preview' : 'remediate-apply');
     setError(null);
     try {
@@ -240,7 +254,7 @@ export default function ProvisionManagePanel({ onDeploymentsChange }) {
       <div className="provision-empty-state">
         <h3>No deployments yet</h3>
         <p>
-          Use <strong>New stack</strong> to deploy optional Terraform workloads, or focus on
+          Use <strong>New stack</strong> to deploy optional infrastructure (Boto3 or Terraform), or focus on
           cost, storage, and VM optimization — your AWS account is already linked in Settings.
         </p>
         <Link to="/dashboard/costs" className="btn-provision secondary" style={{ marginTop: '1rem', display: 'inline-block' }}>
@@ -335,7 +349,7 @@ export default function ProvisionManagePanel({ onDeploymentsChange }) {
                   {loadingAction === 'detail' && 'Loading'}
                   {loadingAction === 'delete' && 'Updating list'}
                 </strong>
-                <p>{LOADING_MESSAGES[loadingAction]}</p>
+                <p>{getLoadingMessage(loadingAction, actionEngine)}</p>
               </div>
             </div>
           )}
@@ -346,6 +360,8 @@ export default function ProvisionManagePanel({ onDeploymentsChange }) {
             <>
               <h3>{detail.deployment_name}</h3>
               <p className="provision-empty-hint">
+                Engine: <strong>{getEngineLabel(detailEngine)}</strong>
+                {' · '}
                 Modules: {(detail.enabled_modules || []).join(', ') || '—'} ·{' '}
                 {detail.resources_count || 0} resources
               </p>
