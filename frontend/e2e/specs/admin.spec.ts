@@ -18,6 +18,6 @@ test.describe('Admin smoke', () => {
     await expect(page.getByRole('heading', { name: /system health/i })).toBeVisible({
       timeout: 15_000,
     });
-    await expect(page.getByText(/database status/i)).toBeVisible();
+    await expect(page.getByRole('heading', { name: /database status/i })).toBeVisible();
   });
 });
