@@ -12,7 +12,7 @@ test.describe('Admin smoke', () => {
       test.skip(true, 'Admin credentials not configured');
     }
 
-    await loginOnPage(page, admin);
+    await loginOnPage(page, admin, request);
     await page.goto('/admin/system');
 
     await expect(page.getByRole('heading', { name: /system health/i })).toBeVisible({

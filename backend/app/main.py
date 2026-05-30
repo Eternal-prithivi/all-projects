@@ -248,6 +248,11 @@ def on_startup():
     """Connect MongoDB and log Terraform status without blocking the HTTP server."""
     import threading
 
+    if getattr(settings, "ENVIRONMENT", "") == "test":
+        from app.utils.rate_limit import disable_rate_limits
+
+        disable_rate_limits(app)
+
     def _warm_dependencies() -> None:
         mongodb_client.connect()
         try:

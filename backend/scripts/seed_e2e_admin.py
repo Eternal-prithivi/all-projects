@@ -33,7 +33,10 @@ def main() -> None:
                 "hashed_password": get_password_hash(password),
                 "role": "admin",
                 "email_verified": True,
-            }
+                "two_fa_enabled": False,
+                "two_fa_verified": False,
+            },
+            "$unset": {"email_verify_token": ""},
         },
         upsert=True,
     )

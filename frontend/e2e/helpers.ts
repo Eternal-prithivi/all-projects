@@ -30,15 +30,59 @@ export async function registerTestUser(
   return { username, password, email };
 }
 
+/** Obtain JWT via API (avoids UI rate limits and flaky full-page load waits). */
+export async function loginViaApi(
+  page: import('@playwright/test').Page,
+  request: import('@playwright/test').APIRequestContext,
+  user: { username: string; password: string },
+): Promise<void> {
+  const body = new URLSearchParams({
+    username: user.username,
+    password: user.password,
+  });
+  const res = await request.post(`${apiRoot()}/api/auth/token`, {
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    data: body.toString(),
+  });
+  if (!res.ok()) {
+    throw new Error(`Login API failed (${res.status()}): ${await res.text()}`);
+  }
+  const payload = (await res.json()) as { access_token?: string };
+  if (!payload.access_token) {
+    throw new Error('Login API response missing access_token');
+  }
+
+  await page.goto('/login');
+  await page.evaluate((token) => {
+    localStorage.setItem('authToken', token);
+    sessionStorage.removeItem('cachedUser');
+  }, payload.access_token);
+  await page.goto('/dashboard');
+  await page.waitForURL(/\/dashboard/, { timeout: 30_000, waitUntil: 'commit' });
+}
+
 export async function loginOnPage(
   page: import('@playwright/test').Page,
   user: { username: string; password: string },
+  request?: import('@playwright/test').APIRequestContext,
 ): Promise<void> {
+  if (request) {
+    await loginViaApi(page, request, user);
+    return;
+  }
+
   await page.goto('/login');
   await page.getByLabel(/username/i).fill(user.username);
   await page.getByLabel(/^password$/i).fill(user.password);
   await page.getByRole('button', { name: /submit login form/i }).click();
-  await page.waitForURL(/\/dashboard/, { timeout: 20_000 });
+
+  const errorBanner = page.locator('#login-error, .auth-error');
+  try {
+    await page.waitForURL(/\/dashboard/, { timeout: 30_000, waitUntil: 'commit' });
+  } catch {
+    const errText = (await errorBanner.first().textContent())?.trim();
+    throw new Error(errText ? `Login failed: ${errText}` : 'Login did not reach /dashboard');
+  }
 }
 
 export function adminCredentials(): { username: string; password: string } | null {

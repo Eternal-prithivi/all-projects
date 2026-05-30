@@ -28,7 +28,7 @@ test.describe('BYOC form validation', () => {
       await route.fulfill({ status: 200, contentType: 'application/json', body: '{}' });
     });
 
-    await loginOnPage(page, user);
+    await loginOnPage(page, user, request);
     await page.goto('/dashboard/settings');
 
     const connectButtons = page.getByRole('button', { name: /^connect$/i });

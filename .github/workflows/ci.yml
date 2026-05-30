@@ -136,6 +136,13 @@ jobs:
       - name: Seed E2E admin user
         working-directory: backend
         run: python scripts/seed_e2e_admin.py
+
+      - name: Verify E2E admin can obtain token
+        run: |
+          curl -fsS -X POST "http://127.0.0.1:8000/api/auth/token" \
+            -H "Content-Type: application/x-www-form-urlencoded" \
+            -d "username=e2e_admin&password=SecurePass1" \
+            | grep -q access_token
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
