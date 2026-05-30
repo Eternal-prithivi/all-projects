@@ -12,18 +12,15 @@
 #   - /deployments/{id}/remediate → fix drift (terraform apply)
 #   - /policy-check       → run policy engine only (no deploy)
 #   - /estimate           → cost estimation only
-#   - /roles              → manage RBAC role assignments
 #   - /audit-log          → query provision audit trail
-#   - /my-permissions     → show current user's provision permissions
-# READS FROM: provision_deployments, provision_roles, provision_audit_log
-# WRITES TO: provision_deployments, provision_roles, provision_audit_log
+# READS FROM: provision_deployments, provision_audit_log
+# WRITES TO: provision_deployments, provision_audit_log
 # MOUNTED AT: /api/provision
 # DEPENDS ON: BYOC credentials for AWS auth, Terraform CLI on server
 # DO NOT:
 #   - Allow apply without a prior successful plan
 #   - Allow apply when policy check has blocks
 #   - Run terraform commands without BYOC credential injection
-#   - Skip RBAC checks on state-changing endpoints
 #   - Skip audit logging on any plan/apply/destroy/remediate action
 # =============================================================================
 from __future__ import annotations
@@ -61,19 +58,10 @@ from app.provision.config_normalize import normalize_provision_config
 from app.provision.policy_checker import full_policy_check, get_yaml_rules
 from app.provision.cost_estimator import estimate_cost
 from app.provision.drift_detector import detect_drift, remediate_drift
-from app.provision.rbac import (
-    ProvisionAction,
-    check_permission,
-    get_user_permissions,
-    get_user_provision_role,
-    assign_provision_role,
-    list_role_assignments,
-)
 from app.provision.audit_logger import (
     log_provision_action,
     get_deployment_audit_log,
     get_user_audit_log,
-    get_recent_audit_log,
 )
 
 logger = logging.getLogger(__name__)
@@ -98,23 +86,6 @@ def _get_deployments_collection():
     """Get the provision_deployments MongoDB collection."""
     DB = get_database()
     return DB["provision_deployments"]
-
-
-def _enforce_permission(user: Any, action: str, deployment_id: str = ""):
-    """
-    Check RBAC permission and raise HTTPException if denied.
-    Also logs the denial to the audit trail.
-    """
-    allowed, message = check_permission(user, action)
-    if not allowed:
-        log_provision_action(
-            action=action,
-            actor=user.username,
-            deployment_id=deployment_id or "n/a",
-            status="denied",
-            details={"reason": message},
-        )
-        raise HTTPException(status_code=403, detail=message)
 
 
 # ── Templates & Modules ──
@@ -175,25 +146,16 @@ async def provisioning_status(user: dict = Depends(get_current_user)):
     """Check if Terraform is installed and return system status."""
     tf_installed = check_terraform_installed()
     tf_version = get_terraform_version() if tf_installed else None
-    user_perms = get_user_permissions(user)
     return {
         "terraform_installed": tf_installed,
         "terraform_version": tf_version,
         "policy_rules_count": len(get_yaml_rules()),
-        "user_permissions": user_perms,
     }
-
-
-@router.get("/my-permissions")
-async def my_permissions(user: dict = Depends(get_current_user)):
-    """Show the current user's provision RBAC permissions."""
-    return get_user_permissions(user)
 
 
 @router.get("/policy-rules")
 async def list_policy_rules(user: dict = Depends(get_current_user)):
     """Return YAML policy rules for read-only display in the UI."""
-    _enforce_permission(user, ProvisionAction.VIEW)
     rules = get_yaml_rules()
     return {"rules": rules, "count": len(rules)}
 
@@ -207,7 +169,6 @@ async def run_policy_check(
     user: dict = Depends(get_current_user),
 ):
     """Run policy engine against a config WITHOUT deploying."""
-    _enforce_permission(user, ProvisionAction.PLAN)
     config_dict = config.model_dump()
     _prepare_provision_config(config_dict)
     result = full_policy_check(config_dict, include_opa=False)
@@ -220,7 +181,6 @@ async def run_cost_estimate(
     user: dict = Depends(get_current_user),
 ):
     """Get cost estimation for a given config (instant lookup table)."""
-    _enforce_permission(user, ProvisionAction.PLAN)
     config_dict = config.model_dump()
     _prepare_provision_config(config_dict)
     result = estimate_cost(config_dict, use_infracost=False)
@@ -239,8 +199,6 @@ async def run_plan(
     Start terraform plan — returns immediately; init/plan run in a background thread.
   Poll GET /plan/status/{deployment_id} for the result (avoids Render HTTP 502 timeouts).
     """
-    _enforce_permission(user, ProvisionAction.PLAN)
-
     if not check_terraform_installed():
         raise HTTPException(status_code=503, detail="Terraform CLI is not installed on this server.")
 
@@ -322,8 +280,6 @@ async def get_plan_status(
     user: dict = Depends(get_current_user),
 ):
     """Poll background terraform plan result."""
-    _enforce_permission(user, ProvisionAction.PLAN)
-
     doc = _get_deployment_for_user(deployment_id, user.username)
     if not doc:
         raise HTTPException(status_code=404, detail="Deployment not found.")
@@ -341,6 +297,7 @@ async def get_plan_status(
     success = status_value == DeploymentStatus.AWAITING_APPLY.value
     plan_output = doc.get("plan_output") or ""
     plan_error = doc.get("plan_error") or ""
+    plan_stage = doc.get("plan_stage") or ("plan" if done else "background")
 
     return {
         "deployment_id": deployment_id,
@@ -350,7 +307,12 @@ async def get_plan_status(
         "plan_output": plan_output,
         "error": plan_error if done and not success else (None if success else plan_error),
         "has_changes": doc.get("has_plan_changes", False),
-        "stage": doc.get("plan_stage", "plan" if done else "background"),
+        "stage": plan_stage,
+        "message": (
+            f"Terraform {plan_stage} in progress…"
+            if not done and status_value == DeploymentStatus.PLANNING.value
+            else None
+        ),
     }
 
 
@@ -360,8 +322,6 @@ async def run_apply(
     user: dict = Depends(get_current_user),
 ):
     """Run terraform apply on a previously planned deployment."""
-    _enforce_permission(user, ProvisionAction.APPLY, deployment_id)
-
     collection = _get_deployments_collection()
     deployment = collection.find_one({"deployment_name": deployment_id, "user_id": user.username})
 
@@ -431,8 +391,6 @@ async def run_destroy(
     user: dict = Depends(get_current_user),
 ):
     """Run terraform destroy on a deployed infrastructure."""
-    _enforce_permission(user, ProvisionAction.DESTROY, deployment_id)
-
     collection = _get_deployments_collection()
     deployment = collection.find_one({"deployment_name": deployment_id, "user_id": user.username})
 
@@ -526,8 +484,6 @@ async def check_drift(
     user: dict = Depends(get_current_user),
 ):
     """Trigger an on-demand drift check for a deployed infrastructure."""
-    _enforce_permission(user, ProvisionAction.DRIFT_CHECK, deployment_id)
-
     collection = _get_deployments_collection()
     deployment = collection.find_one(
         {"deployment_name": deployment_id, "user_id": user.username}
@@ -586,8 +542,6 @@ async def remediate_deployment_drift(
     By default runs in check-only mode (shows plan without applying).
     Set check_only=false in the request body to actually apply.
     """
-    _enforce_permission(user, ProvisionAction.REMEDIATE, deployment_id)
-
     check_only = body.check_only if body else True
 
     collection = _get_deployments_collection()
@@ -631,48 +585,6 @@ async def remediate_deployment_drift(
     return result.model_dump()
 
 
-# ── RBAC Management ──
-
-
-class RoleAssignRequest(BaseModel):
-    """Request body for assigning a provision role."""
-    username: str
-    role: str
-
-
-@router.post("/roles/assign")
-async def assign_role(
-    body: RoleAssignRequest,
-    user: dict = Depends(get_current_user),
-):
-    """Assign a provision role to a user. Only admins can do this."""
-    _enforce_permission(user, ProvisionAction.MANAGE_ROLES)
-
-    try:
-        result = assign_provision_role(
-            target_username=body.username,
-            role=body.role,
-            assigned_by=user.username,
-        )
-        log_provision_action(
-            action="role_assign", actor=user.username,
-            deployment_id="system",
-            status="success",
-            details={"target": body.username, "role": body.role},
-        )
-        return result
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-
-@router.get("/roles")
-async def list_roles(user: dict = Depends(get_current_user)):
-    """List all provision role assignments. Only admins can see all."""
-    _enforce_permission(user, ProvisionAction.MANAGE_ROLES)
-    assignments = list_role_assignments()
-    return {"assignments": assignments, "count": len(assignments)}
-
-
 # ── Audit Log ──
 
 
@@ -682,17 +594,9 @@ async def get_audit_log(
     limit: int = 50,
     user: dict = Depends(get_current_user),
 ):
-    """
-    Query the provision audit log.
-
-    Admins/devops can see all events. Developers/viewers see only their own.
-    """
-    role = get_user_provision_role(user)
-
+    """Query the provision audit log for the current user (or one deployment)."""
     if deployment_id:
         events = get_deployment_audit_log(deployment_id)
-    elif role in ("admin", "devops"):
-        events = get_recent_audit_log(limit=limit)
     else:
         events = get_user_audit_log(user.username, limit=limit)
 
@@ -779,6 +683,20 @@ def _get_deployment_for_user(deployment_id: str, username: str) -> Optional[dict
     )
 
 
+def _update_plan_progress(deployment_id: str, stage: str, message: str) -> None:
+    """Write in-progress status so the UI poll is not stuck on a static line."""
+    _get_deployments_collection().update_one(
+        {"deployment_name": deployment_id},
+        {
+            "$set": {
+                "plan_stage": stage,
+                "plan_output": message,
+                "updated_at": datetime.utcnow(),
+            }
+        },
+    )
+
+
 def _run_plan_background(
     username: str,
     deployment_id: str,
@@ -790,6 +708,11 @@ def _run_plan_background(
 ) -> None:
     """Run terraform init/plan off the HTTP thread (avoids Render 502 on long requests)."""
     plan_t0 = time.monotonic()
+    _update_plan_progress(
+        deployment_id,
+        "init",
+        "Running terraform init on the server (may take 1–3 minutes on Render)…\n",
+    )
     # #region agent log
     agent_log(
         "H1",
@@ -830,6 +753,15 @@ def _run_plan_background(
                 {"$set": {"plan_error": err, "plan_stage": "init"}},
             )
             return
+
+        init_snippet = (init_result.get("output") or "").strip()
+        if init_snippet:
+            init_snippet = init_snippet[-2000:] + "\n"
+        _update_plan_progress(
+            deployment_id,
+            "plan",
+            f"{init_snippet}Running terraform plan (talking to AWS)…\n",
+        )
 
         plan_t1 = time.monotonic()
         plan_result = runner.plan()

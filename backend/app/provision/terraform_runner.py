@@ -107,7 +107,7 @@ class TerraformRunner:
         try:
             result = subprocess.run(
                 ["terraform", "init", "-input=false", "-no-color"],
-                capture_output=True, text=True, timeout=120,
+                capture_output=True, text=True, timeout=300,
                 cwd=str(self.workspace_dir),
                 env=self._get_env(),
             )
@@ -119,7 +119,7 @@ class TerraformRunner:
                 "error": combined if not ok else None,
             }
         except subprocess.TimeoutExpired:
-            return {"success": False, "output": "", "error": "Terraform init timed out (120s)"}
+            return {"success": False, "output": "", "error": "Terraform init timed out (300s)"}
         except Exception as e:
             return {"success": False, "output": "", "error": str(e)}
 
@@ -128,7 +128,7 @@ class TerraformRunner:
         try:
             result = subprocess.run(
                 ["terraform", "plan", "-input=false", "-no-color"],
-                capture_output=True, text=True, timeout=180,
+                capture_output=True, text=True, timeout=300,
                 cwd=str(self.workspace_dir),
                 env=self._get_env(),
             )
@@ -142,7 +142,7 @@ class TerraformRunner:
                 "has_changes": result.returncode == 2 or "No changes." not in result.stdout,
             }
         except subprocess.TimeoutExpired:
-            return {"success": False, "output": "", "error": "Terraform plan timed out (180s)"}
+            return {"success": False, "output": "", "error": "Terraform plan timed out (300s)"}
         except Exception as e:
             return {"success": False, "output": "", "error": str(e)}
 

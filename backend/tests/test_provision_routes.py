@@ -11,8 +11,7 @@ def test_get_yaml_rules_non_empty():
 
 
 @patch("app.provision.routes_provision.get_yaml_rules")
-@patch("app.provision.routes_provision._enforce_permission")
-def test_policy_rules_endpoint_shape(mock_enforce, mock_rules):
+def test_policy_rules_endpoint_shape(mock_rules):
     from app.provision.routes_provision import list_policy_rules
 
     mock_rules.return_value = [{"name": "test_rule", "severity": "block"}]
@@ -22,4 +21,3 @@ def test_policy_rules_endpoint_shape(mock_enforce, mock_rules):
     result = asyncio.run(list_policy_rules(user=user))
     assert result["count"] == 1
     assert result["rules"][0]["name"] == "test_rule"
-    mock_enforce.assert_called_once()

@@ -24,10 +24,7 @@ const LOADING_MESSAGES = {
   detail: 'Loading deployment details…',
 };
 
-export default function ProvisionManagePanel({
-  userPermissions,
-  onDeploymentsChange,
-}) {
+export default function ProvisionManagePanel({ onDeploymentsChange }) {
   const [deployments, setDeployments] = useState([]);
   const [selectedId, setSelectedId] = useState(null);
   const [detail, setDetail] = useState(null);
@@ -238,7 +235,7 @@ export default function ProvisionManagePanel({
                     <button
                       type="button"
                       className={`btn-provision primary${loadingAction === 'remediate-apply' ? ' is-loading' : ''}`}
-                      disabled={isBusy || (userPermissions && !userPermissions.can_remediate)}
+                      disabled={isBusy}
                       onClick={() => runRemediate(detail.deployment_name, false)}
                     >
                       {loadingAction === 'remediate-apply'
@@ -249,7 +246,7 @@ export default function ProvisionManagePanel({
                   <button
                     type="button"
                     className={`btn-provision danger${loadingAction === 'destroy' ? ' is-loading' : ''}`}
-                    disabled={isBusy || (userPermissions && !userPermissions.can_destroy)}
+                    disabled={isBusy}
                     onClick={() => runDestroy(detail.deployment_name)}
                   >
                     {loadingAction === 'destroy'

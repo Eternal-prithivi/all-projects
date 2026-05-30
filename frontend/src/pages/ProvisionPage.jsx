@@ -24,7 +24,6 @@ const TABS = [
 export default function ProvisionPage() {
   const [tab, setTab] = useState('manage');
   const [awsByocConnected, setAwsByocConnected] = useState(null);
-  const [userPermissions, setUserPermissions] = useState(null);
   const [terraformOk, setTerraformOk] = useState(null);
   const [deploymentCount, setDeploymentCount] = useState(0);
 
@@ -32,16 +31,13 @@ export default function ProvisionPage() {
     let cancelled = false;
     (async () => {
       try {
-        const [byocRes, permRes, statusRes] = await Promise.all([
+        const [byocRes, statusRes] = await Promise.all([
           api.get('/byoc/status'),
-          api.get('/provision/my-permissions').catch(() => ({ data: null })),
           api.get('/provision/status').catch(() => ({ data: {} })),
         ]);
         if (cancelled) return;
         setAwsByocConnected(!!byocRes.data?.connections?.aws?.connected);
-        if (permRes.data) setUserPermissions(permRes.data);
         setTerraformOk(statusRes.data?.terraform_installed ?? false);
-        if (statusRes.data?.user_permissions) setUserPermissions(statusRes.data.user_permissions);
       } catch {
         if (!cancelled) setAwsByocConnected(false);
       }
@@ -86,11 +82,6 @@ export default function ProvisionPage() {
     );
   }
 
-  const visibleTabs = TABS.filter((t) => {
-    if (t.id === 'deploy' && userPermissions && !userPermissions.can_plan) return false;
-    return true;
-  });
-
   return (
     <div className="provision-page">
       <PageHeader
@@ -102,16 +93,10 @@ export default function ProvisionPage() {
       <div className="provision-status-bar">
         <span className="status-dot online" />
         <span>AWS connected via Settings</span>
-        {userPermissions && (
-          <span className="role-badge" style={{ marginLeft: 'auto' }}>
-            Role: {userPermissions.provision_role}
-            {userPermissions.can_apply ? ' · can deploy' : ' · view / plan'}
-          </span>
-        )}
       </div>
 
       <nav className="provision-tabs" aria-label="Infrastructure sections">
-        {visibleTabs.map((t) => (
+        {TABS.map((t) => (
           <button
             key={t.id}
             type="button"
@@ -127,10 +112,7 @@ export default function ProvisionPage() {
       </nav>
 
       {tab === 'manage' && (
-        <ProvisionManagePanel
-          userPermissions={userPermissions}
-          onDeploymentsChange={setDeploymentCount}
-        />
+        <ProvisionManagePanel onDeploymentsChange={setDeploymentCount} />
       )}
       {tab === 'activity' && <ProvisionActivityPanel />}
       {tab === 'policies' && <ProvisionPoliciesPanel />}
@@ -142,7 +124,6 @@ export default function ProvisionPage() {
             </div>
           )}
           <ProvisionDeployWizard
-            userPermissions={userPermissions}
             terraformOk={terraformOk}
             onDeployed={() => {
               setTab('manage');

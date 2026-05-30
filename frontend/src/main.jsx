@@ -73,7 +73,6 @@ const AdminPaymentsPage = lazy(() => import("./pages/admin/AdminPaymentsPage.jsx
 const AdminSystemPage = lazy(() => import("./pages/admin/AdminSystemPage.jsx"));
 const AdminSettingsPage = lazy(() => import("./pages/admin/AdminSettingsPage.jsx"));
 const AdminTestPage = lazy(() => import("./pages/admin/AdminTestPage.jsx"));
-const AdminProvisionRolesPage = lazy(() => import("./pages/admin/AdminProvisionRolesPage.jsx"));
 const TrustCenterPage = lazy(() => import("./pages/TrustCenterPage.jsx"));
 const CookiePolicyPage = lazy(() => import("./pages/CookiePolicyPage.jsx"));
 const DpaPage = lazy(() => import("./pages/DpaPage.jsx"));
@@ -156,7 +155,6 @@ const router = createBrowserRouter([
               { path: "analytics", element: <Suspense fallback={<LazyLoadFallback />}><AdminAnalyticsPage /></Suspense> },
               { path: "payments", element: <Suspense fallback={<LazyLoadFallback />}><AdminPaymentsPage /></Suspense> },
               { path: "system", element: <Suspense fallback={<LazyLoadFallback />}><AdminSystemPage /></Suspense> },
-              { path: "provision-roles", element: <Suspense fallback={<LazyLoadFallback />}><AdminProvisionRolesPage /></Suspense> },
               { path: "settings", element: <Suspense fallback={<LazyLoadFallback />}><AdminSettingsPage /></Suspense> },
               { path: "test", element: <Suspense fallback={<LazyLoadFallback />}><AdminTestPage /></Suspense> },
             ],

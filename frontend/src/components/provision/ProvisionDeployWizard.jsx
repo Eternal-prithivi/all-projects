@@ -86,7 +86,7 @@ async function wakeBackend() {
   }
 }
 
-export default function ProvisionDeployWizard({ userPermissions, terraformOk, onDeployed }) {
+export default function ProvisionDeployWizard({ terraformOk, onDeployed }) {
   const [step, setStep] = useState(0);
   const [selectedTemplate, setSelectedTemplate] = useState(null);
 
@@ -120,6 +120,7 @@ export default function ProvisionDeployWizard({ userPermissions, terraformOk, on
   const [costEstimate, setCostEstimate] = useState(null);
   const [planOutput, setPlanOutput] = useState('');
   const [deploymentId, setDeploymentId] = useState(null);
+  const [planReady, setPlanReady] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const terminalRef = useRef(null);
@@ -178,6 +179,7 @@ export default function ProvisionDeployWizard({ userPermissions, terraformOk, on
     setLoading(true);
     setError(null);
     setPlanOutput('');
+    setPlanReady(false);
     const planStartedAt = Date.now();
     try {
       await wakeBackend();
@@ -190,7 +192,7 @@ export default function ProvisionDeployWizard({ userPermissions, terraformOk, on
 
       // Background plan — poll until done (avoids Render 502 on long terraform)
       if (res.data.status === 'running' && res.data.deployment_id) {
-        setPlanOutput('Running terraform init and plan on the server…\n');
+        setPlanOutput('Starting terraform plan on the server…\n');
         for (let attempt = 0; attempt < PLAN_POLL_MAX_ATTEMPTS; attempt += 1) {
           await sleep(PLAN_POLL_INTERVAL_MS);
           let st;
@@ -204,18 +206,29 @@ export default function ProvisionDeployWizard({ userPermissions, terraformOk, on
             }
             throw pollErr;
           }
+          const elapsedSec = Math.round((Date.now() - planStartedAt) / 1000);
           if (st.data.plan_output) {
             setPlanOutput(st.data.plan_output);
+          } else if (!st.data.done) {
+            const stage = st.data.stage || st.data.status || 'working';
+            setPlanOutput(
+              `Terraform ${stage} in progress (${elapsedSec}s elapsed, poll ${attempt + 1}/${PLAN_POLL_MAX_ATTEMPTS})…\n`
+            );
           }
           if (st.data.done) {
             if (!st.data.success) {
               const stage = st.data.stage ? `${st.data.stage}: ` : '';
               setError(stage + (st.data.error || st.data.plan_output || 'Terraform plan failed'));
+            } else {
+              setPlanReady(true);
             }
             return;
           }
         }
-        setError('Plan is still running on the server. Check Deployments tab or try again in a minute.');
+        setError(
+          'Plan is still running on the server after ~5 minutes. ' +
+          'Open Render logs and search for AGENT_DEBUG or your deployment id, or try again.'
+        );
         return;
       }
 
@@ -235,11 +248,14 @@ export default function ProvisionDeployWizard({ userPermissions, terraformOk, on
 
   // ── Apply ──
   const runApply = async () => {
-    if (!deploymentId) return;
+    if (!deploymentId || !planReady) return;
     setLoading(true);
     setError(null);
+    setPlanOutput((prev) => `${prev}\n\nApplying changes in AWS (this can take several minutes)…\n`);
     try {
-      const res = await api.post(`/provision/apply/${deploymentId}`);
+      const res = await api.post(`/provision/apply/${deploymentId}`, {
+        timeout: 10 * 60 * 1000,
+      });
       if (res.data.success) {
         setPlanOutput(prev => prev + '\n\n✅ Apply complete! ' + res.data.resources_count + ' resources created.');
         onDeployed?.();
@@ -672,13 +688,16 @@ export default function ProvisionDeployWizard({ userPermissions, terraformOk, on
             {deploymentId && (
               <button
                 className="btn-provision primary"
-                disabled={loading}
+                disabled={loading || !planReady}
+                title={!planReady ? 'Wait for terraform plan to finish successfully' : undefined}
                 onClick={runApply}
               >
-                {loading ? (
-                  <><div className="provision-spinner" style={{ width: 16, height: 16 }} /> Applying...</>
-                ) : (
+                {loading && planReady ? (
+                  <><div className="provision-spinner" style={{ width: 16, height: 16 }} /> Applying in AWS…</>
+                ) : planReady ? (
                   '🚀 Apply — Create Resources'
+                ) : (
+                  '⏳ Waiting for plan…'
                 )}
               </button>
             )}
