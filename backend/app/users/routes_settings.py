@@ -12,8 +12,8 @@
 # =============================================================================
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
-from typing import Optional, Dict, Any
+from pydantic import BaseModel, field_validator
+from typing import Optional, Dict, Any, Literal
 from datetime import datetime
 from ..users.routes_users import get_current_user
 from ..users.user_model import User
@@ -38,6 +38,18 @@ class PreferencesSettings(BaseModel):
     timezone: str = "UTC-5"
     date_format: str = "MM/DD/YYYY"
     currency: str = "USD"
+    # Infrastructure: boto3 (fast, Render-friendly) or terraform (full IaC + drift)
+    provision_engine: Literal["boto3", "terraform"] = "boto3"
+
+    @field_validator("provision_engine", mode="before")
+    @classmethod
+    def _normalize_provision_engine(cls, value: object) -> str:
+        if value is None:
+            return "boto3"
+        v = str(value).lower().strip()
+        if v not in ("boto3", "terraform"):
+            raise ValueError("provision_engine must be 'boto3' or 'terraform'")
+        return v
 
 
 class BillingSettings(BaseModel):

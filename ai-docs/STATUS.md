@@ -1,6 +1,6 @@
 # STATUS.md — Live Project Snapshot
 
-**Last Updated:** 2026-05-29
+**Last Updated:** 2026-05-30
 
 ---
 
@@ -17,7 +17,7 @@
 
 ## 🔴 Active Task
 
-**None** — start **Phase 20.1** (pytest expansion) when ready.
+**None** — Provision engine toggle (DEC-022) complete 2026-05-30. Next: Phase 20.1 pytest expansion when ready.
 
 ---
 

@@ -1,7 +1,7 @@
 # AI_CONTEXT_FRONTEND.md — Frontend Architecture & Source Map
 
 > Read this for any frontend, UI, CSS, component, or routing task.
-> **Last Updated: 2026-05-29** — Phase 18 enterprise public pages.
+> **Last Updated: 2026-05-30** — Settings `provision_engine`; Infrastructure page engine badge (DEC-022).
 
 ---
 

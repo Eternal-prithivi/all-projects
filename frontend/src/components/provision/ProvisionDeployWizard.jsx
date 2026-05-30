@@ -118,7 +118,7 @@ async function waitForBackend(maxWaitMs = WAKE_MAX_WAIT_MS) {
   return { ok: false, attempts: attempt };
 }
 
-export default function ProvisionDeployWizard({ terraformOk, onDeployed }) {
+export default function ProvisionDeployWizard({ terraformOk, provisionEngine = 'boto3', onDeployed }) {
   const [step, setStep] = useState(0);
   const [selectedTemplate, setSelectedTemplate] = useState(null);
 
@@ -377,7 +377,13 @@ export default function ProvisionDeployWizard({ terraformOk, onDeployed }) {
     }
   }, [planOutput]);
 
-  const canProceedStep0 = hasAnyModule;
+  const ec2NeedsVpc = config.enable_ec2 && !config.enable_vpc;
+  const cloudwatchOnlyHint =
+    config.enable_cloudwatch && !config.enable_ec2
+      ? 'CloudWatch will create SNS alerts only. Enable EC2 for CPU alarms.'
+      : null;
+
+  const canProceedStep0 = hasAnyModule && !(provisionEngine === 'boto3' && ec2NeedsVpc);
   const canProceedStep2 = policyResult && (!policyResult.blocks || policyResult.blocks.length === 0);
 
 
@@ -385,7 +391,11 @@ export default function ProvisionDeployWizard({ terraformOk, onDeployed }) {
     <div className="provision-deploy-wizard">
       <div className="section-header">
         <h3>Deploy a new stack (optional)</h3>
-        <p>Uses your AWS account from Settings. For day-to-day optimization, use Cost, Storage, and VM pages instead.</p>
+        <p>
+          Uses your AWS account from Settings. Deploy engine:{' '}
+          <strong>{provisionEngine === 'terraform' ? 'Terraform' : 'Boto3'}</strong>
+          {' '}(change in Settings). For day-to-day optimization, use Cost, Storage, and VM pages instead.
+        </p>
       </div>
 
       <div className="wizard-steps">
@@ -454,6 +464,12 @@ export default function ProvisionDeployWizard({ terraformOk, onDeployed }) {
             ))}
           </div>
 
+          {provisionEngine === 'boto3' && ec2NeedsVpc && (
+            <p className="provision-empty-hint" style={{ color: 'var(--warning, #e6a23c)' }}>
+              EC2 requires VPC when using Boto3. Enable VPC or switch to Terraform in Settings.
+            </p>
+          )}
+
           <div className="provision-actions">
             <button
               className="btn-provision primary"
@@ -472,6 +488,11 @@ export default function ProvisionDeployWizard({ terraformOk, onDeployed }) {
           <div className="section-header">
             <h3>Configure Resources</h3>
             <p>Set parameters for your selected modules. Defaults are free-tier safe.</p>
+            {cloudwatchOnlyHint && (
+              <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginTop: '0.5rem' }}>
+                {cloudwatchOnlyHint}
+              </p>
+            )}
           </div>
 
           <div className="config-form">

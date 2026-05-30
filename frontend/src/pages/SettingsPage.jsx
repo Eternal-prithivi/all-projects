@@ -50,6 +50,7 @@ const SettingsPage = () => {
     timezone: 'UTC+5:30',
     dateFormat: 'MM/DD/YYYY',
     currency: 'USD',
+    provisionEngine: 'boto3',
   });
 
   // BYOC State
@@ -178,6 +179,7 @@ const SettingsPage = () => {
         ...prev,
         ...data.preferences,
         dateFormat: data.preferences?.date_format || data.preferences?.dateFormat || prev.dateFormat,
+        provisionEngine: data.preferences?.provision_engine || prev.provisionEngine || 'boto3',
         theme: serverTheme && ['dark', 'light', 'auto'].includes(serverTheme) ? serverTheme : theme,
       }));
     } catch (error) {
@@ -412,6 +414,7 @@ const SettingsPage = () => {
         timezone: nextPreferences.timezone,
         date_format: nextPreferences.dateFormat,
         currency: nextPreferences.currency,
+        provision_engine: nextPreferences.provisionEngine || 'boto3',
       }).catch(() => {
         notifications.error('Theme updated locally but failed to save to account');
       });
@@ -426,6 +429,7 @@ const SettingsPage = () => {
         timezone: preferences.timezone,
         date_format: preferences.dateFormat,
         currency: preferences.currency,
+        provision_engine: preferences.provisionEngine || 'boto3',
       });
       
       // Update the app-wide PreferencesContext so formatting changes propagate immediately
@@ -934,6 +938,40 @@ const SettingsPage = () => {
               );
             })}
           </div>
+        </div>
+
+        {/* Infrastructure provisioning engine */}
+        <div className="settings-card animate-fade-in-up">
+          <h3>
+            <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor">
+              <path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zM4.5 8a3.5 3.5 0 1 1 7 0 3.5 3.5 0 0 1-7 0z"/>
+            </svg>
+            Infrastructure provisioning
+          </h3>
+          <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '1rem' }}>
+            Choose how new stacks are deployed. Works on localhost and Render. Boto3 is faster on Render free tier.
+          </p>
+          <div className="settings-group">
+            <div className="setting-item-full">
+              <label>Deploy engine</label>
+              <select
+                name="provisionEngine"
+                value={preferences.provisionEngine || 'boto3'}
+                onChange={handlePreferenceChange}
+                className="zenith-select settings-select"
+              >
+                <option value="boto3">Fast deploy (Boto3) — recommended for Render</option>
+                <option value="terraform">Full IaC (Terraform) — drift + state file</option>
+              </select>
+              <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: '8px 0 0' }}>
+                Boto3: direct AWS calls, works on localhost and Render without Terraform CLI.
+                Terraform: full plan/apply; requires Terraform installed on the backend (Docker on Render).
+              </p>
+            </div>
+          </div>
+          <button className="btn-save" onClick={handleSavePreferences} style={{ marginTop: '12px' }}>
+            Save provisioning preference
+          </button>
         </div>
 
         {/* Preferences */}

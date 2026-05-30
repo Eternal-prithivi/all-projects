@@ -23,6 +23,19 @@ Notes: [one line optional]
 ## Session Log (recent only)
 
 ---
+SESSION_ID: 20260530-provision-engine
+Date: 2026-05-30
+Agent: Cursor
+Task: Provision engine toggle + modular boto3 (localhost + Render)
+Changes:
+- Added DEC-022, engine_resolver, boto3_composer (6 AWS modules), Settings provision_engine UI
+- routes_provision uses user preference; Terraform path for all configs when terraform selected
+- ProvisionPage engine badge; drift blocked for boto3 deployments
+Outcome: Done
+Notes: pytest test_provision_engine 8/8 + routes 3/3 passed
+---
+
+---
 SESSION_ID: 20260529-uiux
 Date: 2026-05-29
 Agent: Cursor

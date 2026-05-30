@@ -25,6 +25,7 @@ export default function ProvisionPage() {
   const [tab, setTab] = useState('manage');
   const [awsByocConnected, setAwsByocConnected] = useState(null);
   const [terraformOk, setTerraformOk] = useState(null);
+  const [provisionEngine, setProvisionEngine] = useState('boto3');
   const [deploymentCount, setDeploymentCount] = useState(0);
 
   useEffect(() => {
@@ -38,6 +39,7 @@ export default function ProvisionPage() {
         if (cancelled) return;
         setAwsByocConnected(!!byocRes.data?.connections?.aws?.connected);
         setTerraformOk(statusRes.data?.terraform_installed ?? false);
+        setProvisionEngine(statusRes.data?.user_provision_engine || 'boto3');
       } catch {
         if (!cancelled) setAwsByocConnected(false);
       }
@@ -93,6 +95,11 @@ export default function ProvisionPage() {
       <div className="provision-status-bar">
         <span className="status-dot online" />
         <span>AWS connected via Settings</span>
+        <span style={{ marginLeft: '1rem', opacity: 0.85 }}>
+          Engine: {provisionEngine === 'terraform' ? 'Terraform' : 'Boto3'}
+          {provisionEngine === 'terraform' && terraformOk && ' (CLI ready)'}
+          {provisionEngine === 'terraform' && !terraformOk && ' (CLI missing — change in Settings)'}
+        </span>
       </div>
 
       <nav className="provision-tabs" aria-label="Infrastructure sections">
@@ -118,13 +125,17 @@ export default function ProvisionPage() {
       {tab === 'policies' && <ProvisionPoliciesPanel />}
       {tab === 'deploy' && (
         <>
-          {!terraformOk && (
+          {provisionEngine === 'terraform' && !terraformOk && (
             <div className="provision-empty-state" style={{ marginBottom: '1rem' }}>
-              <p>Terraform CLI is not available on the server. Contact your administrator to enable deployments.</p>
+              <p>
+                Terraform is selected in Settings but the CLI is not available on this server.
+                Switch to Boto3 in Settings for localhost/Render, or use the Docker backend image on Render.
+              </p>
             </div>
           )}
           <ProvisionDeployWizard
             terraformOk={terraformOk}
+            provisionEngine={provisionEngine}
             onDeployed={() => {
               setTab('manage');
               setDeploymentCount((c) => c + 1);

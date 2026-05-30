@@ -187,7 +187,7 @@ When a user connects BYOC for a CSP, **that user's** API operations should use t
 | Cost Explorer / billing APIs | Yes | Yes (BigQuery export in user's project) | Platform SP only* | Azure BYOC stores storage keys only |
 | Dashboard cost refresh | Yes | — | — | Per-user cache |
 | VM cluster (Compute) | N/A | Yes** | N/A | Uses BYOC SA when `get_vm_user` context set |
-| Terraform provision | Yes | — | — | `provision/byoc_credentials.py` (DEC-019) |
+| Terraform provision | Yes | — | — | `provision/byoc_credentials.py` (DEC-019); engine: `provision_engine` pref (DEC-022) |
 | Zenith subscription billing | — | — | — | Razorpay/invoices — not customer cloud |
 
 \* Azure cost still uses platform service principal until BYOC stores Cost Management credentials.  

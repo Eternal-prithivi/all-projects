@@ -7,6 +7,17 @@
 
 ---
 
+**Provision engine toggle + modular Boto3** — COMPLETE 2026-05-30
+
+- DEC-022: `provision_engine` user preference (`boto3` default | `terraform`) in Settings and MongoDB
+- `engine_resolver.py` routes plan/apply/destroy; `provision_engine` stored per deployment
+- `boto3_composer.py`: modular S3, DynamoDB, VPC, EC2, IAM, CloudWatch (all templates + custom module toggles)
+- Terraform modules under `backend/terraform/` unchanged; Terraform path restored when user selects Terraform
+- `GET /api/provision/status` returns engine + hosting notes for localhost/Render
+- Tests: `test_provision_engine.py` (11 passed with existing provision routes test)
+
+---
+
 **Phase 19: Isolated ops & hygiene** — COMPLETE 2026-05-29
 
 - CORS production tightening + `CORS_ALLOWED_ORIGINS`; `DEPLOYMENT_SECRETS.md`, `CREDENTIAL_ROTATION.md`, `CLOUD_COST_GUARDRAILS.md`

@@ -65,11 +65,17 @@ from app.provision.audit_logger import (
     get_user_audit_log,
 )
 from app.provision.boto3_deployer import (
-    is_fast_path_config,
+    BOTO3_SUPPORTED_MODULES,
     plan_fast,
     apply_fast,
     destroy_fast,
 )
+from app.provision.engine_resolver import (
+    resolve_provision_engine,
+    deployment_engine,
+    get_user_provision_engine,
+)
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -153,13 +159,25 @@ async def list_modules(user: dict = Depends(get_current_user)):
 
 @router.get("/status")
 async def provisioning_status(user: dict = Depends(get_current_user)):
-    """Check if Terraform is installed and return system status."""
+    """Terraform CLI status, user engine preference, and hosting hints (localhost + Render)."""
     tf_installed = check_terraform_installed()
     tf_version = get_terraform_version() if tf_installed else None
+    user_engine = get_user_provision_engine(user.username)
+    env = os.getenv("ENVIRONMENT", "development")
     return {
         "terraform_installed": tf_installed,
         "terraform_version": tf_version,
         "policy_rules_count": len(get_yaml_rules()),
+        "user_provision_engine": user_engine,
+        "boto3_supported_modules": sorted(BOTO3_SUPPORTED_MODULES),
+        "environment": env,
+        "hosting_notes": {
+            "boto3": "Works on localhost and Render without Terraform CLI.",
+            "terraform": (
+                "Requires Terraform CLI (Docker on Render). "
+                "May be slow on Render free tier; use Boto3 for quick deploys."
+            ),
+        },
     }
 
 
@@ -213,9 +231,7 @@ async def run_plan(
     config_dict = config.model_dump()
     _prepare_provision_config(config_dict)
 
-    # Only the terraform path requires the CLI; fast-path (boto3) does not.
-    if not is_fast_path_config(config_dict) and not check_terraform_installed():
-        raise HTTPException(status_code=503, detail="Terraform CLI is not installed on this server.")
+    engine = resolve_provision_engine(user.username, config_dict)
 
     policy_result = full_policy_check(config_dict, include_opa=False)
     cost_result = estimate_cost(config_dict, use_infracost=False)
@@ -250,10 +266,7 @@ async def run_plan(
             "cost_estimate": cost_result.model_dump(),
         }
 
-    # ── Fast path: simple templates skip Terraform entirely (boto3 direct) ──
-    # Required because Render free tier (0.1 CPU / 512MB) cannot reliably run
-    # `terraform plan` with the AWS provider — multi-minute hangs / OOM kills.
-    if is_fast_path_config(config_dict):
+    if engine == "boto3":
         fast_result = plan_fast(config_dict, aws_creds)
         status = DeploymentStatus.AWAITING_APPLY if fast_result["success"] else DeploymentStatus.PLAN_FAILED
         _save_deployment(
@@ -267,13 +280,14 @@ async def run_plan(
                 "plan_error": fast_result.get("error") or "",
                 "plan_stage": "plan",
                 "has_plan_changes": fast_result.get("has_changes", False),
+                "provision_engine": "boto3",
                 "fast_path": True,
             }},
         )
         log_provision_action(
             action="plan", actor=user.username, deployment_id=deployment_id,
             status="success" if fast_result["success"] else "failed",
-            details={"fast_path": True, "template": config_dict.get("template")},
+            details={"provision_engine": "boto3", "template": config_dict.get("template")},
             error=fast_result.get("error"),
         )
         return {
@@ -281,6 +295,7 @@ async def run_plan(
             "status": "done",
             "deployment_id": deployment_id,
             "stage": "plan",
+            "provision_engine": "boto3",
             "fast_path": True,
             "plan_output": fast_result["output"],
             "error": fast_result.get("error"),
@@ -292,6 +307,10 @@ async def run_plan(
         user.username, deployment_id, config_dict, "",
         DeploymentStatus.PLANNING, policy_result, cost_result,
         plan_output="Preparing terraform workspace on the server…\n",
+    )
+    _get_deployments_collection().update_one(
+        {"deployment_name": deployment_id},
+        {"$set": {"provision_engine": "terraform", "fast_path": False}},
     )
 
     thread = threading.Thread(
@@ -316,6 +335,7 @@ async def run_plan(
         "status": "running",
         "deployment_id": deployment_id,
         "stage": "background",
+        "provision_engine": "terraform",
         "message": "Terraform plan is running. Poll /api/provision/plan/status/{deployment_id}.",
         "policy_check": policy_result.model_dump(),
         "cost_estimate": cost_result.model_dump(),
@@ -414,8 +434,7 @@ async def run_apply(
         {"$set": {"status": DeploymentStatus.APPLYING, "updated_at": datetime.utcnow()}},
     )
 
-    # ── Fast path: simple templates use boto3 directly (no terraform) ──
-    if deployment.get("fast_path") or is_fast_path_config(config_dict):
+    if deployment_engine(deployment) == "boto3":
         apply_result = apply_fast(config_dict, aws_creds)
         resources = apply_result.get("resources", []) if apply_result["success"] else []
         new_status = DeploymentStatus.DEPLOYED if apply_result["success"] else DeploymentStatus.APPLY_FAILED
@@ -425,6 +444,7 @@ async def run_apply(
                 "status": new_status,
                 "apply_output": apply_result.get("output", ""),
                 "resources_count": len(resources),
+                "provision_engine": "boto3",
                 "fast_path": True,
                 "updated_at": datetime.utcnow(),
             }},
@@ -432,7 +452,7 @@ async def run_apply(
         log_provision_action(
             action="apply", actor=user.username, deployment_id=deployment_id,
             status="success" if apply_result["success"] else "failed",
-            details={"resources_count": len(resources), "fast_path": True},
+            details={"resources_count": len(resources), "provision_engine": "boto3"},
             error=apply_result.get("error"),
         )
         return {
@@ -441,6 +461,7 @@ async def run_apply(
             "resources_count": len(resources),
             "output": apply_result.get("output", ""),
             "error": apply_result.get("error"),
+            "provision_engine": "boto3",
             "fast_path": True,
         }
 
@@ -509,7 +530,7 @@ async def run_destroy(
         {"$set": {"status": DeploymentStatus.DESTROYING, "updated_at": datetime.utcnow()}},
     )
 
-    if deployment.get("fast_path") or is_fast_path_config(config_dict):
+    if deployment_engine(deployment) == "boto3":
         destroy_result = destroy_fast(config_dict, aws_creds)
     else:
         workspace = deployment.get("terraform_workspace", "")
@@ -685,6 +706,15 @@ async def check_drift(
     if deployment.get("status") != DeploymentStatus.DEPLOYED:
         raise HTTPException(status_code=400, detail="Drift check only available for deployed infrastructure.")
 
+    if deployment_engine(deployment) == "boto3":
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Drift detection requires Terraform. "
+                "Re-deploy with Terraform in Settings, or check resources in the AWS console."
+            ),
+        )
+
     workspace = deployment.get("terraform_workspace", "")
     aws_creds = _resolve_byoc_credentials(
         user, deployment.get("config", {}).get("aws_region", "ap-south-1")
@@ -744,6 +774,12 @@ async def remediate_deployment_drift(
 
     if deployment.get("status") != DeploymentStatus.DEPLOYED:
         raise HTTPException(status_code=400, detail="Remediation only available for deployed infrastructure.")
+
+    if deployment_engine(deployment) == "boto3":
+        raise HTTPException(
+            status_code=400,
+            detail="Drift remediation requires Terraform-managed deployments.",
+        )
 
     workspace = deployment.get("terraform_workspace", "")
     aws_creds = _resolve_byoc_credentials(
