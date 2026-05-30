@@ -68,7 +68,7 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["Provisioning"])
 
-RECENT_DEPLOYMENTS_LIMIT = 10
+RECENT_DEPLOYMENTS_LIMIT = 5
 _DEPLOYMENT_LIST_PROJECTION = {"plan_output": 0, "apply_output": 0}
 
 

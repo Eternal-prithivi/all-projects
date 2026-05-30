@@ -262,7 +262,7 @@ export default function ProvisionManagePanel({ onDeploymentsChange }) {
         <div className="deployments-section">
           <div className="deployments-section-header">
             <h3>Recent deployments</h3>
-            <span className="deployments-section-hint">Last {recent.length} active</span>
+            <span className="deployments-section-hint">Up to 5 most recent</span>
           </div>
 
           {recent.length === 0 ? (
