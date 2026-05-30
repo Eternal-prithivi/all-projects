@@ -157,10 +157,17 @@ export default function ProvisionDeployWizard({ userPermissions, terraformOk, on
     setLoading(true);
     setError(null);
     setPlanOutput('');
+    const planStartedAt = Date.now();
+    // #region agent log
+    fetch('http://127.0.0.1:7873/ingest/7adea292-3505-46ae-9501-d327cf266f05',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'8e7315'},body:JSON.stringify({sessionId:'8e7315',runId:'pre-fix',hypothesisId:'H3',location:'ProvisionDeployWizard.runPlan:start',message:'plan POST starting',data:{url:'/provision/plan',timeoutMs:PLAN_REQUEST_TIMEOUT_MS},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
     try {
       const res = await api.post('/provision/plan', config, {
         timeout: PLAN_REQUEST_TIMEOUT_MS,
       });
+      // #region agent log
+      fetch('http://127.0.0.1:7873/ingest/7adea292-3505-46ae-9501-d327cf266f05',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'8e7315'},body:JSON.stringify({sessionId:'8e7315',runId:'pre-fix',hypothesisId:'H1',location:'ProvisionDeployWizard.runPlan:success',message:'plan POST completed',data:{status:res.status,success:res.data?.success,stage:res.data?.stage,elapsedMs:Date.now()-planStartedAt,hasCorsHeader:!!res.headers?.['access-control-allow-origin']},timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
       setPlanOutput(res.data.plan_output || '');
       setDeploymentId(res.data.deployment_id);
       setPolicyResult(res.data.policy_check);
@@ -174,6 +181,9 @@ export default function ProvisionDeployWizard({ userPermissions, terraformOk, on
         }
       }
     } catch (err) {
+      // #region agent log
+      fetch('http://127.0.0.1:7873/ingest/7adea292-3505-46ae-9501-d327cf266f05',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'8e7315'},body:JSON.stringify({sessionId:'8e7315',runId:'pre-fix',hypothesisId:'H5',location:'ProvisionDeployWizard.runPlan:error',message:'plan POST failed',data:{elapsedMs:Date.now()-planStartedAt,status:err.response?.status,code:err.code,message:err.message,hasResponse:!!err.response,responseDataType:typeof err.response?.data},timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
       setError(formatProvisionError(err, 'Failed to run terraform plan'));
     } finally {
       setLoading(false);

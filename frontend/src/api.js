@@ -17,9 +17,14 @@
 //   - Import apiClient in VMClusterPage — it uses its own fetch() pattern
 // =============================================================================
 import axios from "axios";
-import { getApiBaseUrl } from "./config/apiBase.js";
+import { getApiBaseUrl, getApiRoot } from "./config/apiBase.js";
 
 const API_BASE_URL = getApiBaseUrl();
+
+// #region agent log
+console.info('[AGENT_DEBUG] api base', { apiRoot: getApiRoot(), apiBaseUrl: API_BASE_URL });
+fetch('http://127.0.0.1:7873/ingest/7adea292-3505-46ae-9501-d327cf266f05',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'8e7315'},body:JSON.stringify({sessionId:'8e7315',runId:'pre-fix',hypothesisId:'H3',location:'api.js:init',message:'api client configured',data:{apiRoot:getApiRoot(),apiBaseUrl:API_BASE_URL,mode:import.meta.env.MODE,viteApiUrl:import.meta.env.VITE_API_URL||null},timestamp:Date.now()})}).catch(()=>{});
+// #endregion
 
 console.log('🚀 API Base URL:', API_BASE_URL);
 console.log('🚀 Environment:', import.meta.env.MODE);

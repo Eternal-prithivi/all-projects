@@ -31,6 +31,8 @@ from __future__ import annotations
 import logging
 import time
 from datetime import datetime
+
+from app.debug_agent_log import agent_log
 from typing import Any, Optional
 
 from bson import ObjectId
@@ -250,11 +252,29 @@ async def run_plan(
 
     deployment_id = f"{user.username}-{int(time.time())}"
     workspace = ""
+    plan_t0 = time.monotonic()
+
+    # #region agent log
+    agent_log(
+        "H5",
+        "routes_provision.run_plan:entry",
+        "plan request started",
+        {"deployment_id": deployment_id, "user": user.username},
+    )
+    # #endregion
 
     try:
         # Step 3: Create workspace + write tfvars
         workspace = create_workspace(deployment_id)
         write_tfvars(workspace, config_dict)
+        # #region agent log
+        agent_log(
+            "H4",
+            "routes_provision.run_plan:workspace",
+            "workspace ready",
+            {"deployment_id": deployment_id, "elapsed_s": round(time.monotonic() - plan_t0, 2)},
+        )
+        # #endregion
 
         # Fill in user-specific tags
         config_dict["tags"]["Owner"] = user.username
@@ -281,7 +301,22 @@ async def run_plan(
 
         runner = TerraformRunner(workspace, aws_creds)
 
+        init_t0 = time.monotonic()
         init_result = runner.init()
+        # #region agent log
+        agent_log(
+            "H1",
+            "routes_provision.run_plan:init_done",
+            "terraform init finished",
+            {
+                "deployment_id": deployment_id,
+                "success": init_result["success"],
+                "init_s": round(time.monotonic() - init_t0, 2),
+                "total_s": round(time.monotonic() - plan_t0, 2),
+                "error_len": len(init_result.get("error") or ""),
+            },
+        )
+        # #endregion
         if not init_result["success"]:
             err = init_result.get("error") or "Terraform init failed"
             logger.error("Provision plan init failed for %s: %s", deployment_id, err[:500])
@@ -301,7 +336,22 @@ async def run_plan(
                 "cost_estimate": cost_result.model_dump(),
             }
 
+        plan_t1 = time.monotonic()
         plan_result = runner.plan()
+        # #region agent log
+        agent_log(
+            "H1",
+            "routes_provision.run_plan:plan_done",
+            "terraform plan finished",
+            {
+                "deployment_id": deployment_id,
+                "success": plan_result["success"],
+                "plan_s": round(time.monotonic() - plan_t1, 2),
+                "total_s": round(time.monotonic() - plan_t0, 2),
+                "error_len": len(plan_result.get("error") or ""),
+            },
+        )
+        # #endregion
 
         status = DeploymentStatus.AWAITING_APPLY if plan_result["success"] else DeploymentStatus.PLAN_FAILED
         plan_err = plan_result.get("error")
@@ -335,6 +385,18 @@ async def run_plan(
         }
     except Exception as exc:
         logger.exception("Provision plan unexpected error for %s", deployment_id)
+        # #region agent log
+        agent_log(
+            "H2",
+            "routes_provision.run_plan:exception",
+            "unhandled exception",
+            {
+                "deployment_id": deployment_id,
+                "exc_type": type(exc).__name__,
+                "total_s": round(time.monotonic() - plan_t0, 2),
+            },
+        )
+        # #endregion
         err = str(exc)
         if workspace:
             try:
