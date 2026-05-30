@@ -400,7 +400,7 @@ export default function ProvisionDeployWizard({ userPermissions, terraformOk, on
                     }
                   }}
                   placeholder="my-testing-bucket-for-zenith"
-                  pattern="[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]"
+                  pattern="[a-z0-9][a-z0-9.\-]{1,61}[a-z0-9]"
                   title="Lowercase letters, numbers, dots, and hyphens only (3–63 characters)"
                 />
                 <p className="config-field-hint">Use lowercase only — no spaces or uppercase (e.g. my-zenith-bucket-2026).</p>
