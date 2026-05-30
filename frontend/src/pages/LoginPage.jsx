@@ -6,6 +6,7 @@ import { getValidationErrorMessage, validateLoginForm } from '../utils/formValid
 import { getDeviceFingerprint } from '../utils/deviceFingerprint.js';
 import '../styles/auth.css';
 import '../styles/auth-polish.css';
+import { getApiRoot } from '../config/apiBase.js';
 
 function LoginPage() {
   const [username, setUsername] = useState('');
@@ -16,13 +17,7 @@ function LoginPage() {
   const [ssoProviders, setSsoProviders] = useState([]);
   const { login, isAuthenticated } = useAuth();
 
-  const apiRoot = useMemo(
-    () =>
-      import.meta.env.MODE === 'production'
-        ? 'https://zenith-backend-707i.onrender.com'
-        : 'http://localhost:8000',
-    []
-  );
+  const apiRoot = useMemo(() => getApiRoot(), []);
   const navigate = useNavigate();
   const location = useLocation();
 

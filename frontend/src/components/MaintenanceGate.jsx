@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+import { apiUrl } from '../config/apiBase.js';
 
 const ALLOWED_PREFIXES = [
   '/503',
@@ -30,7 +29,7 @@ export default function MaintenanceGate({ children }) {
 
     const check = async () => {
       try {
-        const res = await fetch(`${API_BASE}/api/platform/status`);
+        const res = await fetch(apiUrl('/platform/status'));
         if (!res.ok) {
           if (!cancelled) setChecked(true);
           return;

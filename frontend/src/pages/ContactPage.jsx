@@ -4,6 +4,7 @@ import { toast } from 'react-toastify';
 import MarketingPageLayout from '../components/layout/MarketingPageLayout.jsx';
 import { getValidationErrorMessage, validateContactForm } from '../utils/formValidation.js';
 import '../styles/contact.css';
+import { apiUrl } from '../config/apiBase.js';
 
 function ContactPage() {
   const navigate = useNavigate();
@@ -39,7 +40,7 @@ function ContactPage() {
     setLoading(true);
 
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/contact/submit`, {
+      const response = await fetch(apiUrl('/contact/submit'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

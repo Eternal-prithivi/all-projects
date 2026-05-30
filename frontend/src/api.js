@@ -17,12 +17,9 @@
 //   - Import apiClient in VMClusterPage — it uses its own fetch() pattern
 // =============================================================================
 import axios from "axios";
+import { getApiBaseUrl } from "./config/apiBase.js";
 
-// Determine API base URL based on environment
-// Use local backend for development
-const API_BASE_URL = import.meta.env.MODE === 'production' 
-  ? 'https://zenith-backend-707i.onrender.com/api'
-  : 'http://localhost:8000/api';
+const API_BASE_URL = getApiBaseUrl();
 
 console.log('🚀 API Base URL:', API_BASE_URL);
 console.log('🚀 Environment:', import.meta.env.MODE);

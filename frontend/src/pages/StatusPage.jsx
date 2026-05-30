@@ -4,7 +4,7 @@ import { FaCheckCircle, FaExclamationTriangle, FaTools } from 'react-icons/fa';
 import MarketingPageLayout from '../components/layout/MarketingPageLayout.jsx';
 import '../styles/status-page.css';
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+import { apiUrl } from '../config/apiBase.js';
 
 function statusLabel(overall) {
   if (overall === 'operational') return { text: 'All systems operational', icon: <FaCheckCircle />, className: 'ok' };
@@ -20,7 +20,7 @@ export default function StatusPage() {
     let cancelled = false;
     const load = async () => {
       try {
-        const res = await fetch(`${API_BASE}/api/platform/status`);
+        const res = await fetch(apiUrl('/platform/status'));
         if (!res.ok) throw new Error('Status unavailable');
         const json = await res.json();
         if (!cancelled) setData(json);

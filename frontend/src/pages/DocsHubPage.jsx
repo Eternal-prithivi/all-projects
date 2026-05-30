@@ -4,7 +4,9 @@ import { FaBook, FaCode } from 'react-icons/fa';
 import MarketingPageLayout from '../components/layout/MarketingPageLayout.jsx';
 import '../styles/docs-hub.css';
 
-const API_DOCS_URL = `${(import.meta.env.VITE_API_URL || 'http://localhost:8000').replace(/\/api\/?$/, '')}/docs`;
+import { getApiRoot } from '../config/apiBase.js';
+
+const API_DOCS_URL = `${getApiRoot()}/docs`;
 
 export default function DocsHubPage() {
   return (

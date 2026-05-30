@@ -4,7 +4,7 @@ import { FaEnvelopeOpenText } from 'react-icons/fa';
 import MarketingPageLayout from '../components/layout/MarketingPageLayout.jsx';
 import '../styles/verify-email.css';
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+import { apiUrl } from '../config/apiBase.js';
 
 export default function VerifyEmailPage() {
   const [searchParams] = useSearchParams();
@@ -17,7 +17,7 @@ export default function VerifyEmailPage() {
     (async () => {
       try {
         const res = await fetch(
-          `${API_BASE}/api/auth/verify-email?token=${encodeURIComponent(token)}`,
+          `${apiUrl('/auth/verify-email')}?token=${encodeURIComponent(token)}`,
           { method: 'POST' }
         );
         const body = await res.json().catch(() => ({}));
