@@ -1,13 +1,15 @@
 services:
   - type: web
     name: zenith-backend
-    env: python
+    env: docker
     region: singapore
     plan: free
     rootDir: backend
-    # requirements.txt includes en_core_web_sm wheel (NER for Phase 6 NLP)
-    buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    # Dockerfile installs Terraform CLI, copies terraform/ modules, pre-downloads
+    # AWS provider plugins, and starts uvicorn — required for /api/provision to work.
+    # DO NOT switch back to env: python — Terraform CLI will not be available and
+    # all infrastructure deploy endpoints will return 503.
+    dockerfilePath: ./Dockerfile
     # Fast liveness endpoint — must not block on MongoDB (see app/main.py /health)
     healthCheckPath: /health
     autoDeploy: true
