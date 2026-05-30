@@ -15,16 +15,21 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from pathlib import Path
 import os
 
-# This builds the correct path to the .env file in the project's root
-# Assuming .env is two levels up from this file (e.g., backend/app/utils/config.py -> backend/.env)
+# Local dev: backend/.env — Production (Render): OS env vars from the dashboard
 env_path = Path(__file__).resolve().parents[2] / '.env'
+_env_file = str(env_path) if env_path.is_file() else None
+
 
 class Settings(BaseSettings):
     """
     Manages all application settings, including cloud provider credentials.
     """
-    # Using model_config for Pydantic v2 setup for loading .env
-    model_config = SettingsConfigDict(env_file=env_path, extra="ignore")
+    # env_file only when present locally; Render/Docker always use injected env vars
+    model_config = SettingsConfigDict(
+        env_file=_env_file,
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
 
     # --- MongoDB Settings ---
     MONGO_CONNECTION_STRING: str

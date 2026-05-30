@@ -67,5 +67,7 @@ logs/
 *.log
 celerybeat-schedule*
 zenith-backend.env
+render-env-paste.env
+render-env-from-paste.env
 backend/.env.backup-local
 .DS_Store
