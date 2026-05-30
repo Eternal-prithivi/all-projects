@@ -225,14 +225,18 @@ def read_root():
 
 @app.get("/health", tags=["Health"])
 def health_check():
-    """Simple health check that reports MongoDB connection and GCP credential status."""
-    mongo_ok = False
-    try:
-        mongo_ok = mongodb_client.client is not None
-    except Exception:
-        mongo_ok = False
+    """
+    Liveness probe for Render — must respond in <5s without waiting on MongoDB/Terraform.
+    """
+    return {"status": "ok", "service": "zenith-api"}
 
+
+@app.get("/health/ready", tags=["Health"])
+def health_ready():
+    """Readiness probe — includes dependency status (may be slower)."""
+    mongo_ok = mongodb_client.is_connected() or mongodb_client.connect()
     return {
+        "status": "ok" if mongo_ok else "degraded",
         "mongo_connected": mongo_ok,
         "gcp_credentials_present": gcp_credentials_file_present(),
         "environment": getattr(settings, "ENVIRONMENT", "development"),
@@ -240,11 +244,21 @@ def health_check():
 
 
 @app.on_event("startup")
-def check_terraform_on_startup():
-    """Log a warning at startup if Terraform CLI is not installed."""
-    from app.provision.terraform_runner import check_terraform_installed, get_terraform_version
-    if check_terraform_installed():
-        version = get_terraform_version()
-        print(f"\u2705 Terraform CLI detected: v{version}")
-    else:
-        print("\u26a0\ufe0f  Terraform CLI not found — /api/provision endpoints will return 503")
+def on_startup():
+    """Connect MongoDB and log Terraform status without blocking the HTTP server."""
+    import threading
+
+    def _warm_dependencies() -> None:
+        mongodb_client.connect()
+        from app.provision.terraform_runner import (
+            check_terraform_installed,
+            get_terraform_version,
+        )
+
+        if check_terraform_installed():
+            version = get_terraform_version()
+            print(f"\u2705 Terraform CLI detected: v{version}")
+        else:
+            print("\u26a0\ufe0f  Terraform CLI not found — /api/provision endpoints will return 503")
+
+    threading.Thread(target=_warm_dependencies, daemon=True).start()

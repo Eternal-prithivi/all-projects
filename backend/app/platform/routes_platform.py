@@ -9,8 +9,6 @@ from app.utils.gcp_credentials import gcp_credentials_file_present
 
 router = APIRouter(tags=["Platform"])
 
-DB = get_database()
-
 
 @router.get("/status")
 async def get_platform_status():
@@ -23,7 +21,8 @@ async def get_platform_status():
     platform_name = "Zenith"
 
     try:
-        settings = DB["platform_settings"].find_one({"_id": "platform_config"})
+        db = get_database()
+        settings = db["platform_settings"].find_one({"_id": "platform_config"})
         if settings:
             maintenance_mode = bool(settings.get("maintenance_mode", False))
             allow_new_registrations = bool(settings.get("allow_new_registrations", True))
@@ -33,9 +32,9 @@ async def get_platform_status():
 
     mongo_ok = False
     try:
-        mongo_ok = mongodb_client.client is not None
+        mongo_ok = mongodb_client.is_connected() or mongodb_client.connect()
         if mongo_ok:
-            DB.command("ping")
+            get_database().command("ping")
             mongo_ok = True
     except Exception:
         mongo_ok = False
