@@ -3,7 +3,17 @@
 import tempfile
 from pathlib import Path
 
-from app.provision.terraform_runner import write_tfvars
+from app.provision.terraform_runner import _write_local_backend_config, write_tfvars
+
+
+def test_workspace_local_backend_replaces_s3():
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        (root / "backend.tf").write_text('terraform { backend "s3" {} }\n', encoding="utf-8")
+        _write_local_backend_config(root)
+        content = (root / "backend.tf").read_text(encoding="utf-8")
+        assert 'backend "local"' in content
+        assert "terraform.tfstate" in content
 
 
 def test_write_tfvars_enables_flags_and_tags():

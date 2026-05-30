@@ -139,10 +139,18 @@ export default function ProvisionDeployWizard({ userPermissions, terraformOk, on
       setPolicyResult(res.data.policy_check);
       setCostEstimate(res.data.cost_estimate);
       if (!res.data.success) {
-        setError(res.data.error || 'Terraform plan failed');
+        const stage = res.data.stage ? `${res.data.stage}: ` : '';
+        setError(stage + (res.data.error || 'Terraform plan failed'));
+        if (res.data.plan_output) {
+          setPlanOutput(res.data.plan_output);
+        }
       }
     } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to run terraform plan');
+      const data = err.response?.data;
+      const msg = (typeof data === 'object' && data)
+        ? (data.error || data.detail || data.message)
+        : null;
+      setError(msg || 'Failed to run terraform plan');
     } finally {
       setLoading(false);
     }

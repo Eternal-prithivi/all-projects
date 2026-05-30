@@ -257,8 +257,25 @@ async def run_plan(
     config_dict["tags"]["Owner"] = user.username
     config_dict["tags"]["ManagedBy"] = "zenith-provision"
 
-    # Step 4: Terraform init + plan
+    # Step 4: Terraform init + plan (AWS creds from Settings BYOC)
     aws_creds = _resolve_byoc_credentials(user, config_dict.get("aws_region", "ap-south-1"))
+    if not aws_creds.get("AWS_ACCESS_KEY_ID"):
+        msg = (
+            "No AWS credentials available for Terraform. "
+            "Connect AWS under Settings (BYOC), then try again."
+        )
+        log_provision_action(
+            action="plan", actor=user.username, deployment_id=deployment_id,
+            status="failed", details={"stage": "credentials"}, error=msg,
+        )
+        return {
+            "success": False,
+            "stage": "credentials",
+            "error": msg,
+            "policy_check": policy_result.model_dump(),
+            "cost_estimate": cost_result.model_dump(),
+        }
+
     runner = TerraformRunner(workspace, aws_creds)
 
     init_result = runner.init()
