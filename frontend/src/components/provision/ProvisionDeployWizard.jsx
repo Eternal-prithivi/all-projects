@@ -118,7 +118,8 @@ async function waitForBackend(maxWaitMs = WAKE_MAX_WAIT_MS) {
   return { ok: false, attempts: attempt };
 }
 
-export default function ProvisionDeployWizard({ terraformOk, provisionEngine = 'boto3', onDeployed }) {
+export default function ProvisionDeployWizard({ terraformOk, userProvisionEngine = 'boto3', onDeployed }) {
+  const engineLabel = userProvisionEngine === 'terraform' ? 'Terraform' : 'Boto3';
   const [step, setStep] = useState(0);
   const [selectedTemplate, setSelectedTemplate] = useState(null);
 
@@ -229,10 +230,11 @@ export default function ProvisionDeployWizard({ terraformOk, provisionEngine = '
       setPolicyResult(res.data.policy_check);
       setCostEstimate(res.data.cost_estimate);
       setDeploymentId(res.data.deployment_id);
+      const planEngine = res.data.provision_engine || userProvisionEngine;
 
       // Background plan — poll until done (avoids Render 502 on long terraform)
       if (res.data.status === 'running' && res.data.deployment_id) {
-        setPlanOutput('Starting terraform plan on the server…\n');
+        setPlanOutput(`Starting ${planEngine === 'terraform' ? 'Terraform' : 'Boto3'} plan on the server…\n`);
         for (let attempt = 0; attempt < PLAN_POLL_MAX_ATTEMPTS; attempt += 1) {
           await sleep(PLAN_POLL_INTERVAL_MS);
           let st;
@@ -264,7 +266,7 @@ export default function ProvisionDeployWizard({ terraformOk, provisionEngine = '
           } else if (!st.data.done) {
             const stage = st.data.stage || st.data.status || 'working';
             setPlanOutput(
-              `Terraform ${stage} in progress (${elapsedSec}s elapsed, poll ${attempt + 1}/${PLAN_POLL_MAX_ATTEMPTS})…\n`
+              `${planEngine === 'terraform' ? 'Terraform' : 'Plan'} ${stage} in progress (${elapsedSec}s elapsed, poll ${attempt + 1}/${PLAN_POLL_MAX_ATTEMPTS})…\n`
             );
           }
           if (st.data.done) {
@@ -294,7 +296,7 @@ export default function ProvisionDeployWizard({ terraformOk, provisionEngine = '
         setError(stage + detail);
       }
     } catch (err) {
-      setError(formatProvisionError(err, 'Failed to run terraform plan', {
+      setError(formatProvisionError(err, `Failed to run ${engineLabel} plan`, {
         duringPoll: Boolean(deploymentId),
       }));
     } finally {
@@ -377,13 +379,7 @@ export default function ProvisionDeployWizard({ terraformOk, provisionEngine = '
     }
   }, [planOutput]);
 
-  const ec2NeedsVpc = config.enable_ec2 && !config.enable_vpc;
-  const cloudwatchOnlyHint =
-    config.enable_cloudwatch && !config.enable_ec2
-      ? 'CloudWatch will create SNS alerts only. Enable EC2 for CPU alarms.'
-      : null;
-
-  const canProceedStep0 = hasAnyModule && !(provisionEngine === 'boto3' && ec2NeedsVpc);
+  const canProceedStep0 = hasAnyModule;
   const canProceedStep2 = policyResult && (!policyResult.blocks || policyResult.blocks.length === 0);
 
 
@@ -392,9 +388,9 @@ export default function ProvisionDeployWizard({ terraformOk, provisionEngine = '
       <div className="section-header">
         <h3>Deploy a new stack (optional)</h3>
         <p>
-          Uses your AWS account from Settings. Deploy engine:{' '}
-          <strong>{provisionEngine === 'terraform' ? 'Terraform' : 'Boto3'}</strong>
-          {' '}(change in Settings). For day-to-day optimization, use Cost, Storage, and VM pages instead.
+          Uses your AWS account from Settings. Deploy engine: <strong>{engineLabel}</strong>
+          {' '}(change in Settings → Infrastructure provisioning).
+          For day-to-day optimization, use Cost, Storage, and VM pages instead.
         </p>
       </div>
 
@@ -464,12 +460,6 @@ export default function ProvisionDeployWizard({ terraformOk, provisionEngine = '
             ))}
           </div>
 
-          {provisionEngine === 'boto3' && ec2NeedsVpc && (
-            <p className="provision-empty-hint" style={{ color: 'var(--warning, #e6a23c)' }}>
-              EC2 requires VPC when using Boto3. Enable VPC or switch to Terraform in Settings.
-            </p>
-          )}
-
           <div className="provision-actions">
             <button
               className="btn-provision primary"
@@ -488,11 +478,6 @@ export default function ProvisionDeployWizard({ terraformOk, provisionEngine = '
           <div className="section-header">
             <h3>Configure Resources</h3>
             <p>Set parameters for your selected modules. Defaults are free-tier safe.</p>
-            {cloudwatchOnlyHint && (
-              <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginTop: '0.5rem' }}>
-                {cloudwatchOnlyHint}
-              </p>
-            )}
           </div>
 
           <div className="config-form">
@@ -742,7 +727,7 @@ export default function ProvisionDeployWizard({ terraformOk, provisionEngine = '
           {loading && !planOutput && (
             <div className="provision-loading">
               <div className="provision-spinner" />
-              <span>Running terraform plan...</span>
+              <span>Running {engineLabel} plan…</span>
             </div>
           )}
 
@@ -766,7 +751,7 @@ export default function ProvisionDeployWizard({ terraformOk, provisionEngine = '
               <button
                 className="btn-provision primary"
                 disabled={loading || !planReady}
-                title={!planReady ? 'Wait for terraform plan to finish successfully' : undefined}
+                title={!planReady ? `Wait for ${engineLabel} plan to finish successfully` : undefined}
                 onClick={runApply}
               >
                 {loading && planReady ? (

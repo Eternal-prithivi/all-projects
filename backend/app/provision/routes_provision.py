@@ -58,24 +58,24 @@ from app.provision.terraform_runner import (
 from app.provision.config_normalize import normalize_provision_config
 from app.provision.policy_checker import full_policy_check, get_yaml_rules
 from app.provision.cost_estimator import estimate_cost
-from app.provision.drift_detector import detect_drift, remediate_drift
+from app.provision.drift_detector import RemediationResult, detect_drift, remediate_drift
+from app.provision.boto3_drift import detect_drift_boto3, remediate_drift_boto3
+from app.provision.engine_resolver import (
+    deployment_engine,
+    get_user_provision_engine,
+    resolve_provision_engine,
+)
+from app.provision.boto3_composer import BOTO3_IMPLEMENTED, boto3_can_handle
 from app.provision.audit_logger import (
     log_provision_action,
     get_deployment_audit_log,
     get_user_audit_log,
 )
 from app.provision.boto3_deployer import (
-    BOTO3_SUPPORTED_MODULES,
     plan_fast,
     apply_fast,
     destroy_fast,
 )
-from app.provision.engine_resolver import (
-    resolve_provision_engine,
-    deployment_engine,
-    get_user_provision_engine,
-)
-import os
 
 logger = logging.getLogger(__name__)
 
@@ -159,25 +159,26 @@ async def list_modules(user: dict = Depends(get_current_user)):
 
 @router.get("/status")
 async def provisioning_status(user: dict = Depends(get_current_user)):
-    """Terraform CLI status, user engine preference, and hosting hints (localhost + Render)."""
+    """Terraform CLI status, user engine preference, and boto3 module support."""
+    import os
+
     tf_installed = check_terraform_installed()
     tf_version = get_terraform_version() if tf_installed else None
     user_engine = get_user_provision_engine(user.username)
-    env = os.getenv("ENVIRONMENT", "development")
+    environment = os.getenv("ENVIRONMENT", "development")
     return {
         "terraform_installed": tf_installed,
         "terraform_version": tf_version,
         "policy_rules_count": len(get_yaml_rules()),
         "user_provision_engine": user_engine,
-        "boto3_supported_modules": sorted(BOTO3_SUPPORTED_MODULES),
-        "environment": env,
-        "hosting_notes": {
-            "boto3": "Works on localhost and Render without Terraform CLI.",
-            "terraform": (
-                "Requires Terraform CLI (Docker on Render). "
-                "May be slow on Render free tier; use Boto3 for quick deploys."
-            ),
-        },
+        "boto3_supported_modules": sorted(BOTO3_IMPLEMENTED),
+        "environment": environment,
+        "hosting_hint": (
+            "Boto3 is recommended on Render free tier (fast, low memory). "
+            "Terraform works on localhost and Render Docker when the CLI is installed."
+            if environment == "production"
+            else "Both engines work on localhost; use Boto3 for quick tests without Terraform installed."
+        ),
     }
 
 
@@ -224,9 +225,8 @@ async def run_plan(
     user: dict = Depends(get_current_user),
 ):
     """
-    Start terraform plan — returns immediately; init/plan run in a background thread.
-  Poll GET /plan/status/{deployment_id} for the result (avoids Render HTTP 502 timeouts).
-    Simple templates (static-site, serverless-db) skip Terraform and use boto3 directly.
+    Plan deployment — boto3 (instant) or Terraform (background poll) per Settings.
+    Works on localhost and Render; engine from users.settings.preferences.provision_engine.
     """
     config_dict = config.model_dump()
     _prepare_provision_config(config_dict)
@@ -270,7 +270,7 @@ async def run_plan(
         fast_result = plan_fast(config_dict, aws_creds)
         status = DeploymentStatus.AWAITING_APPLY if fast_result["success"] else DeploymentStatus.PLAN_FAILED
         _save_deployment(
-            user.username, deployment_id, config_dict, "fast-path",
+            user.username, deployment_id, config_dict, "boto3",
             status, policy_result, cost_result,
             plan_output=fast_result["output"] or fast_result.get("error", ""),
         )
@@ -434,35 +434,39 @@ async def run_apply(
         {"$set": {"status": DeploymentStatus.APPLYING, "updated_at": datetime.utcnow()}},
     )
 
-    if deployment_engine(deployment) == "boto3":
-        apply_result = apply_fast(config_dict, aws_creds)
-        resources = apply_result.get("resources", []) if apply_result["success"] else []
+    engine = deployment_engine(deployment)
+
+    if engine == "boto3":
+        boto3_ctx = deployment.get("boto3_context")
+        apply_result = apply_fast(config_dict, aws_creds, boto3_ctx)
+        ctx_out = apply_result.get("boto3_context") or {}
+        resources_count = len(ctx_out) if apply_result["success"] else 0
         new_status = DeploymentStatus.DEPLOYED if apply_result["success"] else DeploymentStatus.APPLY_FAILED
         collection.update_one(
             {"deployment_name": deployment_id},
             {"$set": {
                 "status": new_status,
                 "apply_output": apply_result.get("output", ""),
-                "resources_count": len(resources),
+                "resources_count": resources_count,
                 "provision_engine": "boto3",
                 "fast_path": True,
+                "boto3_context": ctx_out,
                 "updated_at": datetime.utcnow(),
             }},
         )
         log_provision_action(
             action="apply", actor=user.username, deployment_id=deployment_id,
             status="success" if apply_result["success"] else "failed",
-            details={"resources_count": len(resources), "provision_engine": "boto3"},
+            details={"resources_count": resources_count, "provision_engine": "boto3"},
             error=apply_result.get("error"),
         )
         return {
             "success": apply_result["success"],
             "status": new_status,
-            "resources_count": len(resources),
+            "resources_count": resources_count,
             "output": apply_result.get("output", ""),
             "error": apply_result.get("error"),
             "provision_engine": "boto3",
-            "fast_path": True,
         }
 
     workspace = deployment.get("terraform_workspace", "")
@@ -530,10 +534,17 @@ async def run_destroy(
         {"$set": {"status": DeploymentStatus.DESTROYING, "updated_at": datetime.utcnow()}},
     )
 
-    if deployment_engine(deployment) == "boto3":
-        destroy_result = destroy_fast(config_dict, aws_creds)
+    engine = deployment_engine(deployment)
+
+    if engine == "boto3":
+        destroy_result = destroy_fast(config_dict, aws_creds, deployment.get("boto3_context"))
     else:
         workspace = deployment.get("terraform_workspace", "")
+        if not workspace or workspace in ("fast-path", "boto3"):
+            raise HTTPException(
+                status_code=400,
+                detail="Terraform workspace missing for this deployment. Cannot destroy via Terraform.",
+            )
         runner = TerraformRunner(workspace, aws_creds)
         destroy_result = runner.destroy()
 
@@ -706,21 +717,27 @@ async def check_drift(
     if deployment.get("status") != DeploymentStatus.DEPLOYED:
         raise HTTPException(status_code=400, detail="Drift check only available for deployed infrastructure.")
 
-    if deployment_engine(deployment) == "boto3":
-        raise HTTPException(
-            status_code=400,
-            detail=(
-                "Drift detection requires Terraform. "
-                "Re-deploy with Terraform in Settings, or check resources in the AWS console."
-            ),
-        )
-
-    workspace = deployment.get("terraform_workspace", "")
+    config_dict = deployment.get("config", {}) or {}
     aws_creds = _resolve_byoc_credentials(
-        user, deployment.get("config", {}).get("aws_region", "ap-south-1")
+        user, config_dict.get("aws_region", "ap-south-1")
     )
 
-    drift_report = detect_drift(workspace, aws_creds)
+    engine = deployment_engine(deployment)
+    if engine == "boto3":
+        drift_report = detect_drift_boto3(
+            config_dict, aws_creds, deployment.get("boto3_context")
+        )
+    else:
+        workspace = deployment.get("terraform_workspace", "")
+        if not workspace or workspace in ("fast-path", "boto3"):
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "This deployment has no Terraform workspace. "
+                    "Use Boto3 engine in Settings for new deployments, or redeploy with Terraform."
+                ),
+            )
+        drift_report = detect_drift(workspace, aws_creds)
 
     # Append to drift history and update latest status
     collection.update_one(
@@ -775,18 +792,39 @@ async def remediate_deployment_drift(
     if deployment.get("status") != DeploymentStatus.DEPLOYED:
         raise HTTPException(status_code=400, detail="Remediation only available for deployed infrastructure.")
 
-    if deployment_engine(deployment) == "boto3":
-        raise HTTPException(
-            status_code=400,
-            detail="Drift remediation requires Terraform-managed deployments.",
-        )
-
-    workspace = deployment.get("terraform_workspace", "")
+    config_dict = deployment.get("config", {}) or {}
     aws_creds = _resolve_byoc_credentials(
-        user, deployment.get("config", {}).get("aws_region", "ap-south-1")
+        user, config_dict.get("aws_region", "ap-south-1")
     )
 
-    result = remediate_drift(workspace, aws_creds, check_only=check_only)
+    engine = deployment_engine(deployment)
+    if engine == "boto3":
+        raw = remediate_drift_boto3(
+            config_dict,
+            aws_creds,
+            deployment.get("boto3_context"),
+            check_only=check_only,
+        )
+        result = RemediationResult(
+            success=raw.get("success", False),
+            performed=raw.get("performed", False),
+            message=raw.get("message", ""),
+            plan_output=raw.get("plan_output", ""),
+            apply_output=raw.get("apply_output", ""),
+        )
+        if raw.get("boto3_context"):
+            collection.update_one(
+                {"deployment_name": deployment_id},
+                {"$set": {"boto3_context": raw["boto3_context"]}},
+            )
+    else:
+        workspace = deployment.get("terraform_workspace", "")
+        if not workspace or workspace in ("fast-path", "boto3"):
+            raise HTTPException(
+                status_code=400,
+                detail="Terraform workspace missing — cannot remediate with Terraform.",
+            )
+        result = remediate_drift(workspace, aws_creds, check_only=check_only)
 
     # If remediation was actually performed, update deployment record
     if result.performed and result.success:

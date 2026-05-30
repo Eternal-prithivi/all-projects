@@ -25,7 +25,8 @@ export default function ProvisionPage() {
   const [tab, setTab] = useState('manage');
   const [awsByocConnected, setAwsByocConnected] = useState(null);
   const [terraformOk, setTerraformOk] = useState(null);
-  const [provisionEngine, setProvisionEngine] = useState('boto3');
+  const [userProvisionEngine, setUserProvisionEngine] = useState('boto3');
+  const [hostingHint, setHostingHint] = useState('');
   const [deploymentCount, setDeploymentCount] = useState(0);
 
   useEffect(() => {
@@ -39,7 +40,8 @@ export default function ProvisionPage() {
         if (cancelled) return;
         setAwsByocConnected(!!byocRes.data?.connections?.aws?.connected);
         setTerraformOk(statusRes.data?.terraform_installed ?? false);
-        setProvisionEngine(statusRes.data?.user_provision_engine || 'boto3');
+        setUserProvisionEngine(statusRes.data?.user_provision_engine || 'boto3');
+        setHostingHint(statusRes.data?.hosting_hint || '');
       } catch {
         if (!cancelled) setAwsByocConnected(false);
       }
@@ -89,17 +91,27 @@ export default function ProvisionPage() {
       <PageHeader
         kicker="Infrastructure"
         title="Infrastructure governance"
-        subtitle="Manage Terraform deployments, drift, and policies. AWS credentials come from Settings — not configured again here."
+        subtitle="Deploy and manage stacks with Boto3 or Terraform. AWS credentials come from Settings — not configured again here."
       />
 
       <div className="provision-status-bar">
         <span className="status-dot online" />
         <span>AWS connected via Settings</span>
-        <span style={{ marginLeft: '1rem', opacity: 0.85 }}>
-          Engine: {provisionEngine === 'terraform' ? 'Terraform' : 'Boto3'}
-          {provisionEngine === 'terraform' && terraformOk && ' (CLI ready)'}
-          {provisionEngine === 'terraform' && !terraformOk && ' (CLI missing — change in Settings)'}
+        <span className="provision-status-sep">·</span>
+        <span>
+          Engine: <strong>{userProvisionEngine === 'terraform' ? 'Terraform' : 'Boto3'}</strong>
+          {userProvisionEngine === 'terraform' && !terraformOk && (
+            <span style={{ color: 'var(--warning, #f0ad4e)', marginLeft: '0.35rem' }}>
+              (CLI not on server — switch to Boto3 in Settings)
+            </span>
+          )}
         </span>
+        {hostingHint && (
+          <>
+            <span className="provision-status-sep">·</span>
+            <span style={{ opacity: 0.85, fontSize: '0.9em' }}>{hostingHint}</span>
+          </>
+        )}
       </div>
 
       <nav className="provision-tabs" aria-label="Infrastructure sections">
@@ -125,17 +137,17 @@ export default function ProvisionPage() {
       {tab === 'policies' && <ProvisionPoliciesPanel />}
       {tab === 'deploy' && (
         <>
-          {provisionEngine === 'terraform' && !terraformOk && (
+          {userProvisionEngine === 'terraform' && !terraformOk && (
             <div className="provision-empty-state" style={{ marginBottom: '1rem' }}>
               <p>
-                Terraform is selected in Settings but the CLI is not available on this server.
-                Switch to Boto3 in Settings for localhost/Render, or use the Docker backend image on Render.
+                Terraform CLI is not available on this server. Use <strong>Boto3</strong> in Settings for
+                deployments on Render free tier, or deploy the backend Docker image with Terraform installed.
               </p>
             </div>
           )}
           <ProvisionDeployWizard
             terraformOk={terraformOk}
-            provisionEngine={provisionEngine}
+            userProvisionEngine={userProvisionEngine}
             onDeployed={() => {
               setTab('manage');
               setDeploymentCount((c) => c + 1);

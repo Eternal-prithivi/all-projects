@@ -9,10 +9,7 @@
 
 ## 🔴 Active Task
 
-**None** — Phase **20** complete (Slices 0–16 + coverage gap follow-up).
-
-| Next up | Phase **21** — Observability & runbooks |
-|---------|----------------------------------------|
+**None** — last completed: **Provision engine toggle** (2026-05-30).
 
 ---
 

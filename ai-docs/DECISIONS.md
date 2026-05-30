@@ -199,17 +199,6 @@
 
 ---
 
-### [DEC-022] Dual provision engines (Boto3 + Terraform) with user preference
-- **Date**: 2026-05-30
-- **Status**: ✅ Implemented
-- **Context**: Terraform plan/apply is unreliable on Render free tier (OOM, multi-minute hangs). Users still need Terraform for drift and full IaC. Static-site auto-routing to boto3 bypassed existing `backend/terraform/` modules without deleting them.
-- **Decision**: **`users.settings.preferences.provision_engine`** (`boto3` default | `terraform`). **`engine_resolver.py`** picks engine per request. **`boto3_composer.py`** implements modular plan/apply/destroy for S3, DynamoDB, VPC, EC2, IAM, CloudWatch (parity with terraform modules). Each deployment stores **`provision_engine`** at plan time; apply/destroy use the same engine. Drift/remediate remain Terraform-only. Billing module requires Terraform if enabled.
-- **Key files**: `engine_resolver.py`, `boto3_composer.py`, `boto3_deployer.py` (thin wrapper), `routes_settings.py` (`provision_engine`), `SettingsPage.jsx`, `ProvisionPage.jsx`.
-- **Consequences**: Works on **localhost** (boto3 without Terraform CLI; terraform if CLI installed) and **Render** (boto3 recommended). Terraform modules under `backend/terraform/` unchanged — reconnect when user selects Terraform.
-- **DO NOT**: Remove Terraform from Docker image. Do NOT run drift on boto3 deployments without import/migration (future work).
-
----
-
 ### [DEC-020] Phase 12 — Security Research Paper as Acceptance Source
 - **Date**: 2026-05-29 (updated 2026-05-29 — SSE not KMS; browser CSE gap documented)
 - **Status**: Planned (not implemented)
@@ -219,6 +208,17 @@
   - **Client-side:** Build **browser** zero-knowledge CSE (Web Crypto); do not call server-side password encryption “client-side architecture.”
 - **Consequences**: Docs and UI must say **SSE** / **SSE-S3**, not KMS. Auto-encrypt on sensitive detect uses SSE-S3. CSE requires new `clientEncryption.js` and API changes.
 - **DO NOT**: Implement KMS or require `kms_encryption.py` for Phase 12. Do not claim zero-knowledge while sending passwords to `/choose-encryption` or `/decrypt-download`.
+
+---
+
+### [DEC-022] Dual provision engine — Boto3 vs Terraform (user Settings)
+- **Date**: 2026-05-30
+- **Status**: ✅ Implemented
+- **Context**: Terraform plan/apply on Render free tier is slow and OOM-prone; boto3 fast path existed but was auto-forced for some templates. Users need explicit control and boto3 drift for non-Terraform deployments.
+- **Decision**: `users.settings.preferences.provision_engine` = `boto3` (default) | `terraform`. Each deployment stores `provision_engine` at plan time. Boto3 uses `boto3_composer.py` (s3, dynamodb, vpc, ec2, iam, cloudwatch); billing module remains Terraform-only. Boto3 drift via `boto3_drift.py` comparing Mongo `boto3_context` to live AWS.
+- **Key files**: `engine_resolver.py`, `boto3_composer.py`, `boto3_drift.py`, `routes_provision.py`, `routes_settings.py`, Settings + Provision UI.
+- **Consequences**: Legacy `fast_path` deployments resolve to boto3. Terraform modules under `backend/terraform/` remain for Terraform engine — not deleted.
+- **DO NOT**: Auto-force engine by template without reading user preference. Do not implement billing via boto3.
 
 ---
 

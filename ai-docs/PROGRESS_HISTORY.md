@@ -7,14 +7,13 @@
 
 ---
 
-**Provision engine toggle + modular Boto3** — COMPLETE 2026-05-30
+**Provision engine toggle (Boto3 / Terraform)** — COMPLETE 2026-05-30
 
-- DEC-022: `provision_engine` user preference (`boto3` default | `terraform`) in Settings and MongoDB
-- `engine_resolver.py` routes plan/apply/destroy; `provision_engine` stored per deployment
-- `boto3_composer.py`: modular S3, DynamoDB, VPC, EC2, IAM, CloudWatch (all templates + custom module toggles)
-- Terraform modules under `backend/terraform/` unchanged; Terraform path restored when user selects Terraform
-- `GET /api/provision/status` returns engine + hosting notes for localhost/Render
-- Tests: `test_provision_engine.py` (11 passed with existing provision routes test)
+- Settings `provision_engine` (`boto3` default, `terraform` optional); persisted via `PUT /api/settings/preferences`.
+- `engine_resolver.py` picks engine per plan; deployments store `provision_engine`; apply/destroy/drift/remediate branch on engine.
+- `boto3_composer.py` modular plan/apply/destroy (s3, dynamodb, vpc, ec2, iam, cloudwatch); `boto3_drift.py` for drift without Terraform workspace.
+- Frontend: Settings “Infrastructure provisioning” card; Provision status bar shows engine + hosting hint; wizard labels engine-aware.
+- Tests: `tests/test_provision_engine.py` (10 passed).
 
 ---
 

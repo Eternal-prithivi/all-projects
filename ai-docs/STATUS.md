@@ -11,13 +11,13 @@
 | Project | CloudResourceOptimizationPlatform (**Zenith**) |
 | Phase | **19** — Isolated ops & hygiene — **COMPLETE** (code + docs) |
 | Last major | Phase 19: CORS, secrets docs, Sentry optional, vitest, platform status |
-| Prior push | `stage` @ `153a519` |
+| Prior push | `stage` (provision engine toggle — see git log) |
 
 ---
 
 ## 🔴 Active Task
 
-**None** — Provision engine toggle (DEC-022) complete 2026-05-30. Next: Phase 20.1 pytest expansion when ready.
+**None** — provision engine toggle **COMPLETE** (2026-05-30). Resume Phase 20+ or user-directed work.
 
 ---
 

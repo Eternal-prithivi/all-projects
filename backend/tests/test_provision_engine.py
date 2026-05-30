@@ -1,87 +1,116 @@
-"""Tests for provision engine resolver and boto3 module coverage."""
+"""Tests for Boto3 vs Terraform provision engine resolution."""
 
 from unittest.mock import MagicMock, patch
 
 import pytest
 from fastapi import HTTPException
 
-from app.provision.boto3_composer import boto3_can_handle, enabled_modules
+from app.provision.boto3_composer import BOTO3_IMPLEMENTED, boto3_can_handle
 from app.provision.engine_resolver import (
+    DEFAULT_ENGINE,
+    deployment_engine,
     get_user_provision_engine,
     resolve_provision_engine,
-    deployment_engine,
 )
 
 
-def test_enabled_modules_static_site():
-    config = {
+def _static_site_config():
+    return {
+        "template": "static-site",
+        "aws_region": "ap-south-1",
         "enable_s3": True,
-        "enable_ec2": False,
         "enable_vpc": False,
+        "enable_ec2": False,
+        "enable_iam": False,
+        "enable_cloudwatch": False,
         "enable_dynamodb": False,
+        "enable_billing": False,
     }
-    assert enabled_modules(config) == {"s3"}
-
-
-def test_boto3_can_handle_backend_app():
-    config = {
-        "enable_vpc": True,
-        "enable_ec2": True,
-        "enable_iam": True,
-        "enable_cloudwatch": True,
-        "enable_s3": False,
-        "enable_dynamodb": False,
-    }
-    ok, unsupported = boto3_can_handle(config)
-    assert ok is True
-    assert unsupported == set()
-
-
-def test_boto3_cannot_ec2_without_vpc():
-    config = {"enable_ec2": True, "enable_vpc": False}
-    ok, unsupported = boto3_can_handle(config)
-    assert ok is False
-    assert "ec2" in unsupported
 
 
 @patch("app.provision.engine_resolver.get_database")
 def test_get_user_provision_engine_default(mock_db):
-    mock_db.return_value = MagicMock()
-    mock_db.return_value.__getitem__.return_value.find_one.return_value = {}
-    assert get_user_provision_engine("user1") == "boto3"
+    mock_db.return_value["users"].find_one.return_value = None
+    assert get_user_provision_engine("alice") == DEFAULT_ENGINE
 
 
 @patch("app.provision.engine_resolver.get_database")
 def test_get_user_provision_engine_terraform(mock_db):
-    mock_db.return_value = MagicMock()
-    mock_db.return_value.__getitem__.return_value.find_one.return_value = {
+    mock_db.return_value["users"].find_one.return_value = {
         "settings": {"preferences": {"provision_engine": "terraform"}}
     }
-    assert get_user_provision_engine("user1") == "terraform"
+    assert get_user_provision_engine("alice") == "terraform"
 
 
+@patch("app.provision.engine_resolver.get_database")
 @patch("app.provision.engine_resolver.check_terraform_installed", return_value=True)
-@patch("app.provision.engine_resolver.get_user_provision_engine", return_value="terraform")
-def test_resolve_terraform_static_site(_pref, _tf):
-    config = {"enable_s3": True, "template": "static-site"}
-    assert resolve_provision_engine("u", config) == "terraform"
+def test_resolve_boto3_for_static_site(mock_tf, mock_db):
+    mock_db.return_value["users"].find_one.return_value = {
+        "settings": {"preferences": {"provision_engine": "boto3"}}
+    }
+    assert resolve_provision_engine("alice", _static_site_config()) == "boto3"
 
 
-@patch("app.provision.engine_resolver.get_user_provision_engine", return_value="boto3")
-def test_resolve_boto3_static_site(_pref):
-    config = {"enable_s3": True, "bucket_name": "my-bucket"}
-    assert resolve_provision_engine("u", config) == "boto3"
+@patch("app.provision.engine_resolver.get_database")
+@patch("app.provision.engine_resolver.check_terraform_installed", return_value=True)
+def test_resolve_terraform_when_preferred(mock_tf, mock_db):
+    mock_db.return_value["users"].find_one.return_value = {
+        "settings": {"preferences": {"provision_engine": "terraform"}}
+    }
+    assert resolve_provision_engine("alice", _static_site_config()) == "terraform"
 
 
-@patch("app.provision.engine_resolver.get_user_provision_engine", return_value="boto3")
-def test_resolve_boto3_rejects_billing(_pref):
-    config = {"enable_s3": True, "enable_billing": True}
+@patch("app.provision.engine_resolver.get_database")
+@patch("app.provision.engine_resolver.check_terraform_installed", return_value=False)
+def test_resolve_terraform_without_cli_raises_503(mock_tf, mock_db):
+    mock_db.return_value["users"].find_one.return_value = {
+        "settings": {"preferences": {"provision_engine": "terraform"}}
+    }
     with pytest.raises(HTTPException) as exc:
-        resolve_provision_engine("u", config)
+        resolve_provision_engine("alice", _static_site_config())
+    assert exc.value.status_code == 503
+
+
+@patch("app.provision.engine_resolver.get_database")
+def test_resolve_billing_requires_terraform(mock_db):
+    mock_db.return_value["users"].find_one.return_value = {
+        "settings": {"preferences": {"provision_engine": "boto3"}}
+    }
+    cfg = _static_site_config()
+    cfg["enable_billing"] = True
+    with pytest.raises(HTTPException) as exc:
+        resolve_provision_engine("alice", cfg)
     assert exc.value.status_code == 400
+    assert "billing" in exc.value.detail.lower()
 
 
-def test_deployment_engine_legacy_fast_path():
+def test_boto3_can_handle_static_site():
+    ok, unsupported = boto3_can_handle(_static_site_config())
+    assert ok is True
+    assert unsupported == set()
+
+
+def test_boto3_implemented_modules_include_core():
+    assert "s3" in BOTO3_IMPLEMENTED
+    assert "dynamodb" in BOTO3_IMPLEMENTED
+
+
+def test_deployment_engine_from_record():
+    assert deployment_engine({"provision_engine": "boto3"}) == "boto3"
     assert deployment_engine({"fast_path": True}) == "boto3"
-    assert deployment_engine({"terraform_workspace": "/tmp/x"}) == "terraform"
-    assert deployment_engine({"provision_engine": "terraform"}) == "terraform"
+    assert deployment_engine({}) == "terraform"
+
+
+@patch("app.provision.routes_provision.get_user_provision_engine", return_value="boto3")
+@patch("app.provision.routes_provision.check_terraform_installed", return_value=False)
+@patch("app.provision.routes_provision.get_yaml_rules", return_value=[])
+def test_provisioning_status_includes_engine(mock_rules, mock_tf, mock_pref):
+    from app.provision.routes_provision import provisioning_status
+
+    user = MagicMock(username="u1")
+    import asyncio
+
+    result = asyncio.run(provisioning_status(user=user))
+    assert result["user_provision_engine"] == "boto3"
+    assert "s3" in result["boto3_supported_modules"]
+    assert result["terraform_installed"] is False

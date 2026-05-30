@@ -1,7 +1,7 @@
 # AI_CONTEXT_FRONTEND.md — Frontend Architecture & Source Map
 
 > Read this for any frontend, UI, CSS, component, or routing task.
-> **Last Updated: 2026-05-30** — Settings `provision_engine`; Infrastructure page engine badge (DEC-022).
+> **Last Updated: 2026-05-29** — Phase 18 enterprise public pages.
 
 ---
 
@@ -71,7 +71,7 @@ For backend context → read `AI_CONTEXT_BACKEND.md`
 | `/dashboard/security` | `SecurityPage.jsx` | 2FA vault + `syncAwsSecureBucket()` via `api.js` named exports |
 | `/dashboard/security-settings` | `SecuritySettingsPage.jsx` | |
 | `/dashboard/profile` | `ProfilePage.jsx` | |
-| `/dashboard/settings` | `SettingsPage.jsx` | Includes "Restart Tour" in Preferences |
+| `/dashboard/settings` | `SettingsPage.jsx` | Infrastructure provisioning engine (Boto3/Terraform); Preferences + Restart Tour |
 | `/dashboard/notifications` | `NotificationsPage.jsx` | Persisted notification history |
 | `/dashboard/team` | `TeamPage.jsx` | Org create, invites, members |
 | `/invite/:token` | `AcceptInvitePage.jsx` | Accept team invite |

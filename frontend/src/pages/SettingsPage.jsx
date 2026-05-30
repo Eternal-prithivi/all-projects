@@ -179,8 +179,8 @@ const SettingsPage = () => {
         ...prev,
         ...data.preferences,
         dateFormat: data.preferences?.date_format || data.preferences?.dateFormat || prev.dateFormat,
-        provisionEngine: data.preferences?.provision_engine || prev.provisionEngine || 'boto3',
         theme: serverTheme && ['dark', 'light', 'auto'].includes(serverTheme) ? serverTheme : theme,
+        provisionEngine: data.preferences?.provision_engine || prev.provisionEngine,
       }));
     } catch (error) {
       console.error('Failed to fetch settings:', error);
@@ -414,9 +414,21 @@ const SettingsPage = () => {
         timezone: nextPreferences.timezone,
         date_format: nextPreferences.dateFormat,
         currency: nextPreferences.currency,
-        provision_engine: nextPreferences.provisionEngine || 'boto3',
+        provision_engine: nextPreferences.provisionEngine,
       }).catch(() => {
         notifications.error('Theme updated locally but failed to save to account');
+      });
+    }
+    if (name === 'provisionEngine') {
+      apiClient.put('/settings/preferences', {
+        theme: nextPreferences.theme,
+        language: nextPreferences.language,
+        timezone: nextPreferences.timezone,
+        date_format: nextPreferences.dateFormat,
+        currency: nextPreferences.currency,
+        provision_engine: value,
+      }).catch(() => {
+        notifications.error('Failed to save provisioning engine preference');
       });
     }
   };
@@ -429,7 +441,7 @@ const SettingsPage = () => {
         timezone: preferences.timezone,
         date_format: preferences.dateFormat,
         currency: preferences.currency,
-        provision_engine: preferences.provisionEngine || 'boto3',
+        provision_engine: preferences.provisionEngine,
       });
       
       // Update the app-wide PreferencesContext so formatting changes propagate immediately
@@ -944,34 +956,28 @@ const SettingsPage = () => {
         <div className="settings-card animate-fade-in-up">
           <h3>
             <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor">
-              <path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zM4.5 8a3.5 3.5 0 1 1 7 0 3.5 3.5 0 0 1-7 0z"/>
+              <path d="M1 2.5A1.5 1.5 0 0 1 2.5 1h3A1.5 1.5 0 0 1 7 2.5v3A1.5 1.5 0 0 1 5.5 7h-3A1.5 1.5 0 0 1 1 5.5v-3zM2.5 2a.5.5 0 0 0-.5.5v3a.5.5 0 0 0 .5.5h3a.5.5 0 0 0 .5-.5v-3a.5.5 0 0 0-.5-.5h-3zm6.5.5A1.5 1.5 0 0 1 10.5 1h3A1.5 1.5 0 0 1 15 2.5v3A1.5 1.5 0 0 1 13.5 7h-3A1.5 1.5 0 0 1 9 5.5v-3zm1.5-.5a.5.5 0 0 0-.5.5v3a.5.5 0 0 0 .5.5h3a.5.5 0 0 0 .5-.5v-3a.5.5 0 0 0-.5-.5h-3zM1 10.5A1.5 1.5 0 0 1 2.5 9h3A1.5 1.5 0 0 1 7 10.5v3A1.5 1.5 0 0 1 5.5 15h-3A1.5 1.5 0 0 1 1 13.5v-3zm1.5-.5a.5.5 0 0 0-.5.5v3a.5.5 0 0 0 .5.5h3a.5.5 0 0 0 .5-.5v-3a.5.5 0 0 0-.5-.5h-3zm6.5.5A1.5 1.5 0 0 1 10.5 9h3a1.5 1.5 0 0 1 1.5 1.5v3a1.5 1.5 0 0 1-1.5 1.5h-3A1.5 1.5 0 0 1 9 13.5v-3zm1.5-.5a.5.5 0 0 0-.5.5v3a.5.5 0 0 0 .5.5h3a.5.5 0 0 0 .5-.5v-3a.5.5 0 0 0-.5-.5h-3z"/>
             </svg>
             Infrastructure provisioning
           </h3>
-          <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '1rem' }}>
-            Choose how new stacks are deployed. Works on localhost and Render. Boto3 is faster on Render free tier.
+          <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '16px' }}>
+            Choose how new stacks are deployed. Boto3 is fast and works on Render free tier.
+            Terraform provides full IaC with state (best on localhost or Render Docker).
           </p>
           <div className="settings-group">
             <div className="setting-item-full">
               <label>Deploy engine</label>
               <select
                 name="provisionEngine"
-                value={preferences.provisionEngine || 'boto3'}
+                value={preferences.provisionEngine}
                 onChange={handlePreferenceChange}
                 className="zenith-select settings-select"
               >
-                <option value="boto3">Fast deploy (Boto3) — recommended for Render</option>
-                <option value="terraform">Full IaC (Terraform) — drift + state file</option>
+                <option value="boto3">Boto3 — fast (recommended for Render)</option>
+                <option value="terraform">Terraform — full plan &amp; state</option>
               </select>
-              <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: '8px 0 0' }}>
-                Boto3: direct AWS calls, works on localhost and Render without Terraform CLI.
-                Terraform: full plan/apply; requires Terraform installed on the backend (Docker on Render).
-              </p>
             </div>
           </div>
-          <button className="btn-save" onClick={handleSavePreferences} style={{ marginTop: '12px' }}>
-            Save provisioning preference
-          </button>
         </div>
 
         {/* Preferences */}

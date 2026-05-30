@@ -25,15 +25,14 @@ Notes: [one line optional]
 ---
 SESSION_ID: 20260530-provision-engine
 Date: 2026-05-30
-Agent: Cursor
-Task: Provision engine toggle + modular boto3 (localhost + Render)
+Agent: Cursor Composer
+Task: Provision engine toggle — Boto3 vs Terraform
 Changes:
-- Added DEC-022, engine_resolver, boto3_composer (6 AWS modules), Settings provision_engine UI
-- routes_provision uses user preference; Terraform path for all configs when terraform selected
-- ProvisionPage engine badge; drift blocked for boto3 deployments
+  - `engine_resolver.py`, `boto3_composer.py`, `boto3_drift.py`; routes plan/apply/destroy/drift/remediate
+  - Settings `provision_engine`; SettingsPage + ProvisionPage + ProvisionDeployWizard UI
+  - `test_provision_engine.py` (10 tests); DEC-022; ai-docs POST
 Outcome: Done
-Notes: pytest test_provision_engine 8/8 + routes 3/3 passed
----
+Notes: Default boto3 for Render; Terraform when CLI present + user selects it.
 
 ---
 SESSION_ID: 20260529-uiux
