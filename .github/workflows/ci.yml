@@ -81,12 +81,38 @@ jobs:
         image: mongo:7
         ports:
           - 27017:27017
+    # Match backend/tests/conftest.py — uvicorn loads Settings at import time (no pytest hook).
     env:
       MONGO_CONNECTION_STRING: mongodb://localhost:27017
       MONGO_DB_NAME: zenith_test
-      SECRET_KEY: pytest-ci-secret-key
+      SECRET_KEY: pytest-secret-key-do-not-use-in-production
+      ALGORITHM: HS256
+      ACCESS_TOKEN_EXPIRE_MINUTES: "60"
+      AWS_ACCESS_KEY_ID: test-aws-key
+      AWS_SECRET_ACCESS_KEY: test-aws-secret
+      S3_BUCKET_NAME: test-bucket
+      REGULAR_S3_BUCKET_NAME: test-regular-bucket
+      SECURE_S3_BUCKET_NAME: test-secure-bucket
+      REPLICA_S3_BUCKET_NAME: test-replica-bucket
+      REPLICA_S3_REGION: us-east-1
+      PRIMARY_S3_REGION: us-east-1
+      CELERY_BROKER_URL: redis://localhost:6379/0
+      GCP_BUCKET_NAME: test-gcp-bucket
+      GCP_PROJECT_ID: test-gcp-project
+      GCP_ZONE: us-central1-a
+      GCP_SERVICE_ACCOUNT_JSON_PATH: ""
+      AZURE_STORAGE_ACCOUNT_NAME: testazure
+      AZURE_STORAGE_ACCOUNT_KEY: testazurekey
+      AZURE_CONTAINER_NAME: test-container
+      AZURE_TENANT_ID: test-tenant
+      AZURE_CLIENT_ID: test-client
+      AZURE_CLIENT_SECRET: test-secret
+      FRONTEND_URL: http://127.0.0.1:5173
+      BACKEND_URL: http://127.0.0.1:8000
       ENVIRONMENT: test
       DEMO_MODE: "true"
+      RAZORPAY_KEY_ID: rzp_test
+      RAZORPAY_KEY_SECRET: rzp_test_secret
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -126,3 +152,4 @@ jobs:
           CI: "true"
           PLAYWRIGHT_BASE_URL: http://127.0.0.1:5173
           PLAYWRIGHT_API_URL: http://127.0.0.1:8000
+          VITE_API_URL: http://127.0.0.1:8000
