@@ -42,13 +42,19 @@ const MODULES = [
 const STEP_LABELS = ['Choose', 'Configure', 'Review', 'Deploy'];
 
 /** Initial POST returns quickly; poll status for terraform output. */
-const PLAN_START_TIMEOUT_MS = 90 * 1000;
-const PLAN_POLL_INTERVAL_MS = 2500;
+const PLAN_START_TIMEOUT_MS = 120 * 1000;
+const PLAN_POLL_INTERVAL_MS = 3000;
 const PLAN_POLL_MAX_ATTEMPTS = 120;
+const PLAN_POLL_REQUEST_TIMEOUT_MS = 45 * 1000;
+const WAKE_MAX_WAIT_MS = 90 * 1000;
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-function formatProvisionError(err, fallback) {
+function isNetworkFailure(err) {
+  return err?.message === 'Network Error' || err?.code === 'ERR_NETWORK';
+}
+
+function formatProvisionError(err, fallback, { duringPoll = false } = {}) {
   const data = err.response?.data;
   if (data && typeof data === 'object') {
     if (data.error) return String(data.error);
@@ -63,11 +69,19 @@ function formatProvisionError(err, fallback) {
   if (err.code === 'ECONNABORTED') {
     return 'Request timed out. Terraform may still be running — wait a minute, check Render logs, or try again.';
   }
-  if (err.message === 'Network Error' || err.code === 'ERR_NETWORK') {
+  if (isNetworkFailure(err)) {
+    if (duringPoll) {
+      return (
+        'Lost connection to the server while Terraform was running. ' +
+        'On Render free tier the API often restarts during terraform plan. ' +
+        'Open Render → confirm zenith-backend is Live, visit /health, then start a new plan ' +
+        '(or check Deployments for a finished plan).'
+      );
+    }
     return (
       `Cannot reach the API at ${getApiBaseUrl()}. ` +
-      'On Vercel set VITE_API_URL to https://zenith-backend-707i.onrender.com (no /api), redeploy frontend, ' +
-      'and wait ~30s for Render to wake up, then try again.'
+      'Open https://zenith-backend-707i.onrender.com/health in a tab and wait for {"status":"ok"}. ' +
+      'Vercel: VITE_API_URL=https://zenith-backend-707i.onrender.com (no /api), then redeploy frontend.'
     );
   }
   if (err.response?.status) {
@@ -77,13 +91,30 @@ function formatProvisionError(err, fallback) {
   return fallback;
 }
 
-/** Wake Render free-tier backend before long provision calls. */
-async function wakeBackend() {
-  try {
-    await fetch(`${getApiRoot()}/health`, { method: 'GET', cache: 'no-store' });
-  } catch {
-    // ignore — best effort
+/** Wait until Render health responds (free tier cold start / restart). */
+async function waitForBackend(maxWaitMs = WAKE_MAX_WAIT_MS) {
+  const deadline = Date.now() + maxWaitMs;
+  let attempt = 0;
+  while (Date.now() < deadline) {
+    attempt += 1;
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 15000);
+      const res = await fetch(`${getApiRoot()}/health`, {
+        method: 'GET',
+        cache: 'no-store',
+        signal: controller.signal,
+      });
+      clearTimeout(timer);
+      if (res.ok) {
+        return { ok: true, attempts: attempt };
+      }
+    } catch {
+      // Render still waking or restarting
+    }
+    await sleep(Math.min(2500 + attempt * 200, 5000));
   }
+  return { ok: false, attempts: attempt };
 }
 
 export default function ProvisionDeployWizard({ terraformOk, onDeployed }) {
@@ -182,7 +213,15 @@ export default function ProvisionDeployWizard({ terraformOk, onDeployed }) {
     setPlanReady(false);
     const planStartedAt = Date.now();
     try {
-      await wakeBackend();
+      setPlanOutput('Waking Render API (first load can take up to 90s)…\n');
+      const wake = await waitForBackend(WAKE_MAX_WAIT_MS);
+      if (!wake.ok) {
+        setError(
+          'Render API did not respond in time. Open https://zenith-backend-707i.onrender.com/health ' +
+          'in your browser, wait for {"status":"ok"}, then try again.'
+        );
+        return;
+      }
       const res = await api.post('/provision/plan', config, {
         timeout: PLAN_START_TIMEOUT_MS,
       });
@@ -197,11 +236,17 @@ export default function ProvisionDeployWizard({ terraformOk, onDeployed }) {
           await sleep(PLAN_POLL_INTERVAL_MS);
           let st;
           try {
-            st = await api.get(`/provision/plan/status/${res.data.deployment_id}`);
+            st = await api.get(`/provision/plan/status/${res.data.deployment_id}`, {
+              timeout: PLAN_POLL_REQUEST_TIMEOUT_MS,
+            });
           } catch (pollErr) {
-            // Retry while Render cold-starts (first ~30s)
-            if (attempt < 12 && (pollErr.message === 'Network Error' || pollErr.code === 'ERR_NETWORK')) {
-              setPlanOutput(`Waiting for API to wake up (attempt ${attempt + 1})…\n`);
+            // Render often restarts mid-terraform on free tier — keep polling until max attempts
+            if (isNetworkFailure(pollErr)) {
+              setPlanOutput(
+                `API unreachable (Render may be restarting during terraform). ` +
+                `Reconnecting… poll ${attempt + 1}/${PLAN_POLL_MAX_ATTEMPTS}\n`
+              );
+              await waitForBackend(120 * 1000);
               continue;
             }
             throw pollErr;
@@ -240,7 +285,9 @@ export default function ProvisionDeployWizard({ terraformOk, onDeployed }) {
         setError(stage + detail);
       }
     } catch (err) {
-      setError(formatProvisionError(err, 'Failed to run terraform plan'));
+      setError(formatProvisionError(err, 'Failed to run terraform plan', {
+        duringPoll: Boolean(deploymentId),
+      }));
     } finally {
       setLoading(false);
     }
