@@ -281,6 +281,24 @@ input:disabled + .toggle-slider {
   border-radius: var(--radius-md);
 }
 
+.current-plan-card.plan-enterprise,
+.current-plan-card.plan-pro {
+  background: linear-gradient(135deg, rgba(212, 175, 55, 0.15), rgba(139, 92, 246, 0.08));
+  border-color: rgba(212, 175, 55, 0.45);
+}
+
+.current-plan-card.plan-basic {
+  background: rgba(59, 130, 246, 0.08);
+  border-color: rgba(59, 130, 246, 0.35);
+}
+
+.settings-plan-actions {
+  margin-top: 1.25rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
 .free-plan-header {
   display: flex;
   justify-content: space-between;

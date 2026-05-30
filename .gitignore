@@ -71,3 +71,7 @@ render-env-paste.env
 render-env-from-paste.env
 backend/.env.backup-local
 .DS_Store
+
+# Per-user terraform run workspaces (local / Render ephemeral — never commit)
+backend/terraform_workspaces/
+frontend/test-results/

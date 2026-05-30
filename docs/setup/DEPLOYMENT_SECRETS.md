@@ -23,6 +23,9 @@ Set in **Render → Service → Environment**:
 - `FRONTEND_URL=https://your-frontend-domain` (exact origin, no trailing slash)
 - `CORS_ALLOWED_ORIGINS` — comma-separated extra origins if needed (preview URLs, custom domains)
 - `PUBLIC_API_URL=https://your-api.onrender.com`
+- Optional single-tenant owner plan (keeps Settings/Billing/BYOC in sync on production):
+  - `PLATFORM_OWNER_USERNAMES` — exact Zenith username(s), comma-separated (e.g. `Tanjore developer`)
+  - `PLATFORM_OWNER_PLAN` — `enterprise` (default), `pro`, `basic`, or `free`
 - Optional: `SENTRY_DSN`, `GOOGLE_OAUTH_*`
 
 ## Production (Vercel frontend)

@@ -14,6 +14,7 @@
 //   - Remove the "Restart Tour" button from Preferences section (localStorage: zenith_onboarding_complete)
 // =============================================================================
 import React, { useMemo, useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { useNotifications } from "../hooks/useNotifications";
 import { useTheme } from "../context/ThemeContext";
 import { usePreferences } from "../context/PreferencesContext";
@@ -55,6 +56,7 @@ const SettingsPage = () => {
   const [byocStatus, setByocStatus] = useState(null);
   const [byocEligible, setByocEligible] = useState(false);
   const [byocCurrentPlan, setByocCurrentPlan] = useState('free');
+  const [subscription, setSubscription] = useState(null);
   const [byocActiveCSP, setByocActiveCSP] = useState(null); // Which CSP form is open
   const [byocMethod, setByocMethod] = useState('access_keys'); // access_keys or iam_role
   const [byocConnecting, setByocConnecting] = useState(false);
@@ -111,7 +113,42 @@ const SettingsPage = () => {
     fetchSettings();
     fetchApiKeys();
     fetchByocStatus();
+    fetchSubscription();
   }, []);
+
+  const fetchSubscription = async () => {
+    try {
+      const response = await apiClient.get('/payments/my-subscription');
+      setSubscription(response.data);
+    } catch (error) {
+      console.error('Failed to fetch subscription:', error);
+      setSubscription({ plan_id: 'free', plan_name: 'Free Tier', status: 'active' });
+    }
+  };
+
+  const planDisplay = useMemo(() => {
+    const planId = subscription?.plan_id || 'free';
+    const names = {
+      free: 'Free Plan',
+      basic: 'Basic Plan',
+      pro: 'Pro Plan',
+      enterprise: 'Enterprise Plan',
+    };
+    const prices = {
+      free: { amount: '$0', period: '/month' },
+      basic: { amount: '₹499', period: '/month' },
+      pro: { amount: '₹1,499', period: '/month' },
+      enterprise: { amount: '₹4,999', period: '/month' },
+    };
+    const icons = { free: '✨', basic: '⭐', pro: '🚀', enterprise: '👑' };
+    return {
+      planId,
+      name: subscription?.plan_name || names[planId] || planId,
+      ...prices[planId] || prices.free,
+      icon: icons[planId] || '✨',
+      isPaid: planId !== 'free',
+    };
+  }, [subscription]);
 
   // Sync theme from ThemeContext when it changes externally
   useEffect(() => {
@@ -981,7 +1018,7 @@ const SettingsPage = () => {
           </div>
         </div>
 
-        {/* Billing & Plan — Honest free tier display */}
+        {/* Plan & Billing — loaded from /payments/my-subscription (same DB as Billing page) */}
         <div className="settings-card animate-fade-in-up">
           <h3>
             <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor">
@@ -990,38 +1027,41 @@ const SettingsPage = () => {
             </svg>
             Plan & Billing
           </h3>
-          <div className="free-plan-card">
+          <div className={`free-plan-card current-plan-card plan-${planDisplay.planId}`}>
             <div className="free-plan-header">
               <div className="free-plan-badge">
-                <span className="plan-icon">✨</span>
-                <span className="plan-name">Free Plan</span>
+                <span className="plan-icon">{planDisplay.icon}</span>
+                <span className="plan-name">{planDisplay.name}</span>
               </div>
-              <span className="plan-price">$0<span className="plan-period">/month</span></span>
+              <span className="plan-price">
+                {planDisplay.amount}
+                <span className="plan-period">{planDisplay.period}</span>
+              </span>
             </div>
             <p className="free-plan-description">
-              All core features included for evaluation — storage management, cost analysis, VM monitoring, 2FA security, and more.
+              {planDisplay.isPaid
+                ? `Your Zenith subscription is active (${subscription?.status || 'active'}). BYOC, billing, and limits follow this plan.`
+                : 'Core features for evaluation — upgrade to Pro or Enterprise for BYOC and higher limits.'}
             </p>
-            <div className="free-plan-features">
-              <div className="feature-item">
-                <span className="feature-check">✓</span>
-                <span>Multi-cloud storage (AWS, GCP, Azure)</span>
-              </div>
-              <div className="feature-item">
-                <span className="feature-check">✓</span>
-                <span>Intelligent file placement & tiering</span>
-              </div>
-              <div className="feature-item">
-                <span className="feature-check">✓</span>
-                <span>2FA-protected secure vault</span>
-              </div>
-              <div className="feature-item">
-                <span className="feature-check">✓</span>
-                <span>Cost analysis & optimization</span>
-              </div>
-              <div className="feature-item">
-                <span className="feature-check">✓</span>
-                <span>VM cluster management</span>
-              </div>
+            {subscription?.vm_limit != null && (
+              <p className="free-plan-description" style={{ marginTop: 0 }}>
+                Includes up to {subscription.vm_limit >= 999 ? 'unlimited' : subscription.vm_limit} VMs
+                {' · '}
+                {subscription.storage_gb >= 1000
+                  ? `${subscription.storage_gb / 1000} TB`
+                  : `${subscription.storage_gb} GB`}{' '}
+                storage per VM
+              </p>
+            )}
+            <div className="settings-plan-actions">
+              <Link to="/dashboard/billing" className="btn-save" style={{ textDecoration: 'none', display: 'inline-block' }}>
+                Manage billing →
+              </Link>
+              {!planDisplay.isPaid && (
+                <Link to="/dashboard/pricing" className="btn-save" style={{ textDecoration: 'none', display: 'inline-block', marginLeft: '0.75rem', background: 'rgba(255,255,255,0.06)' }}>
+                  View plans
+                </Link>
+              )}
             </div>
           </div>
         </div>

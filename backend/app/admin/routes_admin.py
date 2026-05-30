@@ -345,6 +345,12 @@ async def create_user(
 
         DB["users"].insert_one(user_doc)
 
+        plan_id = payload.plan_id or "free"
+        if plan_id != "free":
+            from app.payments.subscription_service import set_user_subscription
+
+            set_user_subscription(payload.username, plan_id)
+
         # Log admin action
         DB["admin_actions"].insert_one({
             "admin_username": getattr(admin_user, 'username', admin_user.get('username') if isinstance(admin_user, dict) else None),

@@ -85,6 +85,12 @@ class Settings(BaseSettings):
     BACKEND_URL: str = "http://localhost:8000"   # Update to your production API domain
     ENVIRONMENT: str = "development"  # development, staging, production
 
+    # --- Single-tenant / owner account (optional) ---
+    # Comma-separated Zenith usernames that always receive PLATFORM_OWNER_PLAN on this deployment.
+    # Example: PLATFORM_OWNER_USERNAMES=Tanjore developer
+    PLATFORM_OWNER_USERNAMES: str = ""
+    PLATFORM_OWNER_PLAN: str = "enterprise"
+
     # --- Azure Credentials ---
     AZURE_STORAGE_ACCOUNT_NAME: str
     AZURE_STORAGE_ACCOUNT_KEY: str

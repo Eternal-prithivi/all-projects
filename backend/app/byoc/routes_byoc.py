@@ -321,10 +321,9 @@ def _save_aws_byoc_record(
 
 def check_byoc_eligibility(username: str):
     """Check if user's plan supports BYOC (Pro or Enterprise only)."""
-    sub = subscriptions_collection.find_one(
-        {"$or": [{"username": username}, {"user_id": username}]}
-    )
-    plan = sub.get("plan_id", "free") if sub else "free"
+    from app.payments.subscription_service import get_effective_plan_id
+
+    plan = get_effective_plan_id(username)
     
     if plan not in ("pro", "enterprise"):
         raise HTTPException(
@@ -463,11 +462,10 @@ async def get_status(user: User = Depends(get_current_user)):
     """Get BYOC connection status for all cloud providers."""
     status_data = get_byoc_status(user.username)
     
-    sub = subscriptions_collection.find_one(
-        {"$or": [{"username": user.username}, {"user_id": user.username}]}
-    )
-    plan = sub.get("plan_id", "free") if sub else "free"
-    
+    from app.payments.subscription_service import get_effective_plan_id
+
+    plan = get_effective_plan_id(user.username)
+
     return {
         "eligible": plan in ("pro", "enterprise"),
         "current_plan": plan,

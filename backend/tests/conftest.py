@@ -257,8 +257,15 @@ def pro_subscription(db: Database):
 
     def _grant(username: str, plan_id: str = "pro") -> None:
         db["subscriptions"].update_one(
-            {"username": username},
-            {"$set": {"username": username, "plan_id": plan_id}},
+            {"$or": [{"user_id": username}, {"username": username}]},
+            {
+                "$set": {
+                    "user_id": username,
+                    "username": username,
+                    "plan_id": plan_id,
+                    "status": "active",
+                }
+            },
             upsert=True,
         )
 

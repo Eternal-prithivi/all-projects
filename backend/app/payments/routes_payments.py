@@ -146,38 +146,17 @@ PLANS = {
 # --- Helper Functions ---
 
 def get_user_subscription(user_id: str) -> Dict[str, Any]:
-    """Get user's current subscription from MongoDB"""
-    subscription = DB["subscriptions"].find_one({"user_id": user_id})
-    
-    if not subscription:
-        # Return free tier by default
-        return {
-            "user_id": user_id,
-            "plan_id": "free",
-            "status": "active",
-            "subscription_id": None,
-            "razorpay_subscription_id": None,
-            "razorpay_customer_id": None,
-            "current_period_start": None,
-            "current_period_end": None,
-            "auto_renew": True
-        }
-    
-    return subscription
+    """Get user's current subscription (MongoDB + owner env + legacy users.plan_id)."""
+    from app.payments.subscription_service import get_user_subscription as _resolve
+
+    return _resolve(user_id)
+
 
 def update_user_limits(user_id: str, plan_id: str):
     """Update user's VM and storage limits based on plan"""
-    plan = PLANS[plan_id]
-    
-    DB["users"].update_one(
-        {"username": user_id},
-        {"$set": {
-            "vm_limit": plan.vm_limit,
-            "storage_limit_gb": plan.storage_gb,
-            "plan_id": plan_id,
-            "updated_at": datetime.utcnow()
-        }}
-    )
+    from app.payments.subscription_service import apply_user_plan_limits
+
+    apply_user_plan_limits(user_id, plan_id)
 
 # --- API Endpoints ---
 
@@ -322,24 +301,19 @@ async def verify_payment(
         )
         
         # Create/update subscription in MongoDB
-        DB["subscriptions"].update_one(
-            {"user_id": current_user.username},
-            {"$set": {
-                "plan_id": order["plan_id"],
-                "status": "active",
-                "razorpay_payment_id": razorpay_payment_id,
-                "razorpay_order_id": razorpay_order_id,
-                "billing_cycle": billing_cycle,
-                "current_period_start": current_period_start,
-                "current_period_end": current_period_end,
-                "auto_renew": True,
-                "updated_at": datetime.utcnow()
-            }},
-            upsert=True
+        from app.payments.subscription_service import set_user_subscription
+
+        set_user_subscription(
+            current_user.username,
+            order["plan_id"],
+            status="active",
+            razorpay_payment_id=razorpay_payment_id,
+            razorpay_order_id=razorpay_order_id,
+            billing_cycle=billing_cycle,
+            current_period_start=current_period_start,
+            current_period_end=current_period_end,
+            auto_renew=True,
         )
-        
-        # Update user limits
-        update_user_limits(current_user.username, order["plan_id"])
         
         # Update order status
         DB["payment_orders"].update_one(
