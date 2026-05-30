@@ -276,7 +276,7 @@ export default function ProvisionManagePanel({ onDeploymentsChange }) {
         <div className="deployments-section">
           <div className="deployments-section-header">
             <h3>Recent deployments</h3>
-            <span className="deployments-section-hint">Up to 5 most recent</span>
+            <span className="deployments-section-hint">Up to 3 most recent (older ones move to History automatically)</span>
           </div>
 
           {recent.length === 0 ? (
@@ -311,7 +311,8 @@ export default function ProvisionManagePanel({ onDeploymentsChange }) {
               {historyOpen && (
                 <div className="deployments-history-list">
                   <p className="provision-empty-hint deployments-history-note">
-                    Archived stacks and older runs. Remove clears the record only (not AWS).
+                    Archived stacks (including auto-archived when you have more than 3 recent).
+                    Use Archive to hide a stack without destroying AWS. Remove clears the record only.
                   </p>
                   {history.map((dep) => (
                     <DeploymentRow

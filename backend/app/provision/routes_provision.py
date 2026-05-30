@@ -81,7 +81,7 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["Provisioning"])
 
-RECENT_DEPLOYMENTS_LIMIT = 5
+RECENT_DEPLOYMENTS_LIMIT = 3
 _DEPLOYMENT_LIST_PROJECTION = {"plan_output": 0, "apply_output": 0}
 
 
@@ -583,25 +583,73 @@ def _serialize_deployment_docs(docs: list) -> list:
     return docs
 
 
+def _auto_archive_excess_deployments(user_id: str) -> int:
+    """
+    Keep at most RECENT_DEPLOYMENTS_LIMIT non-archived deployments per user.
+
+    Older active rows are archived automatically (newest stay in Recent).
+    Manual Archive still works for stacks within the limit.
+    """
+    collection = _get_deployments_collection()
+    active_filter = {"user_id": user_id, "archived": {"$ne": True}}
+    all_active = list(
+        collection.find(active_filter, {"deployment_name": 1, "status": 1})
+        .sort("created_at", -1)
+    )
+    if len(all_active) <= RECENT_DEPLOYMENTS_LIMIT:
+        return 0
+
+    now = datetime.utcnow()
+    archived_count = 0
+    for doc in all_active[RECENT_DEPLOYMENTS_LIMIT:]:
+        deployment_id = doc["deployment_name"]
+        collection.update_one(
+            {"deployment_name": deployment_id, "user_id": user_id},
+            {
+                "$set": {
+                    "archived": True,
+                    "archived_at": now,
+                    "updated_at": now,
+                    "auto_archived": True,
+                }
+            },
+        )
+        log_provision_action(
+            action="archive_auto",
+            actor=user_id,
+            deployment_id=deployment_id,
+            status="success",
+            details={
+                "reason": "recent_limit_exceeded",
+                "limit": RECENT_DEPLOYMENTS_LIMIT,
+                "previous_status": doc.get("status"),
+            },
+        )
+        archived_count += 1
+    return archived_count
+
+
 @router.get("/deployments")
 async def list_deployments(user: dict = Depends(get_current_user)):
     """
-    List deployments split into recent (active) and history (archived + older active).
-
-    The UI shows only ``recent`` by default; ``history`` holds archived rows and active
-    stacks beyond RECENT_DEPLOYMENTS_LIMIT.
+    List deployments split into recent (non-archived, max RECENT_DEPLOYMENTS_LIMIT)
+    and history (archived). Excess active rows are auto-archived on each list/save.
     """
     collection = _get_deployments_collection()
     user_filter = {"user_id": user.username}
+
+    await asyncio.to_thread(_auto_archive_excess_deployments, user.username)
+
     active_filter = {**user_filter, "archived": {"$ne": True}}
-
-    all_active = list(
-        collection.find(active_filter, _DEPLOYMENT_LIST_PROJECTION).sort("created_at", -1)
+    recent = _serialize_deployment_docs(
+        list(
+            collection.find(active_filter, _DEPLOYMENT_LIST_PROJECTION)
+            .sort("created_at", -1)
+            .limit(RECENT_DEPLOYMENTS_LIMIT)
+        )
     )
-    recent = _serialize_deployment_docs(all_active[:RECENT_DEPLOYMENTS_LIMIT])
-    overflow = _serialize_deployment_docs(all_active[RECENT_DEPLOYMENTS_LIMIT:])
 
-    archived = _serialize_deployment_docs(
+    history = _serialize_deployment_docs(
         list(
             collection.find(
                 {**user_filter, "archived": True},
@@ -612,8 +660,6 @@ async def list_deployments(user: dict = Depends(get_current_user)):
         )
     )
 
-    history = archived + overflow
-
     return {
         "recent": recent,
         "history": history,
@@ -622,7 +668,7 @@ async def list_deployments(user: dict = Depends(get_current_user)):
         "counts": {
             "recent": len(recent),
             "history": len(history),
-            "active": len(all_active),
+            "active": len(recent),
         },
     }
 
@@ -940,6 +986,7 @@ def _save_deployment(
         {"$set": doc, "$setOnInsert": {"archived": False}},
         upsert=True,
     )
+    _auto_archive_excess_deployments(user_id)
 
 
 def _get_deployment_for_user(deployment_id: str, username: str) -> Optional[dict]:
