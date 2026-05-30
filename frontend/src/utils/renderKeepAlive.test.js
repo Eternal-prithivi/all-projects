@@ -1,0 +1,49 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+vi.mock('../config/apiBase.js', () => ({
+  getApiRoot: vi.fn(() => 'https://zenith-backend-707i.onrender.com'),
+}));
+
+import { getApiRoot } from '../config/apiBase.js';
+import { startRenderKeepAlive } from './renderKeepAlive.js';
+
+describe('renderKeepAlive', () => {
+  beforeEach(() => {
+    vi.stubGlobal('fetch', vi.fn(() => Promise.resolve({ ok: true })));
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.useRealTimers();
+    vi.clearAllMocks();
+  });
+
+  it('does not ping in development', () => {
+    const stop = startRenderKeepAlive();
+    stop();
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('pings /health in production', () => {
+    vi.stubEnv('MODE', 'production');
+    const stop = startRenderKeepAlive();
+    expect(fetch).toHaveBeenCalledWith(
+      'https://zenith-backend-707i.onrender.com/health',
+      expect.objectContaining({ method: 'GET' })
+    );
+    vi.advanceTimersByTime(10 * 60 * 1000);
+    expect(fetch).toHaveBeenCalledTimes(2);
+    stop();
+    vi.unstubAllEnvs();
+  });
+
+  it('skips ping when API root is localhost', () => {
+    vi.stubEnv('MODE', 'production');
+    getApiRoot.mockReturnValueOnce('http://localhost:8000');
+    const stop = startRenderKeepAlive();
+    stop();
+    expect(fetch).not.toHaveBeenCalled();
+    vi.unstubAllEnvs();
+  });
+});

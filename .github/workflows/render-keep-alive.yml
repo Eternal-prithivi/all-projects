@@ -1,0 +1,30 @@
+# Pings Render /health every 5 minutes so the free-tier web service does not spin down
+# after ~15 minutes of no traffic. Scheduled workflows run only on the repository DEFAULT branch.
+#
+# Optional: set secret RENDER_API_URL (e.g. https://zenith-backend-707i.onrender.com)
+name: Render keep-alive
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: render-keep-alive
+  cancel-in-progress: false
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Wake Render backend (/health)
+        env:
+          RENDER_API_URL: ${{ secrets.RENDER_API_URL }}
+        run: |
+          BASE="${RENDER_API_URL:-https://zenith-backend-707i.onrender.com}"
+          BASE="${BASE%/}"
+          echo "Pinging ${BASE}/health"
+          curl -fsS --max-time 90 "${BASE}/health"
+          echo ""
+          echo "OK — backend received traffic (helps prevent Render free-tier sleep)."

@@ -44,6 +44,19 @@ The API uses `DynamicCORSMiddleware` in `app/main.py`:
 
 After changing domains, update `FRONTEND_URL` and redeploy the backend.
 
+## Render free tier — keep backend awake
+
+Render spins down free web services after about **15 minutes** with no HTTP traffic. Zenith uses two layers:
+
+| Layer | What | When it runs |
+|-------|------|----------------|
+| **GitHub Actions** | `.github/workflows/render-keep-alive.yml` pings `/health` every 5 minutes | Only on the repo **default branch** (check GitHub → Settings → General) |
+| **Frontend** | `renderKeepAlive.js` pings `/health` every 10 minutes while a production tab is open | After Vercel deploy |
+
+Optional GitHub secret: `RENDER_API_URL` (backend origin, no `/api`). If unset, the workflow uses `https://zenith-backend-707i.onrender.com`.
+
+**Actions:** merge `render-keep-alive.yml` into your default branch, enable Actions, run **Render keep-alive** once via *workflow_dispatch* to verify. Paid Render plans do not sleep — no heartbeat needed.
+
 ## Optional observability (Phase 19)
 
 | Variable | Required? | Notes |
