@@ -1,6 +1,7 @@
 // ProvisionDeployWizard.jsx — optional Terraform deploy (uses BYOC from Settings)
 import React, { useState, useEffect, useRef } from 'react';
 import api from '../../api';
+import { getApiBaseUrl, getApiRoot } from '../../config/apiBase.js';
 
 const TEMPLATES = [
   {
@@ -62,11 +63,27 @@ function formatProvisionError(err, fallback) {
   if (err.code === 'ECONNABORTED') {
     return 'Request timed out. Terraform may still be running — wait a minute, check Render logs, or try again.';
   }
+  if (err.message === 'Network Error' || err.code === 'ERR_NETWORK') {
+    return (
+      `Cannot reach the API at ${getApiBaseUrl()}. ` +
+      'On Vercel set VITE_API_URL to https://zenith-backend-707i.onrender.com (no /api), redeploy frontend, ' +
+      'and wait ~30s for Render to wake up, then try again.'
+    );
+  }
   if (err.response?.status) {
     return `${fallback} (HTTP ${err.response.status})`;
   }
   if (err.message) return err.message;
   return fallback;
+}
+
+/** Wake Render free-tier backend before long provision calls. */
+async function wakeBackend() {
+  try {
+    await fetch(`${getApiRoot()}/health`, { method: 'GET', cache: 'no-store' });
+  } catch {
+    // ignore — best effort
+  }
 }
 
 export default function ProvisionDeployWizard({ userPermissions, terraformOk, onDeployed }) {
@@ -162,10 +179,8 @@ export default function ProvisionDeployWizard({ userPermissions, terraformOk, on
     setError(null);
     setPlanOutput('');
     const planStartedAt = Date.now();
-    // #region agent log
-    fetch('http://127.0.0.1:7873/ingest/7adea292-3505-46ae-9501-d327cf266f05',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'8e7315'},body:JSON.stringify({sessionId:'8e7315',runId:'post-fix',hypothesisId:'H1',location:'ProvisionDeployWizard.runPlan:start',message:'plan POST starting',data:{url:'/provision/plan'},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
     try {
+      await wakeBackend();
       const res = await api.post('/provision/plan', config, {
         timeout: PLAN_START_TIMEOUT_MS,
       });
@@ -178,14 +193,21 @@ export default function ProvisionDeployWizard({ userPermissions, terraformOk, on
         setPlanOutput('Running terraform init and plan on the server…\n');
         for (let attempt = 0; attempt < PLAN_POLL_MAX_ATTEMPTS; attempt += 1) {
           await sleep(PLAN_POLL_INTERVAL_MS);
-          const st = await api.get(`/provision/plan/status/${res.data.deployment_id}`);
+          let st;
+          try {
+            st = await api.get(`/provision/plan/status/${res.data.deployment_id}`);
+          } catch (pollErr) {
+            // Retry while Render cold-starts (first ~30s)
+            if (attempt < 12 && (pollErr.message === 'Network Error' || pollErr.code === 'ERR_NETWORK')) {
+              setPlanOutput(`Waiting for API to wake up (attempt ${attempt + 1})…\n`);
+              continue;
+            }
+            throw pollErr;
+          }
           if (st.data.plan_output) {
             setPlanOutput(st.data.plan_output);
           }
           if (st.data.done) {
-            // #region agent log
-            fetch('http://127.0.0.1:7873/ingest/7adea292-3505-46ae-9501-d327cf266f05',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'8e7315'},body:JSON.stringify({sessionId:'8e7315',runId:'post-fix',hypothesisId:'H1',location:'ProvisionDeployWizard.runPlan:polled',message:'plan poll complete',data:{attempts:attempt+1,success:st.data.success,status:st.data.status,elapsedMs:Date.now()-planStartedAt},timestamp:Date.now()})}).catch(()=>{});
-            // #endregion
             if (!st.data.success) {
               const stage = st.data.stage ? `${st.data.stage}: ` : '';
               setError(stage + (st.data.error || st.data.plan_output || 'Terraform plan failed'));
@@ -205,9 +227,6 @@ export default function ProvisionDeployWizard({ userPermissions, terraformOk, on
         setError(stage + detail);
       }
     } catch (err) {
-      // #region agent log
-      fetch('http://127.0.0.1:7873/ingest/7adea292-3505-46ae-9501-d327cf266f05',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'8e7315'},body:JSON.stringify({sessionId:'8e7315',runId:'post-fix',hypothesisId:'H5',location:'ProvisionDeployWizard.runPlan:error',message:'plan POST failed',data:{elapsedMs:Date.now()-planStartedAt,status:err.response?.status,code:err.code,message:err.message},timestamp:Date.now()})}).catch(()=>{});
-      // #endregion
       setError(formatProvisionError(err, 'Failed to run terraform plan'));
     } finally {
       setLoading(false);

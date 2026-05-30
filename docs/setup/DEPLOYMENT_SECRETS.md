@@ -29,7 +29,7 @@ Set in **Render → Service → Environment**:
 
 Set in **Vercel → Project → Environment Variables**:
 
-- `VITE_API_URL` — backend base URL (e.g. `https://zenith-backend.onrender.com`)
+- `VITE_API_URL` — backend base URL **without** `/api` (e.g. `https://zenith-backend-707i.onrender.com`)
 - Optional: `VITE_SENTRY_DSN`
 
 ## CORS

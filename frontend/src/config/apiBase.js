@@ -1,20 +1,38 @@
 /**
  * Normalized API URLs for fetch() and axios.
  *
- * VITE_API_URL should be the backend ROOT without /api, e.g.
- *   https://zenith-backend-707i.onrender.com
- * If it ends with /api, we strip it so callers never produce /api/api/...
+ * Vercel production must set:
+ *   VITE_API_URL=https://zenith-backend-707i.onrender.com
+ * (no trailing /api)
  */
 
 const PRODUCTION_API_ROOT = 'https://zenith-backend-707i.onrender.com';
 const DEV_API_ROOT = 'http://localhost:8000';
 
+function isLocalhostUrl(url) {
+  return /localhost|127\.0\.0\.1/i.test(url);
+}
+
 /** Backend origin only (no /api suffix). */
 export function getApiRoot() {
-  const raw =
-    import.meta.env.VITE_API_URL ||
-    (import.meta.env.MODE === 'production' ? PRODUCTION_API_ROOT : DEV_API_ROOT);
-  return String(raw).replace(/\/api\/?$/i, '').replace(/\/$/, '');
+  const isProd = import.meta.env.MODE === 'production';
+  const fromEnv = import.meta.env.VITE_API_URL
+    ? String(import.meta.env.VITE_API_URL).replace(/\/api\/?$/i, '').replace(/\/$/, '')
+    : '';
+
+  if (isProd) {
+    // Never call localhost from rajverse.me — common mis-set Vercel env
+    if (fromEnv && !isLocalhostUrl(fromEnv)) {
+      // Old Render hostname without the trailing "i" returns 404
+      if (/zenith-backend-707\.onrender\.com/i.test(fromEnv) && !/707i/i.test(fromEnv)) {
+        return PRODUCTION_API_ROOT;
+      }
+      return fromEnv;
+    }
+    return PRODUCTION_API_ROOT;
+  }
+
+  return fromEnv || DEV_API_ROOT;
 }
 
 /** Axios baseURL and fetch prefix for routes under /api/... */
