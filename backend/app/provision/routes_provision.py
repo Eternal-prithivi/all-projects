@@ -248,82 +248,108 @@ async def run_plan(
     policy_result = full_policy_check(config_dict, include_opa=False)
     cost_result = estimate_cost(config_dict, use_infracost=False)
 
-    # Step 3: Create workspace + write tfvars
     deployment_id = f"{user.username}-{int(time.time())}"
-    workspace = create_workspace(deployment_id)
-    write_tfvars(workspace, config_dict)
+    workspace = ""
 
-    # Fill in user-specific tags
-    config_dict["tags"]["Owner"] = user.username
-    config_dict["tags"]["ManagedBy"] = "zenith-provision"
+    try:
+        # Step 3: Create workspace + write tfvars
+        workspace = create_workspace(deployment_id)
+        write_tfvars(workspace, config_dict)
 
-    # Step 4: Terraform init + plan (AWS creds from Settings BYOC)
-    aws_creds = _resolve_byoc_credentials(user, config_dict.get("aws_region", "ap-south-1"))
-    if not aws_creds.get("AWS_ACCESS_KEY_ID"):
-        msg = (
-            "No AWS credentials available for Terraform. "
-            "Connect AWS under Settings (BYOC), then try again."
-        )
-        log_provision_action(
-            action="plan", actor=user.username, deployment_id=deployment_id,
-            status="failed", details={"stage": "credentials"}, error=msg,
-        )
-        return {
-            "success": False,
-            "stage": "credentials",
-            "error": msg,
-            "policy_check": policy_result.model_dump(),
-            "cost_estimate": cost_result.model_dump(),
-        }
+        # Fill in user-specific tags
+        config_dict["tags"]["Owner"] = user.username
+        config_dict["tags"]["ManagedBy"] = "zenith-provision"
 
-    runner = TerraformRunner(workspace, aws_creds)
+        # Step 4: Terraform init + plan (AWS creds from Settings BYOC)
+        aws_creds = _resolve_byoc_credentials(user, config_dict.get("aws_region", "ap-south-1"))
+        if not aws_creds.get("AWS_ACCESS_KEY_ID"):
+            msg = (
+                "No AWS credentials available for Terraform. "
+                "Connect AWS under Settings (BYOC), then try again."
+            )
+            log_provision_action(
+                action="plan", actor=user.username, deployment_id=deployment_id,
+                status="failed", details={"stage": "credentials"}, error=msg,
+            )
+            return {
+                "success": False,
+                "stage": "credentials",
+                "error": msg,
+                "policy_check": policy_result.model_dump(),
+                "cost_estimate": cost_result.model_dump(),
+            }
 
-    init_result = runner.init()
-    if not init_result["success"]:
+        runner = TerraformRunner(workspace, aws_creds)
+
+        init_result = runner.init()
+        if not init_result["success"]:
+            err = init_result.get("error") or "Terraform init failed"
+            logger.error("Provision plan init failed for %s: %s", deployment_id, err[:500])
+            _save_deployment(user.username, deployment_id, config_dict, workspace,
+                             DeploymentStatus.PLAN_FAILED, policy_result, cost_result,
+                             plan_output=err)
+            log_provision_action(
+                action="plan", actor=user.username, deployment_id=deployment_id,
+                status="failed", details={"stage": "init"},
+                error=err,
+            )
+            return {
+                "success": False,
+                "stage": "init",
+                "error": err,
+                "policy_check": policy_result.model_dump(),
+                "cost_estimate": cost_result.model_dump(),
+            }
+
+        plan_result = runner.plan()
+
+        status = DeploymentStatus.AWAITING_APPLY if plan_result["success"] else DeploymentStatus.PLAN_FAILED
+        plan_err = plan_result.get("error")
+        if not plan_result["success"]:
+            logger.error("Provision plan failed for %s: %s", deployment_id, (plan_err or "")[:500])
+
         _save_deployment(user.username, deployment_id, config_dict, workspace,
-                         DeploymentStatus.PLAN_FAILED, policy_result, cost_result,
-                         plan_output=init_result.get("error", ""))
+                         status, policy_result, cost_result,
+                         plan_output=plan_result.get("output", ""))
+
         log_provision_action(
             action="plan", actor=user.username, deployment_id=deployment_id,
-            status="failed", details={"stage": "init"},
-            error=init_result.get("error"),
+            status="success" if plan_result["success"] else "failed",
+            details={
+                "has_changes": plan_result.get("has_changes", False),
+                "policy_blocks": len(policy_result.blocks),
+                "cost": cost_result.total_monthly_cost,
+            },
+            error=plan_err,
         )
+
+        return {
+            "success": plan_result["success"],
+            "stage": "plan",
+            "deployment_id": deployment_id,
+            "plan_output": plan_result.get("output", ""),
+            "has_changes": plan_result.get("has_changes", False),
+            "policy_check": policy_result.model_dump(),
+            "cost_estimate": cost_result.model_dump(),
+            "error": plan_err,
+        }
+    except Exception as exc:
+        logger.exception("Provision plan unexpected error for %s", deployment_id)
+        err = str(exc)
+        if workspace:
+            try:
+                _save_deployment(user.username, deployment_id, config_dict, workspace,
+                                 DeploymentStatus.PLAN_FAILED, policy_result, cost_result,
+                                 plan_output=err)
+            except Exception:
+                pass
         return {
             "success": False,
-            "stage": "init",
-            "error": init_result.get("error"),
+            "stage": "server",
+            "error": err,
             "policy_check": policy_result.model_dump(),
             "cost_estimate": cost_result.model_dump(),
         }
-
-    plan_result = runner.plan()
-
-    status = DeploymentStatus.AWAITING_APPLY if plan_result["success"] else DeploymentStatus.PLAN_FAILED
-    _save_deployment(user.username, deployment_id, config_dict, workspace,
-                     status, policy_result, cost_result,
-                     plan_output=plan_result.get("output", ""))
-
-    log_provision_action(
-        action="plan", actor=user.username, deployment_id=deployment_id,
-        status="success" if plan_result["success"] else "failed",
-        details={
-            "has_changes": plan_result.get("has_changes", False),
-            "policy_blocks": len(policy_result.blocks),
-            "cost": cost_result.total_monthly_cost,
-        },
-        error=plan_result.get("error"),
-    )
-
-    return {
-        "success": plan_result["success"],
-        "stage": "plan",
-        "deployment_id": deployment_id,
-        "plan_output": plan_result.get("output", ""),
-        "has_changes": plan_result.get("has_changes", False),
-        "policy_check": policy_result.model_dump(),
-        "cost_estimate": cost_result.model_dump(),
-        "error": plan_result.get("error"),
-    }
 
 
 @router.post("/apply/{deployment_id}")

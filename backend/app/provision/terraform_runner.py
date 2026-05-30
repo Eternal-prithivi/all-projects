@@ -87,6 +87,9 @@ class TerraformRunner:
     def _get_env(self) -> dict[str, str]:
         """Build environment variables for terraform subprocess."""
         env = os.environ.copy()
+        cache = os.getenv("TF_PLUGIN_CACHE_DIR")
+        if cache:
+            env["TF_PLUGIN_CACHE_DIR"] = cache
         # Inject BYOC AWS credentials if provided
         if self.aws_credentials:
             if "AWS_ACCESS_KEY_ID" in self.aws_credentials:

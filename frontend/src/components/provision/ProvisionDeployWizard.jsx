@@ -40,6 +40,31 @@ const MODULES = [
 
 const STEP_LABELS = ['Choose', 'Configure', 'Review', 'Deploy'];
 
+/** Terraform plan can take several minutes on Render — allow long requests. */
+const PLAN_REQUEST_TIMEOUT_MS = 5 * 60 * 1000;
+
+function formatProvisionError(err, fallback) {
+  const data = err.response?.data;
+  if (data && typeof data === 'object') {
+    if (data.error) return String(data.error);
+    if (data.detail) {
+      if (typeof data.detail === 'string') return data.detail;
+      if (Array.isArray(data.detail)) {
+        return data.detail.map((d) => d.msg || JSON.stringify(d)).join('; ');
+      }
+    }
+    if (data.message) return String(data.message);
+  }
+  if (err.code === 'ECONNABORTED') {
+    return 'Request timed out. Terraform may still be running — wait a minute, check Render logs, or try again.';
+  }
+  if (err.response?.status) {
+    return `${fallback} (HTTP ${err.response.status})`;
+  }
+  if (err.message) return err.message;
+  return fallback;
+}
+
 export default function ProvisionDeployWizard({ userPermissions, terraformOk, onDeployed }) {
   const [step, setStep] = useState(0);
   const [selectedTemplate, setSelectedTemplate] = useState(null);
@@ -133,24 +158,23 @@ export default function ProvisionDeployWizard({ userPermissions, terraformOk, on
     setError(null);
     setPlanOutput('');
     try {
-      const res = await api.post('/provision/plan', config);
+      const res = await api.post('/provision/plan', config, {
+        timeout: PLAN_REQUEST_TIMEOUT_MS,
+      });
       setPlanOutput(res.data.plan_output || '');
       setDeploymentId(res.data.deployment_id);
       setPolicyResult(res.data.policy_check);
       setCostEstimate(res.data.cost_estimate);
       if (!res.data.success) {
         const stage = res.data.stage ? `${res.data.stage}: ` : '';
-        setError(stage + (res.data.error || 'Terraform plan failed'));
+        const detail = res.data.error || res.data.plan_output || 'Terraform plan failed';
+        setError(stage + detail);
         if (res.data.plan_output) {
           setPlanOutput(res.data.plan_output);
         }
       }
     } catch (err) {
-      const data = err.response?.data;
-      const msg = (typeof data === 'object' && data)
-        ? (data.error || data.detail || data.message)
-        : null;
-      setError(msg || 'Failed to run terraform plan');
+      setError(formatProvisionError(err, 'Failed to run terraform plan'));
     } finally {
       setLoading(false);
     }

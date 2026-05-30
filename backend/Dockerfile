@@ -30,6 +30,12 @@ COPY terraform ./terraform
 RUN mkdir -p /app/terraform_workspaces
 
 ENV TERRAFORM_ROOT=/app/terraform
+ENV TF_PLUGIN_CACHE_DIR=/app/terraform-plugin-cache
+
+# Pre-download AWS provider plugins (speeds up first user terraform init on Render)
+RUN mkdir -p /app/terraform-plugin-cache \
+    && cd /app/terraform \
+    && terraform init -backend=false -input=false -no-color
 
 EXPOSE 8000
 
