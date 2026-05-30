@@ -267,8 +267,26 @@ def create_workspace(deployment_id: str) -> str:
     # Per-deployment local state (BYOC keys must not need access to platform S3 state bucket)
     _write_local_backend_config(workspace_path)
 
+    # Reuse provider plugins baked into the image at Docker build (faster init on Render)
+    _bootstrap_workspace_providers(workspace_path)
+
     logger.info(f"Created terraform workspace: {workspace_path}")
     return str(workspace_path)
+
+
+def _bootstrap_workspace_providers(workspace_path: Path) -> None:
+    """Copy pre-downloaded .terraform providers from the template tree when available."""
+    src = TERRAFORM_ROOT / ".terraform"
+    dest = workspace_path / ".terraform"
+    if not src.is_dir():
+        return
+    try:
+        if dest.exists():
+            shutil.rmtree(dest)
+        shutil.copytree(src, dest, dirs_exist_ok=True)
+        logger.info("Bootstrapped terraform providers into workspace %s", workspace_path)
+    except OSError as exc:
+        logger.warning("Could not copy .terraform providers: %s", exc)
 
 
 def _write_local_backend_config(workspace_path: Path) -> None:

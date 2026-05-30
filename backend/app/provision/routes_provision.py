@@ -29,6 +29,7 @@
 from __future__ import annotations
 
 import logging
+import threading
 import time
 from datetime import datetime
 
@@ -235,8 +236,8 @@ async def run_plan(
     user: dict = Depends(get_current_user),
 ):
     """
-    Run terraform plan — creates workspace, writes tfvars, runs policy check,
-    cost estimate, and terraform plan. Returns full result.
+    Start terraform plan — returns immediately; init/plan run in a background thread.
+  Poll GET /plan/status/{deployment_id} for the result (avoids Render HTTP 502 timeouts).
     """
     _enforce_permission(user, ProvisionAction.PLAN)
 
@@ -246,12 +247,10 @@ async def run_plan(
     config_dict = config.model_dump()
     _prepare_provision_config(config_dict)
 
-    # Step 1–2: Fast review (YAML policies + lookup table; no OPA/Infracost yet)
     policy_result = full_policy_check(config_dict, include_opa=False)
     cost_result = estimate_cost(config_dict, use_infracost=False)
 
     deployment_id = f"{user.username}-{int(time.time())}"
-    workspace = ""
     plan_t0 = time.monotonic()
 
     # #region agent log
@@ -260,158 +259,99 @@ async def run_plan(
         "routes_provision.run_plan:entry",
         "plan request started",
         {"deployment_id": deployment_id, "user": user.username},
+        run_id="post-fix",
     )
     # #endregion
 
-    try:
-        # Step 3: Create workspace + write tfvars
-        workspace = create_workspace(deployment_id)
-        write_tfvars(workspace, config_dict)
-        # #region agent log
-        agent_log(
-            "H4",
-            "routes_provision.run_plan:workspace",
-            "workspace ready",
-            {"deployment_id": deployment_id, "elapsed_s": round(time.monotonic() - plan_t0, 2)},
+    workspace = create_workspace(deployment_id)
+    write_tfvars(workspace, config_dict)
+    config_dict["tags"]["Owner"] = user.username
+    config_dict["tags"]["ManagedBy"] = "zenith-provision"
+
+    aws_creds = _resolve_byoc_credentials(user, config_dict.get("aws_region", "ap-south-1"))
+    if not aws_creds.get("AWS_ACCESS_KEY_ID"):
+        msg = (
+            "No AWS credentials available for Terraform. "
+            "Connect AWS under Settings (BYOC), then try again."
         )
-        # #endregion
-
-        # Fill in user-specific tags
-        config_dict["tags"]["Owner"] = user.username
-        config_dict["tags"]["ManagedBy"] = "zenith-provision"
-
-        # Step 4: Terraform init + plan (AWS creds from Settings BYOC)
-        aws_creds = _resolve_byoc_credentials(user, config_dict.get("aws_region", "ap-south-1"))
-        if not aws_creds.get("AWS_ACCESS_KEY_ID"):
-            msg = (
-                "No AWS credentials available for Terraform. "
-                "Connect AWS under Settings (BYOC), then try again."
-            )
-            log_provision_action(
-                action="plan", actor=user.username, deployment_id=deployment_id,
-                status="failed", details={"stage": "credentials"}, error=msg,
-            )
-            return {
-                "success": False,
-                "stage": "credentials",
-                "error": msg,
-                "policy_check": policy_result.model_dump(),
-                "cost_estimate": cost_result.model_dump(),
-            }
-
-        runner = TerraformRunner(workspace, aws_creds)
-
-        init_t0 = time.monotonic()
-        init_result = runner.init()
-        # #region agent log
-        agent_log(
-            "H1",
-            "routes_provision.run_plan:init_done",
-            "terraform init finished",
-            {
-                "deployment_id": deployment_id,
-                "success": init_result["success"],
-                "init_s": round(time.monotonic() - init_t0, 2),
-                "total_s": round(time.monotonic() - plan_t0, 2),
-                "error_len": len(init_result.get("error") or ""),
-            },
-        )
-        # #endregion
-        if not init_result["success"]:
-            err = init_result.get("error") or "Terraform init failed"
-            logger.error("Provision plan init failed for %s: %s", deployment_id, err[:500])
-            _save_deployment(user.username, deployment_id, config_dict, workspace,
-                             DeploymentStatus.PLAN_FAILED, policy_result, cost_result,
-                             plan_output=err)
-            log_provision_action(
-                action="plan", actor=user.username, deployment_id=deployment_id,
-                status="failed", details={"stage": "init"},
-                error=err,
-            )
-            return {
-                "success": False,
-                "stage": "init",
-                "error": err,
-                "policy_check": policy_result.model_dump(),
-                "cost_estimate": cost_result.model_dump(),
-            }
-
-        plan_t1 = time.monotonic()
-        plan_result = runner.plan()
-        # #region agent log
-        agent_log(
-            "H1",
-            "routes_provision.run_plan:plan_done",
-            "terraform plan finished",
-            {
-                "deployment_id": deployment_id,
-                "success": plan_result["success"],
-                "plan_s": round(time.monotonic() - plan_t1, 2),
-                "total_s": round(time.monotonic() - plan_t0, 2),
-                "error_len": len(plan_result.get("error") or ""),
-            },
-        )
-        # #endregion
-
-        status = DeploymentStatus.AWAITING_APPLY if plan_result["success"] else DeploymentStatus.PLAN_FAILED
-        plan_err = plan_result.get("error")
-        if not plan_result["success"]:
-            logger.error("Provision plan failed for %s: %s", deployment_id, (plan_err or "")[:500])
-
-        _save_deployment(user.username, deployment_id, config_dict, workspace,
-                         status, policy_result, cost_result,
-                         plan_output=plan_result.get("output", ""))
-
-        log_provision_action(
-            action="plan", actor=user.username, deployment_id=deployment_id,
-            status="success" if plan_result["success"] else "failed",
-            details={
-                "has_changes": plan_result.get("has_changes", False),
-                "policy_blocks": len(policy_result.blocks),
-                "cost": cost_result.total_monthly_cost,
-            },
-            error=plan_err,
-        )
-
-        return {
-            "success": plan_result["success"],
-            "stage": "plan",
-            "deployment_id": deployment_id,
-            "plan_output": plan_result.get("output", ""),
-            "has_changes": plan_result.get("has_changes", False),
-            "policy_check": policy_result.model_dump(),
-            "cost_estimate": cost_result.model_dump(),
-            "error": plan_err,
-        }
-    except Exception as exc:
-        logger.exception("Provision plan unexpected error for %s", deployment_id)
-        # #region agent log
-        agent_log(
-            "H2",
-            "routes_provision.run_plan:exception",
-            "unhandled exception",
-            {
-                "deployment_id": deployment_id,
-                "exc_type": type(exc).__name__,
-                "total_s": round(time.monotonic() - plan_t0, 2),
-            },
-        )
-        # #endregion
-        err = str(exc)
-        if workspace:
-            try:
-                _save_deployment(user.username, deployment_id, config_dict, workspace,
-                                 DeploymentStatus.PLAN_FAILED, policy_result, cost_result,
-                                 plan_output=err)
-            except Exception:
-                pass
         return {
             "success": False,
-            "stage": "server",
-            "error": err,
+            "stage": "credentials",
+            "error": msg,
             "policy_check": policy_result.model_dump(),
             "cost_estimate": cost_result.model_dump(),
         }
+
+    _save_deployment(
+        user.username, deployment_id, config_dict, workspace,
+        DeploymentStatus.PLANNING, policy_result, cost_result,
+        plan_output="",
+    )
+
+    thread = threading.Thread(
+        target=_run_plan_background,
+        args=(user.username, deployment_id, config_dict, workspace, aws_creds, policy_result, cost_result),
+        daemon=True,
+    )
+    thread.start()
+
+    # #region agent log
+    agent_log(
+        "H1",
+        "routes_provision.run_plan:accepted",
+        "plan accepted; background thread started",
+        {"deployment_id": deployment_id, "elapsed_s": round(time.monotonic() - plan_t0, 2)},
+        run_id="post-fix",
+    )
+    # #endregion
+
+    return {
+        "success": True,
+        "status": "running",
+        "deployment_id": deployment_id,
+        "stage": "background",
+        "message": "Terraform plan is running. Poll /api/provision/plan/status/{deployment_id}.",
+        "policy_check": policy_result.model_dump(),
+        "cost_estimate": cost_result.model_dump(),
+    }
+
+
+@router.get("/plan/status/{deployment_id}")
+async def get_plan_status(
+    deployment_id: str,
+    user: dict = Depends(get_current_user),
+):
+    """Poll background terraform plan result."""
+    _enforce_permission(user, ProvisionAction.PLAN)
+
+    doc = _get_deployment_for_user(deployment_id, user.username)
+    if not doc:
+        raise HTTPException(status_code=404, detail="Deployment not found.")
+
+    status = doc.get("status")
+    if isinstance(status, DeploymentStatus):
+        status_value = status.value
+    else:
+        status_value = str(status)
+
+    done = status_value in (
+        DeploymentStatus.AWAITING_APPLY.value,
+        DeploymentStatus.PLAN_FAILED.value,
+    )
+    success = status_value == DeploymentStatus.AWAITING_APPLY.value
+    plan_output = doc.get("plan_output") or ""
+    plan_error = doc.get("plan_error") or ""
+
+    return {
+        "deployment_id": deployment_id,
+        "status": status_value,
+        "done": done,
+        "success": success if done else None,
+        "plan_output": plan_output,
+        "error": plan_error if done and not success else (None if success else plan_error),
+        "has_changes": doc.get("has_plan_changes", False),
+        "stage": doc.get("plan_stage", "plan" if done else "background"),
+    }
 
 
 @router.post("/apply/{deployment_id}")
@@ -831,3 +771,127 @@ def _save_deployment(
         {"$set": doc},
         upsert=True,
     )
+
+
+def _get_deployment_for_user(deployment_id: str, username: str) -> Optional[dict]:
+    return _get_deployments_collection().find_one(
+        {"deployment_name": deployment_id, "user_id": username}
+    )
+
+
+def _run_plan_background(
+    username: str,
+    deployment_id: str,
+    config_dict: dict,
+    workspace: str,
+    aws_creds: dict[str, str],
+    policy_result: Any,
+    cost_result: Any,
+) -> None:
+    """Run terraform init/plan off the HTTP thread (avoids Render 502 on long requests)."""
+    plan_t0 = time.monotonic()
+    # #region agent log
+    agent_log(
+        "H1",
+        "routes_provision._run_plan_background:start",
+        "background plan started",
+        {"deployment_id": deployment_id},
+        run_id="post-fix",
+    )
+    # #endregion
+    try:
+        runner = TerraformRunner(workspace, aws_creds)
+
+        init_t0 = time.monotonic()
+        init_result = runner.init()
+        # #region agent log
+        agent_log(
+            "H1",
+            "routes_provision._run_plan_background:init_done",
+            "terraform init finished",
+            {
+                "deployment_id": deployment_id,
+                "success": init_result["success"],
+                "init_s": round(time.monotonic() - init_t0, 2),
+                "total_s": round(time.monotonic() - plan_t0, 2),
+            },
+            run_id="post-fix",
+        )
+        # #endregion
+        if not init_result["success"]:
+            err = init_result.get("error") or "Terraform init failed"
+            _save_deployment(
+                username, deployment_id, config_dict, workspace,
+                DeploymentStatus.PLAN_FAILED, policy_result, cost_result,
+                plan_output=err,
+            )
+            _get_deployments_collection().update_one(
+                {"deployment_name": deployment_id},
+                {"$set": {"plan_error": err, "plan_stage": "init"}},
+            )
+            return
+
+        plan_t1 = time.monotonic()
+        plan_result = runner.plan()
+        # #region agent log
+        agent_log(
+            "H1",
+            "routes_provision._run_plan_background:plan_done",
+            "terraform plan finished",
+            {
+                "deployment_id": deployment_id,
+                "success": plan_result["success"],
+                "plan_s": round(time.monotonic() - plan_t1, 2),
+                "total_s": round(time.monotonic() - plan_t0, 2),
+            },
+            run_id="post-fix",
+        )
+        # #endregion
+
+        status = DeploymentStatus.AWAITING_APPLY if plan_result["success"] else DeploymentStatus.PLAN_FAILED
+        plan_err = plan_result.get("error")
+        _save_deployment(
+            username, deployment_id, config_dict, workspace,
+            status, policy_result, cost_result,
+            plan_output=plan_result.get("output", ""),
+        )
+        _get_deployments_collection().update_one(
+            {"deployment_name": deployment_id},
+            {
+                "$set": {
+                    "plan_error": plan_err or "",
+                    "plan_stage": "plan" if plan_result["success"] else "plan",
+                    "has_plan_changes": plan_result.get("has_changes", False),
+                }
+            },
+        )
+        log_provision_action(
+            action="plan", actor=username, deployment_id=deployment_id,
+            status="success" if plan_result["success"] else "failed",
+            details={"has_changes": plan_result.get("has_changes", False)},
+            error=plan_err,
+        )
+    except Exception as exc:
+        logger.exception("Background plan failed for %s", deployment_id)
+        err = str(exc)
+        # #region agent log
+        agent_log(
+            "H2",
+            "routes_provision._run_plan_background:exception",
+            "background plan exception",
+            {"deployment_id": deployment_id, "exc_type": type(exc).__name__},
+            run_id="post-fix",
+        )
+        # #endregion
+        try:
+            _save_deployment(
+                username, deployment_id, config_dict, workspace,
+                DeploymentStatus.PLAN_FAILED, policy_result, cost_result,
+                plan_output=err,
+            )
+            _get_deployments_collection().update_one(
+                {"deployment_name": deployment_id},
+                {"$set": {"plan_error": err, "plan_stage": "server"}},
+            )
+        except Exception:
+            pass

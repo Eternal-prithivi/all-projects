@@ -40,8 +40,12 @@ const MODULES = [
 
 const STEP_LABELS = ['Choose', 'Configure', 'Review', 'Deploy'];
 
-/** Terraform plan can take several minutes on Render — allow long requests. */
-const PLAN_REQUEST_TIMEOUT_MS = 5 * 60 * 1000;
+/** Initial POST returns quickly; poll status for terraform output. */
+const PLAN_START_TIMEOUT_MS = 90 * 1000;
+const PLAN_POLL_INTERVAL_MS = 2500;
+const PLAN_POLL_MAX_ATTEMPTS = 120;
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 function formatProvisionError(err, fallback) {
   const data = err.response?.data;
@@ -159,30 +163,50 @@ export default function ProvisionDeployWizard({ userPermissions, terraformOk, on
     setPlanOutput('');
     const planStartedAt = Date.now();
     // #region agent log
-    fetch('http://127.0.0.1:7873/ingest/7adea292-3505-46ae-9501-d327cf266f05',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'8e7315'},body:JSON.stringify({sessionId:'8e7315',runId:'pre-fix',hypothesisId:'H3',location:'ProvisionDeployWizard.runPlan:start',message:'plan POST starting',data:{url:'/provision/plan',timeoutMs:PLAN_REQUEST_TIMEOUT_MS},timestamp:Date.now()})}).catch(()=>{});
+    fetch('http://127.0.0.1:7873/ingest/7adea292-3505-46ae-9501-d327cf266f05',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'8e7315'},body:JSON.stringify({sessionId:'8e7315',runId:'post-fix',hypothesisId:'H1',location:'ProvisionDeployWizard.runPlan:start',message:'plan POST starting',data:{url:'/provision/plan'},timestamp:Date.now()})}).catch(()=>{});
     // #endregion
     try {
       const res = await api.post('/provision/plan', config, {
-        timeout: PLAN_REQUEST_TIMEOUT_MS,
+        timeout: PLAN_START_TIMEOUT_MS,
       });
-      // #region agent log
-      fetch('http://127.0.0.1:7873/ingest/7adea292-3505-46ae-9501-d327cf266f05',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'8e7315'},body:JSON.stringify({sessionId:'8e7315',runId:'pre-fix',hypothesisId:'H1',location:'ProvisionDeployWizard.runPlan:success',message:'plan POST completed',data:{status:res.status,success:res.data?.success,stage:res.data?.stage,elapsedMs:Date.now()-planStartedAt,hasCorsHeader:!!res.headers?.['access-control-allow-origin']},timestamp:Date.now()})}).catch(()=>{});
-      // #endregion
-      setPlanOutput(res.data.plan_output || '');
-      setDeploymentId(res.data.deployment_id);
       setPolicyResult(res.data.policy_check);
       setCostEstimate(res.data.cost_estimate);
+      setDeploymentId(res.data.deployment_id);
+
+      // Background plan — poll until done (avoids Render 502 on long terraform)
+      if (res.data.status === 'running' && res.data.deployment_id) {
+        setPlanOutput('Running terraform init and plan on the server…\n');
+        for (let attempt = 0; attempt < PLAN_POLL_MAX_ATTEMPTS; attempt += 1) {
+          await sleep(PLAN_POLL_INTERVAL_MS);
+          const st = await api.get(`/provision/plan/status/${res.data.deployment_id}`);
+          if (st.data.plan_output) {
+            setPlanOutput(st.data.plan_output);
+          }
+          if (st.data.done) {
+            // #region agent log
+            fetch('http://127.0.0.1:7873/ingest/7adea292-3505-46ae-9501-d327cf266f05',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'8e7315'},body:JSON.stringify({sessionId:'8e7315',runId:'post-fix',hypothesisId:'H1',location:'ProvisionDeployWizard.runPlan:polled',message:'plan poll complete',data:{attempts:attempt+1,success:st.data.success,status:st.data.status,elapsedMs:Date.now()-planStartedAt},timestamp:Date.now()})}).catch(()=>{});
+            // #endregion
+            if (!st.data.success) {
+              const stage = st.data.stage ? `${st.data.stage}: ` : '';
+              setError(stage + (st.data.error || st.data.plan_output || 'Terraform plan failed'));
+            }
+            return;
+          }
+        }
+        setError('Plan is still running on the server. Check Deployments tab or try again in a minute.');
+        return;
+      }
+
+      // Immediate result (legacy / fast failure)
+      setPlanOutput(res.data.plan_output || '');
       if (!res.data.success) {
         const stage = res.data.stage ? `${res.data.stage}: ` : '';
         const detail = res.data.error || res.data.plan_output || 'Terraform plan failed';
         setError(stage + detail);
-        if (res.data.plan_output) {
-          setPlanOutput(res.data.plan_output);
-        }
       }
     } catch (err) {
       // #region agent log
-      fetch('http://127.0.0.1:7873/ingest/7adea292-3505-46ae-9501-d327cf266f05',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'8e7315'},body:JSON.stringify({sessionId:'8e7315',runId:'pre-fix',hypothesisId:'H5',location:'ProvisionDeployWizard.runPlan:error',message:'plan POST failed',data:{elapsedMs:Date.now()-planStartedAt,status:err.response?.status,code:err.code,message:err.message,hasResponse:!!err.response,responseDataType:typeof err.response?.data},timestamp:Date.now()})}).catch(()=>{});
+      fetch('http://127.0.0.1:7873/ingest/7adea292-3505-46ae-9501-d327cf266f05',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'8e7315'},body:JSON.stringify({sessionId:'8e7315',runId:'post-fix',hypothesisId:'H5',location:'ProvisionDeployWizard.runPlan:error',message:'plan POST failed',data:{elapsedMs:Date.now()-planStartedAt,status:err.response?.status,code:err.code,message:err.message},timestamp:Date.now()})}).catch(()=>{});
       // #endregion
       setError(formatProvisionError(err, 'Failed to run terraform plan'));
     } finally {
