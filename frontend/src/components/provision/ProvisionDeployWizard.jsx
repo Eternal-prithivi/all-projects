@@ -44,7 +44,7 @@ const STEP_LABELS = ['Choose', 'Configure', 'Review', 'Deploy'];
 /** Initial POST returns quickly; poll status for terraform output. */
 const PLAN_START_TIMEOUT_MS = 120 * 1000;
 const PLAN_POLL_INTERVAL_MS = 3000;
-const PLAN_POLL_MAX_ATTEMPTS = 180;  // 9 minutes — outlasts 240s plan timeout + init time
+const PLAN_POLL_MAX_ATTEMPTS = 260;  // ~13 min — outlasts 480s plan timeout + init on Render
 // Render free tier can be slow to answer while terraform init runs (512MB RAM).
 const PLAN_POLL_REQUEST_TIMEOUT_MS = 120 * 1000;
 const WAKE_MAX_WAIT_MS = 90 * 1000;
@@ -278,7 +278,7 @@ export default function ProvisionDeployWizard({ terraformOk, onDeployed }) {
           }
         }
         setError(
-          'Plan did not finish within 9 minutes. ' +
+          'Plan did not finish within ~13 minutes. ' +
           'Check Render logs for errors, or start a new plan (try enabling fewer modules).'
         );
         return;

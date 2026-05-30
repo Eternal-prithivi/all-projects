@@ -125,10 +125,18 @@ class TerraformRunner:
 
     def plan(self) -> dict[str, Any]:
         """Run terraform plan and return the result."""
+        # Render free tier + cross-region AWS can exceed 4 minutes; skip refresh to speed plan.
+        plan_timeout_s = 480
+        plan_cmd = [
+            "terraform", "plan",
+            "-input=false", "-no-color",
+            "-parallelism=1",
+            "-refresh=false",
+        ]
         try:
             result = subprocess.run(
-                ["terraform", "plan", "-input=false", "-no-color", "-parallelism=1"],
-                capture_output=True, text=True, timeout=240,
+                plan_cmd,
+                capture_output=True, text=True, timeout=plan_timeout_s,
                 cwd=str(self.workspace_dir),
                 env=self._get_env(),
             )
@@ -141,8 +149,18 @@ class TerraformRunner:
                 "error": combined.strip() if not ok else None,
                 "has_changes": result.returncode == 2 or "No changes." not in result.stdout,
             }
-        except subprocess.TimeoutExpired:
-            return {"success": False, "output": "", "error": "Terraform plan timed out (240s). AWS may be slow or credentials may be missing permissions. Try again or reduce the number of enabled modules."}
+        except subprocess.TimeoutExpired as exc:
+            partial = ((exc.stdout or "") + (exc.stderr or "")).strip()
+            if len(partial) > 3000:
+                partial = "…\n" + partial[-3000:]
+            msg = (
+                f"Terraform plan timed out ({plan_timeout_s}s). "
+                "AWS may be slow from Render, or BYOC credentials may lack permissions. "
+                "Try again in a few minutes."
+            )
+            if partial:
+                msg = f"{msg}\n\nPartial terraform output:\n{partial}"
+            return {"success": False, "output": partial, "error": msg}
         except Exception as e:
             return {"success": False, "output": "", "error": str(e)}
 
