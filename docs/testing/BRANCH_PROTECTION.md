@@ -9,8 +9,8 @@ Require the **CI** workflow to pass before merging into protected branches.
 3. Enable:
    - **Require a pull request before merging**
    - **Require status checks to pass before merging**
-   - Status check: **`backend`** and **`frontend`** (from `.github/workflows/ci.yml`)
-   - Optionally: **`terraform-validate`**
+   - Status check: **`backend`**, **`frontend`**, **`terraform-validate`**, **`playwright`** (after Phase 20.5.2)
+   - After Phase 20.5.1: require CI to pass before merge; deploy runs only after CI (see `PHASE_20_5_CI_GATES.md`)
 
 ## What CI runs
 

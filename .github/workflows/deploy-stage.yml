@@ -1,14 +1,22 @@
+# Deploy stage only after CI succeeds on the same commit (Phase 20.5.1).
 name: Deploy Stage
 
 on:
-  push:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
     branches: [stage]
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    if: >
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_branch == 'stage'
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
 
       - name: Trigger Render backend deploy
         env:
@@ -35,3 +43,17 @@ jobs:
           npx vercel pull --yes --environment=preview --token="$VERCEL_TOKEN"
           npx vercel build --token="$VERCEL_TOKEN"
           npx vercel deploy --prebuilt --token="$VERCEL_TOKEN"
+
+      - name: Post-deploy stage smoke (Phase 20.5.4)
+        env:
+          STAGE_API_URL: ${{ secrets.STAGE_API_URL }}
+        run: |
+          if [ -z "$STAGE_API_URL" ]; then
+            echo "STAGE_API_URL not set; skip post-deploy smoke."
+            exit 0
+          fi
+          BASE="${STAGE_API_URL%/}"
+          echo "Waiting 90s for Render/Vercel cold start..."
+          sleep 90
+          curl -fsS "${BASE}/health"
+          curl -fsS "${BASE}/api/platform/status"

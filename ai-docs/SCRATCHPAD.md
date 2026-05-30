@@ -2,10 +2,10 @@
 
 ## 🔄 Current Resume State
 
-**Status:** COMPLETE (2026-05-30)
+**Status:** Phase **20.5** code landed — verify CI on `stage` push.
 
-**Task:** Boto3 / Terraform full parity — all 7 modules in `boto3_modules/`, drift expanded, tests.
+**Done in repo:** CI-gated deploy, required Playwright, coverage 40%, audits, CodeQL, gitleaks, terraform plan PR job, ESLint zero warnings, jspdf 4.x, Trivy Dockerfile scan.
 
-**LKGS:** `pytest -q` → 153 passed. Boto3 mirrors vpc/ec2/s3/iam/cloudwatch/dynamodb/billing. Push `stage` for latest hash.
+**Manual (you):** **20.5.10** — GitHub → Settings → Branches → protect `stage` with checks: `backend`, `frontend`, `terraform-validate`, `playwright`, `security-audit`. Set secret `STAGE_API_URL` for post-deploy smoke.
 
-**Next:** Manual smoke on Render (static-site boto3 plan); Phase 21+.
+**Next:** Confirm green CI, then start **Phase 21**.

@@ -211,6 +211,16 @@
 
 ---
 
+### [DEC-023] Phase 20.5 before Phase 21 (CI/CD enterprise gates)
+- **Date**: 2026-05-30
+- **Status**: Accepted (roadmap)
+- **Context**: Phase 20 delivered baseline CI/CD; enterprise gaps (gated deploy, security scans, required E2E, coverage floor) were not in Phase 20 checklist and should not wait for observability (21) or compliance (26).
+- **Decision**: Insert **Phase 20.5** between 20 and 21. Items explicitly deferred: Celery/Redis in CI → 25; load tests → 25; SOC2/GDPR/pen-test → 26; SAML/SCIM → 24; org tenancy → 22–23.
+- **Key doc**: `docs/testing/PHASE_20_5_CI_GATES.md`, checklist in `ai-docs/PROGRESS.md`.
+- **DO NOT**: Start Phase 21 production observability work until 20.5.1–20.5.2 (gated deploy + required Playwright) are done unless explicitly waived.
+
+---
+
 ### [DEC-022] Dual provision engine — Boto3 vs Terraform (user Settings)
 - **Date**: 2026-05-30 (parity completed 2026-05-30)
 - **Status**: ✅ Implemented

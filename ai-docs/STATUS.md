@@ -1,6 +1,6 @@
 # STATUS.md — Live Project Snapshot
 
-**Last Updated:** 2026-05-30
+**Last Updated:** 2026-05-30 (Phase 20.5 roadmap added)
 
 ---
 
@@ -9,15 +9,15 @@
 | Field | Value |
 |-------|--------|
 | Project | CloudResourceOptimizationPlatform (**Zenith**) |
-| Phase | **19** — Isolated ops & hygiene — **COMPLETE** (code + docs) |
-| Last major | Phase 19: CORS, secrets docs, Sentry optional, vitest, platform status |
-| Prior push | `stage` (provision engine toggle — see git log) |
+| Phase | **20.5** — CI/CD enterprise gates — **in progress** (code landed; apply branch protection) |
+| Last major | Playwright CI fixes, Render keep-alive, Boto3/Terraform parity |
+| Prior push | `stage` (see git log) |
 
 ---
 
 ## 🔴 Active Task
 
-**None** — Boto3 / Terraform full parity **COMPLETE** (2026-05-30).
+**Phase 20.5** — CI/CD enterprise gates (before Phase 21). Checklist: `PROGRESS.md`, map: `docs/testing/PHASE_20_5_CI_GATES.md`.
 
 ---
 
@@ -31,7 +31,8 @@ CORS hardening, deployment/rotation/cost docs, optional Sentry, uptime workflow,
 
 | Phase | Focus |
 |-------|--------|
-| **20** | Tests, CI Mongo, CD, Playwright |
+| **20** | Tests, CI Mongo, CD, Playwright ✅ |
+| **20.5** | CI gates, security scans, gated deploy 🔴 |
 | **21** | Logging, runbooks |
 | **22–27** | Org tenancy → scale → compliance → cloud parity |
 

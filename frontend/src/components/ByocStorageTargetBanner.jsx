@@ -20,7 +20,7 @@ export default function ByocStorageTargetBanner({
       try {
         const res = await apiClient.get('/byoc/storage-targets');
         if (!cancelled) setTargets(res.data);
-      } catch (e) {
+      } catch {
         if (!cancelled) setError('Could not load storage destination.');
       }
     })();

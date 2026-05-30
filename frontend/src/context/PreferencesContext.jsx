@@ -85,7 +85,7 @@ export const PreferencesProvider = ({ children }) => {
             // localStorage not available
           }
         }
-      } catch (error) {
+      } catch {
         console.warn('PreferencesContext: Failed to fetch preferences, using cached/defaults');
       } finally {
         setIsLoaded(true);

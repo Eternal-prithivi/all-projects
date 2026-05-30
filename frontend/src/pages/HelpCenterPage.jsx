@@ -209,6 +209,7 @@ const HelpCenterPage = () => {
     }
 
     return filtered;
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- static FAQ list defined in component
   }, [searchQuery, selectedCategory]);
 
   const toggleQuestion = (id) => {

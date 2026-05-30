@@ -141,11 +141,11 @@ function SecurityPage() {
       setSecureFiles(files);
       sessionStorage.setItem('cache_secureFiles', JSON.stringify(files));
       return files;
-    } catch (err) {
+    } catch {
       notifications.error("Could not fetch secure file list.");
       return [];
     }
-  }, [token, canAccessSecureArea, selectedBucket, selectedRegion]);
+  }, [token, canAccessSecureArea, selectedBucket, selectedRegion, notifications]);
 
   useEffect(() => {
     const wsRef = { current: null };
@@ -162,7 +162,10 @@ function SecurityPage() {
     }
     return () => {
       if (wsRef.current) wsRef.current.close();
-      if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+      // pollIntervalRef unused for scheduling today; clear if set elsewhere
+      // eslint-disable-next-line react-hooks/exhaustive-deps -- ref cleanup snapshot
+      const pollId = pollIntervalRef.current;
+      if (pollId) clearInterval(pollId);
     };
   }, [user, token, canAccessSecureArea, fetchSecureFiles, loading]);
 

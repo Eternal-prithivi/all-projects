@@ -577,9 +577,31 @@ Reference: 97-page project report (Chapter 4–6). Last cross-check: 2026-05-24.
 
 ---
 
+## Phase 20.5 — CI/CD enterprise gates
+
+*Depends on: Phase 20 complete. **Blocks recommended start of Phase 21** (deploy safety before adding observability). Full gap map: `docs/testing/PHASE_20_5_CI_GATES.md`.*
+
+- [ ] **20.5.1** — CI-gated stage deploy (`workflow_run` after CI success on `stage`)
+- [ ] **20.5.2** — Playwright required in CI (remove `continue-on-error`); update `BRANCH_PROTECTION.md`
+- [ ] **20.5.3** — Backend coverage gate (`--cov-fail-under=40`, ratchet quarterly)
+- [ ] **20.5.4** — Post-deploy stage smoke (`STAGE_API_URL` → `/health` + `/api/platform/status`)
+- [ ] **20.5.5** — ESLint `--max-warnings 0` in CI (fix current warnings)
+- [ ] **20.5.6** — Dependabot (`.github/dependabot.yml` npm + pip)
+- [ ] **20.5.7** — `pip-audit` + `npm audit` (fail high/critical) in CI
+- [ ] **20.5.8** — CodeQL workflow (Python + JavaScript)
+- [ ] **20.5.9** — Gitleaks (or equivalent) on pull_request
+- [ ] **20.5.10** — Apply GitHub branch protection for `stage` per doc
+- [ ] **20.5.11** — Default branch + `render-keep-alive` on deploy branch
+- [ ] **20.5.12** — Terraform `plan` on PR (read-only; completes 20.16 plan gap)
+- [ ] **20.5.13** — Doc: Celery/Redis CI deferred to Phase 25
+- [ ] **20.5.14** — *(Optional)* OpenAPI snapshot tests
+- [ ] **20.5.15** — *(Optional)* Trivy scan `backend/Dockerfile`
+
+---
+
 ## Phase 21 — Observability & runbooks
 
-*Depends on: 19.4–19.5 Sentry recommended first.*
+*Depends on: 19.4–19.5 Sentry recommended first; **20.5** deploy gates recommended.*
 
 - [ ] **21.1** — Structured JSON logging (request id, user, route, duration)
 - [ ] **21.2** — Request ID middleware + pass to logs and error responses
@@ -594,7 +616,7 @@ Reference: 97-page project report (Chapter 4–6). Last cross-check: 2026-05-24.
 
 ## Phase 22 — Org foundation (tenancy data model)
 
-*Depends on: Phase 19–21 ops baseline. **Blocks Phase 23–26.***
+*Depends on: Phase 19–**20.5**–21 ops baseline. **Blocks Phase 23–26.***
 
 - [ ] **22.1** — `DECISIONS.md`: tenancy model (single org per user vs multi-org later; org_id on documents)
 - [ ] **22.2** — Add `org_id` to `cloud_credentials` / BYOC records + migration script for existing users

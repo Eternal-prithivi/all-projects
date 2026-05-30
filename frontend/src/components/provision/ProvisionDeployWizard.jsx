@@ -118,7 +118,7 @@ async function waitForBackend(maxWaitMs = WAKE_MAX_WAIT_MS) {
   return { ok: false, attempts: attempt };
 }
 
-export default function ProvisionDeployWizard({ terraformOk, userProvisionEngine = 'boto3', onDeployed }) {
+export default function ProvisionDeployWizard({ terraformOk: _terraformOk, userProvisionEngine = 'boto3', onDeployed }) {
   const engineLabel = userProvisionEngine === 'terraform' ? 'Terraform' : 'Boto3';
   const [step, setStep] = useState(0);
   const [selectedTemplate, setSelectedTemplate] = useState(null);
@@ -380,8 +380,6 @@ export default function ProvisionDeployWizard({ terraformOk, userProvisionEngine
   }, [planOutput]);
 
   const canProceedStep0 = hasAnyModule;
-  const canProceedStep2 = policyResult && (!policyResult.blocks || policyResult.blocks.length === 0);
-
 
   return (
     <div className="provision-deploy-wizard">

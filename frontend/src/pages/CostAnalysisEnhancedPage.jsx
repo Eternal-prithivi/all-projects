@@ -13,7 +13,6 @@
 import React, { useState, useEffect } from 'react';
 import { apiClient } from '../api.js';
 import { useNotifications } from "../hooks/useNotifications";
-import { useNavigate } from 'react-router-dom';
 import PageHeader from '../components/ui/PageHeader.jsx';
 import CostHubNav from '../components/dashboard/CostHubNav.jsx';
 import {
@@ -35,7 +34,6 @@ const ProviderLogo = ({ provider }) => {
 };
 
 const CostAnalysisEnhancedPage = () => {
-  const navigate = useNavigate();
   const notifications = useNotifications();
   
   // Core state

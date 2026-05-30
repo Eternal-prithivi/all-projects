@@ -21,9 +21,11 @@ Copy `backend/.env.example` and `frontend/.env.example` to staging-specific valu
 - `ENVIRONMENT=staging`
 - Use test/sandbox payment keys (Razorpay test mode)
 
-## Deploy
+## Deploy (Phase 20.5.1)
 
-- **Automatic:** push to `stage` triggers `.github/workflows/deploy-stage.yml` when `RENDER_DEPLOY_HOOK` and Vercel secrets are configured.
+- **Automatic:** push to `stage` runs **CI** first; on success, `deploy-stage.yml` deploys the **same commit** (`workflow_run`).
+- **Secrets:** `RENDER_DEPLOY_HOOK`, `VERCEL_*`, optional `STAGE_API_URL` for post-deploy smoke (hits `/health` + `/api/platform/status` after ~90s).
+- **GitHub:** set **default branch** to `stage` (or merge workflows into default branch) so `render-keep-alive.yml` runs on schedule.
 - **Manual:** Render dashboard deploy + Vercel promote preview.
 
 ## Smoke checklist after deploy

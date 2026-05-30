@@ -1,15 +1,17 @@
 # PROGRESS.md — Task Tracker
 
 > **Last Updated:** 2026-05-30  
-> **Roadmap:** Phases **19–27** — summary table below. **Full checklists** for completed Phase 19 and future Phases 21–27 → `PROGRESS_HISTORY.md` (do not read at startup).  
-> **Order rule:** Phases **19–21** isolated first; **22+** need org foundation.
+> **Roadmap:** Phases **19–27** + **20.5**. Full checklists → `PROGRESS_HISTORY.md`.  
+> **Order rule:** **19 → 20 → 20.5 → 21**; **22+** need org foundation.
 
 
 ---
 
 ## 🔴 Active Task
 
-**None** — last completed: **Boto3 / Terraform full parity** (2026-05-30).
+**Phase 20.5 — CI/CD enterprise gates** — implementation in progress on `stage`.
+
+**Next after 20.5:** Phase 21 (observability & runbooks).
 
 ---
 
@@ -18,39 +20,43 @@
 | Phase | Theme | Depends on | Status |
 |-------|--------|------------|--------|
 | **19** | Isolated ops & hygiene | — | ✅ Complete |
-| **20** | Quality, CI depth & CD | 19 (secrets/CORS doc) | ✅ Complete (20.0–20.16 + gap tests) |
-| **21** | Observability & runbooks | 19 | ⬜ Not started |
+| **20** | Quality, CI depth & CD | 19 | ✅ Complete |
+| **20.5** | **CI/CD enterprise gates** | 20 | 🟡 In progress |
+| **21** | Observability & runbooks | 19, **20.5** | ⬜ Not started |
 | **22** | Org foundation (data model) | 19–21 recommended | ⬜ Not started |
 | **23** | Org-scoped product | **22** | ⬜ Not started |
 | **24** | Enterprise IdP & API governance | **22**, partial 23 | ⬜ Not started |
-| **25** | Scale-out & performance | 20 CI, 21 metrics | ⬜ Not started |
-| **26** | Compliance & commercial | **22–23** for org billing | ⬜ Not started |
+| **25** | Scale-out & performance | 20, 21, 24.8 optional | ⬜ Not started |
+| **26** | Compliance & commercial | **22–23** | ⬜ Not started |
 | **27** | Cloud parity & deferred UI | BYOC/GCP billing active | ⬜ Not started |
 
 ---
 
-## Phase 20 — Quality, CI depth & CD
+## Phase 20.5 — CI/CD enterprise gates
 
-*Depends on: 19.2 secrets doc helpful. CI already exists (`.github/workflows/ci.yml`).*
+*Detail: `docs/testing/PHASE_20_5_CI_GATES.md`*
 
-- [x] **20.0** — Test foundation (`conftest.py`, markers, `docs/testing/TESTING.md`, CI Mongo)
-- [x] **20.1** — Pytest: admin user CRUD + audit export (`tests/integration/test_admin_api.py`)
-- [x] **20.2** — Pytest: BYOC connect / test / disconnect (mocks)
-- [x] **20.3** — Pytest: storage list / upload / sync smoke
-- [x] **20.4** — Pytest: password reset + email verify flows
-- [x] **20.5** — Pytest: organizations (create org, invite, accept)
-- [x] **20.6** — Pytest: notifications API
-- [x] **20.7** — CI: MongoDB service container
-- [x] **20.8** — CI: `--cov` report artifact
-- [x] **20.9** — CD: `deploy-stage.yml`
-- [x] **20.10** — CD: production deploy (`deploy-production.yml`, tag / manual)
-- [x] **20.11** — Branch protection doc (`docs/testing/BRANCH_PROTECTION.md`)
-- [x] **20.12** — Playwright: login page smoke
-- [x] **20.13** — Playwright: settings auth redirect smoke
-- [x] **20.14** — Staging environment doc (`docs/testing/STAGING.md`)
-- [x] **20.15** — MongoDB Atlas migration guide (`docs/testing/MONGODB_ATLAS.md`)
-- [x] **20.16** — Terraform CI doc (`docs/testing/TERRAFORM_CI.md`; validate job in CI)
-- [x] **20.x** — Gap follow-up: `TESTING_POLICY.md`, storage analyze + security upload integration, settings/profile API tests, AWS BYOC + E2E admin/BYOC validation, CI `seed_e2e_admin.py`
+- [x] **20.5.1** — CI-gated stage deploy (`workflow_run` after CI)
+- [x] **20.5.2** — Playwright required (removed `continue-on-error`)
+- [x] **20.5.3** — Backend `--cov-fail-under=40`
+- [x] **20.5.4** — Post-deploy stage smoke (`STAGE_API_URL` secret)
+- [x] **20.5.5** — ESLint `--max-warnings 0` + warning fixes
+- [x] **20.5.6** — Dependabot (`.github/dependabot.yml`)
+- [x] **20.5.7** — `pip-audit` + `npm audit --audit-level=high` in CI
+- [x] **20.5.8** — CodeQL workflow
+- [x] **20.5.9** — Gitleaks + `.gitleaks.toml`
+- [ ] **20.5.10** — Apply GitHub branch protection on `stage` (manual in repo Settings)
+- [x] **20.5.11** — `STAGING.md` default branch + keep-alive notes
+- [x] **20.5.12** — `terraform-plan.yml` on PR
+- [x] **20.5.13** — Celery/Redis CI deferral documented in `PHASE_20_5_CI_GATES.md`
+- [ ] **20.5.14** — *(Optional)* OpenAPI snapshot tests
+- [x] **20.5.15** — Trivy Dockerfile scan in CI
+
+---
+
+## Phase 20 — Quality, CI depth & CD ✅
+
+*Complete — see `PROGRESS_HISTORY.md`.*
 
 ---
 
@@ -58,11 +64,7 @@
 
 | Topic | Doc |
 |-------|-----|
+| Phase 20.5 gap map | `docs/testing/PHASE_20_5_CI_GATES.md` |
 | Agent protocol | `AI_MASTER.md` |
 | Live snapshot | `STATUS.md` |
-| Resume / next step | `SCRATCHPAD.md` |
-| Completed narratives + Phases 19–27 checklists | `PROGRESS_HISTORY.md` |
-| Session log (8 recent) | `AUDIT_LOG.md` |
-| Session log archive | `AUDIT_LOG_ARCHIVE_2026.md` |
-
-> **Token rule:** This file = active task + summary table + **current phase checklist only**. Do not duplicate completed phase item lists here.
+| Resume | `SCRATCHPAD.md` |

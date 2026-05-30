@@ -4,7 +4,7 @@ import reactHooks from "eslint-plugin-react-hooks";
 import reactRefresh from "eslint-plugin-react-refresh";
 
 export default [
-  { ignores: ["dist/**", "node_modules/**"] },
+  { ignores: ["dist/**", "node_modules/**", "src/examples/**"] },
   js.configs.recommended,
   {
     files: ["**/*.{js,jsx}"],
@@ -31,6 +31,12 @@ export default [
         varsIgnorePattern: "^(_|React$|[A-Z][A-Za-z0-9]*)$",
         caughtErrorsIgnorePattern: "^_",
       }],
+    },
+  },
+  {
+    files: ["src/context/**/*.{js,jsx}"],
+    rules: {
+      "react-refresh/only-export-components": "off",
     },
   },
 ];

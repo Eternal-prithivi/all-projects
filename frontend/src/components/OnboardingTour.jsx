@@ -162,7 +162,8 @@ function OnboardingTour() {
       }, 1500);
       return () => clearTimeout(timer);
     }
-  }, []); // empty deps — runs once on mount only
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- welcome modal once on dashboard mount
+  }, []);
 
   const startTour = useCallback(() => {
     setShowWelcome(false);

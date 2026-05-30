@@ -1,0 +1,25 @@
+# Phase 20.5.12 — terraform plan on PR (read-only, no remote state)
+name: Terraform plan
+
+on:
+  pull_request:
+    branches: [main, master, stage, develop]
+    paths:
+      - "backend/terraform/**"
+      - ".github/workflows/terraform-plan.yml"
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend/terraform
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.10.0"
+      - name: Terraform init
+        run: terraform init -backend=false
+      - name: Terraform plan
+        run: terraform plan -input=false -no-color

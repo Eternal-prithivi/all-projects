@@ -14,7 +14,6 @@ export function getEngineLabel(engine) {
 }
 
 export function getLoadingMessage(action, engine) {
-  const label = getEngineLabel(engine);
   const messages = {
     drift:
       engine === 'boto3'

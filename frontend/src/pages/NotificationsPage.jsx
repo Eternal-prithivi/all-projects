@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { apiClient } from '../api';
 import PageHeader from '../components/ui/PageHeader.jsx';
 import { useNotificationCenter } from '../context/NotificationContext.jsx';
 import '../styles/notifications-page.css';

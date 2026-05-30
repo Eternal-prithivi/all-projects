@@ -32,11 +32,11 @@ import { IconHardDrive } from "../components/dashboard/Icons.jsx";
 
 // --- API FUNCTIONS (Missing from api.js) ---
 import { apiClient } from "../api";
-const analyzeFile = async (data, token) => {
+const analyzeFile = async (data, _token) => {
   const response = await apiClient.post("/storage/analyze", data);
   return response.data;
 };
-const initiateGlacierRestore = async (filename, tier, days, token) => {
+const initiateGlacierRestore = async (filename, tier, days, _token) => {
   const formData = new FormData();
   formData.append("tier", tier);
   formData.append("days", days);

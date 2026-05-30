@@ -44,6 +44,13 @@ The API uses `DynamicCORSMiddleware` in `app/main.py`:
 
 After changing domains, update `FRONTEND_URL` and redeploy the backend.
 
+## Phase 20.5 CI secrets
+
+| Secret | Purpose |
+|--------|---------|
+| `STAGE_API_URL` | Post-deploy smoke in `deploy-stage.yml` (e.g. `https://zenith-backend-707i.onrender.com`) |
+| `CODECOV_TOKEN` | Optional coverage upload |
+
 ## Render free tier — keep backend awake
 
 Render spins down free web services after about **15 minutes** with no HTTP traffic. Zenith uses two layers:

@@ -31,7 +31,7 @@ import '../styles/profile.css';
 import PageHeader from '../components/ui/PageHeader.jsx';
 
 const ProfilePage = () => {
-  const { user, token, logout } = useAuth();
+  const { token, logout } = useAuth();
   const notifications = useNotifications();
   const [isEditing, setIsEditing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -77,6 +77,7 @@ const ProfilePage = () => {
 
   useEffect(() => {
     fetchProfileData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reload profile when token changes
   }, [token]);
 
   const fetchProfileData = async () => {
@@ -171,14 +172,14 @@ const ProfilePage = () => {
     formDataObj.append('file', file);
 
     try {
-      const response = await apiClient.post('/profile/picture', formDataObj, {
+      await apiClient.post('/profile/picture', formDataObj, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
       });
       notifications.success('Profile picture uploaded successfully!');
       fetchProfileData();
-    } catch (error) {
+    } catch {
       notifications.error('Failed to upload profile picture');
     }
   };
@@ -188,7 +189,7 @@ const ProfilePage = () => {
       await apiClient.delete('/profile/picture');
       notifications.success('Profile picture removed successfully!');
       fetchProfileData();
-    } catch (error) {
+    } catch {
       notifications.error('Failed to remove profile picture');
     }
   };

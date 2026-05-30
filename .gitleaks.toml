@@ -1,0 +1,17 @@
+# Allow known test/CI placeholders (Phase 20.5.9)
+title = "Zenith gitleaks config"
+
+[allowlist]
+description = "CI and test fixtures"
+paths = [
+  '''backend/tests/''',
+  '''backend/scripts/seed_e2e_admin.py''',
+  '''backend/.env.example''',
+  '''docs/''',
+  '''ai-docs/''',
+]
+
+[[rules]]
+id = "allow-test-aws-key"
+description = "pytest placeholder AWS keys"
+regex = '''test-aws-(key|secret)'''

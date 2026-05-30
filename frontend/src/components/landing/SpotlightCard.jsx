@@ -3,7 +3,8 @@ import React, { useRef, useCallback } from 'react';
 /**
  * Card with cursor-following soft spotlight on hover (no slash sweep).
  */
-export default function SpotlightCard({ children, className = '', as: Tag = 'div', ...rest }) {
+export default function SpotlightCard({ children, className = '', as, ...rest }) {
+  const Wrapper = as || 'div';
   const ref = useRef(null);
 
   const onMove = useCallback((e) => {
@@ -22,7 +23,7 @@ export default function SpotlightCard({ children, className = '', as: Tag = 'div
   }, []);
 
   return (
-    <Tag
+    <Wrapper
       ref={ref}
       className={`spotlight-card ${className}`.trim()}
       onMouseMove={onMove}
@@ -31,6 +32,6 @@ export default function SpotlightCard({ children, className = '', as: Tag = 'div
     >
       <span className="spotlight-card__glow" aria-hidden="true" />
       {children}
-    </Tag>
+    </Wrapper>
   );
 }

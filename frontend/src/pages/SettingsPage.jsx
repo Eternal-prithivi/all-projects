@@ -115,6 +115,7 @@ const SettingsPage = () => {
     fetchApiKeys();
     fetchByocStatus();
     fetchSubscription();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- initial load on mount
   }, []);
 
   const fetchSubscription = async () => {
@@ -393,7 +394,7 @@ const SettingsPage = () => {
         maintenance_updates: newNotificationSettings.maintenanceUpdates,
       });
       notifications.success('Notification settings updated');
-    } catch (error) {
+    } catch {
       notifications.error('Failed to update notifications');
       // Revert change
       setNotificationSettings(notificationSettings);
@@ -452,7 +453,7 @@ const SettingsPage = () => {
       });
       
       notifications.success('Preferences saved successfully!');
-    } catch (error) {
+    } catch {
       notifications.error('Failed to save preferences');
     }
   };
@@ -469,7 +470,7 @@ const SettingsPage = () => {
         { autoClose: false }
       );
       fetchApiKeys();
-    } catch (error) {
+    } catch {
       notifications.error('Failed to generate API key');
     }
   };
@@ -479,7 +480,7 @@ const SettingsPage = () => {
       await apiClient.delete(`/settings/api-keys/${keyId}`);
       notifications.success('API key revoked');
       fetchApiKeys();
-    } catch (error) {
+    } catch {
       notifications.error('Failed to revoke API key');
     }
   };

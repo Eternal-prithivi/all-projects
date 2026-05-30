@@ -54,16 +54,16 @@ See [TESTING.md](./TESTING.md) for commands and layout.
 - Keep CI green: `pytest`, `npm test`, Playwright (API + Vite).
 - Extend **existing** integration files when touching a domain.
 
-**Next (high signal)**
+**Next — Phase 20.5** ([PHASE_20_5_CI_GATES.md](./PHASE_20_5_CI_GATES.md))
 
-- Raise Playwright from `continue-on-error` to required when stable 2–4 weeks.
-- Coverage gate: start ~40% backend, increase quarterly.
+- CI-gated deploy, Playwright required, coverage gate ~40%, post-deploy stage smoke.
+- Dependabot, `pip-audit` / `npm audit`, CodeQL, gitleaks.
+- Branch protection applied; terraform `plan` on PR; ESLint max-warnings 0.
+
+**Later (Phases 21–27)**
+
+- Observability, runbooks (21); load/k6 (25); SOC2/pen-test (26); contract tests when API keys ship (24).
 - Fix app pattern: avoid `DB = get_database()` at import in route modules (use call-time `get_database()`).
-
-**Later**
-
-- Staging smoke job against deployed `stage` URL.
-- Contract tests for public API if external integrators appear.
 - Staging / Atlas / Terraform CI docs: [STAGING.md](./STAGING.md), [MONGODB_ATLAS.md](./MONGODB_ATLAS.md), [TERRAFORM_CI.md](./TERRAFORM_CI.md).
 
 ## Anti-patterns
