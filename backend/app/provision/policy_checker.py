@@ -17,10 +17,10 @@ from typing import Any
 import yaml
 
 from app.provision.models import PolicyCheckResult, PolicyViolation
+from app.provision.terraform_runner import TERRAFORM_ROOT
 
 logger = logging.getLogger(__name__)
 
-TERRAFORM_ROOT = Path(__file__).resolve().parent.parent.parent / "terraform"
 RULES_PATH = TERRAFORM_ROOT / "policy-engine" / "rules.yaml"
 OPA_POLICIES_DIR = TERRAFORM_ROOT / "opa-policies"
 

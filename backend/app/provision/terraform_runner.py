@@ -22,8 +22,28 @@ from typing import Any, AsyncGenerator, Optional
 
 logger = logging.getLogger(__name__)
 
+
+def get_terraform_root() -> Path:
+    """
+    Resolve backend/terraform for local dev and Docker (Render).
+
+    Local:  backend/app/provision/ → backend/terraform
+    Docker: /app/app/provision/    → /app/terraform (also set via COPY in Dockerfile)
+    """
+    if custom := os.getenv("TERRAFORM_ROOT"):
+        return Path(custom)
+
+    here = Path(__file__).resolve()
+    for base in (here.parent.parent.parent, here.parent.parent.parent.parent):
+        candidate = base / "terraform"
+        if candidate.is_dir():
+            return candidate
+
+    return here.parent.parent.parent / "terraform"
+
+
 # Path to the Terraform modules/configs inside Zenith's backend
-TERRAFORM_ROOT = Path(__file__).resolve().parent.parent.parent / "terraform"
+TERRAFORM_ROOT = get_terraform_root()
 
 
 def check_terraform_installed() -> bool:
