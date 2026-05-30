@@ -542,11 +542,103 @@
   border-top: 1px solid rgba(255,255,255,0.08);
 }
 
-.deployments-section h2 {
-  font-size: 1.3rem;
+.deployments-section h2,
+.deployments-section h3 {
+  font-size: 1.1rem;
   font-weight: 700;
   color: var(--text-primary);
-  margin-bottom: 1.25rem;
+  margin: 0;
+}
+
+.deployments-section-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.deployments-section-hint {
+  font-size: 0.75rem;
+  color: var(--text-muted, rgba(255, 255, 255, 0.45));
+}
+
+.deployments-history-block {
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+  border-top: 1px dashed rgba(255, 255, 255, 0.1);
+}
+
+.deployments-history-toggle {
+  width: 100%;
+  text-align: left;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  padding: 0.65rem 0.85rem;
+  color: var(--text-secondary);
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.deployments-history-toggle:hover {
+  border-color: rgba(255, 255, 255, 0.15);
+  color: var(--text-primary);
+}
+
+.deployments-history-list {
+  margin-top: 0.75rem;
+}
+
+.deployments-history-note {
+  margin: 0 0 0.75rem;
+  font-size: 0.78rem;
+}
+
+.deployment-card--history {
+  opacity: 0.85;
+  padding: 0.9rem 1rem;
+}
+
+.deployment-card--history:hover {
+  opacity: 1;
+}
+
+.deployment-tag {
+  font-size: 0.72rem;
+  padding: 0.15rem 0.45rem;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-secondary);
+}
+
+.deployment-when {
+  font-size: 0.72rem;
+  color: var(--text-muted, rgba(255, 255, 255, 0.4));
+}
+
+.deployment-delete-btn {
+  flex-shrink: 0;
+  padding: 0.4rem 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border-radius: 8px;
+  border: 1px solid rgba(231, 76, 60, 0.35);
+  background: rgba(231, 76, 60, 0.1);
+  color: #e74c3c;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.deployment-delete-btn:hover:not(:disabled) {
+  background: rgba(231, 76, 60, 0.2);
+  border-color: rgba(231, 76, 60, 0.5);
+}
+
+.deployment-delete-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 .deployment-card {

@@ -34,7 +34,7 @@ from app.debug_agent_log import agent_log
 from typing import Any, Optional
 
 from bson import ObjectId
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
@@ -67,6 +67,9 @@ from app.provision.audit_logger import (
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["Provisioning"])
+
+RECENT_DEPLOYMENTS_LIMIT = 10
+_DEPLOYMENT_LIST_PROJECTION = {"plan_output": 0, "apply_output": 0}
 
 
 # ── Helper: resolve BYOC credentials for the current user ──
@@ -462,21 +465,112 @@ async def run_destroy(
 # ── Deployments ──
 
 
+def _serialize_deployment_docs(docs: list) -> list:
+    for doc in docs:
+        doc["_id"] = str(doc["_id"])
+    return docs
+
+
 @router.get("/deployments")
 async def list_deployments(user: dict = Depends(get_current_user)):
-    """List all deployments for the current user."""
+    """
+    List deployments split into recent (active) and history (archived + older active).
+
+    The UI shows only ``recent`` by default; ``history`` holds archived rows and active
+    stacks beyond RECENT_DEPLOYMENTS_LIMIT.
+    """
     collection = _get_deployments_collection()
-    deployments = list(
-        collection.find(
-            {"user_id": user.username},
-            {"plan_output": 0, "apply_output": 0},  # Exclude large text fields
-        ).sort("created_at", -1).limit(50)
+    user_filter = {"user_id": user.username}
+    active_filter = {**user_filter, "archived": {"$ne": True}}
+
+    all_active = list(
+        collection.find(active_filter, _DEPLOYMENT_LIST_PROJECTION).sort("created_at", -1)
+    )
+    recent = _serialize_deployment_docs(all_active[:RECENT_DEPLOYMENTS_LIMIT])
+    overflow = _serialize_deployment_docs(all_active[RECENT_DEPLOYMENTS_LIMIT:])
+
+    archived = _serialize_deployment_docs(
+        list(
+            collection.find(
+                {**user_filter, "archived": True},
+                _DEPLOYMENT_LIST_PROJECTION,
+            )
+            .sort("archived_at", -1)
+            .limit(100)
+        )
     )
 
-    for d in deployments:
-        d["_id"] = str(d["_id"])
+    history = archived + overflow
 
-    return {"deployments": deployments, "count": len(deployments)}
+    return {
+        "recent": recent,
+        "history": history,
+        "deployments": recent,
+        "count": len(recent),
+        "counts": {
+            "recent": len(recent),
+            "history": len(history),
+            "active": len(all_active),
+        },
+    }
+
+
+@router.delete("/deployments/{deployment_id}")
+async def remove_deployment(
+    deployment_id: str,
+    permanent: bool = Query(
+        False,
+        description="If true, permanently delete an already-archived record",
+    ),
+    user: dict = Depends(get_current_user),
+):
+    """
+    Archive a deployment (moves to history) or permanently delete from history.
+
+    Archiving does not run terraform destroy — use POST /destroy/{id} for live AWS stacks.
+    """
+    collection = _get_deployments_collection()
+    deployment = collection.find_one(
+        {"deployment_name": deployment_id, "user_id": user.username}
+    )
+    if not deployment:
+        raise HTTPException(status_code=404, detail="Deployment not found")
+
+    if permanent:
+        if not deployment.get("archived"):
+            raise HTTPException(
+                status_code=400,
+                detail="Archive the deployment first, then remove it from history.",
+            )
+        collection.delete_one(
+            {"deployment_name": deployment_id, "user_id": user.username}
+        )
+        log_provision_action(
+            action="delete_permanent",
+            actor=user.username,
+            deployment_id=deployment_id,
+            status="success",
+        )
+        return {"success": True, "permanent": True}
+
+    collection.update_one(
+        {"deployment_name": deployment_id},
+        {
+            "$set": {
+                "archived": True,
+                "archived_at": datetime.utcnow(),
+                "updated_at": datetime.utcnow(),
+            }
+        },
+    )
+    log_provision_action(
+        action="archive",
+        actor=user.username,
+        deployment_id=deployment_id,
+        status="success",
+        details={"previous_status": deployment.get("status")},
+    )
+    return {"success": True, "archived": True}
 
 
 @router.get("/deployments/{deployment_id}")
@@ -689,7 +783,7 @@ def _save_deployment(
     # Upsert — update if exists, insert if new
     collection.update_one(
         {"deployment_name": deployment_id},
-        {"$set": doc},
+        {"$set": doc, "$setOnInsert": {"archived": False}},
         upsert=True,
     )
 

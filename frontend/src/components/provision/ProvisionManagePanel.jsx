@@ -16,16 +16,75 @@ const formatDriftStatus = (s) => {
   return s || '—';
 };
 
+const formatWhen = (dep) => {
+  const raw = dep.archived_at || dep.created_at || dep.updated_at;
+  if (!raw) return '';
+  try {
+    return new Date(raw).toLocaleString();
+  } catch {
+    return '';
+  }
+};
+
 const LOADING_MESSAGES = {
   drift: 'Checking drift against your AWS account… Terraform is comparing live state to your stack. This can take up to a minute.',
   'remediate-preview': 'Running Terraform plan to preview fixes…',
   'remediate-apply': 'Applying Terraform to restore desired state…',
   destroy: 'Destroying infrastructure…',
   detail: 'Loading deployment details…',
+  delete: 'Updating deployment list…',
 };
 
+function DeploymentRow({
+  dep,
+  selectedId,
+  isBusy,
+  muted,
+  deleteLabel,
+  onSelect,
+  onDelete,
+}) {
+  return (
+    <div
+      className={`deployment-card ${selectedId === dep.deployment_name ? 'selected' : ''}${muted ? ' deployment-card--history' : ''}`}
+      onClick={() => !isBusy && onSelect(dep.deployment_name)}
+      onKeyDown={(e) => e.key === 'Enter' && !isBusy && onSelect(dep.deployment_name)}
+      role="button"
+      tabIndex={isBusy ? -1 : 0}
+      aria-disabled={isBusy}
+    >
+      <div className="deployment-info">
+        <h4>{dep.deployment_name}</h4>
+        <div className="deployment-meta">
+          <span className={`deployment-status ${getStatusClass(dep.status)}`}>
+            {dep.status}
+          </span>
+          {dep.template && <span className="deployment-tag">{dep.template}</span>}
+          {formatWhen(dep) && <span className="deployment-when">{formatWhen(dep)}</span>}
+          {!muted && dep.latest_drift && dep.latest_drift !== 'unknown' && (
+            <span className={`drift-indicator ${dep.latest_drift === 'clean' ? 'clean' : 'drift'}`}>
+              {formatDriftStatus(dep.latest_drift)}
+            </span>
+          )}
+        </div>
+      </div>
+      <button
+        type="button"
+        className="deployment-delete-btn"
+        title={deleteLabel}
+        disabled={isBusy}
+        onClick={(e) => onDelete(e, dep)}
+      >
+        {deleteLabel}
+      </button>
+    </div>
+  );
+}
+
 export default function ProvisionManagePanel({ onDeploymentsChange }) {
-  const [deployments, setDeployments] = useState([]);
+  const [recent, setRecent] = useState([]);
+  const [history, setHistory] = useState([]);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const [selectedId, setSelectedId] = useState(null);
   const [detail, setDetail] = useState(null);
   const [loadingAction, setLoadingAction] = useState(null);
@@ -37,11 +96,15 @@ export default function ProvisionManagePanel({ onDeploymentsChange }) {
   const loadDeployments = useCallback(async () => {
     try {
       const res = await api.get('/provision/deployments');
-      const list = res.data.deployments || [];
-      setDeployments(list);
-      onDeploymentsChange?.(list.length);
+      const recentList = res.data.recent || res.data.deployments || [];
+      const historyList = res.data.history || [];
+      setRecent(recentList);
+      setHistory(historyList);
+      onDeploymentsChange?.(recentList.length);
     } catch {
-      setDeployments([]);
+      setRecent([]);
+      setHistory([]);
+      onDeploymentsChange?.(0);
     }
   }, [onDeploymentsChange]);
 
@@ -66,6 +129,52 @@ export default function ProvisionManagePanel({ onDeploymentsChange }) {
       if (!quiet) {
         setLoadingAction((current) => (current === 'detail' ? null : current));
       }
+    }
+  };
+
+  const archiveDeployment = async (e, dep) => {
+    e.stopPropagation();
+    const isLive = dep.status === 'deployed';
+    const msg = isLive
+      ? 'Archive this deployment? AWS resources are NOT removed — open it and use Destroy first if you want to tear down infrastructure.'
+      : 'Remove this from recent deployments? It will move to history.';
+    if (!window.confirm(msg)) return;
+
+    setLoadingAction('delete');
+    setError(null);
+    try {
+      await api.delete(`/provision/deployments/${dep.deployment_name}`);
+      if (selectedId === dep.deployment_name) {
+        setSelectedId(null);
+        setDetail(null);
+      }
+      await loadDeployments();
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Could not archive deployment');
+    } finally {
+      setLoadingAction(null);
+    }
+  };
+
+  const permanentlyRemove = async (e, dep) => {
+    e.stopPropagation();
+    if (!window.confirm('Permanently delete this record from history? This cannot be undone.')) {
+      return;
+    }
+
+    setLoadingAction('delete');
+    setError(null);
+    try {
+      await api.delete(`/provision/deployments/${dep.deployment_name}?permanent=true`);
+      if (selectedId === dep.deployment_name) {
+        setSelectedId(null);
+        setDetail(null);
+      }
+      await loadDeployments();
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Could not delete record');
+    } finally {
+      setLoadingAction(null);
     }
   };
 
@@ -124,7 +233,9 @@ export default function ProvisionManagePanel({ onDeploymentsChange }) {
     </>
   );
 
-  if (deployments.length === 0) {
+  const hasAny = recent.length > 0 || history.length > 0;
+
+  if (!hasAny) {
     return (
       <div className="provision-empty-state">
         <h3>No deployments yet</h3>
@@ -149,32 +260,61 @@ export default function ProvisionManagePanel({ onDeploymentsChange }) {
 
       <div className="provision-manage-grid">
         <div className="deployments-section">
-          <h3>Your deployments</h3>
-          {deployments.map((dep) => (
-            <div
-              key={dep._id}
-              className={`deployment-card ${selectedId === dep.deployment_name ? 'selected' : ''}${loadingAction === 'drift' && selectedId === dep.deployment_name ? ' card-busy' : ''}`}
-              onClick={() => !isBusy && loadDetail(dep.deployment_name)}
-              onKeyDown={(e) => e.key === 'Enter' && !isBusy && loadDetail(dep.deployment_name)}
-              role="button"
-              tabIndex={isBusy ? -1 : 0}
-              aria-disabled={isBusy}
-            >
-              <div className="deployment-info">
-                <h4>{dep.deployment_name}</h4>
-                <div className="deployment-meta">
-                  <span className={`deployment-status ${getStatusClass(dep.status)}`}>
-                    {dep.status}
-                  </span>
-                  {dep.latest_drift && dep.latest_drift !== 'unknown' && (
-                    <span className={`drift-indicator ${dep.latest_drift === 'clean' ? 'clean' : 'drift'}`}>
-                      {formatDriftStatus(dep.latest_drift)}
-                    </span>
-                  )}
+          <div className="deployments-section-header">
+            <h3>Recent deployments</h3>
+            <span className="deployments-section-hint">Last {recent.length} active</span>
+          </div>
+
+          {recent.length === 0 ? (
+            <p className="provision-empty-hint">
+              No recent deployments. Open history below or create a new stack.
+            </p>
+          ) : (
+            recent.map((dep) => (
+              <DeploymentRow
+                key={dep._id || dep.deployment_name}
+                dep={dep}
+                selectedId={selectedId}
+                isBusy={isBusy}
+                muted={false}
+                deleteLabel="Archive"
+                onSelect={loadDetail}
+                onDelete={archiveDeployment}
+              />
+            ))
+          )}
+
+          {history.length > 0 && (
+            <div className="deployments-history-block">
+              <button
+                type="button"
+                className="deployments-history-toggle"
+                onClick={() => setHistoryOpen((o) => !o)}
+                aria-expanded={historyOpen}
+              >
+                {historyOpen ? '▼' : '▶'} History ({history.length})
+              </button>
+              {historyOpen && (
+                <div className="deployments-history-list">
+                  <p className="provision-empty-hint deployments-history-note">
+                    Archived stacks and older runs. Remove clears the record only (not AWS).
+                  </p>
+                  {history.map((dep) => (
+                    <DeploymentRow
+                      key={dep._id || dep.deployment_name}
+                      dep={dep}
+                      selectedId={selectedId}
+                      isBusy={isBusy}
+                      muted
+                      deleteLabel={dep.archived ? 'Remove' : 'Archive'}
+                      onSelect={loadDetail}
+                      onDelete={dep.archived ? permanentlyRemove : archiveDeployment}
+                    />
+                  ))}
                 </div>
-              </div>
+              )}
             </div>
-          ))}
+          )}
         </div>
 
         <div className="provision-detail-panel">
@@ -193,6 +333,7 @@ export default function ProvisionManagePanel({ onDeploymentsChange }) {
                   {loadingAction === 'remediate-apply' && 'Applying fix'}
                   {loadingAction === 'destroy' && 'Destroy in progress'}
                   {loadingAction === 'detail' && 'Loading'}
+                  {loadingAction === 'delete' && 'Updating list'}
                 </strong>
                 <p>{LOADING_MESSAGES[loadingAction]}</p>
               </div>
