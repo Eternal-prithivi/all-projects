@@ -127,7 +127,7 @@ class TerraformRunner:
         """Run terraform plan and return the result."""
         try:
             result = subprocess.run(
-                ["terraform", "plan", "-input=false", "-no-color"],
+                ["terraform", "plan", "-input=false", "-no-color", "-parallelism=1"],
                 capture_output=True, text=True, timeout=240,
                 cwd=str(self.workspace_dir),
                 env=self._get_env(),

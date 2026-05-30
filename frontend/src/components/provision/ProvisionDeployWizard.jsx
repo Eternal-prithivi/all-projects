@@ -45,7 +45,8 @@ const STEP_LABELS = ['Choose', 'Configure', 'Review', 'Deploy'];
 const PLAN_START_TIMEOUT_MS = 120 * 1000;
 const PLAN_POLL_INTERVAL_MS = 3000;
 const PLAN_POLL_MAX_ATTEMPTS = 180;  // 9 minutes — outlasts 240s plan timeout + init time
-const PLAN_POLL_REQUEST_TIMEOUT_MS = 45 * 1000;
+// Render free tier can be slow to answer while terraform init runs (512MB RAM).
+const PLAN_POLL_REQUEST_TIMEOUT_MS = 120 * 1000;
 const WAKE_MAX_WAIT_MS = 90 * 1000;
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -240,11 +241,17 @@ export default function ProvisionDeployWizard({ terraformOk, onDeployed }) {
               timeout: PLAN_POLL_REQUEST_TIMEOUT_MS,
             });
           } catch (pollErr) {
-            // Render often restarts mid-terraform on free tier — keep polling until max attempts
-            if (isNetworkFailure(pollErr)) {
+            // Timeout or network blip while server is busy with terraform — keep polling
+            const retryable =
+              isNetworkFailure(pollErr) || pollErr?.code === 'ECONNABORTED';
+            if (retryable) {
+              const reason =
+                pollErr?.code === 'ECONNABORTED'
+                  ? 'Server is busy (terraform init/plan) or Render restarted'
+                  : 'API unreachable';
               setPlanOutput(
-                `API unreachable (Render may be restarting during terraform). ` +
-                `Reconnecting… poll ${attempt + 1}/${PLAN_POLL_MAX_ATTEMPTS}\n`
+                `${reason}. Still working… poll ${attempt + 1}/${PLAN_POLL_MAX_ATTEMPTS}. ` +
+                `Deployment: ${res.data.deployment_id}\n`
               );
               await waitForBackend(120 * 1000);
               continue;

@@ -25,6 +25,7 @@
 # =============================================================================
 from __future__ import annotations
 
+import asyncio
 import logging
 import threading
 import time
@@ -281,7 +282,7 @@ async def get_plan_status(
     user: dict = Depends(get_current_user),
 ):
     """Poll background terraform plan result."""
-    doc = _get_deployment_for_user(deployment_id, user.username)
+    doc = await asyncio.to_thread(_get_deployment_for_user, deployment_id, user.username)
     if not doc:
         raise HTTPException(status_code=404, detail="Deployment not found.")
 
@@ -835,6 +836,14 @@ def _update_plan_progress(deployment_id: str, stage: str, message: str) -> None:
     )
 
 
+def _touch_plan_heartbeat(deployment_id: str) -> None:
+    """Keep updated_at fresh while terraform runs (Render status polls stay responsive)."""
+    _get_deployments_collection().update_one(
+        {"deployment_name": deployment_id},
+        {"$set": {"updated_at": datetime.utcnow()}},
+    )
+
+
 def _run_plan_background(
     username: str,
     deployment_id: str,
@@ -846,6 +855,18 @@ def _run_plan_background(
 ) -> None:
     """Run terraform init/plan off the HTTP thread (avoids Render 502 on long requests)."""
     plan_t0 = time.monotonic()
+    logger.info("Background terraform plan started deployment_id=%s user=%s", deployment_id, username)
+    stop_heartbeat = threading.Event()
+
+    def _heartbeat_loop() -> None:
+        while not stop_heartbeat.wait(20):
+            try:
+                _touch_plan_heartbeat(deployment_id)
+            except Exception:
+                pass
+
+    heartbeat_thread = threading.Thread(target=_heartbeat_loop, daemon=True)
+    heartbeat_thread.start()
     # #region agent log
     agent_log(
         "H1",
@@ -955,6 +976,12 @@ def _run_plan_background(
             details={"has_changes": plan_result.get("has_changes", False)},
             error=plan_err,
         )
+        logger.info(
+            "Background terraform plan finished deployment_id=%s success=%s total_s=%.1f",
+            deployment_id,
+            plan_result["success"],
+            time.monotonic() - plan_t0,
+        )
     except Exception as exc:
         logger.exception("Background plan failed for %s", deployment_id)
         err = str(exc)
@@ -979,3 +1006,5 @@ def _run_plan_background(
             )
         except Exception:
             pass
+    finally:
+        stop_heartbeat.set()
