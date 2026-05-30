@@ -78,5 +78,9 @@ module "dynamodb" {
   enable_dynamodb = var.enable_dynamodb
   table_name      = var.dynamodb_table_name
   hash_key        = var.dynamodb_hash_key
+  hash_key_type   = var.dynamodb_hash_key_type
+  read_capacity   = var.dynamodb_read_capacity
+  write_capacity  = var.dynamodb_write_capacity
+  enable_pitr     = var.dynamodb_enable_pitr
   tags            = var.tags
 }

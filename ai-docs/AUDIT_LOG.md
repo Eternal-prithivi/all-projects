@@ -23,6 +23,18 @@ Notes: [one line optional]
 ## Session Log (recent only)
 
 ---
+SESSION_ID: 20260530-boto3-parity
+Date: 2026-05-30
+Agent: Cursor Composer
+Task: Boto3 / Terraform full module parity
+Changes:
+  - `boto3_modules/*` (7 modules) + slim `boto3_composer.py`; billing via AWS Budgets API
+  - Parity: IAM profile, DynamoDB SSE/PITR, VPC public IP, CloudWatch names
+  - Expanded `boto3_drift.py`; terraform dynamodb variable wiring; 153 pytest
+Outcome: Done
+Notes: S3 file upload still out of scope (not in Terraform).
+
+---
 SESSION_ID: 20260530-provision-engine
 Date: 2026-05-30
 Agent: Cursor Composer

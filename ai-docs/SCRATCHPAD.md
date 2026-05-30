@@ -4,12 +4,8 @@
 
 **Status:** COMPLETE (2026-05-30)
 
-**Task:** Provision engine toggle (Boto3 / Terraform) — Settings preference, modular boto3 composer, boto3 drift, UI.
+**Task:** Boto3 / Terraform full parity — all 7 modules in `boto3_modules/`, drift expanded, tests.
 
-**LKGS:** `cd backend && .venv/bin/pytest tests/test_provision_engine.py -q` → 10 passed. Settings → Infrastructure provisioning → Boto3 (default). Render: boto3 plan is instant; Terraform needs Docker image with CLI.
+**LKGS:** `pytest -q` → 153 passed. Boto3 mirrors vpc/ec2/s3/iam/cloudwatch/dynamodb/billing. Push `stage` for latest hash.
 
-**Next:** Phase 21 observability, or user smoke on Render after redeploy.
-
----
-
-**Prior COMPLETE (2026-05-30):** Testing policy; gap tests; Phase 20.14–16 docs.
+**Next:** Manual smoke on Render (static-site boto3 plan); Phase 21+.

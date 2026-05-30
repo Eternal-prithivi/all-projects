@@ -7,6 +7,16 @@
 
 ---
 
+**Boto3 / Terraform full parity** — COMPLETE 2026-05-30
+
+- Extracted `app/provision/boto3_modules/` (vpc, ec2, s3, iam, cloudwatch, dynamodb, billing) with Terraform-aligned behavior.
+- Gaps closed: VPC MapPublicIpOnLaunch, IAM instance profile, DynamoDB SSE + PITR, CloudWatch resource names, AWS Budgets via boto3.
+- `engine_resolver` allows billing on boto3; `boto3_drift` checks vpc/iam/billing/dynamodb detail.
+- Terraform `main.tf` passes dynamodb capacity/hash_key_type/enable_pitr to module.
+- Tests: `test_boto3_composer_parity.py` (17 cases) + updated `test_provision_engine.py`; 153 pytest total.
+
+---
+
 **Provision engine toggle (Boto3 / Terraform)** — COMPLETE 2026-05-30
 
 - Settings `provision_engine` (`boto3` default, `terraform` optional); persisted via `PUT /api/settings/preferences`.

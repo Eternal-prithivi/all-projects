@@ -9,7 +9,7 @@
 
 ## 🔴 Active Task
 
-**None** — last completed: **Provision engine toggle** (2026-05-30).
+**None** — last completed: **Boto3 / Terraform full parity** (2026-05-30).
 
 ---
 

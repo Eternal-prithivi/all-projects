@@ -188,7 +188,7 @@ When a user connects BYOC for a CSP, **that user's** API operations should use t
 | Dashboard cost refresh | Yes | — | — | Per-user cache |
 | VM cluster (Compute) | N/A | Yes** | N/A | Uses BYOC SA when `get_vm_user` context set |
 | Terraform provision | Yes | — | — | `provision/byoc_credentials.py` (DEC-019) |
-| Provision engine | Settings `provision_engine` | `boto3` \| `terraform` | boto3 default; billing → terraform only (DEC-022) |
+| Provision engine | Settings `provision_engine` | `boto3` \| `terraform` | boto3 default; full module parity via `boto3_modules/*` (DEC-022) |
 | Zenith subscription billing | — | — | — | Razorpay/invoices — not customer cloud |
 
 \* Azure cost still uses platform service principal until BYOC stores Cost Management credentials.  

@@ -17,7 +17,7 @@
 
 ## 🔴 Active Task
 
-**None** — provision engine toggle **COMPLETE** (2026-05-30). Resume Phase 20+ or user-directed work.
+**None** — Boto3 / Terraform full parity **COMPLETE** (2026-05-30).
 
 ---
 

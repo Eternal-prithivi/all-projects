@@ -44,15 +44,6 @@ def resolve_provision_engine(username: str, config: dict) -> ProvisionEngine:
     """
     pref = get_user_provision_engine(username)
 
-    if config.get("enable_billing"):
-        raise HTTPException(
-            status_code=400,
-            detail=(
-                "AWS Budgets (billing module) requires Terraform. "
-                "Switch to Terraform in Settings or disable billing alerts."
-            ),
-        )
-
     if pref == "terraform":
         if not check_terraform_installed():
             raise HTTPException(

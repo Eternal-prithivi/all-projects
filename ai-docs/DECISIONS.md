@@ -212,13 +212,13 @@
 ---
 
 ### [DEC-022] Dual provision engine — Boto3 vs Terraform (user Settings)
-- **Date**: 2026-05-30
+- **Date**: 2026-05-30 (parity completed 2026-05-30)
 - **Status**: ✅ Implemented
-- **Context**: Terraform plan/apply on Render free tier is slow and OOM-prone; boto3 fast path existed but was auto-forced for some templates. Users need explicit control and boto3 drift for non-Terraform deployments.
-- **Decision**: `users.settings.preferences.provision_engine` = `boto3` (default) | `terraform`. Each deployment stores `provision_engine` at plan time. Boto3 uses `boto3_composer.py` (s3, dynamodb, vpc, ec2, iam, cloudwatch); billing module remains Terraform-only. Boto3 drift via `boto3_drift.py` comparing Mongo `boto3_context` to live AWS.
-- **Key files**: `engine_resolver.py`, `boto3_composer.py`, `boto3_drift.py`, `routes_provision.py`, `routes_settings.py`, Settings + Provision UI.
-- **Consequences**: Legacy `fast_path` deployments resolve to boto3. Terraform modules under `backend/terraform/` remain for Terraform engine — not deleted.
-- **DO NOT**: Auto-force engine by template without reading user preference. Do not implement billing via boto3.
+- **Context**: Terraform plan/apply on Render free tier is slow and OOM-prone; users need explicit engine choice and boto3 parity with all Terraform modules.
+- **Decision**: `users.settings.preferences.provision_engine` = `boto3` (default) | `terraform`. Boto3 handlers live in `app/provision/boto3_modules/` (vpc, ec2, s3, iam, cloudwatch, dynamodb, **billing**) orchestrated by `boto3_composer.py`. Parity targets `backend/terraform/modules/*` (same resource names where applicable). S3 static **file upload** is out of scope — neither engine uploads HTML.
+- **Key files**: `boto3_modules/*`, `boto3_composer.py`, `boto3_drift.py`, `engine_resolver.py`, `routes_provision.py`.
+- **Consequences**: Billing via boto3 uses AWS Budgets API (`us-east-1`); requires `budgets:*` on BYOC keys (same as Terraform). DynamoDB PITR/SSE, IAM instance profile, VPC `MapPublicIpOnLaunch` implemented in boto3.
+- **DO NOT**: Auto-force engine by template. Do not claim S3 website/file upload without adding it to Terraform first.
 
 ---
 

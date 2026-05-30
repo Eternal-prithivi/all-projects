@@ -72,16 +72,14 @@ def test_resolve_terraform_without_cli_raises_503(mock_tf, mock_db):
 
 
 @patch("app.provision.engine_resolver.get_database")
-def test_resolve_billing_requires_terraform(mock_db):
+@patch("app.provision.engine_resolver.check_terraform_installed", return_value=True)
+def test_resolve_boto3_with_billing_enabled(mock_tf, mock_db):
     mock_db.return_value["users"].find_one.return_value = {
         "settings": {"preferences": {"provision_engine": "boto3"}}
     }
     cfg = _static_site_config()
     cfg["enable_billing"] = True
-    with pytest.raises(HTTPException) as exc:
-        resolve_provision_engine("alice", cfg)
-    assert exc.value.status_code == 400
-    assert "billing" in exc.value.detail.lower()
+    assert resolve_provision_engine("alice", cfg) == "boto3"
 
 
 def test_boto3_can_handle_static_site():
@@ -90,9 +88,10 @@ def test_boto3_can_handle_static_site():
     assert unsupported == set()
 
 
-def test_boto3_implemented_modules_include_core():
-    assert "s3" in BOTO3_IMPLEMENTED
-    assert "dynamodb" in BOTO3_IMPLEMENTED
+def test_boto3_implemented_modules_match_terraform_modules():
+    assert BOTO3_IMPLEMENTED == frozenset(
+        {"s3", "dynamodb", "vpc", "ec2", "iam", "cloudwatch", "billing"}
+    )
 
 
 def test_deployment_engine_from_record():
@@ -112,5 +111,5 @@ def test_provisioning_status_includes_engine(mock_rules, mock_tf, mock_pref):
 
     result = asyncio.run(provisioning_status(user=user))
     assert result["user_provision_engine"] == "boto3"
-    assert "s3" in result["boto3_supported_modules"]
+    assert "billing" in result["boto3_supported_modules"]
     assert result["terraform_installed"] is False
