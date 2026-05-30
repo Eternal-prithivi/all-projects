@@ -63,7 +63,10 @@ module "cloudwatch" {
 }
 
 # --- Billing Module ---
+# Disabled by default — requires budgets:* IAM permission not present on most BYOC users.
+# Enable by setting enable_billing = true in terraform.tfvars.
 module "billing" {
+  count        = var.enable_billing ? 1 : 0
   source       = "./modules/billing"
   budget_limit = var.budget_limit
   budget_email = var.budget_email

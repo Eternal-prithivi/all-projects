@@ -64,6 +64,8 @@ class ProvisionConfig(BaseModel):
     enable_iam: bool = False
     enable_cloudwatch: bool = False
     enable_dynamodb: bool = False
+    # Billing requires budgets:* IAM permission — off by default to avoid plan hangs
+    enable_billing: bool = False
 
     # VPC config
     vpc_cidr: str = "10.0.0.0/16"

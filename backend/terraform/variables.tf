@@ -129,6 +129,12 @@ variable "alarm_email" {
 }
 
 # --- Billing ---
+variable "enable_billing" {
+  description = "Whether to create an AWS Budget cost alert. Requires budgets:* IAM permission."
+  type        = bool
+  default     = false
+}
+
 variable "budget_limit" {
   description = "Monthly budget limit in USD. Alert sent when exceeded."
   type        = string

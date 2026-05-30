@@ -307,7 +307,7 @@ async def get_plan_status(
         and status_value == DeploymentStatus.PLANNING.value
         and updated_at
         and isinstance(updated_at, datetime)
-        and updated_at < datetime.utcnow() - timedelta(minutes=8)
+        and updated_at < datetime.utcnow() - timedelta(minutes=6)
     ):
         done = True
         success = False

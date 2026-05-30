@@ -128,7 +128,7 @@ class TerraformRunner:
         try:
             result = subprocess.run(
                 ["terraform", "plan", "-input=false", "-no-color"],
-                capture_output=True, text=True, timeout=300,
+                capture_output=True, text=True, timeout=240,
                 cwd=str(self.workspace_dir),
                 env=self._get_env(),
             )
@@ -142,7 +142,7 @@ class TerraformRunner:
                 "has_changes": result.returncode == 2 or "No changes." not in result.stdout,
             }
         except subprocess.TimeoutExpired:
-            return {"success": False, "output": "", "error": "Terraform plan timed out (300s)"}
+            return {"success": False, "output": "", "error": "Terraform plan timed out (240s). AWS may be slow or credentials may be missing permissions. Try again or reduce the number of enabled modules."}
         except Exception as e:
             return {"success": False, "output": "", "error": str(e)}
 
@@ -326,6 +326,7 @@ def write_tfvars(workspace_dir: str, config: dict[str, Any]) -> str:
         f'enable_iam        = {str(config.get("enable_iam", False)).lower()}',
         f'enable_cloudwatch = {str(config.get("enable_cloudwatch", False)).lower()}',
         f'enable_dynamodb   = {str(config.get("enable_dynamodb", False)).lower()}',
+        f'enable_billing    = {str(config.get("enable_billing", False)).lower()}',
         "",
         f'vpc_cidr      = "{config.get("vpc_cidr", "10.0.0.0/16")}"',
         f'instance_type = "{config.get("instance_type", "t2.micro")}"',

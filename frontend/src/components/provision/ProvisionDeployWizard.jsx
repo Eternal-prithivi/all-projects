@@ -44,7 +44,7 @@ const STEP_LABELS = ['Choose', 'Configure', 'Review', 'Deploy'];
 /** Initial POST returns quickly; poll status for terraform output. */
 const PLAN_START_TIMEOUT_MS = 120 * 1000;
 const PLAN_POLL_INTERVAL_MS = 3000;
-const PLAN_POLL_MAX_ATTEMPTS = 120;
+const PLAN_POLL_MAX_ATTEMPTS = 180;  // 9 minutes — outlasts 240s plan timeout + init time
 const PLAN_POLL_REQUEST_TIMEOUT_MS = 45 * 1000;
 const WAKE_MAX_WAIT_MS = 90 * 1000;
 
@@ -271,8 +271,8 @@ export default function ProvisionDeployWizard({ terraformOk, onDeployed }) {
           }
         }
         setError(
-          'Plan is still running on the server after ~5 minutes. ' +
-          'Open Render logs and search for AGENT_DEBUG or your deployment id, or try again.'
+          'Plan did not finish within 9 minutes. ' +
+          'Check Render logs for errors, or start a new plan (try enabling fewer modules).'
         );
         return;
       }
