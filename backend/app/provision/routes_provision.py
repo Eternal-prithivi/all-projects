@@ -28,7 +28,7 @@ from __future__ import annotations
 import logging
 import threading
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from app.debug_agent_log import agent_log
 from typing import Any, Optional
@@ -224,8 +224,6 @@ async def run_plan(
     )
     # #endregion
 
-    workspace = create_workspace(deployment_id)
-    write_tfvars(workspace, config_dict)
     config_dict["tags"]["Owner"] = user.username
     config_dict["tags"]["ManagedBy"] = "zenith-provision"
 
@@ -244,14 +242,14 @@ async def run_plan(
         }
 
     _save_deployment(
-        user.username, deployment_id, config_dict, workspace,
+        user.username, deployment_id, config_dict, "",
         DeploymentStatus.PLANNING, policy_result, cost_result,
-        plan_output="",
+        plan_output="Preparing terraform workspace on the server…\n",
     )
 
     thread = threading.Thread(
         target=_run_plan_background,
-        args=(user.username, deployment_id, config_dict, workspace, aws_creds, policy_result, cost_result),
+        args=(user.username, deployment_id, config_dict, "", aws_creds, policy_result, cost_result),
         daemon=True,
     )
     thread.start()
@@ -848,11 +846,6 @@ def _run_plan_background(
 ) -> None:
     """Run terraform init/plan off the HTTP thread (avoids Render 502 on long requests)."""
     plan_t0 = time.monotonic()
-    _update_plan_progress(
-        deployment_id,
-        "init",
-        "Running terraform init on the server (may take 1–3 minutes on Render)…\n",
-    )
     # #region agent log
     agent_log(
         "H1",
@@ -863,6 +856,25 @@ def _run_plan_background(
     )
     # #endregion
     try:
+        if not workspace:
+            _update_plan_progress(
+                deployment_id,
+                "workspace",
+                "Copying terraform modules into workspace (first time can take ~30s on Render)…\n",
+            )
+            workspace = create_workspace(deployment_id)
+            write_tfvars(workspace, config_dict)
+            _get_deployments_collection().update_one(
+                {"deployment_name": deployment_id},
+                {"$set": {"terraform_workspace": workspace, "config": config_dict}},
+            )
+
+        _update_plan_progress(
+            deployment_id,
+            "init",
+            "Running terraform init on the server (may take 1–3 minutes on Render)…\n",
+        )
+
         runner = TerraformRunner(workspace, aws_creds)
 
         init_t0 = time.monotonic()
