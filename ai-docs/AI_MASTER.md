@@ -189,7 +189,7 @@ Run in order. Do not end the session with an incomplete checklist.
 | `PROGRESS.md` | Match STATUS; update Phase checklist `[x]` / `[ ]` |
 | `SCRATCHPAD.md` | If **complete**: `Status: COMPLETE`, clear step list, refresh **Last Known Good State**. If **partial**: update steps (`DONE` / `NOT YET DONE`) |
 | `PROGRESS_HISTORY.md` | Append long “what was completed” narrative **only here** — never in chat or `PROGRESS.md` |
-| `AUDIT_LOG.md` | **Append only** at session end (≤5 bullets). **Never read** at startup. Archive if >12 entries → `AUDIT_LOG_ARCHIVE_2026.md` |
+| `AUDIT_LOG.md` | **Append only** at session end (≤5 bullets). **Never read** at startup. Archive if >8 entries → `AUDIT_LOG_ARCHIVE_2026.md` |
 
 ### 3. Context files (only if changed this session)
 

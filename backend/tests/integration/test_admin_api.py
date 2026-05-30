@@ -1,0 +1,69 @@
+"""Admin API integration tests — RBAC, self-protection, audit export."""
+
+from datetime import datetime
+
+import pytest
+
+pytestmark = pytest.mark.integration
+
+
+def test_admin_dashboard_ok(client, auth_headers, db):
+    headers, admin = auth_headers(role="admin")
+    db["users"].insert_one(
+        {
+            "username": "other_user",
+            "email": "other@example.com",
+            "role": "user",
+            "status": "active",
+            "created_at": datetime.utcnow(),
+        }
+    )
+
+    response = client.get("/api/admin/dashboard", headers=headers)
+    assert response.status_code == 200
+    stats = response.json()
+    assert stats["total_users"] >= 2
+    assert "monthly_revenue" in stats
+
+
+def test_non_admin_forbidden(client, auth_headers):
+    headers, _user = auth_headers(role="user")
+    assert client.get("/api/admin/dashboard", headers=headers).status_code == 403
+    assert client.get("/api/admin/users", headers=headers).status_code == 403
+
+
+def test_admin_cannot_delete_self(client, auth_headers):
+    headers, admin = auth_headers(role="admin")
+    response = client.delete(
+        f"/api/admin/users/{admin['username']}",
+        headers=headers,
+    )
+    assert response.status_code == 400
+    assert "own account" in response.json()["detail"].lower()
+
+
+def test_admin_cannot_demote_self(client, auth_headers):
+    headers, admin = auth_headers(role="admin")
+    response = client.put(
+        f"/api/admin/users/{admin['username']}/role",
+        headers=headers,
+        json={"role": "user"},
+    )
+    assert response.status_code == 400
+
+
+def test_audit_export_csv(client, auth_headers, db):
+    headers, admin = auth_headers(role="admin")
+    db["admin_actions"].insert_one(
+        {
+            "admin_username": admin["username"],
+            "action": "create_user",
+            "target_user": "victim",
+            "timestamp": datetime.utcnow(),
+        }
+    )
+
+    response = client.get("/api/admin/audit-logs/export?format=csv", headers=headers)
+    assert response.status_code == 200
+    assert "text/csv" in response.headers.get("content-type", "")
+    assert b"action" in response.content or b"create_user" in response.content

@@ -1,20 +1,20 @@
 # SCRATCHPAD.md
 
-**Status:** COMPLETE (2026-05-29)
+**Status:** COMPLETE (2026-05-30)
 
-**Phase 19 done:** CORS, DEPLOYMENT_SECRETS, CREDENTIAL_ROTATION, CLOUD_COST_GUARDRAILS, Sentry optional, uptime.yml, admin audit export, platform status GCP, vitest+CI.
+**Done:** Testing policy + README links; gap tests (storage analyze, security upload, settings/profile API, BYOC AWS, E2E admin/BYOC); Phase 20.14–16 docs; CI seeds `e2e_admin`; fixed `credential_resolver` rebind in conftest (AWS BYOC status flake).
 
-**Git:** Phase 19 on `stage`; local follow-ups (Sentry wiring, admin auth UX, test button removed) may need commit/push when you resume.
-
-**LKGS:** Phase 19 complete; no API keys needed except optional Sentry DSN.
+**LKGS:** 133 backend tests green with Mongo; integration 39; see `docs/testing/TESTING_POLICY.md`.
 
 ## Next session
 
 1. `git pull` on `stage`
-2. `PROGRESS.md` → **Phase 20.1** (admin pytest)
-3. GCP billing when ready — not blocking Phase 20
+2. `PROGRESS.md` → **Phase 21** (observability)
+3. Optional: ratchet coverage %; make Playwright required in CI when stable
 
-**Optional env (not required):**
+**Local:**
 
-- `SENTRY_DSN` / `VITE_SENTRY_DSN` — free at sentry.io
-- `UPTIME_API_URL` — GitHub repo secret for uptime workflow
+```bash
+cd backend && .venv/bin/python -m pytest -q
+cd frontend && npm test && npm run test:e2e  # API :8000 + seed_e2e_admin
+```

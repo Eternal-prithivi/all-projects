@@ -11,6 +11,16 @@ Production deployment guides and configuration
 - **DEPLOYMENT_GUIDE.md** - General deployment instructions
 - **VERCEL_DEPLOYMENT.md** - Frontend deployment on Vercel
 
+### 🧪 **[testing/](./testing/)**
+Automated testing policy, runbooks, and CI expectations (Phase 20)
+
+- **TESTING.md** - How to run pytest, Vitest, and Playwright locally
+- **TESTING_POLICY.md** - Definition of done, pyramid, roadmap, anti-patterns
+- **BRANCH_PROTECTION.md** - Required GitHub checks before merge
+- **STAGING.md** - Staging environment setup (20.14)
+- **MONGODB_ATLAS.md** - Atlas migration guide (20.15)
+- **TERRAFORM_CI.md** - Terraform validate / plan on PR (20.16)
+
 ### 🛠️ **[development/](./development/)**
 Development environment and testing guides
 
@@ -125,6 +135,7 @@ Technical overviews and architecture
 | Implement cost tracking | `cost-analysis/COST_ANALYSIS_IMPLEMENTATION.md` |
 | Understand the architecture | `technical/COMPLETE_TECHNICAL_BREAKDOWN.md` |
 | Get project overview | `technical/PROJECT_SUMMARY_AND_ROADMAP.md` |
+| Run or add automated tests | `testing/TESTING.md` + `testing/TESTING_POLICY.md` |
 
 ---
 

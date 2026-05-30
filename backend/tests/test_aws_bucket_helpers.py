@@ -50,16 +50,19 @@ def test_create_s3_bucket_skips_when_accessible(mock_client_factory, mock_check)
     mock_client_factory.assert_not_called()
 
 
+@patch("app.byoc.aws_bucket_helpers.get_bucket_actual_region", return_value="ap-south-1")
 @patch("app.byoc.aws_bucket_helpers._apply_bucket_baseline")
 @patch("app.byoc.aws_bucket_helpers.check_bucket_access")
 @patch("app.byoc.aws_bucket_helpers._s3_client_from_keys")
 def test_create_s3_bucket_creates_when_available(
-    mock_client_factory, mock_check, mock_baseline
+    mock_client_factory, mock_check, mock_baseline, _mock_region
 ):
+    # First call: name free; second call: post-create verification
     mock_check.side_effect = ["available", "accessible"]
     client = MagicMock()
     mock_client_factory.return_value = client
     ok, msg = create_s3_bucket("AKIA", "secret", "zenith-new-bucket", "ap-south-1")
     assert ok is True
+    assert "created" in msg.lower()
     client.create_bucket.assert_called_once()
     mock_baseline.assert_called_once()

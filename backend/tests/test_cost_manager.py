@@ -24,7 +24,7 @@ def test_get_aws_cost_and_usage_calls_ce_client(monkeypatch):
         return FakeClient(), False
 
     monkeypatch.setattr(
-        "app.cost.manager.build_aws_ce_client", fake_build_ce
+        "app.storage.cloud_credentials.build_aws_ce_client", fake_build_ce
     )
 
     resp = manager.get_aws_cost_and_usage("alice", "2023-01-01", "2023-01-02")

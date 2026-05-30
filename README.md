@@ -513,15 +513,17 @@ For complete API documentation, visit: http://localhost:8000/docs
 
 ### Running Tests
 
-```bash
-# Backend tests
-cd backend
-pytest
+Zenith uses a **risk-based test pyramid**: unit tests (mocks), API integration tests (Mongo + FastAPI `TestClient`), and a small Playwright suite.
 
-# Frontend tests
-cd frontend
-npm test
-```
+| Layer | Command |
+|-------|---------|
+| Backend (all) | `cd backend && pytest -q` (needs Mongo for integration) |
+| Integration only | `pytest tests/integration -q -m integration` |
+| Frontend unit | `cd frontend && npm test` |
+| E2E | `cd frontend && npm run test:e2e` (API on `:8000`, Vite on `:5173`) |
+
+**Full guide:** [docs/testing/TESTING.md](docs/testing/TESTING.md)  
+**Policy & roadmap:** [docs/testing/TESTING_POLICY.md](docs/testing/TESTING_POLICY.md)
 
 ### Code Style
 
