@@ -13,7 +13,8 @@
 //   - Change provider order — AuthContext must wrap PreferencesContext (it depends on token)
 //   - Import heavy components eagerly here — use React.lazy for all page-level components
 // =============================================================================
-import React, { lazy, Suspense } from "react";
+import React, { Suspense } from "react";
+import { lazyWithRetry } from "./utils/lazyLoad.js";
 import ReactDOM from "react-dom/client";
 import { createBrowserRouter, RouterProvider } from "react-router-dom";
 import App from "./App.jsx";
@@ -39,54 +40,54 @@ import ForgotPasswordPage from "./pages/ForgotPasswordPage.jsx";
 import ResetPasswordPage from "./pages/ResetPasswordPage.jsx";
 
 // Lazy load: All other pages (loaded on-demand)
-const DashboardLayout = lazy(() => import("./components/dashboard/DashboardLayout.jsx"));
-const DashboardPage = lazy(() => import("./pages/DashboardPage.jsx"));
-const StoragePage = lazy(() => import("./pages/StoragePage.jsx"));
-const VMClusterPage = lazy(() => import("./pages/VMClusterPage.jsx"));
-const CostAnalysisPage = lazy(() => import("./pages/CostAnalysisEnhancedPage.jsx"));
-const CostSimulatorPage = lazy(() => import("./pages/CostSimulatorPage.jsx"));
-const CostOptimizationPage = lazy(() => import("./pages/CostOptimizationPage.jsx"));
-const SecurityPage = lazy(() => import("./pages/SecurityPage.jsx"));
-const SecuritySettingsPage = lazy(() => import("./pages/SecuritySettingsPage.jsx"));
-const ProfilePage = lazy(() => import("./pages/ProfilePage.jsx"));
-const SettingsPage = lazy(() => import("./pages/SettingsPage.jsx"));
-const BillingPage = lazy(() => import("./pages/BillingPage.jsx"));
-const PricingPage = lazy(() => import("./pages/PricingPage.jsx"));
-const ContactPage = lazy(() => import("./pages/ContactPage.jsx"));
-const AboutPage = lazy(() => import("./pages/AboutPage.jsx"));
-const FeaturesPage = lazy(() => import("./pages/FeaturesPage.jsx"));
-const HelpCenterPage = lazy(() => import("./pages/HelpCenterPage.jsx"));
-const TermsOfServicePage = lazy(() => import("./pages/TermsOfServicePage.jsx"));
-const PrivacyPolicyPage = lazy(() => import("./pages/PrivacyPolicyPage.jsx"));
-const AccessDeniedPage = lazy(() => import("./pages/AccessDeniedPage.jsx"));
-const NotFoundPage = lazy(() => import("./pages/NotFoundPage.jsx"));
-const ServerErrorPage = lazy(() => import("./pages/ServerErrorPage.jsx"));
-const ServiceUnavailablePage = lazy(() => import("./pages/ServiceUnavailablePage.jsx"));
-const ProvisionPage = lazy(() => import("./pages/ProvisionPage.jsx"));
+const DashboardLayout = lazyWithRetry(() => import("./components/dashboard/DashboardLayout.jsx"));
+const DashboardPage = lazyWithRetry(() => import("./pages/DashboardPage.jsx"));
+const StoragePage = lazyWithRetry(() => import("./pages/StoragePage.jsx"));
+const VMClusterPage = lazyWithRetry(() => import("./pages/VMClusterPage.jsx"));
+const CostAnalysisPage = lazyWithRetry(() => import("./pages/CostAnalysisEnhancedPage.jsx"));
+const CostSimulatorPage = lazyWithRetry(() => import("./pages/CostSimulatorPage.jsx"));
+const CostOptimizationPage = lazyWithRetry(() => import("./pages/CostOptimizationPage.jsx"));
+const SecurityPage = lazyWithRetry(() => import("./pages/SecurityPage.jsx"));
+const SecuritySettingsPage = lazyWithRetry(() => import("./pages/SecuritySettingsPage.jsx"));
+const ProfilePage = lazyWithRetry(() => import("./pages/ProfilePage.jsx"));
+const SettingsPage = lazyWithRetry(() => import("./pages/SettingsPage.jsx"));
+const BillingPage = lazyWithRetry(() => import("./pages/BillingPage.jsx"));
+const PricingPage = lazyWithRetry(() => import("./pages/PricingPage.jsx"));
+const ContactPage = lazyWithRetry(() => import("./pages/ContactPage.jsx"));
+const AboutPage = lazyWithRetry(() => import("./pages/AboutPage.jsx"));
+const FeaturesPage = lazyWithRetry(() => import("./pages/FeaturesPage.jsx"));
+const HelpCenterPage = lazyWithRetry(() => import("./pages/HelpCenterPage.jsx"));
+const TermsOfServicePage = lazyWithRetry(() => import("./pages/TermsOfServicePage.jsx"));
+const PrivacyPolicyPage = lazyWithRetry(() => import("./pages/PrivacyPolicyPage.jsx"));
+const AccessDeniedPage = lazyWithRetry(() => import("./pages/AccessDeniedPage.jsx"));
+const NotFoundPage = lazyWithRetry(() => import("./pages/NotFoundPage.jsx"));
+const ServerErrorPage = lazyWithRetry(() => import("./pages/ServerErrorPage.jsx"));
+const ServiceUnavailablePage = lazyWithRetry(() => import("./pages/ServiceUnavailablePage.jsx"));
+const ProvisionPage = lazyWithRetry(() => import("./pages/ProvisionPage.jsx"));
 
 // Admin pages (lazy loaded - only for admins)
-const AdminLayout = lazy(() => import("./components/admin/AdminLayout.jsx"));
-const AdminOverviewPage = lazy(() => import("./pages/admin/AdminOverviewPage.jsx"));
-const AdminUsersPage = lazy(() => import("./pages/admin/AdminUsersPage.jsx"));
-const AdminAnalyticsPage = lazy(() => import("./pages/admin/AdminAnalyticsPage.jsx"));
-const AdminPaymentsPage = lazy(() => import("./pages/admin/AdminPaymentsPage.jsx"));
-const AdminSystemPage = lazy(() => import("./pages/admin/AdminSystemPage.jsx"));
-const AdminSettingsPage = lazy(() => import("./pages/admin/AdminSettingsPage.jsx"));
-const AdminTestPage = lazy(() => import("./pages/admin/AdminTestPage.jsx"));
-const TrustCenterPage = lazy(() => import("./pages/TrustCenterPage.jsx"));
-const CookiePolicyPage = lazy(() => import("./pages/CookiePolicyPage.jsx"));
-const DpaPage = lazy(() => import("./pages/DpaPage.jsx"));
-const StatusPage = lazy(() => import("./pages/StatusPage.jsx"));
-const VerifyEmailPage = lazy(() => import("./pages/VerifyEmailPage.jsx"));
-const PublicPricingPage = lazy(() => import("./pages/PublicPricingPage.jsx"));
-const SessionExpiredPage = lazy(() => import("./pages/SessionExpiredPage.jsx"));
-const BillingSuccessPage = lazy(() => import("./pages/BillingSuccessPage.jsx"));
-const BillingCancelPage = lazy(() => import("./pages/BillingCancelPage.jsx"));
-const DocsHubPage = lazy(() => import("./pages/DocsHubPage.jsx"));
-const NotificationsPage = lazy(() => import("./pages/NotificationsPage.jsx"));
-const TeamPage = lazy(() => import("./pages/TeamPage.jsx"));
-const AcceptInvitePage = lazy(() => import("./pages/AcceptInvitePage.jsx"));
-const SsoCallbackPage = lazy(() => import("./pages/SsoCallbackPage.jsx"));
+const AdminLayout = lazyWithRetry(() => import("./components/admin/AdminLayout.jsx"));
+const AdminOverviewPage = lazyWithRetry(() => import("./pages/admin/AdminOverviewPage.jsx"));
+const AdminUsersPage = lazyWithRetry(() => import("./pages/admin/AdminUsersPage.jsx"));
+const AdminAnalyticsPage = lazyWithRetry(() => import("./pages/admin/AdminAnalyticsPage.jsx"));
+const AdminPaymentsPage = lazyWithRetry(() => import("./pages/admin/AdminPaymentsPage.jsx"));
+const AdminSystemPage = lazyWithRetry(() => import("./pages/admin/AdminSystemPage.jsx"));
+const AdminSettingsPage = lazyWithRetry(() => import("./pages/admin/AdminSettingsPage.jsx"));
+const AdminTestPage = lazyWithRetry(() => import("./pages/admin/AdminTestPage.jsx"));
+const TrustCenterPage = lazyWithRetry(() => import("./pages/TrustCenterPage.jsx"));
+const CookiePolicyPage = lazyWithRetry(() => import("./pages/CookiePolicyPage.jsx"));
+const DpaPage = lazyWithRetry(() => import("./pages/DpaPage.jsx"));
+const StatusPage = lazyWithRetry(() => import("./pages/StatusPage.jsx"));
+const VerifyEmailPage = lazyWithRetry(() => import("./pages/VerifyEmailPage.jsx"));
+const PublicPricingPage = lazyWithRetry(() => import("./pages/PublicPricingPage.jsx"));
+const SessionExpiredPage = lazyWithRetry(() => import("./pages/SessionExpiredPage.jsx"));
+const BillingSuccessPage = lazyWithRetry(() => import("./pages/BillingSuccessPage.jsx"));
+const BillingCancelPage = lazyWithRetry(() => import("./pages/BillingCancelPage.jsx"));
+const DocsHubPage = lazyWithRetry(() => import("./pages/DocsHubPage.jsx"));
+const NotificationsPage = lazyWithRetry(() => import("./pages/NotificationsPage.jsx"));
+const TeamPage = lazyWithRetry(() => import("./pages/TeamPage.jsx"));
+const AcceptInvitePage = lazyWithRetry(() => import("./pages/AcceptInvitePage.jsx"));
+const SsoCallbackPage = lazyWithRetry(() => import("./pages/SsoCallbackPage.jsx"));
 
 const router = createBrowserRouter([
   {

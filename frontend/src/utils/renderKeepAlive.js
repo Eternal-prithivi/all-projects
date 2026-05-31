@@ -4,7 +4,9 @@
  */
 import { getApiRoot } from '../config/apiBase.js';
 
-const INTERVAL_MS = 10 * 60 * 1000;
+/** Match GitHub Actions `render-keep-alive.yml` (every 5 minutes). */
+const INTERVAL_MS = 5 * 60 * 1000;
+const WAKE_TIMEOUT_MS = 90_000;
 
 function shouldPing() {
   if (import.meta.env.MODE !== 'production') return false;
@@ -12,19 +14,38 @@ function shouldPing() {
   return root && !/localhost|127\.0\.0\.1/i.test(root);
 }
 
+/** GET /health once (used on login and keep-alive). Returns true if backend responded OK. */
+export async function wakeRenderBackend() {
+  if (!shouldPing()) {
+    return true;
+  }
+
+  const root = getApiRoot().replace(/\/$/, '');
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), WAKE_TIMEOUT_MS);
+
+  try {
+    const res = await fetch(`${root}/health`, {
+      method: 'GET',
+      cache: 'no-store',
+      credentials: 'omit',
+      signal: controller.signal,
+    });
+    return res.ok;
+  } catch {
+    return false;
+  } finally {
+    window.clearTimeout(timeoutId);
+  }
+}
+
 export function startRenderKeepAlive() {
   if (!shouldPing()) {
     return () => {};
   }
 
-  const root = getApiRoot().replace(/\/$/, '');
-
   const ping = () => {
-    fetch(`${root}/health`, {
-      method: 'GET',
-      cache: 'no-store',
-      credentials: 'omit',
-    }).catch(() => {});
+    wakeRenderBackend().catch(() => {});
   };
 
   ping();

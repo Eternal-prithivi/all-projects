@@ -5,7 +5,7 @@ vi.mock('../config/apiBase.js', () => ({
 }));
 
 import { getApiRoot } from '../config/apiBase.js';
-import { startRenderKeepAlive } from './renderKeepAlive.js';
+import { startRenderKeepAlive, wakeRenderBackend } from './renderKeepAlive.js';
 
 describe('renderKeepAlive', () => {
   beforeEach(() => {
@@ -32,9 +32,16 @@ describe('renderKeepAlive', () => {
       'https://zenith-backend-707i.onrender.com/health',
       expect.objectContaining({ method: 'GET' })
     );
-    vi.advanceTimersByTime(10 * 60 * 1000);
+    vi.advanceTimersByTime(5 * 60 * 1000);
     expect(fetch).toHaveBeenCalledTimes(2);
     stop();
+    vi.unstubAllEnvs();
+  });
+
+  it('wakeRenderBackend returns true when health responds', async () => {
+    vi.stubEnv('MODE', 'production');
+    fetch.mockResolvedValueOnce({ ok: true });
+    await expect(wakeRenderBackend()).resolves.toBe(true);
     vi.unstubAllEnvs();
   });
 

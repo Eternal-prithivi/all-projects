@@ -8,6 +8,7 @@ import { getDeviceFingerprint } from '../utils/deviceFingerprint.js';
 import '../styles/auth.css';
 import '../styles/auth-polish.css';
 import { getApiRoot } from '../config/apiBase.js';
+import { wakeRenderBackend } from '../utils/renderKeepAlive.js';
 
 function LoginPage() {
   const [username, setUsername] = useState('');
@@ -16,6 +17,7 @@ function LoginPage() {
   const [fieldErrors, setFieldErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
   const [ssoProviders, setSsoProviders] = useState([]);
+  const [backendWaking, setBackendWaking] = useState(false);
   const { login, isAuthenticated } = useAuth();
 
   const apiRoot = useMemo(() => getApiRoot(), []);
@@ -53,6 +55,24 @@ function LoginPage() {
       .then((data) => setSsoProviders(data.providers || []))
       .catch(() => setSsoProviders([]));
   }, [apiRoot]);
+
+  // Render free tier can sleep ~15 min; wake before login so first sign-in is faster
+  useEffect(() => {
+    let cancelled = false;
+    const slowTimer = window.setTimeout(() => {
+      if (!cancelled) setBackendWaking(true);
+    }, 2500);
+
+    wakeRenderBackend().finally(() => {
+      if (!cancelled) setBackendWaking(false);
+      window.clearTimeout(slowTimer);
+    });
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(slowTimer);
+    };
+  }, []);
 
   const startSso = (providerId) => {
     window.location.href = `${apiRoot}/api/auth/sso/${providerId}/login`;
@@ -158,6 +178,11 @@ function LoginPage() {
           )}
           <div className="auth-form-header">
             <h2>Sign in</h2>
+            {backendWaking && (
+              <p className="auth-hint" role="status">
+                Waking the cloud API (first visit after idle can take up to a minute on free hosting)…
+              </p>
+            )}
             <p>Don't have an account? <Link to="/register">Create one free</Link></p>
             {returningToAdmin && (
               <p className="auth-hint" role="status">
