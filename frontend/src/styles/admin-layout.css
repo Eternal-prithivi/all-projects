@@ -10,16 +10,20 @@
 }
 
 .admin-main {
-  flex: 1;
+  flex: 1 1 auto;
   display: flex;
   flex-direction: column;
   min-width: 0;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .admin-content {
-  flex: 1;
+  flex: 1 1 auto;
+  min-height: 0;
   padding: 2rem;
   overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 /* Admin Sidebar */

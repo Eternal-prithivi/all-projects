@@ -8,32 +8,6 @@
 }
 
 @media (max-width: 968px) {
-  html:has(.auth-page),
-  body:has(.auth-page) {
-    overflow-y: auto !important;
-    height: auto !important;
-    max-height: none !important;
-    min-height: 100dvh;
-    min-height: 100svh;
-    -webkit-overflow-scrolling: touch;
-  }
-
-  #root:has(.auth-page) {
-    overflow-y: auto !important;
-    height: auto !important;
-    max-height: none !important;
-    min-height: 100dvh;
-    min-height: 100svh;
-  }
-
-  #root:has(.auth-page) .app-root {
-    flex: 1 0 auto;
-    min-height: 100dvh;
-    min-height: 100svh;
-    height: auto;
-    overflow: visible;
-  }
-
   .auth-page {
     flex-direction: column;
     align-items: stretch;
@@ -42,7 +16,6 @@
     min-height: 100dvh;
     min-height: 100svh;
     height: auto;
-    touch-action: pan-y;
   }
 
   /* Slim top strip */

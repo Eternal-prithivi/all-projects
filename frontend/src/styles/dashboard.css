@@ -35,11 +35,12 @@
 }
 
 .dashboard-main {
-  flex-grow: 1;
+  flex: 1 1 auto;
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  min-width: 0; /* Prevent flex overflow */
+  min-width: 0;
+  min-height: 0;
 }
 
 /* ========================================
@@ -123,9 +124,11 @@
 .dashboard-content {
   padding: 1.5rem 2rem;
   overflow-y: auto;
-  flex-grow: 1;
+  flex: 1 1 auto;
+  min-height: 0;
   animation: fadeIn var(--duration-normal) var(--ease-out);
   background-image: radial-gradient(circle at 80% 10%, rgba(212, 175, 55, 0.03) 0%, transparent 40%);
+  -webkit-overflow-scrolling: touch;
 }
 
 /* ========================================

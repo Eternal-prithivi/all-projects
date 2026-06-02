@@ -7,18 +7,29 @@ function MobileNavMoreSheet({ isOpen, onClose, items, user }) {
 
   useEffect(() => {
     if (!isOpen) return undefined;
-    const prev = document.body.style.overflow;
+    const prevBody = document.body.style.overflow;
+    const prevHtml = document.documentElement.style.overflow;
     document.body.style.overflow = 'hidden';
+    document.documentElement.style.overflow = 'hidden';
     closeRef.current?.focus();
     const onKey = (e) => {
       if (e.key === 'Escape') onClose();
     };
     document.addEventListener('keydown', onKey);
     return () => {
-      document.body.style.overflow = prev;
+      document.body.style.overflow = prevBody;
+      document.documentElement.style.overflow = prevHtml;
       document.removeEventListener('keydown', onKey);
     };
   }, [isOpen, onClose]);
+
+  useEffect(
+    () => () => {
+      document.body.style.overflow = '';
+      document.documentElement.style.overflow = '';
+    },
+    []
+  );
 
   if (!isOpen) return null;
 

@@ -3,77 +3,109 @@
  * Complements mobile-nav.css, landing-mobile.css, mobile-marketing-nav.css.
  */
 
-/* Public pages grow with content; dashboard/admin lock to viewport */
-html,
-body {
-  min-height: 100dvh;
-}
+/* ─── Scroll architecture ───────────────────────────────────────────────────
+   Mobile (≤768px): document/body scroll only — avoids iOS nested-scroll hangs.
+   Desktop (≥769px): dashboard/admin use inner .dashboard-content scroll pane.
+   ─────────────────────────────────────────────────────────────────────────── */
 
 .app-root {
-  flex: 1 0 auto;
   width: 100%;
-  min-height: auto;
+  min-height: 100dvh;
   height: auto;
   overflow: visible;
-}
-
-.app-root:has(.dashboard-page),
-.app-root:has(.admin-layout) {
-  flex: 1 1 auto;
-  min-height: 0;
-  height: 100%;
-  min-height: 100dvh;
-  overflow: hidden;
-}
-
-#root:has(.dashboard-page),
-#root:has(.admin-layout) {
-  height: 100dvh;
-  max-height: 100dvh;
-  overflow: hidden;
 }
 
 .landing-page,
 .marketing-page,
 .auth-page {
-  flex: 1 0 auto;
   width: 100%;
+  min-height: 100dvh;
 }
 
-@media (max-width: 968px) {
-  html:has(.auth-page),
-  body:has(.auth-page),
-  #root:has(.auth-page) {
-    overflow-y: auto !important;
+/* Mobile: never lock #root height; never trap scroll in dashboard panes */
+@media (max-width: 768px) {
+  html,
+  body,
+  #root,
+  .app-root {
     height: auto !important;
     max-height: none !important;
-    min-height: 100dvh;
-    min-height: 100svh;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-y: auto;
   }
 
-  #root:has(.auth-page) .app-root {
-    flex: 1 0 auto;
+  .dashboard-page,
+  .admin-layout {
     min-height: 100dvh;
-    min-height: 100svh;
     height: auto;
     overflow: visible;
   }
-}
 
-@media (max-width: 768px) {
-  html:has(.marketing-page),
-  body:has(.marketing-page),
-  #root:has(.marketing-page) {
-    overflow-y: auto !important;
-    height: auto !important;
-    max-height: none !important;
+  .dashboard-main,
+  .admin-main {
+    overflow: visible !important;
+    min-height: auto;
   }
 
-  #root:has(.marketing-page) .app-root {
-    flex: 1 0 auto;
+  .dashboard-content,
+  .admin-content {
+    overflow: visible !important;
+    flex: none;
     min-height: auto;
     height: auto;
-    overflow: visible;
+  }
+
+  .marketing-page__main {
+    overflow-x: hidden;
+    overflow-y: visible;
+  }
+}
+
+/* Desktop: app shell fills viewport; main content area scrolls inside */
+@media (min-width: 769px) {
+  #root:has(.dashboard-page),
+  #root:has(.admin-layout) {
+    display: flex;
+    flex-direction: column;
+    height: 100dvh;
+    max-height: 100dvh;
+    overflow: hidden;
+  }
+
+  .app-root:has(.dashboard-page),
+  .app-root:has(.admin-layout) {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+    height: 100%;
+    overflow: hidden;
+  }
+
+  .dashboard-page,
+  .admin-layout {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .dashboard-main,
+  .admin-main {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .dashboard-content,
+  .admin-content {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
   }
 }
 
@@ -166,7 +198,8 @@ body {
     padding-top: 5rem;
     padding-left: 0;
     padding-right: 0;
-    overflow-x: clip;
+    overflow-x: hidden;
+    overflow-y: visible;
   }
 
   .marketing-page .section-heading,

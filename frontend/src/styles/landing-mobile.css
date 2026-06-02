@@ -6,24 +6,6 @@
     overflow-y: visible;
     min-height: 100dvh;
     height: auto;
-    touch-action: pan-y;
-  }
-
-  html:has(.landing-page),
-  body:has(.landing-page),
-  #root:has(.landing-page) {
-    overflow-y: auto !important;
-    height: auto !important;
-    max-height: none !important;
-    min-height: 100dvh;
-    -webkit-overflow-scrolling: touch;
-  }
-
-  #root:has(.landing-page) .app-root {
-    flex: 1 0 auto;
-    min-height: auto;
-    height: auto;
-    overflow: visible;
   }
 
   .nav-container {
