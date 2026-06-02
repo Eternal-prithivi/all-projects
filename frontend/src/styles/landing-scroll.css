@@ -311,6 +311,20 @@ html.is-scrolling .landing-cta::after {
   animation-play-state: paused !important;
 }
 
+@media (max-width: 768px) {
+  .landing-hero__tilt {
+    perspective: none;
+  }
+
+  .landing-hero__tilt-target {
+    transform: none !important;
+  }
+
+  .hero-preview__float {
+    transform: none !important;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .landing-scroll-progress {
     display: none;

@@ -1,5 +1,6 @@
 /* Zenith marketing landing — premium SaaS layout */
 @import './mobile-marketing-nav.css';
+@import './landing-mobile.css';
 
 .landing-page {
   position: relative;
@@ -964,9 +965,17 @@
     justify-content: center;
   }
 
+  .landing-hero__visual-wrap {
+    width: 100%;
+    max-width: min(520px, 100%);
+    margin-left: auto;
+    margin-right: auto;
+  }
+
   .hero-preview {
     transform: none;
-    max-width: 520px;
+    width: 100%;
+    max-width: 100%;
     margin: 0 auto;
   }
 
