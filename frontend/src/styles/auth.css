@@ -23,7 +23,8 @@
   display: flex;
   flex-direction: column;
   justify-content: center;
-  padding: 5rem 6rem;
+  align-items: flex-start;
+  padding: 2.5rem 4rem 4rem;
   position: relative;
   background: #050505;
   z-index: 1;
@@ -227,8 +228,8 @@
 /* Advanced Glassmorphism Card Wrapper */
 .auth-form-wrapper {
   width: 100%;
-  max-width: 480px; /* Increased for larger inputs */
-  padding: 3.5rem;
+  max-width: 560px;
+  padding: 3rem 3.25rem;
   background: rgba(15, 15, 15, 0.6);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
@@ -468,24 +469,27 @@
   color: #ffd700;
 }
 
-/* Back link */
+/* Back link — in document flow (no overlap with logo/tagline) */
 .auth-back-link {
-  position: absolute;
-  top: 2.5rem;
-  left: 3.5rem;
+  position: relative;
+  top: auto;
+  left: auto;
+  align-self: flex-start;
+  flex-shrink: 0;
+  margin: 0 0 1.25rem;
   color: #888;
   text-decoration: none;
-  font-size: 0.95rem;
+  font-size: 0.9rem;
   font-weight: 500;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 0.5rem;
   transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
   z-index: 2;
-  padding: 0.5rem 1rem;
+  padding: 0.45rem 0.85rem;
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .auth-back-link:hover {
@@ -516,12 +520,17 @@
   }
 
   .auth-form-wrapper {
-    max-width: min(520px, 100%);
+    max-width: min(600px, 94%);
     width: 100%;
     min-height: min(480px, 85vh);
+    padding: 3.25rem 3.5rem;
     display: flex;
     flex-direction: column;
     justify-content: center;
+  }
+
+  .auth-back-link {
+    margin-bottom: 1.75rem;
   }
 
   .auth-form-wrapper > form {
