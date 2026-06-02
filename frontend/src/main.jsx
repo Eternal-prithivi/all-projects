@@ -6,7 +6,7 @@
 //   /                → LandingPage
 //   /login /register → Auth pages
 //   /dashboard/*     → DashboardLayout (ProtectedRoute) + all page children
-//   /admin/*         → AdminDashboardPage (admin role required)
+//   /admin/*         → AdminLayout + pages/admin/* (admin role required)
 // LAZY LOADING: All dashboard pages are lazy-loaded for performance (React.lazy + Suspense)
 // DO NOT:
 //   - Add routes without wrapping in ProtectedRoute (if auth required)
