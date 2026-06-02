@@ -7,6 +7,7 @@ import logging
 
 from app.users.routes_users import get_current_user
 from app.cost.manager import get_aws_cost_and_usage, get_gcp_billing_data, get_azure_billing_data
+from app.config.demo_mode import is_demo_mode, billing_results_by_time
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -22,7 +23,7 @@ def generate_csv_report(cost_data: dict, provider: str) -> str:
     writer.writerow(["Date", "Total Cost", "Currency"])
     
     # Data rows
-    results = cost_data.get("data", {}).get("ResultsByTime", [])
+    results = billing_results_by_time(cost_data)
     for item in results:
         date_range = f"{item.get('TimePeriod', {}).get('Start', 'N/A')} to {item.get('TimePeriod', {}).get('End', 'N/A')}"
         total = item.get("Total", {}).get("UnblendedCost", {})
@@ -33,9 +34,10 @@ def generate_csv_report(cost_data: dict, provider: str) -> str:
     # Services breakdown
     writer.writerow([])
     writer.writerow(["Service", "Cost"])
-    services = cost_data.get("data", {}).get("Services", [])
+    services = cost_data.get("Services") or cost_data.get("data", {}).get("Services", [])
     for service in services:
-        writer.writerow([service.get("name", "Unknown"), service.get("cost", "0")])
+        name = service.get("name") or service.get("service", "Unknown")
+        writer.writerow([name, service.get("cost", "0")])
     
     return output.getvalue()
 

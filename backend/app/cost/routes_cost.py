@@ -18,7 +18,7 @@ import time
 import logging
 
 from app.cost.manager import get_aws_cost_and_usage, get_gcp_billing_data, get_azure_billing_data
-from app.config.demo_mode import is_demo_mode, MockDataGenerator, log_demo_mode_call
+from app.config.demo_mode import is_demo_mode
 from app.users.routes_users import get_current_user
 
 logger = logging.getLogger(__name__)
@@ -59,12 +59,20 @@ async def get_aws_costs(
     Retrieves AWS Cost and Usage data from Cost Explorer (cached for 1 hour).
     """
     try:
-        # Demo mode: Return mock data (zero API cost)
         if is_demo_mode():
-            log_demo_mode_call("AWS Cost Explorer")
-            mock_data = MockDataGenerator.mock_aws_cost_data(start_date, end_date, granularity)
-            return {"provider": "aws", "data": mock_data, "cached": False, "demo_mode": True}
-        
+            cost_data = get_aws_cost_and_usage(
+                user.username,
+                start_date=start_date,
+                end_date=end_date,
+                granularity=granularity,
+            )
+            return {
+                "provider": "aws",
+                "data": cost_data,
+                "cached": False,
+                "demo_mode": True,
+            }
+
         # Create cache key from query parameters
         cache_key = f"{user.username}_aws_{start_date}_{end_date}_{granularity}"
         current_time = time.time()
@@ -100,7 +108,7 @@ async def get_aws_costs(
         add_to_cost_cache(cache_key, cost_data, current_time)
         logger.info(f"AWS cost data cached for {cache_key}")
         
-        return {"provider": "aws", "data": cost_data, "cached": False}
+        return {"provider": "aws", "data": cost_data, "cached": False, "demo_mode": False}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch AWS costs: {e}")
 
@@ -115,7 +123,11 @@ async def get_gcp_costs(
     """
     try:
         cost_data = get_gcp_billing_data(user.username, start_date=start_date, end_date=end_date)
-        return {"provider": "gcp", "data": cost_data}
+        return {
+            "provider": "gcp",
+            "data": cost_data,
+            "demo_mode": is_demo_mode(),
+        }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch GCP costs: {e}")
 
@@ -130,7 +142,11 @@ async def get_azure_costs(
     """
     try:
         cost_data = get_azure_billing_data(user.username, start_date=start_date, end_date=end_date)
-        return {"provider": "azure", "data": cost_data}
+        return {
+            "provider": "azure",
+            "data": cost_data,
+            "demo_mode": is_demo_mode(),
+        }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch Azure costs: {e}")
 

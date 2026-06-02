@@ -15,9 +15,14 @@ def check_budget_alerts():
     from app.database.mongo_client import get_database
     from app.budgets.models import BudgetDB
     from app.cost.manager import get_aws_cost_and_usage, get_gcp_billing_data, get_azure_billing_data
+    from app.config.demo_mode import is_demo_mode, sum_billing_total
     from app.utils.sms_notifications import send_budget_alert_sms, send_budget_exceeded_sms
     from bson import ObjectId
-    
+
+    if is_demo_mode():
+        logger.info("⏭️  DEMO_MODE: skipping scheduled budget alerts (no billing API calls)")
+        return {"budgets_checked": 0, "alerts_sent": 0, "skipped": True, "reason": "demo_mode"}
+
     DB = get_database()
     budgets_collection = DB["budgets"]
     
@@ -67,26 +72,20 @@ def check_budget_alerts():
                     gcp_data = get_gcp_billing_data(budget.user_id, start_date, end_date)
                     azure_data = get_azure_billing_data(budget.user_id, start_date, end_date)
                     
-                    current_spend += sum(float(item.get("Total", {}).get("UnblendedCost", {}).get("Amount", 0)) 
-                                       for item in aws_data.get("ResultsByTime", []))
-                    current_spend += sum(float(item.get("Total", {}).get("UnblendedCost", {}).get("Amount", 0)) 
-                                       for item in gcp_data.get("data", {}).get("ResultsByTime", []))
-                    current_spend += sum(float(item.get("Total", {}).get("UnblendedCost", {}).get("Amount", 0)) 
-                                       for item in azure_data.get("data", {}).get("ResultsByTime", []))
+                    current_spend += sum_billing_total(aws_data)
+                    current_spend += sum_billing_total(gcp_data)
+                    current_spend += sum_billing_total(azure_data)
                 elif budget.provider == "aws":
                     aws_data = get_aws_cost_and_usage(
                         budget.user_id, start_date, end_date, "DAILY"
                     )
-                    current_spend = sum(float(item.get("Total", {}).get("UnblendedCost", {}).get("Amount", 0)) 
-                                      for item in aws_data.get("ResultsByTime", []))
+                    current_spend = sum_billing_total(aws_data)
                 elif budget.provider == "gcp":
                     gcp_data = get_gcp_billing_data(budget.user_id, start_date, end_date)
-                    current_spend = sum(float(item.get("Total", {}).get("UnblendedCost", {}).get("Amount", 0)) 
-                                      for item in gcp_data.get("data", {}).get("ResultsByTime", []))
+                    current_spend = sum_billing_total(gcp_data)
                 elif budget.provider == "azure":
                     azure_data = get_azure_billing_data(budget.user_id, start_date, end_date)
-                    current_spend = sum(float(item.get("Total", {}).get("UnblendedCost", {}).get("Amount", 0)) 
-                                      for item in azure_data.get("data", {}).get("ResultsByTime", []))
+                    current_spend = sum_billing_total(azure_data)
             except Exception as cost_error:
                 logger.warning(f"Error fetching cost data for budget {budget.id}: {str(cost_error)}")
                 continue

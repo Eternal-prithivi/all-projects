@@ -20,7 +20,7 @@ import time
 from app.auth.auth_utils import get_current_user
 from app.database.mongo_client import get_database
 from .models import BudgetCreate, BudgetUpdate, BudgetDB, BudgetStatus
-from app.config.demo_mode import is_demo_mode, MockDataGenerator, log_demo_mode_call
+from app.config.demo_mode import sum_billing_total
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -101,31 +101,7 @@ async def get_budget_status():
     """
     try:
         from app.cost.manager import get_aws_cost_and_usage, get_gcp_billing_data, get_azure_billing_data
-        
-        # Demo mode: Return budgets with mock spend data (zero API cost)
-        if is_demo_mode():
-            log_demo_mode_call("Budget Status (Cost Explorer)")
-            cursor = budgets_collection.find({"user_id": "default_user", "is_active": True})
-            statuses = []
-            for doc in cursor:
-                doc["id"] = str(doc["_id"])
-                doc.pop("_id", None)
-                budget = BudgetDB(**doc)
-                
-                # Generate realistic mock spend (60-90% of budget)
-                mock_spend = MockDataGenerator.mock_budget_status(budget.amount)
-                budget.current_spend = mock_spend
-                utilization = (mock_spend / budget.amount * 100) if budget.amount > 0 else 0
-                
-                statuses.append(BudgetStatus(
-                    budget=budget,
-                    utilization_percentage=utilization,
-                    is_exceeded=mock_spend >= budget.amount,
-                    is_near_limit=utilization >= budget.alert_threshold,
-                    remaining_amount=max(0, budget.amount - mock_spend)
-                ))
-            return statuses
-        
+
         budgets = []
         cursor = budgets_collection.find({"user_id": "default_user", "is_active": True})  # Default user
         
@@ -190,13 +166,9 @@ async def get_budget_status():
                             )
                         azure_data = cost_data_cache[azure_key]
                         
-                        # Calculate total spend
-                        current_spend += sum(float(item.get("Total", {}).get("UnblendedCost", {}).get("Amount", 0)) 
-                                           for item in aws_data.get("ResultsByTime", []))
-                        current_spend += sum(float(item.get("Total", {}).get("UnblendedCost", {}).get("Amount", 0)) 
-                                           for item in gcp_data.get("data", {}).get("ResultsByTime", []))
-                        current_spend += sum(float(item.get("Total", {}).get("UnblendedCost", {}).get("Amount", 0)) 
-                                           for item in azure_data.get("data", {}).get("ResultsByTime", []))
+                        current_spend += sum_billing_total(aws_data)
+                        current_spend += sum_billing_total(gcp_data)
+                        current_spend += sum_billing_total(azure_data)
                         
                         # Cache the result
                         budget_cost_cache[cache_key] = (current_spend, current_time)
@@ -208,8 +180,7 @@ async def get_budget_status():
                                 budget.user_id, start_date, end_date, "DAILY"
                             )
                         aws_data = cost_data_cache[cache_key]
-                        current_spend = sum(float(item.get("Total", {}).get("UnblendedCost", {}).get("Amount", 0)) 
-                                          for item in aws_data.get("ResultsByTime", []))
+                        current_spend = sum_billing_total(aws_data)
                         # Cache the result
                         budget_cost_cache[cache_key] = (current_spend, current_time)
                         
@@ -219,8 +190,7 @@ async def get_budget_status():
                                 budget.user_id, start_date, end_date
                             )
                         gcp_data = cost_data_cache[cache_key]
-                        current_spend = sum(float(item.get("Total", {}).get("UnblendedCost", {}).get("Amount", 0)) 
-                                          for item in gcp_data.get("data", {}).get("ResultsByTime", []))
+                        current_spend = sum_billing_total(gcp_data)
                         budget_cost_cache[cache_key] = (current_spend, current_time)
                         
                     elif budget.provider == "azure":
@@ -229,8 +199,7 @@ async def get_budget_status():
                                 budget.user_id, start_date, end_date
                             )
                         azure_data = cost_data_cache[cache_key]
-                        current_spend = sum(float(item.get("Total", {}).get("UnblendedCost", {}).get("Amount", 0)) 
-                                          for item in azure_data.get("data", {}).get("ResultsByTime", []))
+                        current_spend = sum_billing_total(azure_data)
                         budget_cost_cache[cache_key] = (current_spend, current_time)
                 
             except Exception as cost_error:

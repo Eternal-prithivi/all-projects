@@ -14,6 +14,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from app.users.routes_users import get_current_user
 from app.database.mongo_client import get_database
+from app.config.demo_mode import is_demo_mode, sum_billing_total
 from datetime import datetime, timedelta
 import logging
 import time
@@ -209,10 +210,7 @@ async def refresh_aws_costs(user: dict = Depends(get_current_user)):
         
         logger.info("Manual refresh: Fetching AWS cost data")
         aws_data = get_aws_cost_and_usage(user.username, start_date, end_date, "DAILY")
-        monthly_costs = sum(
-            float(item.get("Total", {}).get("UnblendedCost", {}).get("Amount", 0))
-            for item in aws_data.get("ResultsByTime", [])
-        )
+        monthly_costs = sum_billing_total(aws_data)
         
         # Update per-user cache
         aws_cost_cache[user.username] = {
@@ -222,11 +220,17 @@ async def refresh_aws_costs(user: dict = Depends(get_current_user)):
         
         logger.info(f"AWS costs refreshed: ${monthly_costs:.2f}")
         
+        msg = (
+            "Cost data refreshed (demo mock — no billing API call)"
+            if is_demo_mode()
+            else "Cost data refreshed successfully (Cost Explorer API call made)"
+        )
         return {
             "success": True,
             "monthly_costs": round(monthly_costs, 2),
             "cached_at": datetime.utcnow().isoformat(),
-            "message": "Cost data refreshed successfully (Cost Explorer API call made)"
+            "demo_mode": is_demo_mode(),
+            "message": msg,
         }
     except Exception as e:
         logger.error(f"Error refreshing AWS costs: {e}")

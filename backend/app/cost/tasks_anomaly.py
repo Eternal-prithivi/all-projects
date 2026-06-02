@@ -5,6 +5,8 @@ import logging
 
 from app.database.mongo_client import get_database
 from app.cost.manager import get_aws_cost_and_usage, get_gcp_billing_data, get_azure_billing_data
+from app.config.demo_mode import is_demo_mode
+from app.cost.forecasting import extract_daily_costs
 
 logger = logging.getLogger(__name__)
 DB = get_database()
@@ -40,6 +42,10 @@ def detect_anomaly_zscore(costs: list, threshold: float = 2.0) -> dict:
 @shared_task(name="check_cost_anomalies")
 def check_cost_anomalies():
     """Daily Celery task to check for cost anomalies across all providers"""
+    if is_demo_mode():
+        logger.info("⏭️  DEMO_MODE: skipping scheduled cost anomaly detection")
+        return {"anomalies_found": 0, "skipped": True, "reason": "demo_mode"}
+
     logger.info("Starting cost anomaly detection...")
     
     try:
@@ -71,9 +77,7 @@ def check_cost_anomalies():
                 else:
                     continue
                 
-                # Extract daily costs
-                results = cost_data.get("data", {}).get("ResultsByTime", [])
-                costs = [float(item.get("Total", {}).get("UnblendedCost", {}).get("Amount", 0)) for item in results]
+                costs = extract_daily_costs(cost_data)
                 
                 if len(costs) < 7:
                     logger.warning(f"Insufficient cost data for {provider}")

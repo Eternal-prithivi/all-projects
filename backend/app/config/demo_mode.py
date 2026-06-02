@@ -1,66 +1,140 @@
-# Demo Mode Configuration for Student Project
-# Set DEMO_MODE=true in .env to use mock data instead of real API calls
+# Demo Mode — mock billing/analytics reads (zero Cost Explorer / BigQuery / Consumption API cost).
+# Set DEMO_MODE=true in backend/.env (and Render env). Does not block uploads or provision.
 
-from typing import Dict, Any
+from typing import Dict, Any, List
 from datetime import datetime, timedelta
 import random
+
 from app.utils.config import settings
 
-# Enable demo mode via settings (loaded from .env)
 DEMO_MODE = settings.DEMO_MODE
 
+
+def is_demo_mode() -> bool:
+    return DEMO_MODE
+
+
+def log_demo_mode_call(api_name: str) -> None:
+    if DEMO_MODE:
+        print(f"🎭 DEMO MODE: Using mock data for {api_name} (zero billing API cost)")
+
+
+def _day_count(start_date: str, end_date: str) -> int:
+    start = datetime.strptime(start_date, "%Y-%m-%d")
+    end = datetime.strptime(end_date, "%Y-%m-%d")
+    return max(1, (end - start).days)
+
+
+def _mock_results_by_time(
+    start_date: str,
+    end_date: str,
+    *,
+    daily_low: float = 8.0,
+    daily_high: float = 45.0,
+    service_names: List[str] | None = None,
+) -> List[Dict[str, Any]]:
+    service_names = service_names or ["Compute", "Storage", "Networking"]
+    days = _day_count(start_date, end_date)
+    results: List[Dict[str, Any]] = []
+    start = datetime.strptime(start_date, "%Y-%m-%d")
+    for i in range(days):
+        date = (start + timedelta(days=i)).strftime("%Y-%m-%d")
+        next_date = (start + timedelta(days=i + 1)).strftime("%Y-%m-%d")
+        daily_cost = round(random.uniform(daily_low, daily_high), 2)
+        groups = []
+        shares = [0.55, 0.30, 0.15]
+        for name, share in zip(service_names, shares):
+            groups.append({
+                "Keys": [name],
+                "Metrics": {
+                    "UnblendedCost": {
+                        "Amount": str(round(daily_cost * share, 2)),
+                        "Unit": "USD",
+                    }
+                },
+            })
+        results.append({
+            "TimePeriod": {"Start": date, "End": next_date},
+            "Total": {"UnblendedCost": {"Amount": str(daily_cost), "Unit": "USD"}},
+            "Groups": groups,
+        })
+    return results
+
+
 class MockDataGenerator:
-    """Generate realistic mock data for demo purposes (zero API cost)"""
-    
     @staticmethod
-    def mock_aws_cost_data(start_date: str, end_date: str, granularity: str = "DAILY") -> Dict[str, Any]:
-        """Mock AWS Cost Explorer response"""
+    def mock_aws_cost_data(
+        start_date: str, end_date: str, granularity: str = "DAILY"
+    ) -> Dict[str, Any]:
         if not DEMO_MODE:
             return None
-            
-        # Generate realistic cost data
-        days = (datetime.strptime(end_date, "%Y-%m-%d") - datetime.strptime(start_date, "%Y-%m-%d")).days
-        
-        results = []
-        for i in range(days):
-            date = (datetime.strptime(start_date, "%Y-%m-%d") + timedelta(days=i)).strftime("%Y-%m-%d")
-            next_date = (datetime.strptime(start_date, "%Y-%m-%d") + timedelta(days=i+1)).strftime("%Y-%m-%d")
-            
-            # Realistic daily cost ($10-50/day)
-            daily_cost = round(random.uniform(10, 50), 2)
-            
-            results.append({
-                "TimePeriod": {"Start": date, "End": next_date},
-                "Total": {
-                    "UnblendedCost": {"Amount": str(daily_cost), "Unit": "USD"}
-                },
-                "Groups": [
-                    {
-                        "Keys": ["Amazon EC2"],
-                        "Metrics": {"UnblendedCost": {"Amount": str(round(daily_cost * 0.6, 2)), "Unit": "USD"}}
-                    },
-                    {
-                        "Keys": ["Amazon S3"],
-                        "Metrics": {"UnblendedCost": {"Amount": str(round(daily_cost * 0.3, 2)), "Unit": "USD"}}
-                    },
-                    {
-                        "Keys": ["AWS CloudTrail"],
-                        "Metrics": {"UnblendedCost": {"Amount": str(round(daily_cost * 0.1, 2)), "Unit": "USD"}}
-                    }
-                ]
-            })
-        
+        results = _mock_results_by_time(
+            start_date,
+            end_date,
+            service_names=["Amazon EC2", "Amazon S3", "AWS CloudTrail"],
+        )
         return {
             "ResultsByTime": results,
-            "ResponseMetadata": {"RequestId": "mock-request-id"}
+            "ResponseMetadata": {"RequestId": "mock-aws-ce"},
+            "demo_mode": True,
         }
-    
+
     @staticmethod
-    def mock_gcp_vm_metrics(vm_name: str) -> Dict[str, Any]:
-        """Mock GCP VM metrics"""
+    def mock_gcp_billing_data(start_date: str, end_date: str) -> Dict[str, Any]:
         if not DEMO_MODE:
             return None
-        
+        results = _mock_results_by_time(
+            start_date,
+            end_date,
+            daily_low=6.0,
+            daily_high= 38.0,
+            service_names=["Compute Engine", "Cloud Storage", "Cloud Monitoring"],
+        )
+        total = sum(float(r["Total"]["UnblendedCost"]["Amount"]) for r in results)
+        services = [
+            {"service": "Compute Engine", "cost": round(total * 0.55, 2), "currency": "USD"},
+            {"service": "Cloud Storage", "cost": round(total * 0.30, 2), "currency": "USD"},
+            {"service": "Cloud Monitoring", "cost": round(total * 0.15, 2), "currency": "USD"},
+        ]
+        return {
+            "ResultsByTime": results,
+            "Services": services,
+            "TotalCost": round(total, 2),
+            "Currency": "USD",
+            "DimensionValueAttributes": [],
+            "demo_mode": True,
+        }
+
+    @staticmethod
+    def mock_azure_billing_data(start_date: str, end_date: str) -> Dict[str, Any]:
+        if not DEMO_MODE:
+            return None
+        results = _mock_results_by_time(
+            start_date,
+            end_date,
+            daily_low=5.0,
+            daily_high= 32.0,
+            service_names=["Virtual Machines", "Storage", "Bandwidth"],
+        )
+        total = sum(float(r["Total"]["UnblendedCost"]["Amount"]) for r in results)
+        services = [
+            {"service": "Virtual Machines", "cost": round(total * 0.50, 2), "currency": "USD"},
+            {"service": "Storage", "cost": round(total * 0.35, 2), "currency": "USD"},
+            {"service": "Bandwidth", "cost": round(total * 0.15, 2), "currency": "USD"},
+        ]
+        return {
+            "ResultsByTime": results,
+            "Services": services,
+            "TotalCost": round(total, 2),
+            "Currency": "USD",
+            "DimensionValueAttributes": [],
+            "demo_mode": True,
+        }
+
+    @staticmethod
+    def mock_gcp_vm_metrics(vm_name: str) -> Dict[str, Any]:
+        if not DEMO_MODE:
+            return None
         return {
             "vm_name": vm_name,
             "cpu_usage": round(random.uniform(20, 80), 1),
@@ -71,57 +145,44 @@ class MockDataGenerator:
             "uptime_hours": round(random.uniform(1, 24), 1),
             "estimated_cost_usd": round(random.uniform(0.01, 0.50), 4),
             "status": "RUNNING",
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.utcnow().isoformat(),
         }
-    
+
     @staticmethod
     def mock_budget_status(budget_amount: float) -> float:
-        """Mock current spending for budget"""
         if not DEMO_MODE:
             return None
-        
-        # Return 60-90% of budget (realistic)
         return round(budget_amount * random.uniform(0.6, 0.9), 2)
-    
+
     @staticmethod
-    def mock_cost_forecast(provider: str, days_ahead: int = 30) -> Dict[str, Any]:
-        """Mock cost forecast"""
+    def mock_forecast_historical_days(days: int = 90) -> List[float]:
+        """Synthetic daily costs for forecast when DEMO_MODE is on."""
         if not DEMO_MODE:
             return None
-        
-        base_cost = random.uniform(500, 1500)
-        daily_increase = base_cost * 0.02  # 2% increase per day
-        
-        predictions = []
-        for i in range(days_ahead):
-            date = (datetime.utcnow() + timedelta(days=i+1)).strftime("%Y-%m-%d")
-            predicted_cost = base_cost + (daily_increase * i)
-            predictions.append({
-                "date": date,
-                "predicted_cost": round(predicted_cost, 2),
-                "confidence_lower": round(predicted_cost * 0.9, 2),
-                "confidence_upper": round(predicted_cost * 1.1, 2)
-            })
-        
-        return {
-            "provider": provider,
-            "predictions": predictions,
-            "total_predicted": round(sum(p["predicted_cost"] for p in predictions), 2),
-            "daily_average": round(sum(p["predicted_cost"] for p in predictions) / days_ahead, 2),
-            "trend": "increasing",
-            "confidence_interval": 95
-        }
+        base_cost = 10.0
+        daily_increase = 0.15
+        noise_level = 2.0
+        historical: List[float] = []
+        for day in range(days):
+            cost = base_cost + (daily_increase * day) + random.uniform(-noise_level, noise_level)
+            historical.append(max(0.01, cost))
+        return historical
 
 
-# Helper function to check if demo mode is enabled
-def is_demo_mode() -> bool:
-    """Check if demo mode is enabled"""
-    return DEMO_MODE
+def billing_results_by_time(cost_payload: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """Normalize AWS / GCP / Azure billing payloads to a ResultsByTime list."""
+    if not cost_payload:
+        return []
+    if "ResultsByTime" in cost_payload:
+        return cost_payload.get("ResultsByTime") or []
+    nested = cost_payload.get("data")
+    if isinstance(nested, dict) and "ResultsByTime" in nested:
+        return nested.get("ResultsByTime") or []
+    return []
 
 
-# Helper to log demo mode usage
-def log_demo_mode_call(api_name: str):
-    """Log when mock data is used instead of real API"""
-    if DEMO_MODE:
-        print(f"🎭 DEMO MODE: Using mock data for {api_name} (zero cost)")
-
+def sum_billing_total(cost_payload: Dict[str, Any]) -> float:
+    return sum(
+        float(item.get("Total", {}).get("UnblendedCost", {}).get("Amount", 0))
+        for item in billing_results_by_time(cost_payload)
+    )

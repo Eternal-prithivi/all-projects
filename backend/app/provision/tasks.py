@@ -62,8 +62,13 @@ def scheduled_drift_check():
     terraform plan per deployment provision_engine.
     """
     from app.database.mongo_client import get_database
+    from app.config.demo_mode import is_demo_mode
     from app.provision.byoc_credentials import resolve_byoc_terraform_env
     from app.provision.models import DeploymentStatus, DriftReport, DriftStatus
+
+    if is_demo_mode():
+        logger.info("⏭️  DEMO_MODE: skipping scheduled provision drift check")
+        return {"checked": 0, "drift_found": 0, "skipped": True, "reason": "demo_mode"}
 
     DB = get_database()
     collection = DB["provision_deployments"]

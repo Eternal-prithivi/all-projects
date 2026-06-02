@@ -20,6 +20,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from app.utils.config import settings
+from app.config.demo_mode import is_demo_mode
 from app.storage.manager import change_tier_on_aws, change_tier_on_gcp, change_tier_on_azure
 from app.utils.logger import setup_logger
 
@@ -211,6 +212,10 @@ def run_storage_optimization():
     The main scheduled task for the complete long-term storage optimization model.
     Handles multi-level demotions and intelligent, one-level-up promotions.
     """
+    if is_demo_mode():
+        logger.info("⏭️  DEMO_MODE: skipping nightly storage tiering (no cloud tier-change API calls)")
+        return {"skipped": True, "reason": "demo_mode"}
+
     logger.info(f"Running scheduled storage optimization task")
     
     mongo_client = MongoClient(settings.MONGO_CONNECTION_STRING)

@@ -6,6 +6,7 @@ import logging
 
 from app.cost.manager import get_aws_cost_and_usage, get_gcp_billing_data, get_azure_billing_data
 from app.cost.forecasting import extract_daily_costs, forecast_costs
+from app.config.demo_mode import is_demo_mode, MockDataGenerator, log_demo_mode_call
 from app.users.routes_users import get_current_user
 
 router = APIRouter()
@@ -23,21 +24,16 @@ async def get_cost_forecast(
         # Set end_date for all modes
         end_date = datetime.utcnow()
         
-        # DEMO MODE: Generate synthetic data to test ML model
-        if demo_mode:
-            logger.info("Demo mode enabled - generating synthetic cost data with upward trend")
-            # Generate 90 days of synthetic data with increasing trend
-            base_cost = 10.0  # Start at $10/day
-            daily_increase = 0.15  # Increase by $0.15 per day
-            noise_level = 2.0  # Random variation
-            
-            historical_costs = []
-            for day in range(90):
-                # Linear trend + random noise
-                cost = base_cost + (daily_increase * day) + np.random.uniform(-noise_level, noise_level)
-                historical_costs.append(max(0.01, cost))  # Ensure positive
-            
-            logger.info(f"Generated {len(historical_costs)} days of demo data. First: ${historical_costs[0]:.2f}, Last: ${historical_costs[-1]:.2f}")
+        use_demo = is_demo_mode() or demo_mode
+        if use_demo:
+            log_demo_mode_call(f"Cost forecast ({provider})")
+            historical_costs = MockDataGenerator.mock_forecast_historical_days(90)
+            logger.info(
+                "Forecast demo data: %s days, first=$%.2f last=$%.2f",
+                len(historical_costs),
+                historical_costs[0],
+                historical_costs[-1],
+            )
         else:
             # Fetch last 90 days of data for better prediction
             start_date = end_date - timedelta(days=90)
@@ -78,7 +74,8 @@ async def get_cost_forecast(
                 "forecast_end_date": (end_date + timedelta(days=days_ahead)).strftime("%Y-%m-%d"),
                 "historical_days_used": len(historical_costs),
                 "model_type": "average_baseline",
-                "note": "Limited historical data available. Using simple average-based forecast."
+                "note": "Limited historical data available. Using simple average-based forecast.",
+                "demo_mode": use_demo,
             }
         
         # Generate forecast
@@ -89,6 +86,7 @@ async def get_cost_forecast(
         forecast_result["forecast_start_date"] = end_date.strftime("%Y-%m-%d")
         forecast_result["forecast_end_date"] = (end_date + timedelta(days=days_ahead)).strftime("%Y-%m-%d")
         forecast_result["historical_days_used"] = len(historical_costs)
+        forecast_result["demo_mode"] = use_demo
         
         return forecast_result
         

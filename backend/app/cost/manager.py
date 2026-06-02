@@ -6,6 +6,11 @@ import os
 
 from app.utils.config import settings
 from app.utils.logger import setup_logger
+from app.config.demo_mode import (
+    is_demo_mode,
+    log_demo_mode_call,
+    MockDataGenerator,
+)
 
 logger = setup_logger(__name__)
 
@@ -33,6 +38,10 @@ def get_aws_cost_and_usage(
     Returns:
         A dictionary containing the cost and usage data.
     """
+    if is_demo_mode():
+        log_demo_mode_call("AWS Cost Explorer")
+        return MockDataGenerator.mock_aws_cost_data(start_date, end_date, granularity)
+
     if metrics is None:
         metrics = ['UnblendedCost']
 
@@ -67,6 +76,10 @@ def get_gcp_billing_data(username: str, start_date: str, end_date: str) -> Dict[
     2. Set GCP_BILLING_DATASET_ID and GCP_BILLING_TABLE_ID in .env
     3. Ensure service account has bigquery.dataViewer role
     """
+    if is_demo_mode():
+        log_demo_mode_call("GCP Billing (BigQuery)")
+        return MockDataGenerator.mock_gcp_billing_data(start_date, end_date)
+
     try:
         from google.cloud import bigquery
         from google.oauth2 import service_account
@@ -210,6 +223,10 @@ def get_azure_billing_data(username: str, start_date: str, end_date: str) -> Dic
     2. Grant 'Cost Management Reader' role
     3. Set AZURE_SUBSCRIPTION_ID, AZURE_TENANT_ID, AZURE_CLIENT_ID, AZURE_CLIENT_SECRET in .env
     """
+    if is_demo_mode():
+        log_demo_mode_call("Azure Consumption API")
+        return MockDataGenerator.mock_azure_billing_data(start_date, end_date)
+
     try:
         from azure.identity import ClientSecretCredential
         from azure.mgmt.consumption import ConsumptionManagementClient
