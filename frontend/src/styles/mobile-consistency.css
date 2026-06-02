@@ -34,9 +34,27 @@ body {
 }
 
 .landing-page,
-.marketing-page {
+.marketing-page,
+.auth-page {
   flex: 1 0 auto;
   width: 100%;
+}
+
+@media (max-width: 968px) {
+  html:has(.auth-page),
+  body:has(.auth-page),
+  #root:has(.auth-page) {
+    overflow-y: auto !important;
+    height: auto !important;
+    max-height: none !important;
+  }
+
+  #root:has(.auth-page) .app-root {
+    flex: 1 0 auto;
+    min-height: auto;
+    height: auto;
+    overflow: visible;
+  }
 }
 
 @media (max-width: 768px) {

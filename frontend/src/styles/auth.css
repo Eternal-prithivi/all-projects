@@ -8,10 +8,12 @@
   display: flex;
   min-height: 100vh;
   min-height: 100dvh;
+  width: 100%;
   background: #000;
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
   overflow-x: hidden;
   overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 /* --- Left Panel: Brand Showcase --- */
@@ -24,6 +26,7 @@
   position: relative;
   background: #050505;
   z-index: 1;
+  box-sizing: border-box;
 }
 
 /* Advanced Ambient Background with Mesh Gradient Effect */
@@ -216,6 +219,8 @@
   position: relative;
   background: #0a0a0a;
   background-image: radial-gradient(circle at top right, rgba(212, 175, 55, 0.05), transparent 50%);
+  box-sizing: border-box;
+  min-width: 0;
 }
 
 /* Advanced Glassmorphism Card Wrapper */
