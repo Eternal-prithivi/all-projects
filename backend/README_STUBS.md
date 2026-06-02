@@ -4,7 +4,6 @@ Per `ai-docs/AI_RULES.md`, do **not** delete these without an explicit architect
 
 | Path | Purpose |
 |------|---------|
-| `app/aws/` | Legacy AWS helper namespace; active code uses `boto3` in `storage/` and `security/` |
 | `app/providers/` | Future multi-provider factory; uploads use `storage/uploader.py` directly |
 | `app/queue/` | Reserved for non-Celery queue adapters |
 | `app/errors/` | Shared error types (partial adoption) |
