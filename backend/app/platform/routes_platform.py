@@ -6,7 +6,7 @@ from fastapi import APIRouter
 
 from app.database.mongo_client import get_database, mongodb_client
 from app.utils.gcp_credentials import gcp_credentials_file_present
-from app.utils.config import settings
+from app.utils.config import settings as app_settings
 from app.config.demo_mode import is_demo_mode
 
 router = APIRouter(tags=["Platform"])
@@ -24,11 +24,11 @@ async def get_platform_status():
 
     try:
         db = get_database()
-        settings = db["platform_settings"].find_one({"_id": "platform_config"})
-        if settings:
-            maintenance_mode = bool(settings.get("maintenance_mode", False))
-            allow_new_registrations = bool(settings.get("allow_new_registrations", True))
-            platform_name = settings.get("platform_name", platform_name)
+        platform_config = db["platform_settings"].find_one({"_id": "platform_config"})
+        if platform_config:
+            maintenance_mode = bool(platform_config.get("maintenance_mode", False))
+            allow_new_registrations = bool(platform_config.get("allow_new_registrations", True))
+            platform_name = platform_config.get("platform_name", platform_name)
     except Exception:
         pass
 
@@ -55,8 +55,8 @@ async def get_platform_status():
         "maintenance_mode": maintenance_mode,
         "allow_new_registrations": allow_new_registrations,
         "demo_mode": is_demo_mode(),
-        "use_real_metrics": settings.USE_REAL_METRICS,
-        "real_time_mode": settings.REAL_TIME_MODE,
+        "use_real_metrics": app_settings.USE_REAL_METRICS,
+        "real_time_mode": app_settings.REAL_TIME_MODE,
         "services": {
             "api": "operational" if not maintenance_mode else "maintenance",
             "database": "operational" if mongo_ok else "degraded",
