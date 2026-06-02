@@ -14,6 +14,7 @@
   overflow-x: hidden;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
+  align-items: stretch;
 }
 
 /* --- Left Panel: Brand Showcase --- */
@@ -500,6 +501,32 @@
   .auth-brand-panel { padding: 4rem; }
   .auth-form-panel { padding: 3rem; }
   .brand-tagline { font-size: clamp(2rem, 3.5vw, 3rem); }
+}
+
+/* Desktop: both columns fill viewport height; form card uses panel width */
+@media (min-width: 969px) {
+  .auth-brand-panel,
+  .auth-form-panel {
+    min-height: 100dvh;
+    align-self: stretch;
+  }
+
+  .auth-form-panel {
+    padding: clamp(2rem, 4vw, 3.5rem) clamp(2rem, 5vw, 5rem);
+  }
+
+  .auth-form-wrapper {
+    max-width: min(520px, 100%);
+    width: 100%;
+    min-height: min(480px, 85vh);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+
+  .auth-form-wrapper > form {
+    width: 100%;
+  }
 }
 
 /* Tablet/mobile auth layout: see auth-mobile.css */
