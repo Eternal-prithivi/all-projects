@@ -1,6 +1,6 @@
 import React from 'react';
 
-export function openGlobalSearch() {
+function openGlobalSearch() {
   document.dispatchEvent(
     new KeyboardEvent('keydown', {
       key: 'k',
