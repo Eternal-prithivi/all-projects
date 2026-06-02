@@ -1,4 +1,4 @@
-/* Notification bell — GCP-style count badge (separate from icon, green / red) */
+/* Notification bell — GCP-style: count replaces bell with green/red glow */
 
 .notification-bell-container {
   position: relative;
@@ -24,12 +24,86 @@
   overflow: visible;
 }
 
+.notification-bell-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
 .notification-bell-button:hover {
   background: var(--surface-active);
   color: var(--text-primary);
 }
 
-/* Count sits on corner of button — not on top of bell glyph */
+/* Unread: hide bell, show centered count with GCP-style glow */
+.notification-bell-button--has-unread .notification-bell-icon {
+  opacity: 0;
+  transform: scale(0.5);
+  pointer-events: none;
+}
+
+.notification-bell-button--has-unread .notification-badge {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  right: auto;
+  transform: translate(-50%, -50%);
+  min-width: 22px;
+  height: 22px;
+  padding: 0 5px;
+  font-size: 12px;
+  border: 2px solid var(--bg-elevated, #0f0f12);
+  background: #34a853;
+  color: #fff;
+  box-shadow:
+    0 0 0 1px rgba(52, 168, 83, 0.35),
+    0 0 10px rgba(52, 168, 83, 0.65),
+    0 0 18px rgba(52, 168, 83, 0.4);
+  animation: notification-badge-glow-green 2.4s ease-in-out infinite;
+}
+
+.notification-bell-button--has-unread.notification-bell-button--urgent .notification-badge {
+  background: #ea4335;
+  box-shadow:
+    0 0 0 1px rgba(234, 67, 53, 0.35),
+    0 0 10px rgba(234, 67, 53, 0.65),
+    0 0 18px rgba(234, 67, 53, 0.4);
+  animation-name: notification-badge-glow-red;
+}
+
+@keyframes notification-badge-glow-green {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 1px rgba(52, 168, 83, 0.35),
+      0 0 8px rgba(52, 168, 83, 0.55),
+      0 0 14px rgba(52, 168, 83, 0.35);
+  }
+  50% {
+    box-shadow:
+      0 0 0 1px rgba(52, 168, 83, 0.5),
+      0 0 14px rgba(52, 168, 83, 0.85),
+      0 0 24px rgba(52, 168, 83, 0.55);
+  }
+}
+
+@keyframes notification-badge-glow-red {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 1px rgba(234, 67, 53, 0.35),
+      0 0 8px rgba(234, 67, 53, 0.55),
+      0 0 14px rgba(234, 67, 53, 0.35);
+  }
+  50% {
+    box-shadow:
+      0 0 0 1px rgba(234, 67, 53, 0.5),
+      0 0 14px rgba(234, 67, 53, 0.85),
+      0 0 24px rgba(234, 67, 53, 0.55);
+  }
+}
+
 .notification-badge {
   position: absolute;
   top: 0;
@@ -59,20 +133,20 @@
 }
 
 .notification-badge--many {
-  min-width: 20px;
+  min-width: 24px;
   padding: 0 5px;
-  font-size: 9px;
+  font-size: 10px;
 }
 
-/* Dropdown panel — solid gray background for readability */
+/* Dropdown panel — darker solid gray for readability */
 .notification-dropdown {
   position: absolute;
   top: calc(100% + 8px);
   right: 0;
   width: 400px;
   max-height: 520px;
-  background: #3c3f43;
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: #25272b;
+  border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: var(--radius-lg, 14px);
   box-shadow:
     0 12px 48px rgba(0, 0, 0, 0.55),
@@ -97,7 +171,8 @@
 /* Header */
 .notification-dropdown-header {
   padding: 16px 20px;
-  border-bottom: 1px solid var(--border-default);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background: #1e2023;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -162,7 +237,7 @@
 }
 
 .notification-list::-webkit-scrollbar-track {
-  background: var(--surface-hover);
+  background: #1e2023;
 }
 
 .notification-list::-webkit-scrollbar-thumb {
@@ -325,7 +400,8 @@
 /* Footer */
 .notification-dropdown-footer {
   padding: 12px 20px;
-  border-top: 1px solid var(--border-default);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  background: #1e2023;
   text-align: center;
 }
 
@@ -353,19 +429,16 @@
     height: var(--touch-min, 44px);
   }
 
-  .notification-badge {
-    top: 2px;
-    right: 2px;
-    min-width: 18px;
-    height: 18px;
-    font-size: 11px;
-    border-width: 2px;
+  .notification-bell-button--has-unread .notification-badge {
+    min-width: 24px;
+    height: 24px;
+    font-size: 13px;
   }
 
   .notification-dropdown {
     width: min(360px, calc(100vw - 1.5rem));
     max-height: min(70vh, 500px);
-    background: #3c3f43;
+    background: #25272b;
   }
 }
 

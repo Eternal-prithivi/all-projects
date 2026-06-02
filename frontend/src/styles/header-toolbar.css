@@ -134,9 +134,11 @@
   overflow: visible;
 }
 
-.header-actions .notification-badge {
-  top: -2px;
-  right: -2px;
+.header-actions .notification-bell-button--has-unread .notification-badge {
+  top: 50%;
+  left: 50%;
+  right: auto;
+  transform: translate(-50%, -50%);
 }
 
 .header-actions .profile-trigger {

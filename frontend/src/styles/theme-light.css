@@ -1013,14 +1013,15 @@ html[data-theme="light"] .profile-menu-item:hover {
 }
 
 html[data-theme="light"] .notification-dropdown {
-  background: #e8eaed;
-  border-color: #dadce0;
+  background: #d2d5da;
+  border-color: #bdc1c6;
   box-shadow: var(--shadow-elevated);
 }
 
 html[data-theme="light"] .notification-dropdown-header,
 html[data-theme="light"] .notification-dropdown-footer {
-  border-color: #dadce0;
+  background: #c4c8ce;
+  border-color: #bdc1c6;
 }
 
 html[data-theme="light"] .notification-item {
@@ -1040,8 +1041,12 @@ html[data-theme="light"] .notification-badge {
 }
 
 html[data-theme="light"] .notifications-page__item {
-  background: #e8eaed;
-  border-color: #dadce0;
+  background: #d2d5da;
+  border-color: #bdc1c6;
+}
+
+html[data-theme="light"] .notification-bell-button--has-unread .notification-badge {
+  border-color: #fff;
 }
 
 html[data-theme="light"] .mark-all-read-btn {

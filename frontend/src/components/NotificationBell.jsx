@@ -165,16 +165,24 @@ const NotificationBell = ({ viewAllPath = '/dashboard/notifications' }) => {
     <div className="notification-bell-container" ref={dropdownRef}>
       <button
         type="button"
-        className="notification-bell-button"
+        className={[
+          'notification-bell-button',
+          unreadCount > 0 ? 'notification-bell-button--has-unread' : '',
+          hasUrgentUnread ? 'notification-bell-button--urgent' : '',
+        ]
+          .filter(Boolean)
+          .join(' ')}
         onClick={toggleDropdown}
         title={unreadCount > 0 ? `${unreadCount} unread notifications` : 'Notifications'}
         aria-label={unreadCount > 0 ? `Notifications, ${unreadCount} unread` : 'Notifications'}
         aria-expanded={isOpen}
         aria-haspopup="true"
       >
-        <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor" aria-hidden>
-          <path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z" />
-        </svg>
+        <span className="notification-bell-icon" aria-hidden>
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+            <path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z" />
+          </svg>
+        </span>
         {unreadCount > 0 && (
           <span
             className={[
