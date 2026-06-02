@@ -109,6 +109,11 @@ const NotificationBell = ({ viewAllPath = '/dashboard/notifications' }) => {
   const todayItems = notifications.filter((n) => isToday(n.timestamp));
   const earlierItems = notifications.filter((n) => !isToday(n.timestamp));
 
+  const hasUrgentUnread = notifications.some(
+    (n) => !n.read && (n.type === 'error' || n.type === 'warning')
+  );
+  const badgeLabel = unreadCount > 99 ? '99+' : String(unreadCount);
+
   const renderGroup = (label, items) => {
     if (items.length === 0) return null;
     return (
@@ -162,7 +167,8 @@ const NotificationBell = ({ viewAllPath = '/dashboard/notifications' }) => {
         type="button"
         className="notification-bell-button"
         onClick={toggleDropdown}
-        title="Notifications"
+        title={unreadCount > 0 ? `${unreadCount} unread notifications` : 'Notifications'}
+        aria-label={unreadCount > 0 ? `Notifications, ${unreadCount} unread` : 'Notifications'}
         aria-expanded={isOpen}
         aria-haspopup="true"
       >
@@ -170,7 +176,18 @@ const NotificationBell = ({ viewAllPath = '/dashboard/notifications' }) => {
           <path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z" />
         </svg>
         {unreadCount > 0 && (
-          <span className="notification-badge">{unreadCount > 99 ? '99+' : unreadCount}</span>
+          <span
+            className={[
+              'notification-badge',
+              hasUrgentUnread ? 'notification-badge--urgent' : '',
+              unreadCount > 9 ? 'notification-badge--many' : '',
+            ]
+              .filter(Boolean)
+              .join(' ')}
+            aria-hidden
+          >
+            {badgeLabel}
+          </span>
         )}
       </button>
 

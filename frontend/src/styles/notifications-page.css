@@ -65,10 +65,8 @@
   gap: 1rem;
   padding: 1rem 1.15rem 1rem 1.25rem;
   border-radius: var(--radius-lg, 14px);
-  background: var(--bg-card, rgba(14, 14, 18, 0.85));
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid var(--border-default, rgba(255, 255, 255, 0.08));
+  background: #3c3f43;
+  border: 1px solid rgba(255, 255, 255, 0.1);
   overflow: hidden;
   transition: transform var(--duration-normal, 250ms) var(--ease-out),
     box-shadow var(--duration-normal, 250ms) var(--ease-out);

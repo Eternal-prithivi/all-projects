@@ -125,11 +125,18 @@
 .header-actions .notification-bell-container {
   display: flex;
   align-items: center;
+  overflow: visible;
 }
 
 .header-actions .notification-bell-button {
   width: 36px;
   height: 36px;
+  overflow: visible;
+}
+
+.header-actions .notification-badge {
+  top: -2px;
+  right: -2px;
 }
 
 .header-actions .profile-trigger {

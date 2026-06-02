@@ -1013,17 +1013,35 @@ html[data-theme="light"] .profile-menu-item:hover {
 }
 
 html[data-theme="light"] .notification-dropdown {
-  background: var(--bg-elevated);
-  border-color: var(--border-default);
+  background: #e8eaed;
+  border-color: #dadce0;
   box-shadow: var(--shadow-elevated);
 }
 
+html[data-theme="light"] .notification-dropdown-header,
+html[data-theme="light"] .notification-dropdown-footer {
+  border-color: #dadce0;
+}
+
+html[data-theme="light"] .notification-item {
+  border-bottom-color: #e0e3e7;
+}
+
 html[data-theme="light"] .notification-item:hover {
-  background: var(--surface-hover);
+  background: #f1f3f4;
 }
 
 html[data-theme="light"] .notification-item.unread {
-  background: var(--gold-glow);
+  background: #e8f0fe;
+}
+
+html[data-theme="light"] .notification-badge {
+  border-color: #fff;
+}
+
+html[data-theme="light"] .notifications-page__item {
+  background: #e8eaed;
+  border-color: #dadce0;
 }
 
 html[data-theme="light"] .mark-all-read-btn {
