@@ -12,7 +12,7 @@ export const useNotificationCenter = () => {
   return context;
 };
 
-const mapServerItem = (item) => ({
+export const mapServerItem = (item) => ({
   id: item.id,
   title: item.title,
   message: item.message,
@@ -27,22 +27,47 @@ export const NotificationProvider = ({ children }) => {
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
 
-  const refreshFromServer = useCallback(async () => {
-    if (!token) return;
-    const res = await apiClient.get('/notifications');
+  const fetchRecent = useCallback(async () => {
+    if (!token) return { items: [], unread: 0 };
+    const res = await apiClient.get('/notifications/recent', { params: { limit: 8 } });
     const items = (res.data.notifications || []).map(mapServerItem);
     setNotifications(items);
     setUnreadCount(res.data.unread_count ?? 0);
+    return { items, unread: res.data.unread_count ?? 0 };
   }, [token]);
+
+  const fetchNotifications = useCallback(
+    async ({ limit = 15, skip = 0, read = 'all', type = 'all' } = {}) => {
+      if (!token) {
+        return { items: [], total: 0, unread_count: 0, has_more: false };
+      }
+      const res = await apiClient.get('/notifications', {
+        params: { limit, skip, read, type },
+      });
+      return {
+        items: (res.data.notifications || []).map(mapServerItem),
+        total: res.data.total ?? 0,
+        unread_count: res.data.unread_count ?? 0,
+        has_more: !!res.data.has_more,
+        limit: res.data.limit,
+        skip: res.data.skip,
+      };
+    },
+    [token]
+  );
+
+  const refreshFromServer = useCallback(async () => {
+    await fetchRecent();
+  }, [fetchRecent]);
 
   useEffect(() => {
     if (token) {
-      refreshFromServer().catch(() => {});
+      fetchRecent().catch(() => {});
     } else {
       setNotifications([]);
       setUnreadCount(0);
     }
-  }, [token, refreshFromServer]);
+  }, [token, fetchRecent]);
 
   const addNotification = useCallback(
     async (notification) => {
@@ -53,7 +78,7 @@ export const NotificationProvider = ({ children }) => {
         ...notification,
       };
 
-      setNotifications((prev) => [local, ...prev]);
+      setNotifications((prev) => [local, ...prev].slice(0, 8));
       setUnreadCount((prev) => prev + 1);
 
       if (token && notification.persist !== false) {
@@ -70,6 +95,7 @@ export const NotificationProvider = ({ children }) => {
               prev.map((n) => (n.id === local.id ? { ...n, id: serverId } : n))
             );
           }
+          await fetchRecent();
         } catch {
           /* keep local copy */
         }
@@ -77,7 +103,7 @@ export const NotificationProvider = ({ children }) => {
 
       return local.id;
     },
-    [token]
+    [token, fetchRecent]
   );
 
   const updateNotification = useCallback((id, updates) => {
@@ -162,6 +188,8 @@ export const NotificationProvider = ({ children }) => {
     deleteNotification,
     clearAll,
     refreshFromServer,
+    fetchRecent,
+    fetchNotifications,
   };
 
   return (

@@ -11,7 +11,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import Any, Optional
 
 import yaml
 
@@ -51,53 +51,88 @@ def config_to_policy_dict(config: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def evaluate_yaml_policies(config: dict[str, Any]) -> PolicyCheckResult:
+def get_merged_rules(username: Optional[str] = None) -> list[dict[str, Any]]:
+    """Built-in YAML rules (with overrides) plus enabled custom rules for the user."""
+    builtins = get_yaml_rules()
+    if username:
+        from app.provision.policy_overrides import apply_overrides_to_builtins
+        from app.provision.policy_store import list_custom_rules
+
+        merged = apply_overrides_to_builtins(builtins, username)
+        merged.extend(list_custom_rules(username, enabled_only=True))
+        return merged
+
+    return [
+        {**r, "source": "builtin", "id": None, "enabled": True, "is_customized": False, "can_reset": False}
+        for r in builtins
+    ]
+
+
+def _evaluate_rules_list(
+    rules: list[dict[str, Any]],
+    config: dict[str, Any],
+) -> PolicyCheckResult:
+    result = PolicyCheckResult(blocks=[], warnings=[], can_deploy=True)
+    policy_dict = config_to_policy_dict(config)
+
+    for rule in rules:
+        condition = rule.get("condition", "False")
+        try:
+            triggered = bool(eval(condition, {"__builtins__": {}}, policy_dict))  # noqa: S307
+        except Exception:
+            triggered = False
+
+        if triggered:
+            violation = PolicyViolation(
+                rule_name=rule["name"],
+                description=(rule.get("description") or "").strip(),
+                severity=rule["severity"],
+            )
+            if rule["severity"] == "block":
+                result.blocks.append(violation)
+            else:
+                result.warnings.append(violation)
+
+    result.can_deploy = len(result.blocks) == 0
+    return result
+
+
+def evaluate_yaml_policies(
+    config: dict[str, Any],
+    *,
+    username: Optional[str] = None,
+) -> PolicyCheckResult:
     """
-    Evaluate config against YAML-defined policy rules.
+    Evaluate config against YAML-defined policy rules (and user custom rules).
 
     Returns PolicyCheckResult with blocks (prevent deploy) and warnings.
     """
-    result = PolicyCheckResult(blocks=[], warnings=[], can_deploy=True)
-
     if not RULES_PATH.exists():
         logger.warning(f"Policy rules file not found: {RULES_PATH}")
-        return result
+        builtin_rules: list[dict[str, Any]] = []
+    else:
+        try:
+            with open(RULES_PATH, "r", encoding="utf-8") as f:
+                data = yaml.safe_load(f)
+            builtin_rules = data.get("rules", []) if data else []
+        except Exception as e:
+            logger.error(f"YAML policy load failed: {e}")
+            builtin_rules = []
+
+    eval_builtins = builtin_rules
+    custom_rules: list[dict[str, Any]] = []
+    if username:
+        from app.provision.policy_overrides import overrides_as_eval_rules
+        from app.provision.policy_store import custom_rules_as_yaml_rules
+
+        eval_builtins = overrides_as_eval_rules(username, builtin_rules)
+        custom_rules = custom_rules_as_yaml_rules(username)
 
     try:
-        with open(RULES_PATH, "r", encoding="utf-8") as f:
-            data = yaml.safe_load(f)
-
-        if not data or "rules" not in data:
-            logger.warning("No 'rules' key in rules.yaml")
-            return result
-
-        policy_dict = config_to_policy_dict(config)
-
-        for rule in data["rules"]:
-            condition = rule.get("condition", "False")
-            try:
-                # Safe eval against the policy dict only
-                triggered = bool(eval(condition, {"__builtins__": {}}, policy_dict))  # noqa: S307
-            except Exception:
-                triggered = False
-
-            if triggered:
-                violation = PolicyViolation(
-                    rule_name=rule["name"],
-                    description=rule["description"].strip(),
-                    severity=rule["severity"],
-                )
-                if rule["severity"] == "block":
-                    result.blocks.append(violation)
-                else:
-                    result.warnings.append(violation)
-
-        result.can_deploy = len(result.blocks) == 0
-
+        return _evaluate_rules_list(eval_builtins + custom_rules, config)
     except Exception as e:
         logger.error(f"YAML policy evaluation failed: {e}")
-
-    return result
+        return PolicyCheckResult(blocks=[], warnings=[], can_deploy=True)
 
 
 def evaluate_opa_policies(config: dict[str, Any]) -> PolicyCheckResult:
@@ -144,11 +179,12 @@ def full_policy_check(
     config: dict[str, Any],
     *,
     include_opa: bool = False,
+    username: Optional[str] = None,
 ) -> PolicyCheckResult:
     """
     Run YAML policy checks (fast). OPA is optional — slow CLI subprocesses.
     """
-    yaml_result = evaluate_yaml_policies(config)
+    yaml_result = evaluate_yaml_policies(config, username=username)
     if not include_opa:
         return yaml_result
 

@@ -72,7 +72,7 @@ For backend context → read `AI_CONTEXT_BACKEND.md`
 | `/dashboard/security-settings` | `SecuritySettingsPage.jsx` | |
 | `/dashboard/profile` | `ProfilePage.jsx` | |
 | `/dashboard/settings` | `SettingsPage.jsx` | Infrastructure provisioning engine (Boto3/Terraform); Preferences + Restart Tour |
-| `/dashboard/notifications` | `NotificationsPage.jsx` | Persisted notification history |
+| `/dashboard/notifications` | `NotificationsPage.jsx` | Paginated history; All/Unread tabs; type filters |
 | `/dashboard/team` | `TeamPage.jsx` | Org create, invites, members |
 | `/invite/:token` | `AcceptInvitePage.jsx` | Accept team invite |
 | `/auth/sso/callback` | `SsoCallbackPage.jsx` | OAuth redirect handler |
@@ -111,7 +111,7 @@ For backend context → read `AI_CONTEXT_BACKEND.md`
 | `QuickActions.jsx` | Floating quick action buttons |
 | `Breadcrumbs.jsx` | Route-aware breadcrumbs |
 | `LoadingSpinner.jsx`, `Skeletons.jsx`, `LazyLoadFallback.jsx` | Loading states |
-| `NotificationBell.jsx` | Header bell with unread badge |
+| `NotificationBell.jsx` | Header bell — recent 8, Today/Earlier groups, glass dropdown |
 | `EmptyState.jsx` | Reusable empty state with icon + message |
 
 ---

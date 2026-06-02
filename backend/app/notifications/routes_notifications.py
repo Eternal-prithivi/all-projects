@@ -1,6 +1,6 @@
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from app.auth.auth_utils import get_current_user
@@ -33,9 +33,43 @@ def create_notification(
 
 
 @router.get("")
-def list_my_notifications(current_user: UserInDB = Depends(get_current_user)):
-    items = notification_service.list_notifications(current_user.username)
-    unread = sum(1 for n in items if not n["read"])
+def list_my_notifications(
+    limit: int = Query(20, ge=5, le=50),
+    skip: int = Query(0, ge=0),
+    read: str = Query("all"),
+    type: str = Query("all"),
+    current_user: UserInDB = Depends(get_current_user),
+):
+    if read not in ("all", "unread", "read"):
+        raise HTTPException(status_code=400, detail="read must be all, unread, or read")
+    items, total, unread = notification_service.list_notifications_paginated(
+        current_user.username,
+        limit=limit,
+        skip=skip,
+        read_filter=read,
+        type_filter=type,
+    )
+    return {
+        "notifications": items,
+        "total": total,
+        "unread_count": unread,
+        "limit": limit,
+        "skip": skip,
+        "has_more": (skip + limit) < total,
+        "read": read,
+        "type": type,
+    }
+
+
+@router.get("/recent")
+def list_recent_notifications(
+    limit: int = Query(8, ge=1, le=20),
+    current_user: UserInDB = Depends(get_current_user),
+):
+    items, unread = notification_service.list_recent_notifications(
+        current_user.username,
+        limit=limit,
+    )
     return {"notifications": items, "unread_count": unread}
 
 

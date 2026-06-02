@@ -919,24 +919,277 @@ html.theme-light .provision-action-status {
   max-height: 160px;
 }
 
-.provision-activity-row {
+/* ── Activity timeline (governance audit) ── */
+.provision-activity-header,
+.provision-policies-header {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
   gap: 1rem;
-  padding: 0.75rem 0;
-  border-bottom: 1px solid rgba(255,255,255,0.06);
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
 }
 
-.provision-activity-status {
+.provision-activity-header-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.provision-activity-retention-hint {
+  font-size: 0.78rem;
+  color: var(--text-secondary, rgba(255,255,255,0.5));
+  margin: 0.35rem 0 0;
+}
+
+.provision-activity-subtitle {
+  font-size: 0.85rem;
+  color: var(--text-secondary, rgba(255,255,255,0.6));
+  margin: 0.25rem 0 0;
+}
+
+.provision-activity-filters,
+.provision-activity-filters.provision-activity-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1.25rem;
+}
+
+.provision-filter-chip {
+  padding: 0.4rem 0.85rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: transparent;
+  color: var(--text-secondary, rgba(255,255,255,0.7));
+  cursor: pointer;
+}
+
+.provision-filter-chip.active {
+  background: rgba(99, 102, 241, 0.2);
+  border-color: rgba(99, 102, 241, 0.45);
+  color: var(--text-primary);
+}
+
+.provision-activity-timeline {
+  position: relative;
+  padding-left: 1.25rem;
+  border-left: 2px solid rgba(255,255,255,0.08);
+}
+
+.provision-activity-entry {
+  position: relative;
+  padding: 0 0 1.25rem 1rem;
+}
+
+.provision-activity-dot {
+  position: absolute;
+  left: -1.38rem;
+  top: 0.35rem;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: rgba(99, 102, 241, 0.85);
+  border: 2px solid var(--bg-primary, #0f1117);
+}
+
+.provision-activity-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.provision-activity-entry h4 {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.provision-activity-entry p {
+  margin: 0.35rem 0 0;
+  font-size: 0.82rem;
+  color: var(--text-secondary, rgba(255,255,255,0.65));
+}
+
+.provision-activity-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  margin-top: 0.4rem;
+  font-size: 0.75rem;
+  color: var(--text-secondary, rgba(255,255,255,0.5));
+}
+
+.provision-activity-tag {
+  padding: 0.1rem 0.45rem;
+  border-radius: 4px;
+  background: rgba(255,255,255,0.08);
+  text-transform: uppercase;
+  font-size: 0.65rem;
+  letter-spacing: 0.04em;
+}
+
+.provision-activity-status-pill {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  padding: 0.15rem 0.5rem;
+  border-radius: 6px;
+  flex-shrink: 0;
+}
+
+.provision-activity-status-pill.status-success {
+  background: rgba(39,174,96,0.15);
+  color: #27ae60;
+}
+
+.provision-activity-status-pill.status-failed,
+.provision-activity-status-pill.status-denied {
+  background: rgba(231,76,60,0.15);
+  color: #e74c3c;
+}
+
+.provision-activity-status-pill.status-pending {
+  background: rgba(241,196,15,0.12);
+  color: #f1c40f;
+}
+
+.provision-activity-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  margin-top: 1.5rem;
+}
+
+.provision-page-indicator {
+  font-size: 0.85rem;
+  color: var(--text-secondary, rgba(255,255,255,0.6));
+}
+
+/* ── Custom policies ── */
+.provision-policy-section {
+  margin-top: 1.5rem;
+}
+
+.provision-policy-section-title {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-secondary, rgba(255,255,255,0.55));
+  margin: 0 0 0.75rem;
+}
+
+.provision-policy-form-card {
+  padding: 1.25rem;
+  margin-bottom: 1.5rem;
+  border-radius: 12px;
+  border: 1px solid rgba(99, 102, 241, 0.25);
+  background: rgba(99, 102, 241, 0.06);
+}
+
+.provision-policy-form-card h4 {
+  margin: 0 0 1rem;
+}
+
+.provision-policy-form-card label {
+  display: block;
+  margin-bottom: 0.85rem;
+  font-size: 0.8rem;
+  color: var(--text-secondary, rgba(255,255,255,0.7));
+}
+
+.provision-policy-form-card input,
+.provision-policy-form-card select,
+.provision-policy-form-card textarea {
+  display: block;
+  width: 100%;
+  margin-top: 0.35rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(0,0,0,0.25);
+  color: var(--text-primary);
+  font-size: 0.88rem;
+}
+
+.provision-condition-hints {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  font-size: 0.78rem;
+}
+
+.provision-hint-chip {
+  padding: 0.25rem 0.6rem;
+  border-radius: 6px;
+  border: 1px dashed rgba(255,255,255,0.2);
+  background: transparent;
+  color: var(--text-secondary, rgba(255,255,255,0.75));
+  cursor: pointer;
+  font-size: 0.75rem;
+}
+
+.provision-policy-form-actions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: flex-end;
+}
+
+.provision-form-error,
+.provision-policy-error {
+  color: #e74c3c;
+  font-size: 0.85rem;
+  margin: 0.5rem 0;
+}
+
+.policy-item-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.policy-item-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.35rem;
+  flex-shrink: 0;
+}
+
+.policy-item--disabled {
+  opacity: 0.55;
+}
+
+.policy-condition-snippet {
+  display: block;
+  margin-top: 0.4rem;
+  font-size: 0.72rem;
+  padding: 0.35rem 0.5rem;
+  border-radius: 6px;
+  background: rgba(0,0,0,0.3);
+  color: rgba(255,255,255,0.75);
+  overflow-x: auto;
+}
+
+.policy-source-tag {
+  margin-left: 0.5rem;
   font-size: 0.7rem;
   text-transform: uppercase;
-  margin-right: 0.5rem;
+  opacity: 0.7;
 }
 
-.provision-activity-status.status-success { color: var(--success, #27ae60); }
-.provision-activity-status.status-failed,
-.provision-activity-status.status-denied { color: var(--danger, #e74c3c); }
+.btn-provision.small {
+  padding: 0.3rem 0.6rem;
+  font-size: 0.75rem;
+}
+
+.btn-provision.danger {
+  border-color: rgba(231,76,60,0.4);
+  color: #e74c3c;
+}
 
 /* ── Responsive ── */
 @media (max-width: 768px) {

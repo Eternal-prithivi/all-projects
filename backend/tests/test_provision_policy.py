@@ -6,6 +6,8 @@ from app.provision.policy_checker import (
     full_policy_check,
     get_yaml_rules,
 )
+from app.provision.policy_store import create_custom_rule, delete_custom_rule
+from app.database.mongo_client import get_database
 
 
 def test_config_to_policy_dict_safe_defaults():
@@ -50,3 +52,28 @@ def test_get_yaml_rules_loads_production_file():
     rules = get_yaml_rules()
     assert len(rules) >= 8
     assert any(r.get("name") == "public_s3_bucket" for r in rules)
+
+
+def test_custom_rule_blocks_deploy_for_user():
+    username = "custom_policy_eval_user"
+    coll = get_database()["provision_custom_policies"]
+    coll.delete_many({"username": username})
+    try:
+        create_custom_rule(
+            username,
+            name="force_micro_only",
+            description="Only micro instances",
+            severity="block",
+            condition="instance_type not in ['t2.micro', 't3.micro', 't4g.micro']",
+        )
+        config = {
+            "instance_type": "m5.large",
+            "enable_ec2": True,
+            "enable_vpc": True,
+            "tags": {"Owner": "tester"},
+        }
+        result = evaluate_yaml_policies(config, username=username)
+        assert any(v.rule_name == "force_micro_only" for v in result.blocks)
+        assert result.can_deploy is False
+    finally:
+        coll.delete_many({"username": username})

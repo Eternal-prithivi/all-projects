@@ -65,6 +65,7 @@
 | Topic | Doc |
 |-------|-----|
 | Phase 20.5 gap map | `docs/testing/PHASE_20_5_CI_GATES.md` |
+| Deferred enterprise checklist | `docs/testing/professional_standard.md` |
 | Agent protocol | `AI_MASTER.md` |
 | Live snapshot | `STATUS.md` |
 | Resume | `SCRATCHPAD.md` |

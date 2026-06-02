@@ -275,4 +275,18 @@ def on_startup():
         else:
             print("\u26a0\ufe0f  Terraform CLI not found — /api/provision endpoints will return 503")
 
+        try:
+            from app.provision.audit_logger import ensure_audit_indexes
+
+            ensure_audit_indexes()
+        except Exception as exc:
+            print(f"\u26a0\ufe0f  Provision audit index setup skipped: {exc}")
+
+        try:
+            from app.notifications.service import ensure_notification_indexes
+
+            ensure_notification_indexes()
+        except Exception as exc:
+            print(f"\u26a0\ufe0f  Notification index setup skipped: {exc}")
+
     threading.Thread(target=_warm_dependencies, daemon=True).start()

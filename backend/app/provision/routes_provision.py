@@ -26,6 +26,8 @@
 from __future__ import annotations
 
 import asyncio
+import csv
+import io
 import logging
 import threading
 import time
@@ -36,7 +38,7 @@ from typing import Any, Optional
 
 from bson import ObjectId
 from fastapi import APIRouter, Depends, HTTPException, Query
-from fastapi.responses import StreamingResponse
+from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel
 
 from app.database.mongo_client import get_database
@@ -56,7 +58,16 @@ from app.provision.terraform_runner import (
     get_terraform_version,
 )
 from app.provision.config_normalize import normalize_provision_config
-from app.provision.policy_checker import full_policy_check, get_yaml_rules
+from app.provision.policy_checker import full_policy_check, get_merged_rules, get_yaml_rules
+from app.provision.policy_store import (
+    create_custom_rule,
+    delete_custom_rule,
+    update_custom_rule,
+)
+from app.provision.policy_overrides import (
+    delete_override,
+    upsert_override,
+)
 from app.provision.cost_estimator import estimate_cost
 from app.provision.drift_detector import RemediationResult, detect_drift, remediate_drift
 from app.provision.boto3_drift import detect_drift_boto3, remediate_drift_boto3
@@ -67,6 +78,8 @@ from app.provision.engine_resolver import (
 )
 from app.provision.boto3_composer import BOTO3_IMPLEMENTED, boto3_can_handle
 from app.provision.audit_logger import (
+    AUDIT_RETENTION_DAYS,
+    export_user_audit_csv_rows,
     log_provision_action,
     get_deployment_audit_log,
     get_user_audit_log,
@@ -182,11 +195,161 @@ async def provisioning_status(user: dict = Depends(get_current_user)):
     }
 
 
+class CustomPolicyBody(BaseModel):
+    name: str
+    description: str
+    severity: str
+    condition: str
+
+
+class CustomPolicyUpdateBody(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    severity: Optional[str] = None
+    condition: Optional[str] = None
+    enabled: Optional[bool] = None
+
+
+class BuiltinPolicyOverrideBody(BaseModel):
+    description: Optional[str] = None
+    severity: Optional[str] = None
+    condition: Optional[str] = None
+    enabled: Optional[bool] = None
+
+
 @router.get("/policy-rules")
 async def list_policy_rules(user: dict = Depends(get_current_user)):
-    """Return YAML policy rules for read-only display in the UI."""
-    rules = get_yaml_rules()
-    return {"rules": rules, "count": len(rules)}
+    """Built-in YAML rules plus the user's custom governance rules."""
+    rules = get_merged_rules(user.username)
+    yaml_count = len(get_yaml_rules())
+    custom_count = sum(1 for r in rules if r.get("source") == "custom")
+    override_count = sum(1 for r in rules if r.get("source") == "override")
+    return {
+        "rules": rules,
+        "count": len(rules),
+        "builtin_count": yaml_count,
+        "custom_count": custom_count,
+        "override_count": override_count,
+    }
+
+
+@router.put("/policy-rules/builtin/{builtin_name}")
+async def upsert_builtin_policy_override(
+    builtin_name: str,
+    body: BuiltinPolicyOverrideBody,
+    user: dict = Depends(get_current_user),
+):
+    """Customize or disable a platform governance rule for this user."""
+    try:
+        rule = upsert_override(
+            user.username,
+            builtin_name,
+            description=body.description,
+            severity=body.severity,
+            condition=body.condition,
+            enabled=body.enabled,
+        )
+        log_provision_action(
+            action="policy_update",
+            actor=user.username,
+            deployment_id="governance",
+            status="success",
+            details={"builtin_name": builtin_name, "enabled": rule.get("enabled")},
+        )
+        return rule
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+
+@router.delete("/policy-rules/builtin/{builtin_name}")
+async def reset_builtin_policy_override(
+    builtin_name: str,
+    user: dict = Depends(get_current_user),
+):
+    """Revert a platform rule to its default for this user."""
+    if not delete_override(user.username, builtin_name):
+        raise HTTPException(status_code=404, detail="No override found for this policy")
+    log_provision_action(
+        action="policy_delete",
+        actor=user.username,
+        deployment_id="governance",
+        status="success",
+        details={"builtin_name": builtin_name, "reset": True},
+    )
+    return {"deleted": True, "builtin_name": builtin_name}
+
+
+@router.post("/policy-rules/custom")
+async def create_custom_policy(
+    body: CustomPolicyBody,
+    user: dict = Depends(get_current_user),
+):
+    """Add a user-defined governance rule evaluated on plan/deploy."""
+    try:
+        rule = create_custom_rule(
+            user.username,
+            name=body.name,
+            description=body.description,
+            severity=body.severity,
+            condition=body.condition,
+        )
+        log_provision_action(
+            action="policy_create",
+            actor=user.username,
+            deployment_id="governance",
+            status="success",
+            details={"rule_name": rule["name"]},
+        )
+        return rule
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+
+@router.put("/policy-rules/custom/{rule_id}")
+async def update_custom_policy(
+    rule_id: str,
+    body: CustomPolicyUpdateBody,
+    user: dict = Depends(get_current_user),
+):
+    """Update or enable/disable a custom governance rule."""
+    try:
+        rule = update_custom_rule(
+            user.username,
+            rule_id,
+            name=body.name,
+            description=body.description,
+            severity=body.severity,
+            condition=body.condition,
+            enabled=body.enabled,
+        )
+        log_provision_action(
+            action="policy_update",
+            actor=user.username,
+            deployment_id="governance",
+            status="success",
+            details={"rule_id": rule_id, "rule_name": rule.get("name")},
+        )
+        return rule
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+
+@router.delete("/policy-rules/custom/{rule_id}")
+async def remove_custom_policy(
+    rule_id: str,
+    user: dict = Depends(get_current_user),
+):
+    """Delete a custom governance rule."""
+    if not delete_custom_rule(user.username, rule_id):
+        raise HTTPException(status_code=404, detail="Policy not found")
+    log_provision_action(
+        action="policy_delete",
+        actor=user.username,
+        deployment_id="governance",
+        status="success",
+        details={"rule_id": rule_id},
+    )
+    return {"deleted": True, "id": rule_id}
 
 
 # ── Policy Check & Cost Estimate (standalone) ──
@@ -200,7 +363,7 @@ async def run_policy_check(
     """Run policy engine against a config WITHOUT deploying."""
     config_dict = config.model_dump()
     _prepare_provision_config(config_dict)
-    result = full_policy_check(config_dict, include_opa=False)
+    result = full_policy_check(config_dict, include_opa=False, username=user.username)
     return result.model_dump()
 
 
@@ -233,7 +396,7 @@ async def run_plan(
 
     engine = resolve_provision_engine(user.username, config_dict)
 
-    policy_result = full_policy_check(config_dict, include_opa=False)
+    policy_result = full_policy_check(config_dict, include_opa=False, username=user.username)
     cost_result = estimate_cost(config_dict, use_infracost=False)
 
     deployment_id = f"{user.username}-{int(time.time())}"
@@ -902,21 +1065,84 @@ async def remediate_deployment_drift(
 @router.get("/audit-log")
 async def get_audit_log(
     deployment_id: Optional[str] = None,
-    limit: int = 50,
+    limit: int = Query(10, ge=5, le=25),
+    skip: int = Query(0, ge=0),
+    action: str = Query("all"),
+    period_days: int = Query(AUDIT_RETENTION_DAYS, ge=7, le=90),
     user: dict = Depends(get_current_user),
 ):
     """Query the provision audit log for the current user (or one deployment)."""
+    period_days = max(7, min(period_days, 90))
     if deployment_id:
         events = get_deployment_audit_log(deployment_id)
+        total = len(events)
+        page = events[skip : skip + limit]
     else:
-        events = get_user_audit_log(user.username, limit=limit)
+        page, total = get_user_audit_log(
+            user.username,
+            limit=limit,
+            skip=skip,
+            action=action if action != "all" else None,
+            days=period_days,
+        )
 
-    # Serialize datetime objects
-    for event in events:
+    for event in page:
         if isinstance(event.get("timestamp"), datetime):
             event["timestamp"] = event["timestamp"].isoformat()
 
-    return {"events": events, "count": len(events)}
+    return {
+        "events": page,
+        "count": len(page),
+        "total": total,
+        "limit": limit,
+        "skip": skip,
+        "has_more": (skip + limit) < total,
+        "action": action,
+        "period_days": period_days,
+        "retention_days": AUDIT_RETENTION_DAYS,
+    }
+
+
+@router.get("/audit-log/export")
+async def export_audit_log_csv(
+    action: str = Query("all"),
+    period_days: int = Query(AUDIT_RETENTION_DAYS, ge=7, le=90),
+    user: dict = Depends(get_current_user),
+):
+    """Export provision audit log as CSV for the selected window."""
+    period_days = max(7, min(period_days, 90))
+    rows = export_user_audit_csv_rows(
+        user.username,
+        action=action if action != "all" else None,
+        days=period_days,
+    )
+
+    output = io.StringIO()
+    writer = csv.DictWriter(
+        output,
+        fieldnames=["timestamp", "action", "status", "actor", "deployment_id", "error"],
+    )
+    writer.writeheader()
+    for doc in rows:
+        writer.writerow({
+            "timestamp": (
+                doc.get("timestamp").isoformat()
+                if isinstance(doc.get("timestamp"), datetime)
+                else str(doc.get("timestamp", ""))
+            ),
+            "action": doc.get("action", ""),
+            "status": doc.get("status", ""),
+            "actor": doc.get("actor", ""),
+            "deployment_id": doc.get("deployment_id", ""),
+            "error": doc.get("error") or "",
+        })
+
+    filename = f"zenith_provision_audit_{user.username}_{datetime.utcnow().strftime('%Y%m%d')}.csv"
+    return Response(
+        content=output.getvalue(),
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 # ── Internal Helpers ──

@@ -1,17 +1,31 @@
 """Persisted in-app notifications per user."""
 
-from datetime import datetime
-from typing import Any, Dict, List, Optional
+from datetime import datetime, timedelta
+from typing import Any, Dict, List, Optional, Tuple
 
 from bson import ObjectId
 
 from app.database.mongo_client import get_database
 
 COLLECTION = "user_notifications"
+NOTIFICATION_RETENTION_DAYS = 180
 
 
 def _col():
     return get_database()[COLLECTION]
+
+
+def ensure_notification_indexes() -> None:
+    col = _col()
+    try:
+        col.create_index([("username", 1), ("created_at", -1)], background=True)
+        col.create_index(
+            "created_at",
+            expireAfterSeconds=NOTIFICATION_RETENTION_DAYS * 86400,
+            background=True,
+        )
+    except Exception:
+        pass
 
 
 def create_notification(
@@ -35,28 +49,77 @@ def create_notification(
     return str(result.inserted_id)
 
 
-def list_notifications(username: str, limit: int = 100) -> List[Dict[str, Any]]:
+def _serialize(doc: dict) -> Dict[str, Any]:
+    return {
+        "id": str(doc["_id"]),
+        "title": doc.get("title"),
+        "message": doc.get("message"),
+        "type": doc.get("type", "info"),
+        "link": doc.get("link"),
+        "read": bool(doc.get("read")),
+        "created_at": doc.get("created_at").isoformat() + "Z"
+        if doc.get("created_at")
+        else None,
+    }
+
+
+def _build_query(
+    username: str,
+    *,
+    read_filter: str = "all",
+    type_filter: str = "all",
+) -> Dict[str, Any]:
+    query: Dict[str, Any] = {"username": username}
+    if read_filter == "unread":
+        query["read"] = False
+    elif read_filter == "read":
+        query["read"] = True
+    if type_filter and type_filter != "all":
+        query["type"] = type_filter
+    return query
+
+
+def count_unread(username: str) -> int:
+    return _col().count_documents({"username": username, "read": False})
+
+
+def list_notifications_paginated(
+    username: str,
+    *,
+    limit: int = 20,
+    skip: int = 0,
+    read_filter: str = "all",
+    type_filter: str = "all",
+) -> Tuple[List[Dict[str, Any]], int, int]:
+    """Returns (items, total_matching, unread_count)."""
+    col = _col()
+    query = _build_query(username, read_filter=read_filter, type_filter=type_filter)
+    limit = max(5, min(limit, 50))
+    skip = max(0, skip)
+
+    total = col.count_documents(query)
+    unread = count_unread(username)
+    cursor = col.find(query).sort("created_at", -1).skip(skip).limit(limit)
+    items = [_serialize(doc) for doc in cursor]
+    return items, total, unread
+
+
+def list_recent_notifications(username: str, limit: int = 8) -> Tuple[List[Dict[str, Any]], int]:
+    """Recent notifications for bell dropdown."""
+    limit = max(1, min(limit, 20))
+    col = _col()
+    unread = count_unread(username)
     cursor = (
-        _col()
-        .find({"username": username})
+        col.find({"username": username})
         .sort("created_at", -1)
         .limit(limit)
     )
-    items = []
-    for doc in cursor:
-        items.append(
-            {
-                "id": str(doc["_id"]),
-                "title": doc.get("title"),
-                "message": doc.get("message"),
-                "type": doc.get("type", "info"),
-                "link": doc.get("link"),
-                "read": bool(doc.get("read")),
-                "created_at": doc.get("created_at").isoformat() + "Z"
-                if doc.get("created_at")
-                else None,
-            }
-        )
+    return [_serialize(doc) for doc in cursor], unread
+
+
+def list_notifications(username: str, limit: int = 100) -> List[Dict[str, Any]]:
+    """Backward-compatible full list (capped)."""
+    items, _, _ = list_notifications_paginated(username, limit=limit, skip=0)
     return items
 
 

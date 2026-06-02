@@ -156,7 +156,9 @@ Database: `CloudResourceOptimizationDB`
 
 Auth: `POST /api/auth/verify-email?token=` — marks `email_verified` when `email_verify_token` matches user.
 
-**Notifications** (`/api/notifications`): list, create, mark read, delete — `user_notifications` collection.
+**Notifications** (`/api/notifications`): paginated `GET ?limit&skip&read&type`, `GET /recent?limit=8`, create, mark read, delete — `user_notifications` (180d TTL).
+
+**Provision governance** (`/api/provision`): `GET/POST/PUT/DELETE policy-rules/custom`, `PUT/DELETE policy-rules/builtin/{name}` (per-user overrides), `GET audit-log?limit=10&period_days`, `GET audit-log/export` — collections `provision_custom_policies`, `provision_policy_overrides`, `provision_audit_log` (90d TTL).
 
 **Organizations** (`/api/organizations`): create org, members, invites, accept invite — single org per user.
 
