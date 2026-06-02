@@ -1,12 +1,16 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="Zenith">
   <defs>
-    <linearGradient id="zenithGold" x1="0%" y1="0%" x2="0%" y2="100%">
-      <stop offset="0%" stop-color="#e8c84a"/>
+    <linearGradient id="zenithGold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f0d060"/>
       <stop offset="100%" stop-color="#9a6f00"/>
     </linearGradient>
   </defs>
-  <rect width="32" height="32" rx="6" fill="#0a0a0a"/>
-  <path fill="#3d3d3d" d="M 5 30 Q 5 28 6.5 27.5 Q 6.8 26 8.5 25.8 Q 8.9 24.5 10 24.3 Q 10.4 23 11.5 23.2 Q 12.6 23 13 24.3 Q 14.1 24.5 14.5 25.8 Q 16.2 26 16.5 27.5 Q 18 28 18 30 Q 19.5 30.5 19.5 32 L 4.5 32 Q 3 32 3 30 Q 3 28 5 30 Z"/>
-  <polygon fill="url(#zenithGold)" points="11,14 17.5,27.5 4.5,27.5"/>
-  <polygon fill="#f0d060" opacity="0.85" points="11,14 13,20 9,20"/>
+  <rect width="32" height="32" rx="7" fill="#0a0a0a"/>
+  <path
+    fill="#404040"
+    d="M5 26.2c0-1.4 1.1-2.6 2.5-2.8.4-2.2 2.4-3.8 4.8-3.8 1.2 0 2.3.4 3.1 1.1.7-.3 1.5-.5 2.3-.5 2.8 0 5 2.2 5 5v.2H5v-.2z"
+  />
+  <path fill="#f0ead6" d="M7 7.5h18v3.25H7z" />
+  <path fill="#f0ead6" d="M7 21.25h13.5v3.25H7z" />
+  <path fill="url(#zenithGold)" d="M21.2 8.2 25 10.4 10.8 24.6 7 22.4 21.2 8.2z" />
 </svg>
