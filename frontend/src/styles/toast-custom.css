@@ -2,8 +2,8 @@
 .Toastify__toast-container {
   z-index: 99999 !important;
   position: fixed !important;
-  top: 1rem !important;
-  right: 1rem !important;
+  top: calc(1rem + env(safe-area-inset-top, 0px)) !important;
+  right: max(1rem, env(safe-area-inset-right, 0px)) !important;
   pointer-events: none !important;
 }
 

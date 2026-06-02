@@ -38,6 +38,19 @@ Use this matrix before marking **Mobile responsiveness** complete in the product
 - [ ] Storage action buttons stack on narrow screens
 - [ ] Onboarding tour does not auto-start on viewports ≤768px
 
+## Known gaps addressed (2026-06)
+
+| Area | Issue | Fix location |
+|------|--------|--------------|
+| Admin tablet | `margin-left: 240px` broke flex layout at 1024px | Removed from `admin-layout.css` |
+| Storage files | Wide table clipped on phone | `table-responsive-scroll` + `file-list.css` |
+| BYOC wizard | Step pills overflow | `byoc-shared.css` |
+| Cost hub | Sub-nav wraps awkwardly | `mobile-consistency.css` scroll row |
+| Breadcrumbs | Long paths overflow header | Ellipsis in `mobile-consistency.css` |
+| Toasts | Overlap notch / header | Safe-area in `toast-custom.css` + `mobile-consistency.css` |
+| Features page | 720px breakpoint mismatch | Aligned to 768px in `features.css` |
+| Marketing pages | Hero padding inconsistent | `marketing-shell.css` + `mobile-consistency.css` |
+
 ## Automated smoke (optional)
 
 ```bash

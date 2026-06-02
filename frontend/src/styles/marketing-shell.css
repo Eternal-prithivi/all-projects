@@ -248,3 +248,19 @@
 }
 
 /* Mobile nav: see mobile-marketing-nav.css */
+
+@media (max-width: 768px) {
+  .marketing-page__main {
+    padding-top: 5rem;
+  }
+
+  .marketing-page .nav-container {
+    padding: 0.85rem 1rem;
+  }
+
+  .marketing-page .btn-nav-login,
+  .marketing-page .btn-nav-signup {
+    padding: 0.5rem 0.85rem;
+    font-size: 0.85rem;
+  }
+}

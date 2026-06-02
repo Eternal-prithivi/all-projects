@@ -700,6 +700,11 @@
     justify-content: center;
   }
 
+  .list-section {
+    overflow: hidden;
+    padding: 1rem;
+  }
+
   .storage-header h2 {
     font-size: 1.75rem;
   }

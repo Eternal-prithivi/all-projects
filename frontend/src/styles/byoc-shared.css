@@ -78,6 +78,30 @@
   color: var(--success);
 }
 
+@media (max-width: 768px) {
+  .byoc-step-indicator {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .byoc-step-indicator span {
+    min-width: 0;
+    width: 100%;
+    flex: none;
+    font-size: 0.75rem;
+    padding: 0.55rem 0.65rem;
+  }
+
+  .byoc-target-banner {
+    font-size: 0.85rem;
+  }
+
+  .byoc-target-list {
+    padding-left: 1rem;
+    word-break: break-word;
+  }
+}
+
 .byoc-bucket-check--forbidden,
 .byoc-bucket-check--invalid,
 .byoc-bucket-check--wrong_region {

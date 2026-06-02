@@ -57,3 +57,37 @@
   background-color: rgba(239, 68, 68, 0.1); /* Red glow */
   color: #ef4444; /* Red */
 }
+
+@media (max-width: 768px) {
+  .list-section .table-responsive-scroll {
+    margin: 0 -0.5rem;
+    padding: 0 0.5rem;
+  }
+
+  .file-table {
+    font-size: 0.85rem;
+  }
+
+  .file-table th,
+  .file-table td {
+    padding: 0.65rem 0.5rem;
+  }
+
+  .file-table .date-col {
+    font-size: 0.75rem;
+    white-space: nowrap;
+  }
+
+  .file-table .action-btn,
+  .file-table .download-btn {
+    padding: 0.4rem 0.65rem;
+    font-size: 0.8rem;
+    min-height: var(--touch-min);
+  }
+
+  .actions-cell {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 0.35rem;
+  }
+}

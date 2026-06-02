@@ -430,6 +430,7 @@ function StoragePage() {
             message="Upload a file above to see it listed here with storage class and actions."
           />
         ) : (
+          <div className="table-responsive-scroll">
           <table className="file-table">
             <thead>
               <tr>
@@ -483,6 +484,7 @@ function StoragePage() {
                 ))}
             </tbody>
           </table>
+          </div>
         )}
       </div>
 

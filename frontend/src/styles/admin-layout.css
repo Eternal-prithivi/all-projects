@@ -555,17 +555,6 @@
   transform: translateY(-2px);
 }
 
-/* Responsive */
-@media (max-width: 1024px) {
-  .admin-sidebar {
-    width: 240px;
-  }
-
-  .admin-main {
-    margin-left: 240px;
-  }
-}
-
 @media (max-width: 768px) {
   .admin-main {
     margin-left: 0;
