@@ -528,13 +528,19 @@ export const finalize2FA = async (token, code) => {
   }
 };
 
-// Disable 2FA
-export const disable2FA = async (token) => {
+// Disable 2FA (code required when 2FA is already enabled)
+export const disable2FA = async (token, code) => {
   try {
+    const body = code ? { code } : {};
     const response = await apiClient.post(
       "/2fa/disable-2fa",
-      {},
-      { headers: { Authorization: `Bearer ${token}` } }
+      body,
+      {
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      }
     );
     return response.data;
   } catch (error) {

@@ -37,6 +37,10 @@ class Verify2FARequest(BaseModel):
 class Finalize2FARequest(BaseModel):
     code: str
 
+
+class Disable2FARequest(BaseModel):
+    code: str | None = None
+
 # Check current 2FA status
 @router.get("/status-2fa")
 async def status_2fa(current_user: UserInDB = Depends(get_current_user)):
@@ -163,11 +167,30 @@ async def verify_2fa(
 
 # Disable 2FA
 @router.post("/disable-2fa")
-async def disable_2fa(current_user: UserInDB = Depends(get_current_user)):
+async def disable_2fa(
+    req: Disable2FARequest | None = None,
+    current_user: UserInDB = Depends(get_current_user),
+):
     """
     Disables 2FA for the user's account by removing the secret key.
-    """
+    When 2FA is enabled, a valid TOTP code is required.
+  """
     users_col = get_users_collection()
+    user_in_db = users_col.find_one({"username": current_user.username})
+
+    if not user_in_db or not user_in_db.get("two_fa_secret"):
+        raise HTTPException(status_code=400, detail="2FA is not set up.")
+
+    if user_in_db.get("two_fa_enabled"):
+        if not req or not req.code:
+            raise HTTPException(
+                status_code=400,
+                detail="2FA code required to disable two-factor authentication.",
+            )
+        totp = pyotp.TOTP(user_in_db["two_fa_secret"])
+        if not totp.verify(req.code, valid_window=1):
+            raise HTTPException(status_code=400, detail="Invalid 2FA code")
+
     users_col.update_one(
         {"username": current_user.username},
         {"$unset": {"two_fa_secret": "", "two_fa_enabled": "", "two_fa_verified": ""}}

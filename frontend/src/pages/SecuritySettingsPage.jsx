@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { apiClient } from '../api';
@@ -9,6 +10,7 @@ import {
   validatePasswordChangeForm,
 } from '../utils/formValidation';
 import '../styles/security-settings.css';
+import '../styles/security-page.css';
 import PageHeader from '../components/ui/PageHeader.jsx';
 
 const formatRelativeTime = (timestamp) => {
@@ -40,6 +42,8 @@ const SecuritySettingsPage = () => {
   const [activitySummary, setActivitySummary] = useState(null);
   const [showAuditPanel, setShowAuditPanel] = useState(false);
   const [showOtherSessions, setShowOtherSessions] = useState(false);
+  const [showDisable2FA, setShowDisable2FA] = useState(false);
+  const [disable2FACode, setDisable2FACode] = useState('');
   const [passwordData, setPasswordData] = useState({
     currentPassword: '',
     newPassword: '',
@@ -111,21 +115,42 @@ const SecuritySettingsPage = () => {
     }
   };
 
-  const handleToggle2FA = async () => {
+  const handleToggle2FA = () => {
+    if (twoFactorEnabled) {
+      setDisable2FACode('');
+      setShowDisable2FA(true);
+      return;
+    }
+    navigate('/dashboard/security');
+    toast.info('Complete 2FA setup on the Security vault page');
+  };
+
+  const handleConfirmDisable2FA = async () => {
+    const code = disable2FACode.trim();
+    if (code.length < 6) {
+      toast.error('Enter the 6-digit code from your authenticator app.');
+      return;
+    }
     try {
-      if (twoFactorEnabled) {
-        await apiClient.post('/2fa/disable-2fa');
-        setTwoFactorEnabled(false);
-        toast.success('Two-factor authentication disabled');
-        await refreshActivitySummary();
-      } else {
-        navigate('/dashboard/security');
-        toast.info('Complete 2FA setup on the Security vault page');
-      }
+      await apiClient.post('/2fa/disable-2fa', { code });
+      setTwoFactorEnabled(false);
+      setShowDisable2FA(false);
+      setDisable2FACode('');
+      toast.success('Two-factor authentication disabled');
+      await refreshActivitySummary();
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Failed to update 2FA settings');
     }
   };
+
+  useEffect(() => {
+    if (!showDisable2FA) return undefined;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [showDisable2FA]);
 
   const handleTerminateSession = async (sessionId) => {
     if (!window.confirm('Revoke this sign-in? That device will need to log in again.')) {
@@ -149,8 +174,69 @@ const SecuritySettingsPage = () => {
     return <LoadingSpinner size="large" text="Loading security settings..." />;
   }
 
+  const disable2FAOverlay =
+    showDisable2FA &&
+    createPortal(
+      <div
+        className="twofa-overlay"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="disable-2fa-title"
+        onClick={() => {
+          setShowDisable2FA(false);
+          setDisable2FACode('');
+        }}
+      >
+        <div className="twofa-panel" onClick={(e) => e.stopPropagation()}>
+          <button
+            type="button"
+            className="twofa-panel__close"
+            onClick={() => {
+              setShowDisable2FA(false);
+              setDisable2FACode('');
+            }}
+            aria-label="Cancel disable 2FA"
+          >
+            ×
+          </button>
+          <h3 id="disable-2fa-title" className="twofa-title">
+            Disable two-factor authentication
+          </h3>
+          <p className="twofa-description">
+            Enter the 6-digit code from your authenticator app to confirm you want to turn off 2FA.
+          </p>
+          <input
+            type="text"
+            inputMode="numeric"
+            autoComplete="one-time-code"
+            placeholder="6-digit code"
+            value={disable2FACode}
+            onChange={(e) => setDisable2FACode(e.target.value.replace(/\D/g, ''))}
+            maxLength={6}
+            className="twofa-input"
+            aria-label="2FA code to disable"
+          />
+          <button type="button" onClick={handleConfirmDisable2FA} className="btn btn--block danger-btn">
+            Disable 2FA
+          </button>
+          <button
+            type="button"
+            className="twofa-panel__cancel-link"
+            onClick={() => {
+              setShowDisable2FA(false);
+              setDisable2FACode('');
+            }}
+          >
+            Cancel
+          </button>
+        </div>
+      </div>,
+      document.body,
+    );
+
   return (
     <div className="security-settings-page">
+      {disable2FAOverlay}
       <PageHeader
         kicker="Account security"
         title="Security Settings"
