@@ -14,7 +14,6 @@
 //   - Skip the two-step upload flow (scan → choice modal → encrypt → S3)
 // =============================================================================
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import { createPortal } from "react-dom";
 import { useNotifications } from "../hooks/useNotifications";
 import EncryptionChoiceModal from "../components/EncryptionChoiceModal";
 import DecryptionPasswordModal from "../components/DecryptionPasswordModal";
@@ -46,6 +45,7 @@ import LoadingSpinner from "../components/LoadingSpinner.jsx";
 import PageHeader from "../components/ui/PageHeader.jsx";
 import BucketRegionSelector from "../components/BucketRegionSelector.jsx";
 import EmptyState from "../components/EmptyState.jsx";
+import TwoFADialog from "../components/TwoFADialog.jsx";
 import { IconLock } from "../components/dashboard/Icons.jsx";
 
 // --- MAIN COMPONENT ---
@@ -534,150 +534,77 @@ function SecurityPage() {
     return <LoadingSpinner size="large" text="Loading security..." />;
   }
 
-  const closeTwoFAOverlay = () => {
-    if (showSetupPanel) {
-      cancelTwoFASetup();
-      return;
-    }
-    if (showDisablePanel) {
-      setShowDisablePanel(false);
-      setTwoFACode("");
-      return;
-    }
-    setVerifyPanelOpen(false);
+  const closeDisablePanel = () => {
+    setShowDisablePanel(false);
+    setTwoFACode("");
   };
 
-  const twoFAOverlay =
-    twoFAOverlayOpen &&
-    createPortal(
-      <div
-        className="twofa-overlay"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="twofa-dialog-title"
-        onClick={closeTwoFAOverlay}
-      >
-        <div
-          className="twofa-panel"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <button
-            type="button"
-            className="twofa-panel__close"
-            onClick={closeTwoFAOverlay}
-            aria-label={
-              showSetupPanel
-                ? "Cancel 2FA setup"
-                : showDisablePanel
-                  ? "Cancel disable 2FA"
-                  : "Close verification dialog"
-            }
-          >
-            ×
-          </button>
-          {showSetupPanel ? (
-            <>
-              <h3 id="twofa-dialog-title" className="twofa-title">
-                Finalize 2FA setup
-              </h3>
-              <p className="twofa-description">
-                Scan this QR code with your authenticator app, then enter the 6-digit code below.
-              </p>
-              <img src={qrCode} alt="2FA QR Code" className="twofa-qr" />
-              <input
-                type="text"
-                inputMode="numeric"
-                autoComplete="one-time-code"
-                placeholder="Enter code to finalize"
-                value={twoFACode}
-                onChange={(e) => setTwoFACode(e.target.value.replace(/\D/g, ""))}
-                maxLength={6}
-                className="twofa-input"
-                aria-label="2FA verification code"
-              />
-              <button type="button" onClick={handleFinalize2FA} className="btn btn--block">
-                Finalize setup
-              </button>
-              <button
-                type="button"
-                className="twofa-panel__cancel-link"
-                onClick={cancelTwoFASetup}
-              >
-                Cancel setup
-              </button>
-            </>
-          ) : showDisablePanel ? (
-            <>
-              <h3 id="twofa-dialog-title" className="twofa-title">
-                Disable two-factor authentication
-              </h3>
-              <p className="twofa-description">
-                Enter the 6-digit code from your authenticator app to confirm you want to turn off 2FA.
-              </p>
-              <input
-                type="text"
-                inputMode="numeric"
-                autoComplete="one-time-code"
-                placeholder="6-digit code"
-                value={twoFACode}
-                onChange={(e) => setTwoFACode(e.target.value.replace(/\D/g, ""))}
-                maxLength={6}
-                className="twofa-input"
-                aria-label="2FA code to disable"
-              />
-              <button type="button" onClick={handleDisable2FA} className="btn btn--block danger-btn">
-                Disable 2FA
-              </button>
-              <button
-                type="button"
-                className="twofa-panel__cancel-link"
-                onClick={() => {
-                  setShowDisablePanel(false);
-                  setTwoFACode("");
-                }}
-              >
-                Cancel
-              </button>
-            </>
-          ) : (
-            <>
-              <h3 id="twofa-dialog-title" className="twofa-title">
-                Verify your identity
-              </h3>
-              <p className="twofa-description">
-                Enter the 6-digit code from your authenticator app to unlock the secure vault.
-              </p>
-              <input
-                type="text"
-                inputMode="numeric"
-                autoComplete="one-time-code"
-                placeholder="6-digit code"
-                value={twoFACode}
-                onChange={(e) => setTwoFACode(e.target.value.replace(/\D/g, ""))}
-                maxLength={6}
-                className="twofa-input"
-                aria-label="2FA verification code"
-              />
-              <button type="button" onClick={handleVerify2FA} className="btn btn--block">
-                Verify
-              </button>
-              <button
-                type="button"
-                className="twofa-panel__cancel-link"
-                onClick={() => setVerifyPanelOpen(false)}
-              >
-                Not now
-              </button>
-            </>
-          )}
-        </div>
-      </div>,
-      document.body,
-    );
+  const codeInput = (placeholder, ariaLabel) => (
+    <input
+      type="text"
+      inputMode="numeric"
+      autoComplete="one-time-code"
+      placeholder={placeholder}
+      value={twoFACode}
+      onChange={(e) => setTwoFACode(e.target.value.replace(/\D/g, ""))}
+      maxLength={6}
+      className="twofa-input"
+      aria-label={ariaLabel}
+    />
+  );
 
   return (
     <div className="security-page page-container zenith-page-enter">
-        {twoFAOverlay}
+        <TwoFADialog
+          open={showSetupPanel}
+          onClose={cancelTwoFASetup}
+          titleId="twofa-dialog-title"
+          title="Finalize 2FA setup"
+          kicker="Secure vault"
+          description="Scan this QR code with your authenticator app, then enter the 6-digit code below."
+          primaryLabel="Finalize setup"
+          onPrimary={handleFinalize2FA}
+          cancelLabel="Cancel setup"
+          onCancel={cancelTwoFASetup}
+        >
+          <div className="twofa-qr-wrap">
+            <img src={qrCode} alt="2FA QR Code" className="twofa-qr" />
+          </div>
+          {codeInput("000000", "2FA verification code")}
+        </TwoFADialog>
+
+        <TwoFADialog
+          open={showDisablePanel}
+          onClose={closeDisablePanel}
+          titleId="twofa-disable-title"
+          title="Disable two-factor authentication"
+          kicker="Account security"
+          variant="danger"
+          description="Enter the 6-digit code from your authenticator app to confirm you want to turn off 2FA."
+          primaryLabel="Disable 2FA"
+          primaryVariant="danger"
+          onPrimary={handleDisable2FA}
+          cancelLabel="Cancel"
+          onCancel={closeDisablePanel}
+        >
+          {codeInput("000000", "2FA code to disable")}
+        </TwoFADialog>
+
+        <TwoFADialog
+          open={showVerifyPanel}
+          onClose={() => setVerifyPanelOpen(false)}
+          titleId="twofa-verify-title"
+          title="Verify your identity"
+          kicker="Secure vault"
+          description="Enter the 6-digit code from your authenticator app to unlock the secure vault."
+          primaryLabel="Verify"
+          primaryVariant="success"
+          onPrimary={handleVerify2FA}
+          cancelLabel="Not now"
+          onCancel={() => setVerifyPanelOpen(false)}
+        >
+          {codeInput("000000", "2FA verification code")}
+        </TwoFADialog>
 
         <div
           className={

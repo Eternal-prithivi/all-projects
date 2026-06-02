@@ -29,8 +29,7 @@
 }
 
 .security-page .page-title,
-.security-page .section-title,
-.security-page .twofa-title {
+.security-page .section-title {
   font-size: 1.75rem;
   font-weight: 700;
   color: var(--text-primary);
@@ -165,8 +164,7 @@ html.theme-light .security-2fa-badge--off {
   background: rgba(0, 0, 0, 0.05);
 }
 
-.security-page .page-description,
-.security-page .twofa-description {
+.security-page .page-description {
   color: var(--text-secondary);
   margin-bottom: var(--space-xl);
   line-height: 1.6;
@@ -435,145 +433,6 @@ html.theme-light .security-2fa-badge--off {
   color: var(--text-secondary);
   text-align: center;
   padding: var(--space-xl);
-}
-
-/* 2FA modal — portaled to document.body, opaque panel (not glass) */
-.twofa-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 10050;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: max(1rem, env(safe-area-inset-top, 0px))
-    max(1rem, env(safe-area-inset-right, 0px))
-    max(1rem, env(safe-area-inset-bottom, 0px))
-    max(1rem, env(safe-area-inset-left, 0px));
-  background: rgba(0, 0, 0, 0.88);
-}
-
-.twofa-panel {
-  position: relative;
-  max-width: 440px;
-  width: 100%;
-  max-height: min(90vh, 640px);
-  overflow-y: auto;
-  margin: 0;
-  text-align: center;
-  padding: 2.75rem 1.5rem 1.5rem;
-  background: #1e2126;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: var(--radius-lg, 14px);
-  box-shadow:
-    0 24px 64px rgba(0, 0, 0, 0.65),
-    0 0 0 1px rgba(0, 0, 0, 0.35);
-  -webkit-overflow-scrolling: touch;
-}
-
-html[data-theme="light"] .twofa-panel {
-  background: #f0f2f5;
-  border-color: #dadce0;
-  box-shadow: 0 24px 48px rgba(60, 64, 67, 0.2);
-}
-
-.twofa-title {
-  font-size: 1.35rem;
-  font-weight: 700;
-  color: var(--text-primary);
-  margin: 0 0 0.75rem;
-}
-
-.twofa-description {
-  color: var(--text-secondary);
-  margin: 0 0 1.25rem;
-  line-height: 1.55;
-  font-size: 0.95rem;
-}
-
-.twofa-input {
-  display: block;
-  width: 100%;
-  box-sizing: border-box;
-  padding: 12px;
-  margin-bottom: var(--space-lg);
-  border-radius: var(--radius-md);
-  border: 1px solid var(--border-default);
-  background: #12141a;
-  color: var(--text-primary);
-  font-size: 1.2rem;
-  text-align: center;
-  letter-spacing: 0.3em;
-}
-
-html[data-theme="light"] .twofa-input {
-  background: #fff;
-}
-
-.twofa-qr {
-  display: block;
-  width: min(250px, 70vw);
-  height: min(250px, 70vw);
-  margin: 0 auto 1.25rem;
-  background: #fff;
-  border-radius: var(--radius-md);
-  padding: var(--space-sm);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
-}
-
-.twofa-panel .btn--block {
-  width: 100%;
-}
-
-.twofa-panel__close {
-  position: absolute;
-  top: 1rem;
-  right: 1rem;
-  width: 36px;
-  height: 36px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: var(--radius-md);
-  background: #2a2d33;
-  color: var(--text-secondary);
-  font-size: 1.35rem;
-  line-height: 1;
-  cursor: pointer;
-  transition:
-    background var(--duration-fast) var(--ease-out),
-    border-color var(--duration-fast) var(--ease-out),
-    color var(--duration-fast) var(--ease-out);
-}
-
-.twofa-panel__close:hover {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: var(--gold-border);
-  color: var(--text-primary);
-}
-
-.twofa-panel__close:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 3px var(--gold-glow);
-}
-
-.twofa-panel__cancel-link {
-  display: block;
-  width: 100%;
-  margin-top: var(--space-md);
-  padding: 0.5rem;
-  border: none;
-  background: transparent;
-  color: var(--text-muted);
-  font-size: 0.9rem;
-  cursor: pointer;
-  text-decoration: underline;
-  text-underline-offset: 3px;
-}
-
-.twofa-panel__cancel-link:hover {
-  color: var(--text-secondary);
 }
 
 .security-page__body--dimmed {
