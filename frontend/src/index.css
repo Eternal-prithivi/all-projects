@@ -121,6 +121,13 @@ body {
   letter-spacing: 0;
 }
 
+@media (max-width: 768px) {
+  /* fixed backgrounds break momentum scrolling on iOS Safari */
+  body {
+    background-attachment: scroll;
+  }
+}
+
 #root {
   min-height: 100dvh;
   width: 100%;

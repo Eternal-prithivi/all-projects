@@ -1,0 +1,85 @@
+/**
+ * Home page scroll fixes (mobile / touch).
+ * Root causes addressed:
+ * - body background-attachment: fixed breaks iOS Safari scrolling
+ * - .landing-backdrop contain:strict + position:fixed traps touch on some WebKit builds
+ * - CSS scroll-driven animation-timeline on root conflicts with touch scroll
+ * - reveal contain:layout style can block compositing during pan
+ */
+
+@media (max-width: 768px) {
+  html:has(.landing-page),
+  body:has(.landing-page) {
+    height: auto !important;
+    max-height: none !important;
+    overflow-x: hidden !important;
+    overflow-y: scroll !important;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-y: auto;
+    background-attachment: scroll !important;
+  }
+
+  #root:has(.landing-page),
+  #root:has(.landing-page) .app-root {
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+    min-height: 100dvh;
+  }
+
+  .landing-page {
+    height: auto !important;
+    min-height: 100dvh;
+    overflow-x: hidden;
+    overflow-y: visible;
+    touch-action: auto;
+  }
+
+  .landing-backdrop {
+    contain: none;
+    will-change: auto;
+  }
+
+  /* Scroll-driven progress bar breaks touch scroll on iOS — JS fallback in useLandingReveal */
+  .landing-scroll-progress {
+    animation: none !important;
+    animation-timeline: auto !important;
+  }
+
+  .reveal-item,
+  .landing-reveal {
+    contain: none;
+  }
+
+  /* Lighter reveals while scrolling — less filter jank */
+  html.is-scrolling .reveal-item,
+  html.is-scrolling .landing-reveal {
+    animation-play-state: paused !important;
+  }
+}
+
+/* Touch devices (any width): disable scroll-timeline progress */
+@media (pointer: coarse) {
+  @supports (animation-timeline: scroll()) {
+    .landing-scroll-progress {
+      animation: none !important;
+      animation-timeline: auto !important;
+    }
+  }
+}
+
+/* Coarse pointer + small screens: instant visible sections (scroll reliability > motion) */
+@media (max-width: 768px) and (pointer: coarse) {
+  .reveal-item,
+  .landing-reveal,
+  .landing-cta.reveal-group .landing-cta__title,
+  .landing-cta.reveal-group .landing-cta__subtitle,
+  .landing-cta.reveal-group .landing-cta__actions,
+  .landing-cta.reveal-group .landing-cta__trust {
+    opacity: 1 !important;
+    transform: none !important;
+    filter: none !important;
+    animation: none !important;
+    contain: none;
+  }
+}

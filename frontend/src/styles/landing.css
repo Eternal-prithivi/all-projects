@@ -1,6 +1,7 @@
 /* Zenith marketing landing — premium SaaS layout */
 @import './mobile-marketing-nav.css';
 @import './landing-mobile.css';
+@import './landing-scroll-fix.css';
 
 .landing-page {
   position: relative;
