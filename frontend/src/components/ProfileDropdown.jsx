@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import '../styles/profile-dropdown.css';
 
@@ -7,7 +7,11 @@ const ProfileDropdown = () => {
   const [isOpen, setIsOpen] = useState(false);
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const dropdownRef = useRef(null);
+  const inAdminArea = location.pathname.startsWith('/admin');
+  const isAdmin = user?.role === 'admin';
+  const settingsPath = inAdminArea ? '/admin/settings' : '/dashboard/settings';
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -65,7 +69,41 @@ const ProfileDropdown = () => {
 
           <div className="profile-menu-divider"></div>
 
-          <button className="profile-menu-item" onClick={() => {
+          {isAdmin && inAdminArea && (
+            <button
+              className="profile-menu-item"
+              type="button"
+              onClick={() => {
+                setIsOpen(false);
+                navigate('/dashboard');
+              }}
+            >
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden>
+                <path d="M8 1l7 6v8H1V7l7-6zm0 1.5L2 8v6h12V8L8 2.5z" />
+              </svg>
+              User dashboard
+            </button>
+          )}
+
+          {isAdmin && !inAdminArea && (
+            <button
+              className="profile-menu-item"
+              type="button"
+              onClick={() => {
+                setIsOpen(false);
+                navigate('/admin');
+              }}
+            >
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden>
+                <path d="M2 2h5l2 3h5v8H2V2zm2 2v2h2V4H4zm8 8H6V9h6v3z" />
+              </svg>
+              Admin portal
+            </button>
+          )}
+
+          {isAdmin && <div className="profile-menu-divider" />}
+
+          <button className="profile-menu-item" type="button" onClick={() => {
             setIsOpen(false);
             navigate('/dashboard/profile');
           }}>
@@ -75,9 +113,9 @@ const ProfileDropdown = () => {
             Profile
           </button>
 
-          <button className="profile-menu-item" onClick={() => {
+          <button className="profile-menu-item" type="button" onClick={() => {
             setIsOpen(false);
-            navigate('/dashboard/settings');
+            navigate(settingsPath);
           }}>
             <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
               <path d="M8 1a7 7 0 100 14A7 7 0 008 1zm0 12.5A5.5 5.5 0 1113.5 8 5.51 5.51 0 018 13.5zM8 4a4 4 0 100 8 4 4 0 000-8z"/>
@@ -85,7 +123,7 @@ const ProfileDropdown = () => {
             Settings
           </button>
 
-          <button className="profile-menu-item" onClick={() => {
+          <button className="profile-menu-item" type="button" onClick={() => {
             setIsOpen(false);
             navigate('/dashboard/security-settings');
           }}>
@@ -97,7 +135,7 @@ const ProfileDropdown = () => {
 
           <div className="profile-menu-divider"></div>
 
-          <button className="profile-menu-item danger" onClick={handleLogout}>
+          <button className="profile-menu-item danger" type="button" onClick={handleLogout}>
             <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
               <path d="M6 2H4v12h2V2zm6 0h-2v12h2V2zM8 8l4-3v6l-4-3z"/>
             </svg>

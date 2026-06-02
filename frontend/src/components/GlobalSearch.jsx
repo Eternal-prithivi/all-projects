@@ -11,8 +11,9 @@
 //   - Remove keyboard event listeners without replacing them — ⌘K is a user expectation
 //   - Change the result shape without updating Header.jsx trigger props
 // =============================================================================
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext.jsx';
 import {
   IconActivity,
   IconBarChart,
@@ -38,6 +39,17 @@ const SEARCH_ITEMS = [
   { id: 7, title: 'Cost Optimization', path: '/dashboard/optimization', icon: <IconZap />, keywords: ['optimize', 'savings', 'recommendations'] },
   { id: 8, title: 'Security Settings', path: '/dashboard/security-settings', icon: <IconLock />, keywords: ['password', '2fa', 'sessions', 'audit'] },
   { id: 9, title: 'Activity', path: '/dashboard/profile', icon: <IconActivity />, keywords: ['profile', 'activity', 'account'] },
+  { id: 10, title: 'Notifications', path: '/dashboard/notifications', icon: <IconActivity />, keywords: ['notifications', 'alerts'] },
+];
+
+const ADMIN_SEARCH_ITEMS = [
+  { id: 101, title: 'Admin Overview', path: '/admin', icon: <IconDashboard />, keywords: ['admin', 'overview'] },
+  { id: 102, title: 'User Management', path: '/admin/users', icon: <IconServer />, keywords: ['users', 'ban', 'roles'] },
+  { id: 103, title: 'Admin Analytics', path: '/admin/analytics', icon: <IconBarChart />, keywords: ['analytics', 'reports'] },
+  { id: 104, title: 'Payments', path: '/admin/payments', icon: <IconDollarSign />, keywords: ['payments', 'razorpay'] },
+  { id: 105, title: 'System Health', path: '/admin/system', icon: <IconShieldCheck />, keywords: ['system', 'health', 'audit'] },
+  { id: 106, title: 'Admin Settings', path: '/admin/settings', icon: <IconLock />, keywords: ['admin settings', 'platform'] },
+  { id: 107, title: 'Admin Notifications', path: '/admin/notifications', icon: <IconActivity />, keywords: ['notifications', 'alerts'] },
 ];
 
 const GlobalSearch = ({ isOpen, onClose }) => {
@@ -45,6 +57,12 @@ const GlobalSearch = ({ isOpen, onClose }) => {
   const [results, setResults] = useState([]);
   const inputRef = useRef(null);
   const navigate = useNavigate();
+  const { user } = useAuth();
+
+  const searchItems = useMemo(
+    () => (user?.role === 'admin' ? [...SEARCH_ITEMS, ...ADMIN_SEARCH_ITEMS] : SEARCH_ITEMS),
+    [user?.role]
+  );
 
   useEffect(() => {
     if (isOpen && inputRef.current) {
@@ -58,7 +76,7 @@ const GlobalSearch = ({ isOpen, onClose }) => {
       return;
     }
 
-    const filtered = SEARCH_ITEMS.filter(item => {
+    const filtered = searchItems.filter((item) => {
       const searchTerm = query.toLowerCase();
       return (
         item.title.toLowerCase().includes(searchTerm) ||
@@ -67,7 +85,7 @@ const GlobalSearch = ({ isOpen, onClose }) => {
     });
 
     setResults(filtered);
-  }, [query]);
+  }, [query, searchItems]);
 
   const handleSelect = (path) => {
     navigate(path);
@@ -136,7 +154,7 @@ const GlobalSearch = ({ isOpen, onClose }) => {
         {!query && (
           <div className="search-suggestions">
             <p className="suggestions-title">Popular Pages</p>
-            {SEARCH_ITEMS.slice(0, 5).map((item) => (
+            {searchItems.slice(0, 6).map((item) => (
               <button
                 key={item.id}
                 className="search-result-item"
