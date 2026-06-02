@@ -146,6 +146,7 @@ const AdminPaymentsPage = () => {
 
       {/* Payments Table */}
       <div className="admin-card">
+        <div className="table-container">
         <table className="admin-table">
           <thead>
             <tr>
@@ -193,6 +194,7 @@ const AdminPaymentsPage = () => {
             )}
           </tbody>
         </table>
+        </div>
 
         {/* Pagination */}
         {totalPages > 1 && (

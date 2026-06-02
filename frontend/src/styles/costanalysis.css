@@ -1276,4 +1276,9 @@
   .cost-table td {
     padding: 0.5rem;
   }
+
+  .cost-breakdown {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
 }

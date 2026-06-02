@@ -787,6 +787,7 @@ function SecurityPage() {
               message="Upload a file to the vault. Sensitive content can be auto-protected with SSE-S3 or browser encryption."
             />
           ) : (
+          <div className="table-responsive-scroll">
           <table className="file-table">
             <thead>
               <tr>
@@ -831,9 +832,8 @@ function SecurityPage() {
                 })}
             </tbody>
           </table>
+          </div>
           )}
-        </div>
-        </div>
 
         {showEncryptPrompt && pendingFileMeta && (
           <EncryptSensitivePromptModal
@@ -890,6 +890,8 @@ function SecurityPage() {
             </div>
           </div>
         )}
+        </div>
+        </div>
     </div>
   );
 }

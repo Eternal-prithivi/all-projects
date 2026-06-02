@@ -50,6 +50,11 @@ Use this matrix before marking **Mobile responsiveness** complete in the product
 | Toasts | Overlap notch / header | Safe-area in `toast-custom.css` + `mobile-consistency.css` |
 | Features page | 720px breakpoint mismatch | Aligned to 768px in `features.css` |
 | Marketing pages | Hero padding inconsistent | `marketing-shell.css` + `mobile-consistency.css` |
+| Admin payments table | No scroll wrapper | `AdminPaymentsPage.jsx` + `table-container` |
+| Security / Cost tables | Wide tables on phone | `table-responsive-scroll` wrappers |
+| Notifications page | No mobile CSS | `notifications-page.css` |
+| Docs / Status pages | Fixed padding, no mobile | `mobile-consistency.css` |
+| Modals (storage, VM, security) | Could exceed viewport | `mobile-consistency.css` |
 
 ## Automated smoke (optional)
 

@@ -516,6 +516,8 @@
 /* Table */
 .table-container {
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  max-width: 100%;
 }
 
 .admin-table {
@@ -847,6 +849,11 @@
 
 /* Responsive */
 @media (max-width: 768px) {
+  .chart-container {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
   .admin-stats-grid {
     grid-template-columns: 1fr;
   }

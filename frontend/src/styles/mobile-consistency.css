@@ -104,25 +104,88 @@
     box-sizing: border-box;
   }
 
-  /* Admin tables — horizontal scroll fallback */
+  /* Tables — horizontal scroll fallback */
   .admin-table-wrapper,
-  .table-scroll-wrap {
+  .table-scroll-wrap,
+  .table-container,
+  .table-responsive-scroll,
+  .chart-container,
+  .cost-breakdown,
+  .analytics-section .chart-container {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
-    margin: 0 -0.25rem;
-    padding: 0 0.25rem;
+    max-width: 100%;
   }
 
-  .admin-table {
+  .admin-table,
+  .cost-table {
+    min-width: 520px;
+  }
+
+  .admin-card {
+    overflow: hidden;
+  }
+
+  .admin-card .table-container,
+  .admin-card > .table-responsive-scroll {
+    margin: 0;
+  }
+
+  /* Admin filters / search */
+  .filter-buttons,
+  .admin-filters {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .filter-btn {
+    min-height: var(--touch-min);
+    flex: 1 1 auto;
+  }
+
+  .search-input-group {
+    flex-wrap: wrap;
+  }
+
+  .search-input-group input {
     min-width: 0;
+    width: 100%;
   }
 
   /* Modals full width on phones */
+  .modal-overlay,
+  .encryption-modal-overlay,
+  .decryption-modal-overlay,
+  .delete-account-modal-overlay {
+    padding: calc(0.75rem + var(--safe-top)) 0.75rem calc(0.75rem + var(--safe-bottom));
+    align-items: flex-end;
+    box-sizing: border-box;
+  }
+
+  .modal-content,
+  .modal-content--wide,
   .encryption-modal-content,
-  .decryption-modal-content {
-    width: calc(100% - 2rem) !important;
+  .decryption-modal-content,
+  .security-page .modal-content,
+  .delete-account-modal {
+    width: calc(100% - 1.5rem) !important;
     max-width: 100% !important;
-    margin: 1rem;
+    max-height: min(88vh, 640px);
+    overflow-y: auto;
+    margin: 0 auto;
+    padding: 1.25rem !important;
+    box-sizing: border-box;
+  }
+
+  .keyboard-shortcuts-overlay {
+    padding: calc(0.5rem + var(--safe-top)) 0.5rem calc(0.5rem + var(--safe-bottom));
+    align-items: flex-start;
+  }
+
+  .keyboard-shortcuts-modal {
+    width: calc(100% - 1rem);
+    max-width: 100%;
+    max-height: min(85vh, 560px);
   }
 
   /* Onboarding welcome — safe areas */
@@ -137,6 +200,103 @@
   .landing-footer-wrap .site-footer {
     padding-left: 1rem;
     padding-right: 1rem;
+  }
+
+  /* Standalone marketing utility pages */
+  .docs-hub,
+  .status-page,
+  .verify-email-page,
+  .trust-center-page {
+    padding: 5.5rem 1rem 2.5rem;
+    box-sizing: border-box;
+  }
+
+  .docs-hub__grid {
+    grid-template-columns: 1fr;
+  }
+
+  .features-page .features-hero {
+    padding-top: 1rem;
+  }
+
+  /* Help center */
+  .help-categories {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 0.35rem;
+  }
+
+  .help-categories .category-button {
+    flex-shrink: 0;
+  }
+
+  /* Notifications */
+  .notifications-page__item {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.75rem;
+  }
+
+  .notifications-page__item-actions {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+
+  .notifications-page__tabs,
+  .notifications-page__filters {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    flex-wrap: nowrap;
+    padding-bottom: 0.25rem;
+  }
+
+  .notifications-page__tab,
+  .notifications-page__chip {
+    flex-shrink: 0;
+  }
+
+  /* Provision wizard */
+  .provision-wizard-steps,
+  .wizard-steps {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    flex-wrap: nowrap;
+    padding-bottom: 0.35rem;
+  }
+
+  .wizard-step {
+    flex-shrink: 0;
+  }
+
+  /* VM cluster modals */
+  .modal-content--wide {
+    max-width: 100% !important;
+  }
+
+  /* Page headers in dashboard */
+  .dashboard-content :is(h1, .page-title) {
+    font-size: clamp(1.35rem, 5vw, 1.75rem);
+    word-break: break-word;
+  }
+
+  .cost-header,
+  .storage-header,
+  .vm-header {
+    flex-direction: column;
+    align-items: flex-start !important;
+    gap: 1rem;
+  }
+
+  .header-buttons {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .header-buttons button,
+  .header-buttons a {
+    flex: 1 1 auto;
+    min-height: var(--touch-min);
   }
 }
 

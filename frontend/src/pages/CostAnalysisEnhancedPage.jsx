@@ -667,6 +667,7 @@ const CostAnalysisEnhancedPage = () => {
       {costByService.length > 0 && (
         <div className="cost-breakdown">
           <h3>Cost by Service</h3>
+          <div className="table-responsive-scroll">
           <table className="cost-table">
             <thead>
               <tr>
@@ -685,6 +686,7 @@ const CostAnalysisEnhancedPage = () => {
               ))}
             </tbody>
           </table>
+          </div>
         </div>
       )}
 
