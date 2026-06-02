@@ -15,6 +15,8 @@ Use this matrix before marking **Mobile responsiveness** complete in the product
 - [ ] Hamburger opens drawer; can reach Features, About, Contact, Help (or landing anchors)
 - [ ] Login and Sign Up reachable from drawer
 - [ ] No horizontal page scroll on home, features, contact, help
+- [ ] Home page scrolls vertically through all sections (same as desktop content)
+- [ ] Login / Register / Forgot password: full form visible or scrollable; no clipped fields at 320px
 - [ ] Cookie banner does not cover primary CTAs on marketing pages
 
 ## Dashboard (logged in)

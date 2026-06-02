@@ -16,13 +16,16 @@ export default function MobileMarketingNav({ userLoggedIn, links }) {
   useEffect(() => {
     if (!open) return undefined;
     const prev = document.body.style.overflow;
+    const prevHtml = document.documentElement.style.overflow;
     document.body.style.overflow = 'hidden';
+    document.documentElement.style.overflow = 'hidden';
     const onKey = (e) => {
       if (e.key === 'Escape') setOpen(false);
     };
     document.addEventListener('keydown', onKey);
     return () => {
       document.body.style.overflow = prev;
+      document.documentElement.style.overflow = prevHtml;
       document.removeEventListener('keydown', onKey);
     };
   }, [open]);

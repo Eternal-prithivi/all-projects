@@ -1,14 +1,17 @@
 /* ============================================
    AUTH PAGES — Advanced Glassmorphism & High-Impact Typography
    ============================================ */
+@import './auth-mobile.css';
 
 /* --- Base Layout --- */
 .auth-page {
   display: flex;
   min-height: 100vh;
+  min-height: 100dvh;
   background: #000;
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-  overflow: hidden; /* Prevent scrollbars from glowing orbs */
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 /* --- Left Panel: Brand Showcase --- */
@@ -494,53 +497,7 @@
   .brand-tagline { font-size: clamp(2rem, 3.5vw, 3rem); }
 }
 
-@media (max-width: 968px) {
-  .auth-page { flex-direction: column; }
-  
-  .auth-brand-panel {
-    padding: 5rem 3rem 3rem;
-    align-items: center;
-    text-align: center;
-  }
-  
-  .brand-description {
-    max-width: 100%;
-    margin-left: auto;
-    margin-right: auto;
-  }
-  
-  .brand-features {
-    flex-direction: row;
-    flex-wrap: wrap;
-    justify-content: center;
-  }
-  
-  .brand-stats {
-    justify-content: center;
-  }
-
-  .auth-back-link {
-    top: 1.5rem;
-    left: 1.5rem;
-  }
-  
-  .auth-form-panel {
-    padding: 3rem 1.5rem;
-  }
-  
-  .auth-form-wrapper {
-    padding: 2.5rem;
-  }
-}
-
-@media (max-width: 480px) {
-  .brand-features, .brand-stats { display: none; }
-  .auth-form-wrapper {
-    padding: 2rem 1.5rem;
-    border-radius: 16px;
-  }
-  .auth-form-header h2 { font-size: 1.75rem; }
-}
+/* Tablet/mobile auth layout: see auth-mobile.css */
 
 .auth-label-row {
   display: flex;

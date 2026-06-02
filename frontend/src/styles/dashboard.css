@@ -25,7 +25,10 @@
    ======================================== */
 .dashboard-page {
   display: flex;
+  flex: 1 1 auto;
   min-height: 100vh;
+  min-height: 100dvh;
+  width: 100%;
   background-color: var(--bg-base);
   color: var(--text-primary);
   font-family: "Inter", "Outfit", sans-serif;
