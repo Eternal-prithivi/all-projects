@@ -4,18 +4,12 @@
   "description": "Multi-cloud resource optimization and management platform for AWS, GCP, and Azure",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#0a0a0a",
-  "theme_color": "#c9a227",
+  "background_color": "#050505",
+  "theme_color": "#050505",
   "icons": [
     {
-      "src": "/icon.svg",
-      "sizes": "any",
-      "type": "image/svg+xml",
-      "purpose": "any"
-    },
-    {
-      "src": "/favicon-48.png",
-      "sizes": "48x48",
+      "src": "/zenith-icon.png",
+      "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
     },
@@ -30,6 +24,12 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
+    },
+    {
+      "src": "/favicon-48.png",
+      "sizes": "48x48",
+      "type": "image/png",
+      "purpose": "any"
     }
   ],
   "categories": ["productivity", "business", "utilities"],

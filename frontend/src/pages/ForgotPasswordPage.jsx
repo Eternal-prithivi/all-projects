@@ -54,8 +54,7 @@ function ForgotPasswordPage() {
         <Link to="/login" className="auth-back-link">← Back to sign in</Link>
         <div className="brand-content">
           <div className="brand-logo auth-brand-logo">
-            <ZenithLogo size={56} />
-            <span className="brand-logo-text">Zenith</span>
+            <ZenithLogo variant="full" size={56} badge="Cloud" textLayout="inline" />
           </div>
           <h1 className="brand-tagline">
             Reset your <span>password.</span>

@@ -25,7 +25,7 @@ export default function MarketingPageLayout({ children, showFooter = true }) {
       <nav className={`landing-nav ${navScrolled ? 'landing-nav--scrolled' : ''}`}>
         <div className="nav-container">
           <Link to="/" className="nav-logo">
-            <ZenithLogo variant="full" size={36} subtitle="Cloud" />
+            <ZenithLogo variant="full" size={40} badge="Cloud" textLayout="inline" />
           </Link>
           <div className="nav-links">
             <Link to="/features">Features</Link>

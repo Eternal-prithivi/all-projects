@@ -10,7 +10,7 @@ const AdminSidebar = ({ user }) => {
   return (
     <aside className="admin-sidebar nav-rail admin-rail" role="navigation" aria-label="Admin navigation">
       <div className="rail-logo admin-rail-logo">
-        <ZenithLogo size={28} linkTo="/admin" />
+        <ZenithLogo size={32} linkTo="/admin" />
       </div>
 
       <nav className="rail-nav admin-rail-nav">

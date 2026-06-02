@@ -1,18 +1,19 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { LOGO_ICON_PATH, LOGO_WORDMARK_PATH } from '../../config/site.js';
+import { LOGO_ICON_PATH } from '../../config/site.js';
 
 /**
- * Zenith brand mark — icon, wordmark, or both.
- * @param {'icon'|'wordmark'|'full'} variant
+ * Zenith brand mark — icon, or icon + wordmark.
+ * @param {'icon'|'full'} variant
+ * @param {'stacked'|'inline'} textLayout — inline matches dashboard header (Zenith + Cloud pill)
  */
 export default function ZenithLogo({
   variant = 'icon',
   size = 32,
   className = '',
   linkTo = null,
-  showText = false,
-  subtitle = null,
+  badge = 'Cloud',
+  textLayout = 'inline',
 }) {
   const icon = (
     <img
@@ -22,39 +23,27 @@ export default function ZenithLogo({
       height={size}
       className={`zenith-logo-icon ${className}`.trim()}
       aria-hidden
+      decoding="async"
     />
   );
 
-  const wordmark = (
-    <img
-      src={LOGO_WORDMARK_PATH}
-      alt="Zenith Cloud"
-      height={Math.max(size, 28)}
-      className={`zenith-logo-wordmark ${className}`.trim()}
-      style={{ width: 'auto', height: Math.max(size, 28) }}
-    />
-  );
+  let content = icon;
 
-  let content;
-  if (variant === 'wordmark') {
-    content = wordmark;
-  } else if (variant === 'full' || showText) {
+  if (variant === 'full') {
     content = (
-      <span className="zenith-logo-full">
+      <span className={`zenith-logo-full zenith-logo-full--${textLayout}`}>
         {icon}
         <span className="zenith-logo-text">
           <span className="zenith-logo-name">Zenith</span>
-          {subtitle ? <span className="zenith-logo-sub">{subtitle}</span> : null}
+          {badge ? <span className="zenith-logo-badge">{badge}</span> : null}
         </span>
       </span>
     );
-  } else {
-    content = icon;
   }
 
   if (linkTo) {
     return (
-      <Link to={linkTo} className="zenith-logo-link" aria-label="Zenith home">
+      <Link to={linkTo} className="zenith-logo-link" aria-label="Zenith Cloud home">
         {content}
       </Link>
     );

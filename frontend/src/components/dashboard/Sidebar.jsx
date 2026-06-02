@@ -50,7 +50,7 @@ function Sidebar({ user }) {
     <aside className="nav-rail" role="navigation" aria-label="Main navigation">
       {/* Logo mark */}
       <div className="rail-logo" data-tour="sidebar-logo">
-        <ZenithLogo size={28} linkTo="/" />
+        <ZenithLogo size={32} linkTo="/" />
       </div>
 
       {/* Navigation items */}

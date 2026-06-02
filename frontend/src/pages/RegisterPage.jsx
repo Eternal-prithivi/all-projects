@@ -56,8 +56,7 @@ function RegisterPage() {
         <Link to="/" className="auth-back-link">← Back to home</Link>
         <div className="brand-content">
           <div className="brand-logo auth-brand-logo">
-            <ZenithLogo size={56} />
-            <span className="brand-logo-text">Zenith</span>
+            <ZenithLogo variant="full" size={56} badge="Cloud" textLayout="inline" />
           </div>
           <h1 className="brand-tagline">
             Start optimizing <span>your cloud today.</span>
