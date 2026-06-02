@@ -6,10 +6,11 @@ from app.provision.models import DeploymentStatus, DriftReport, DriftStatus
 from app.provision.tasks import scheduled_drift_check
 
 
+@patch("app.config.demo_mode.is_demo_mode", return_value=False)
 @patch("app.database.mongo_client.get_database")
 @patch("app.provision.drift_detector.detect_drift")
 @patch("app.provision.byoc_credentials.resolve_byoc_terraform_env")
-def test_scheduled_drift_uses_owner_byoc(mock_byoc, mock_detect, mock_get_db):
+def test_scheduled_drift_uses_owner_byoc(mock_byoc, mock_detect, mock_get_db, _mock_demo):
     mock_byoc.return_value = {
         "AWS_ACCESS_KEY_ID": "AKIATEST",
         "AWS_SECRET_ACCESS_KEY": "secret",
@@ -41,9 +42,10 @@ def test_scheduled_drift_uses_owner_byoc(mock_byoc, mock_detect, mock_get_db):
     assert result["skipped"] == 0
 
 
+@patch("app.config.demo_mode.is_demo_mode", return_value=False)
 @patch("app.database.mongo_client.get_database")
 @patch("app.provision.byoc_credentials.resolve_byoc_terraform_env")
-def test_scheduled_drift_skips_without_byoc(mock_byoc, mock_get_db):
+def test_scheduled_drift_skips_without_byoc(mock_byoc, mock_get_db, _mock_demo):
     mock_byoc.return_value = {}
 
     collection = MagicMock()
@@ -65,10 +67,11 @@ def test_scheduled_drift_skips_without_byoc(mock_byoc, mock_get_db):
     collection.update_one.assert_called_once()
 
 
+@patch("app.config.demo_mode.is_demo_mode", return_value=False)
 @patch("app.database.mongo_client.get_database")
 @patch("app.provision.boto3_drift.detect_drift_boto3")
 @patch("app.provision.byoc_credentials.resolve_byoc_terraform_env")
-def test_scheduled_drift_uses_boto3_for_boto3_deployments(mock_byoc, mock_boto3_drift, mock_get_db):
+def test_scheduled_drift_uses_boto3_for_boto3_deployments(mock_byoc, mock_boto3_drift, mock_get_db, _mock_demo):
     mock_byoc.return_value = {
         "AWS_ACCESS_KEY_ID": "AKIATEST",
         "AWS_SECRET_ACCESS_KEY": "secret",
@@ -101,10 +104,11 @@ def test_scheduled_drift_uses_boto3_for_boto3_deployments(mock_byoc, mock_boto3_
     assert result["skipped"] == 0
 
 
+@patch("app.config.demo_mode.is_demo_mode", return_value=False)
 @patch("app.database.mongo_client.get_database")
 @patch("app.provision.drift_detector.detect_drift")
 @patch("app.provision.byoc_credentials.resolve_byoc_terraform_env")
-def test_scheduled_drift_skips_terraform_without_workspace(mock_byoc, mock_detect, mock_get_db):
+def test_scheduled_drift_skips_terraform_without_workspace(mock_byoc, mock_detect, mock_get_db, _mock_demo):
     mock_byoc.return_value = {
         "AWS_ACCESS_KEY_ID": "AKIATEST",
         "AWS_SECRET_ACCESS_KEY": "secret",
