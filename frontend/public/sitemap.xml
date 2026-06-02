@@ -1,67 +1,67 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
-    <loc>https://zenith-frontend.vercel.app/</loc>
+    <loc>https://rajverse.me/</loc>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
   </url>
   <url>
-    <loc>https://zenith-frontend.vercel.app/login</loc>
+    <loc>https://rajverse.me/login</loc>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
   </url>
   <url>
-    <loc>https://zenith-frontend.vercel.app/register</loc>
+    <loc>https://rajverse.me/register</loc>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://zenith-frontend.vercel.app/pricing</loc>
+    <loc>https://rajverse.me/pricing</loc>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://zenith-frontend.vercel.app/features</loc>
+    <loc>https://rajverse.me/features</loc>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://zenith-frontend.vercel.app/about</loc>
+    <loc>https://rajverse.me/about</loc>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url>
   <url>
-    <loc>https://zenith-frontend.vercel.app/contact</loc>
+    <loc>https://rajverse.me/contact</loc>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url>
   <url>
-    <loc>https://zenith-frontend.vercel.app/help</loc>
+    <loc>https://rajverse.me/help</loc>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url>
   <url>
-    <loc>https://zenith-frontend.vercel.app/docs</loc>
+    <loc>https://rajverse.me/docs</loc>
     <changefreq>weekly</changefreq>
     <priority>0.6</priority>
   </url>
   <url>
-    <loc>https://zenith-frontend.vercel.app/trust</loc>
+    <loc>https://rajverse.me/trust</loc>
     <changefreq>monthly</changefreq>
     <priority>0.4</priority>
   </url>
   <url>
-    <loc>https://zenith-frontend.vercel.app/status</loc>
+    <loc>https://rajverse.me/status</loc>
     <changefreq>daily</changefreq>
     <priority>0.4</priority>
   </url>
   <url>
-    <loc>https://zenith-frontend.vercel.app/legal/privacy</loc>
+    <loc>https://rajverse.me/legal/privacy</loc>
     <changefreq>yearly</changefreq>
     <priority>0.3</priority>
   </url>
   <url>
-    <loc>https://zenith-frontend.vercel.app/legal/terms</loc>
+    <loc>https://rajverse.me/legal/terms</loc>
     <changefreq>yearly</changefreq>
     <priority>0.3</priority>
   </url>

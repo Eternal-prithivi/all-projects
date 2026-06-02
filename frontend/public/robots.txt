@@ -5,7 +5,7 @@ Disallow: /admin/
 Disallow: /dashboard/
 Disallow: /api/
 
-Sitemap: https://zenith-frontend.vercel.app/sitemap.xml
+Sitemap: https://rajverse.me/sitemap.xml
 
 User-agent: Googlebot
 Allow: /

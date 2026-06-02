@@ -17,4 +17,4 @@ services:
       - key: ENVIRONMENT
         value: production
       - key: FRONTEND_URL
-        value: https://zenith-frontend.vercel.app
+        value: https://rajverse.me

@@ -1,6 +1,6 @@
 /** Public site URL for SEO, Open Graph, and sitemap (set VITE_SITE_URL in Vercel). */
 export const SITE_URL = (
-  import.meta.env.VITE_SITE_URL || 'https://zenith-frontend.vercel.app'
+  import.meta.env.VITE_SITE_URL || 'https://rajverse.me'
 ).replace(/\/$/, '');
 
 export const SITE_NAME = 'Zenith Cloud Platform';
