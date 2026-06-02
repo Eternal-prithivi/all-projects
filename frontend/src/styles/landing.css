@@ -1,4 +1,5 @@
 /* Zenith marketing landing — premium SaaS layout */
+@import './mobile-marketing-nav.css';
 
 .landing-page {
   position: relative;
@@ -981,10 +982,6 @@
 }
 
 @media (max-width: 640px) {
-  .nav-links a:not(.btn-nav-login):not(.btn-nav-signup) {
-    display: none;
-  }
-
   .landing-hero {
     padding-top: 7rem;
   }

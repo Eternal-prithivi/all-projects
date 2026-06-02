@@ -67,6 +67,15 @@
   filter: brightness(1.06);
 }
 
+@media (max-width: 768px) {
+  body:has(.dashboard-page) .cookie-consent,
+  body:has(.admin-layout) .cookie-consent {
+    bottom: var(--mobile-shell-bottom);
+    padding-left: max(1rem, env(safe-area-inset-left, 0px));
+    padding-right: max(1rem, env(safe-area-inset-right, 0px));
+  }
+}
+
 @media (max-width: 600px) {
   .cookie-consent__inner {
     flex-direction: column;

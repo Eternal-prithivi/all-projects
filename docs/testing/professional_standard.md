@@ -28,6 +28,7 @@ Do **not** block current work on the items below. They are **later**.
 | Testing policy | `TESTING_POLICY.md` |
 | Security baselines | Rate limits, optional Sentry, dependency scans in CI |
 | Staging docs | `STAGING.md`, Atlas/Terraform CI guides |
+| Mobile UX verification | `mobile_responsive_checklist.md` (marketing drawer, dashboard/admin bottom nav, safe areas) |
 
 ---
 

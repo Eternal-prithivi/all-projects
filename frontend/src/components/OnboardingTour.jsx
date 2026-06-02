@@ -16,6 +16,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Joyride, STATUS, ACTIONS, EVENTS } from 'react-joyride';
 import { useLocation } from 'react-router-dom';
+import { useMediaQuery, MOBILE_MEDIA_QUERY } from '../hooks/useMediaQuery.js';
 import '../styles/onboarding.css';
 
 const TOUR_STORAGE_KEY = 'zenith_onboarding_complete';
@@ -33,6 +34,7 @@ const TOUR_DISMISSED_KEY = 'zenith_onboarding_dismissed';
  */
 function OnboardingTour() {
   const location = useLocation();
+  const isMobile = useMediaQuery(MOBILE_MEDIA_QUERY);
   const [run, setRun] = useState(false);
   const [showWelcome, setShowWelcome] = useState(false);
   const hasCheckedRef = React.useRef(false);
@@ -45,9 +47,9 @@ function OnboardingTour() {
         <div className="tour-step-content">
           <h3>Navigation Sidebar</h3>
           <p>
-            This is your command center. Hover over the icons to see labels.
-            Access <strong>Storage</strong>, <strong>VM Clusters</strong>, 
-            <strong>Security Vault</strong>, <strong>Cost Analysis</strong>, 
+            This is your command center. Use the sidebar on desktop, or the bottom tabs and
+            <strong> More </strong> menu on mobile. Reach <strong>Storage</strong>,{' '}
+            <strong>VM Clusters</strong>, <strong>Security</strong>, <strong>Cost Analysis</strong>,
             and <strong>Billing</strong> from here.
           </p>
         </div>
@@ -156,14 +158,14 @@ function OnboardingTour() {
     const isDismissed = localStorage.getItem(TOUR_DISMISSED_KEY);
     const isDashboard = location.pathname === '/dashboard';
 
-    if (!isComplete && !isDismissed && isDashboard) {
+    if (!isComplete && !isDismissed && isDashboard && !isMobile) {
       const timer = setTimeout(() => {
         setShowWelcome(true);
       }, 1500);
       return () => clearTimeout(timer);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- welcome modal once on dashboard mount
-  }, []);
+  }, [isMobile]);
 
   const startTour = useCallback(() => {
     setShowWelcome(false);
@@ -277,7 +279,8 @@ function OnboardingTour() {
         </div>
       )}
 
-      {/* Joyride tour — UNCONTROLLED mode (no stepIndex prop) */}
+      {/* Joyride tour — desktop/tablet only (skipped on narrow viewports) */}
+      {!isMobile && (
       <Joyride
         steps={steps}
         run={run}
@@ -303,6 +306,7 @@ function OnboardingTour() {
           },
         }}
       />
+      )}
     </>
   );
 }

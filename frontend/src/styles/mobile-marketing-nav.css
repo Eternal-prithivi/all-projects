@@ -1,0 +1,90 @@
+.mobile-marketing-nav {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .mobile-marketing-nav {
+    display: flex;
+    align-items: center;
+  }
+
+  .marketing-page .nav-links.nav-links--desktop,
+  .landing-page .nav-links.nav-links--desktop {
+    display: none;
+  }
+
+  .mobile-marketing-nav__toggle {
+    width: var(--touch-min);
+    height: var(--touch-min);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sm);
+    background: var(--surface-hover);
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 1.1rem;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .mobile-marketing-nav__backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 1100;
+    background: rgba(0, 0, 0, 0.55);
+    border: none;
+    padding: 0;
+    cursor: pointer;
+  }
+
+  .mobile-marketing-nav__drawer {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: min(300px, 88vw);
+    z-index: 1101;
+    background: var(--bg-elevated);
+    border-left: 1px solid var(--border-default);
+    padding: calc(1rem + var(--safe-top)) 0 calc(1rem + var(--safe-bottom));
+    box-shadow: var(--shadow-elevated);
+    animation: marketingDrawerIn 0.25s var(--ease-out);
+  }
+
+  @keyframes marketingDrawerIn {
+    from {
+      transform: translateX(100%);
+    }
+    to {
+      transform: translateX(0);
+    }
+  }
+
+  .mobile-marketing-nav__list {
+    list-style: none;
+    margin: 0;
+    padding: 0.5rem 0;
+  }
+
+  .mobile-marketing-nav__link {
+    display: block;
+    padding: 0.875rem 1.25rem;
+    min-height: var(--touch-min);
+    color: var(--text-secondary);
+    text-decoration: none;
+    font-size: 1rem;
+    box-sizing: border-box;
+  }
+
+  .mobile-marketing-nav__link:hover {
+    background: var(--surface-hover);
+    color: var(--gold-primary);
+  }
+
+  .marketing-page .nav-container,
+  .landing-page .nav-container {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+}

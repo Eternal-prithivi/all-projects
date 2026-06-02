@@ -686,6 +686,20 @@
     padding: 1rem;
   }
 
+  .bucket-card-actions,
+  .file-actions,
+  .storage-header-actions {
+    flex-direction: column;
+    align-items: stretch;
+    width: 100%;
+  }
+
+  .bucket-card-actions .btn,
+  .file-actions .btn {
+    width: 100%;
+    justify-content: center;
+  }
+
   .storage-header h2 {
     font-size: 1.75rem;
   }

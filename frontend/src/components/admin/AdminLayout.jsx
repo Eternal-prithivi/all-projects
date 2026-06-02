@@ -5,6 +5,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import { NotificationProvider } from '../../context/NotificationContext.jsx';
 import AdminSidebar from './AdminSidebar';
+import AdminMobileBottomNav from './AdminMobileBottomNav';
 import AdminHeader from './AdminHeader';
 import Breadcrumbs from '../Breadcrumbs.jsx';
 import GlobalSearch from '../GlobalSearch.jsx';
@@ -78,6 +79,7 @@ const AdminLayout = () => {
     <NotificationProvider>
       <div className="admin-layout">
         <AdminSidebar user={user} />
+        <AdminMobileBottomNav user={user} />
         <div className="admin-main">
           <AdminHeader />
           <div className="dashboard-breadcrumbs-wrapper admin-breadcrumbs-wrapper">

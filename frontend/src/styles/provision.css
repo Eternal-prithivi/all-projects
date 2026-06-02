@@ -1197,7 +1197,13 @@ html.theme-light .provision-action-status {
   .template-grid { grid-template-columns: 1fr; }
   .config-form { grid-template-columns: 1fr; }
   .module-toggles { grid-template-columns: 1fr; }
-  .wizard-step-label { display: none; }
+  .wizard-step-label {
+    font-size: 0.65rem;
+    max-width: 4.5rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
   .deployment-card { flex-direction: column; align-items: flex-start; }
   .provision-manage-grid { grid-template-columns: 1fr; }
 }

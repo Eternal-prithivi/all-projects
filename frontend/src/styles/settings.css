@@ -445,6 +445,22 @@ input:disabled + .toggle-slider {
    RESPONSIVE
    ============================================ */
 @media (max-width: 768px) {
+  .settings-tabs,
+  .settings-nav {
+    display: flex;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    gap: 0.5rem;
+    padding-bottom: 0.25rem;
+    flex-wrap: nowrap;
+  }
+
+  .settings-tabs button,
+  .settings-nav a {
+    flex-shrink: 0;
+    min-height: var(--touch-min);
+  }
+
   .setting-item,
   .billing-method,
   .api-key-item {

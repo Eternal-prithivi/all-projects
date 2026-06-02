@@ -648,10 +648,24 @@
   .cost-filters {
     flex-direction: column;
     gap: 1rem;
+    align-items: stretch;
   }
 
   .filter-group {
     min-width: 100%;
+    width: 100%;
+  }
+
+  .cost-filters select,
+  .cost-filters input,
+  .cost-filters button {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .recharts-legend-wrapper {
+    position: relative !important;
+    width: 100% !important;
   }
 
   .cost-summary {

@@ -12,6 +12,8 @@ import { MARKETING_PRICING } from '../data/marketingPricing.js';
 import '../styles/home.css';
 import '../styles/animated-background.css';
 import ZenithLogo from '../components/brand/ZenithLogo.jsx';
+import MobileMarketingNav from '../components/layout/MobileMarketingNav.jsx';
+import { LANDING_PAGE_LINKS } from '../config/marketingNavLinks.js';
 
 const MARQUEE_ITEMS = [
   'AWS',
@@ -113,10 +115,12 @@ function HomePage() {
           <Link to="/" className="nav-logo">
             <ZenithLogo variant="full" size={40} badge="Cloud" textLayout="inline" />
           </Link>
-          <div className="nav-links">
-            <a href="#features">Features</a>
-            <a href="#how-it-works">How it works</a>
-            <a href="#pricing">Pricing</a>
+          <div className="nav-links nav-links--desktop">
+            {LANDING_PAGE_LINKS.map((link) => (
+              <a key={link.href} href={link.href}>
+                {link.label}
+              </a>
+            ))}
             {user ? (
               <Link to="/dashboard" className="btn-nav-signup">
                 Go to Dashboard
@@ -132,6 +136,7 @@ function HomePage() {
               </>
             )}
           </div>
+          <MobileMarketingNav userLoggedIn={!!user} links={LANDING_PAGE_LINKS} />
         </div>
       </nav>
 

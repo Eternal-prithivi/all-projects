@@ -8,7 +8,7 @@ const AdminSidebar = ({ user }) => {
   const userInitial = user?.username?.charAt(0).toUpperCase() || 'A';
 
   return (
-    <aside className="admin-sidebar nav-rail admin-rail" role="navigation" aria-label="Admin navigation">
+    <aside className="admin-sidebar nav-rail nav-rail--desktop admin-rail" role="navigation" aria-label="Admin navigation">
       <div className="rail-logo admin-rail-logo">
         <ZenithLogo size={32} linkTo="/admin" />
       </div>

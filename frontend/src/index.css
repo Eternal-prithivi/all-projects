@@ -69,6 +69,18 @@
   --duration-normal: 250ms;
   --duration-slow: 400ms;
 
+  /* Breakpoints (for reference in custom media queries) */
+  --bp-sm: 480px;
+  --bp-md: 768px;
+  --bp-lg: 1024px;
+
+  /* Mobile shell */
+  --mobile-tab-height: 56px;
+  --touch-min: 44px;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --mobile-shell-bottom: calc(var(--mobile-tab-height) + var(--safe-bottom));
+
   color-scheme: dark;
 }
 

@@ -728,11 +728,11 @@
   }
 
   .invoices-table-wrapper {
-    overflow-x: scroll;
+    overflow-x: auto;
   }
 
   .invoices-table {
-    min-width: 700px;
+    min-width: 0;
   }
 }
 
@@ -1204,13 +1204,45 @@
     grid-template-columns: 1fr;
   }
   
-  .payment-history-table {
-    font-size: 12px;
+  .payment-history-table-wrapper {
+    overflow-x: visible;
   }
-  
-  .payment-history-table th,
-  .payment-history-table td {
-    padding: 8px;
+
+  .payment-history-table {
+    font-size: 0.9rem;
+  }
+
+  .payment-history-table thead {
+    display: none;
+  }
+
+  .payment-history-table tbody tr {
+    display: block;
+    margin-bottom: 0.75rem;
+    padding: 0.75rem 1rem;
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-md);
+    background: var(--bg-card);
+  }
+
+  .payment-history-table tbody td {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.4rem 0;
+    border: none;
+  }
+
+  .payment-history-table tbody td::before {
+    content: attr(data-label);
+    font-weight: 600;
+    color: var(--text-muted);
+    font-size: 0.8rem;
+  }
+
+  .payment-history-table tbody tr:hover {
+    background: var(--bg-card-hover);
   }
 }
 

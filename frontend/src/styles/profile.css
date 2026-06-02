@@ -478,8 +478,24 @@
 }
 
 @media (max-width: 768px) {
+  .profile-tabs,
+  .profile-nav {
+    display: flex;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    flex-wrap: nowrap;
+    gap: 0.5rem;
+  }
+
   .form-grid {
     grid-template-columns: 1fr;
+  }
+
+  .form-grid input,
+  .form-grid select,
+  .form-grid textarea {
+    width: 100%;
+    max-width: 100%;
   }
 
   .stats-grid {

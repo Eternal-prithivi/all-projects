@@ -2,6 +2,7 @@
 
 @import './animated-background.css';
 @import './landing-scroll.css';
+@import './mobile-marketing-nav.css';
 
 .marketing-page {
   position: relative;
@@ -246,12 +247,4 @@
   display: block;
 }
 
-@media (max-width: 768px) {
-  .marketing-page .nav-links a:not(.btn-nav-login):not(.btn-nav-signup) {
-    display: none;
-  }
-
-  .marketing-page .nav-links a[href='/help'] {
-    display: none;
-  }
-}
+/* Mobile nav: see mobile-marketing-nav.css */

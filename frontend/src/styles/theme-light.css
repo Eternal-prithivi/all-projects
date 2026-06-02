@@ -889,17 +889,18 @@ html[data-theme="light"] .loading-spinner-text {
 /* ============================================
    MOBILE BOTTOM TAB BAR
    ============================================ */
-html[data-theme="light"] .mobile-tab-bar {
-  background: rgba(255, 255, 255, 0.95);
+html[data-theme="light"] .mobile-bottom-nav {
+  background: rgba(255, 255, 255, 0.96);
   border-top-color: var(--border-default);
   backdrop-filter: blur(12px);
 }
 
-html[data-theme="light"] .mobile-tab-bar .tab-item {
+html[data-theme="light"] .mobile-bottom-nav__link {
   color: var(--text-muted);
 }
 
-html[data-theme="light"] .mobile-tab-bar .tab-item.active {
+html[data-theme="light"] .mobile-bottom-nav__link.active,
+html[data-theme="light"] .mobile-bottom-nav__more[aria-expanded='true'] {
   color: var(--gold-primary);
 }
 
@@ -1094,7 +1095,7 @@ html[data-theme] .setting-item,
 html[data-theme] .byoc-provider-card,
 html[data-theme] .footer,
 html[data-theme] .site-footer,
-html[data-theme] .mobile-tab-bar,
+html[data-theme] .mobile-bottom-nav,
 html[data-theme] .upload-section,
 html[data-theme] .list-section,
 html[data-theme] .billing-section,

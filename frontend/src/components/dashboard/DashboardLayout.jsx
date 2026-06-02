@@ -16,6 +16,7 @@ import { ToastContainer } from "react-toastify";
 import { useAuth } from "../../context/AuthContext.jsx";
 import { NotificationProvider } from "../../context/NotificationContext.jsx";
 import Sidebar from "./Sidebar.jsx";
+import MobileBottomNav from "./MobileBottomNav.jsx";
 import Header from "./Header.jsx";
 import Footer from "../layout/Footer.jsx";
 import Breadcrumbs from "../Breadcrumbs.jsx";
@@ -25,6 +26,7 @@ import GlobalSearch from "../GlobalSearch.jsx";
 import OnboardingTour from "../OnboardingTour.jsx";
 import { useTheme } from "../../context/ThemeContext.jsx";
 import "../../styles/dashboard.css";
+import "../../styles/mobile-nav.css";
 import "../../styles/cards.css";
 import "../../styles/dashboard-polish.css";
 import "react-toastify/dist/ReactToastify.css";
@@ -100,6 +102,7 @@ function DashboardLayout() {
           Skip to main content
         </a>
         <Sidebar user={user} />
+        <MobileBottomNav user={user} />
         <div className="dashboard-main">
           <Header user={user} />
           <div className="dashboard-breadcrumbs-wrapper">

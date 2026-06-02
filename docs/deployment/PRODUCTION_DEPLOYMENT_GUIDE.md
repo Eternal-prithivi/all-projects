@@ -425,7 +425,7 @@ Schedule cleanup jobs:
 - [ ] Session management
 - [ ] API rate limiting
 - [ ] Error handling
-- [ ] Mobile responsiveness
+- [ ] Mobile responsiveness ([checklist](../testing/mobile_responsive_checklist.md))
 
 ---
 

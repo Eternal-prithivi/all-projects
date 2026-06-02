@@ -461,6 +461,56 @@ select.intent-archival {
   box-shadow: var(--shadow-card);
 }
 
+/* Mobile layout utilities */
+.table-responsive-scroll {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+@media (max-width: 768px) {
+  .data-card-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .data-card-list .data-card-row,
+  table.data-card-table tbody tr {
+    display: block;
+    padding: 1rem;
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-md);
+    background: var(--bg-card);
+    margin-bottom: 0.5rem;
+  }
+
+  table.data-card-table thead {
+    display: none;
+  }
+
+  table.data-card-table tbody td {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 1rem;
+    padding: 0.5rem 0;
+    border: none;
+    font-size: 0.9rem;
+  }
+
+  table.data-card-table tbody td::before {
+    content: attr(data-label);
+    font-weight: 600;
+    color: var(--text-muted);
+    flex-shrink: 0;
+  }
+
+  table.data-card-table tbody tr:hover {
+    background: var(--bg-card);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .storage-process-info .process-icon,
   .vm-process-info .process-icon,

@@ -565,7 +565,7 @@ function BillingPage() {
           </div>
         ) : (
           <div className="payment-history-table-wrapper">
-            <table className="payment-history-table">
+            <table className="payment-history-table data-card-table">
               <thead>
                 <tr>
                   <th>Date</th>
@@ -579,16 +579,16 @@ function BillingPage() {
               <tbody>
                 {paymentHistory.map((payment) => (
                   <tr key={payment.id}>
-                    <td className="payment-date">{formatDate(payment.paid_at || payment.created)}</td>
-                    <td>
+                    <td className="payment-date" data-label="Date">{formatDate(payment.paid_at || payment.created)}</td>
+                    <td data-label="Plan">
                       <span className="plan-badge">{getPlanDisplayName(payment.plan_id)}</span>
                     </td>
-                    <td className="billing-cycle">{payment.billing_cycle}</td>
-                    <td className="payment-amount">{formatCurrency(payment.amount)}</td>
-                    <td className="payment-id">
+                    <td className="billing-cycle" data-label="Billing cycle">{payment.billing_cycle}</td>
+                    <td className="payment-amount" data-label="Amount">{formatCurrency(payment.amount)}</td>
+                    <td className="payment-id" data-label="Payment ID">
                       <code>{payment.payment_id?.substring(0, 20)}...</code>
                     </td>
-                    <td>
+                    <td data-label="Status">
                       <span className="payment-status-badge success">
                         ✓ Paid
                       </span>

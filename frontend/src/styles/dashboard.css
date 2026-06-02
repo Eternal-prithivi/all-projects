@@ -137,7 +137,7 @@
 @media (max-width: 768px) {
   .dashboard-page {
     flex-direction: column;
-    padding-bottom: 56px; /* Space for mobile tab bar */
+    padding-bottom: var(--mobile-shell-bottom);
   }
 
   .dashboard-header {

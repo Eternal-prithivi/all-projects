@@ -1344,12 +1344,22 @@
   }
 
   .metrics-grid {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: 1fr;
   }
 
   .detail-row {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .cluster-card,
+  .vm-instance-card {
+    width: 100%;
+  }
+
+  .vm-list-table-wrapper {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
   }
 
   .detail-row .label {

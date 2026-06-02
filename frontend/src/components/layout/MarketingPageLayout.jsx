@@ -7,6 +7,8 @@ import { useLandingNav } from '../../hooks/useLandingNav.js';
 import { useLandingReveal } from '../../hooks/useLandingReveal.js';
 import '../../styles/marketing-shell.css';
 import ZenithLogo from '../brand/ZenithLogo.jsx';
+import MobileMarketingNav from './MobileMarketingNav.jsx';
+import { MARKETING_PAGE_LINKS } from '../../config/marketingNavLinks.js';
 
 /**
  * Shared premium shell for public marketing pages (features, about, contact, help).
@@ -27,11 +29,12 @@ export default function MarketingPageLayout({ children, showFooter = true }) {
           <Link to="/" className="nav-logo">
             <ZenithLogo variant="full" size={40} badge="Cloud" textLayout="inline" />
           </Link>
-          <div className="nav-links">
-            <Link to="/features">Features</Link>
-            <Link to="/about">About</Link>
-            <Link to="/contact">Contact</Link>
-            <Link to="/help">Help</Link>
+          <div className="nav-links nav-links--desktop">
+            {MARKETING_PAGE_LINKS.map((link) => (
+              <Link key={link.to} to={link.to}>
+                {link.label}
+              </Link>
+            ))}
             {user ? (
               <Link to="/dashboard" className="btn-nav-signup">
                 Dashboard
@@ -47,6 +50,7 @@ export default function MarketingPageLayout({ children, showFooter = true }) {
               </>
             )}
           </div>
+          <MobileMarketingNav userLoggedIn={!!user} links={MARKETING_PAGE_LINKS} />
         </div>
       </nav>
 
