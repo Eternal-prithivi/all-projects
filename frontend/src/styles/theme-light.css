@@ -1012,15 +1012,20 @@ html[data-theme="light"] .profile-menu-item:hover {
   background: var(--surface-hover);
 }
 
+html[data-theme="light"] {
+  --notification-carbon: #e8eaed;
+  --notification-carbon-elevated: #dadce0;
+}
+
 html[data-theme="light"] .notification-dropdown {
-  background: #d2d5da;
+  background: var(--notification-carbon);
   border-color: #bdc1c6;
   box-shadow: var(--shadow-elevated);
 }
 
 html[data-theme="light"] .notification-dropdown-header,
 html[data-theme="light"] .notification-dropdown-footer {
-  background: #c4c8ce;
+  background: var(--notification-carbon-elevated);
   border-color: #bdc1c6;
 }
 
@@ -1041,7 +1046,7 @@ html[data-theme="light"] .notification-badge {
 }
 
 html[data-theme="light"] .notifications-page__item {
-  background: #d2d5da;
+  background: var(--notification-carbon);
   border-color: #bdc1c6;
 }
 

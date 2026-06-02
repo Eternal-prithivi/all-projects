@@ -42,6 +42,10 @@
   --danger: #ef4444;
   --info: #3b82f6;
 
+  /* Notification panels (dropdown + full page) */
+  --notification-carbon: #0c0c0c;
+  --notification-carbon-elevated: #030303;
+
   /* Spacing */
   --space-xs: 0.25rem;
   --space-sm: 0.5rem;

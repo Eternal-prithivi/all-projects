@@ -109,9 +109,11 @@ function DashboardLayout() {
             <Breadcrumbs />
           </div>
           <main id="main-content" className="dashboard-content" role="main" aria-label="Main dashboard content">
-            <Outlet />
+            <div className="dashboard-content__body">
+              <Outlet />
+            </div>
+            <Footer />
           </main>
-          <Footer />
         </div>
         <QuickActions />
         <KeyboardShortcuts 
