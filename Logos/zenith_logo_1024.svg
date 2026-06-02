@@ -1,0 +1,127 @@
+<svg width="100%" viewBox="0 0 680 800" role="img" xmlns="http://www.w3.org/2000/svg" style="">
+  <title style="fill:rgb(0, 0, 0);stroke:none;color:rgb(255, 255, 255);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto">Zenith — Cloud Resource Optimization Platform Logo</title>
+  <desc style="fill:rgb(0, 0, 0);stroke:none;color:rgb(255, 255, 255);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto">A geometric logo mark for Zenith showing an upward-pointing peak rising above layered cloud arcs, rendered in deep charcoal with warm gold accents. Below the mark is the wordmark "Zenith" with subtitle "Cloud Optimization".</desc>
+
+  <defs>
+    
+
+    <!-- Subtle gold gradient for large icon only -->
+    <linearGradient id="goldSheen" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#e8c84a;stop-opacity:1"/>
+      <stop offset="100%" style="stop-color:#9a6f00;stop-opacity:1"/>
+    </linearGradient>
+
+    <linearGradient id="goldSheenLight" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#d4af37;stop-opacity:1"/>
+      <stop offset="100%" style="stop-color:#8a6200;stop-opacity:1"/>
+    </linearGradient>
+  </defs>
+
+  <!-- ═══════════════════════════════════════════════════
+       DARK VERSION — Left panel
+  ═══════════════════════════════════════════════════ -->
+
+  <!-- Dark background tile -->
+  <rect x="20" y="20" width="300" height="760" rx="16" style="fill:rgb(10, 10, 10);stroke:none;color:rgb(255, 255, 255);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
+
+  <!-- ICON MARK — Dark background version, centered at 170,200 -->
+  <!-- Cloud layer 1 (bottom, widest) -->
+  <path d="&#10;    M 110 295&#10;    Q 110 280 125 275&#10;    Q 128 255 148 252&#10;    Q 152 240 168 238&#10;    Q 172 225 190 228&#10;    Q 208 225 212 238&#10;    Q 228 240 232 252&#10;    Q 252 255 255 275&#10;    Q 270 280 270 295&#10;    Z&#10;  " fill="#2a2a2a" style="fill:rgb(42, 42, 42);stroke:none;color:rgb(255, 255, 255);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
+
+  <!-- Cloud layer 2 (middle) -->
+  <path d="&#10;    M 125 278&#10;    Q 125 265 138 261&#10;    Q 141 245 158 243&#10;    Q 162 233 176 231&#10;    Q 183 222 196 225&#10;    Q 210 222 214 231&#10;    Q 228 233 232 243&#10;    Q 249 245 252 261&#10;    Q 265 265 265 278&#10;    Z&#10;  " fill="#333333" style="fill:rgb(51, 51, 51);stroke:none;color:rgb(255, 255, 255);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
+
+  <!-- Cloud layer 3 (top arc — the "horizon") -->
+  <path d="&#10;    M 138 261&#10;    Q 138 250 150 246&#10;    Q 153 236 167 234&#10;    Q 170 225 182 224&#10;    Q 188 216 198 218&#10;    Q 210 216 213 224&#10;    Q 225 225 228 234&#10;    Q 242 236 245 246&#10;    Q 257 250 257 261&#10;    Z&#10;  " fill="#3d3d3d" style="fill:rgb(61, 61, 61);stroke:none;color:rgb(255, 255, 255);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
+
+  <!-- The PEAK — gold geometric diamond/chevron rising above clouds -->
+  <!-- Main peak triangle -->
+  <polygon points="190,148 218,248 162,248" fill="url(#goldSheen)" style="stroke:none;color:rgb(255, 255, 255);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
+
+  <!-- Left face (slightly darker for dimensionality suggestion — flat, no bevel) -->
+  <polygon points="190,148 162,248 190,220" fill="#9a6f00" opacity="0.4" style="fill:rgb(154, 111, 0);stroke:none;color:rgb(255, 255, 255);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:0.4;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
+
+  <!-- Gold peak tip highlight — small bright cap -->
+  <polygon points="190,148 198,175 182,175" fill="#f0d060" opacity="0.85" style="fill:rgb(240, 208, 96);stroke:none;color:rgb(255, 255, 255);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:0.85;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
+
+  <!-- Subtle horizontal "zenith line" — the moment of peak crossing the cloud -->
+  <line x1="148" y1="235" x2="232" y2="235" stroke="#c9a227" stroke-width="0.75" opacity="0.5" style="fill:rgb(0, 0, 0);stroke:rgb(201, 162, 39);color:rgb(255, 255, 255);stroke-width:0.75px;stroke-linecap:butt;stroke-linejoin:miter;opacity:0.5;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
+
+  <!-- WORDMARK — Dark version -->
+  <text x="170" y="355" text-anchor="middle" font-size="38" fill="#f0ead6" style="fill:rgb(26, 26, 26);stroke:none;color:rgb(255, 255, 255);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:Inter, Outfit, system-ui, -apple-system, sans-serif;font-size:38px;font-weight:500;text-anchor:middle;dominant-baseline:auto">ZENITH</text>
+  <line x1="108" y1="367" x2="232" y2="367" opacity="0.45" style="fill:rgb(0, 0, 0);stroke:rgb(201, 162, 39);color:rgb(255, 255, 255);stroke-width:0.5px;stroke-linecap:butt;stroke-linejoin:miter;opacity:0.45;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
+  <text x="170" y="385" text-anchor="middle" font-size="11.5" fill="#8a8070" style="fill:rgb(138, 128, 112);stroke:none;color:rgb(255, 255, 255);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:Inter, Outfit, system-ui, -apple-system, sans-serif;font-size:11.5px;font-weight:400;text-anchor:middle;dominant-baseline:auto">CLOUD OPTIMIZATION</text>
+
+  <!-- FAVICON SIZE demo — Dark -->
+  <text x="170" y="435" text-anchor="middle" font-family="Inter, system-ui" font-size="10" fill="#5a5550" letter-spacing="0.05em" style="fill:rgb(90, 85, 80);stroke:none;color:rgb(255, 255, 255);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:Inter, system-ui;font-size:10px;font-weight:400;text-anchor:middle;dominant-baseline:auto">32×32 FAVICON</text>
+  <rect x="154" y="442" width="32" height="32" rx="5" fill="#1a1a1a" style="fill:rgb(26, 26, 26);stroke:none;color:rgb(255, 255, 255);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
+  <!-- Favicon icon — peak above minimal arc -->
+  <path d="M 163 466 Q 163 461 168 459.5 Q 169 455 174 454.5 Q 170.5 448 170 447 Q 169.5 448 166.5 454.5 Q 171 455 172 459.5 Q 177 461 177 466 Z" fill="#3d3d3d" style="fill:rgb(61, 61, 61);stroke:none;color:rgb(255, 255, 255);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
+  <polygon points="170,448 175.5,462 164.5,462" fill="url(#goldSheen)" style="stroke:none;color:rgb(255, 255, 255);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
+
+  <!-- ═══════════════════════════════════════════════════
+       LIGHT VERSION — Right panel
+  ═══════════════════════════════════════════════════ -->
+
+  <!-- Light background tile -->
+  <rect x="360" y="20" width="300" height="760" rx="16" style="fill:rgb(245, 242, 235);stroke:none;color:rgb(255, 255, 255);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
+
+  <!-- ICON MARK — Light background version, centered at 510,200 -->
+  <!-- Cloud layer 1 -->
+  <path d="&#10;    M 450 295&#10;    Q 450 280 465 275&#10;    Q 468 255 488 252&#10;    Q 492 240 508 238&#10;    Q 512 225 530 228&#10;    Q 548 225 552 238&#10;    Q 568 240 572 252&#10;    Q 592 255 595 275&#10;    Q 610 280 610 295&#10;    Z&#10;  " fill="#dedad0" style="fill:rgb(222, 218, 208);stroke:none;color:rgb(255, 255, 255);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
+
+  <!-- Cloud layer 2 -->
+  <path d="&#10;    M 465 278&#10;    Q 465 265 478 261&#10;    Q 481 245 498 243&#10;    Q 502 233 516 231&#10;    Q 523 222 536 225&#10;    Q 550 222 554 231&#10;    Q 568 233 572 243&#10;    Q 589 245 592 261&#10;    Q 605 265 605 278&#10;    Z&#10;  " fill="#cec9ba" style="fill:rgb(206, 201, 186);stroke:none;color:rgb(255, 255, 255);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
+
+  <!-- Cloud layer 3 -->
+  <path d="&#10;    M 478 261&#10;    Q 478 250 490 246&#10;    Q 493 236 507 234&#10;    Q 510 225 522 224&#10;    Q 528 216 538 218&#10;    Q 550 216 553 224&#10;    Q 565 225 568 234&#10;    Q 582 236 585 246&#10;    Q 597 250 597 261&#10;    Z&#10;  " fill="#bfba9e" style="fill:rgb(191, 186, 158);stroke:none;color:rgb(255, 255, 255);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
+
+  <!-- Peak — light bg version -->
+  <polygon points="530,148 558,248 502,248" fill="url(#goldSheenLight)" style="stroke:none;color:rgb(255, 255, 255);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
+  <polygon points="530,148 502,248 530,220" fill="#7a5200" opacity="0.3" style="fill:rgb(122, 82, 0);stroke:none;color:rgb(255, 255, 255);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:0.3;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
+  <polygon points="530,148 538,175 522,175" fill="#f0d060" opacity="0.9" style="fill:rgb(240, 208, 96);stroke:none;color:rgb(255, 255, 255);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:0.9;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
+
+  <!-- Zenith line -->
+  <line x1="488" y1="235" x2="572" y2="235" stroke="#b8860b" stroke-width="0.75" opacity="0.6" style="fill:rgb(0, 0, 0);stroke:rgb(184, 134, 11);color:rgb(255, 255, 255);stroke-width:0.75px;stroke-linecap:butt;stroke-linejoin:miter;opacity:0.6;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
+
+  <!-- WORDMARK — Light version -->
+  <text x="510" y="355" text-anchor="middle" font-size="38" fill="#1a1a1a" style="fill:rgb(26, 26, 26);stroke:none;color:rgb(255, 255, 255);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:Inter, Outfit, system-ui, -apple-system, sans-serif;font-size:38px;font-weight:500;text-anchor:middle;dominant-baseline:auto">ZENITH</text>
+  <line x1="448" y1="367" x2="572" y2="367" stroke="#b8860b" stroke-width="0.5" opacity="0.5" style="fill:rgb(0, 0, 0);stroke:rgb(184, 134, 11);color:rgb(255, 255, 255);stroke-width:0.5px;stroke-linecap:butt;stroke-linejoin:miter;opacity:0.5;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
+  <text x="510" y="385" text-anchor="middle" font-size="11.5" fill="#8a7555" style="fill:rgb(138, 128, 112);stroke:none;color:rgb(255, 255, 255);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:Inter, Outfit, system-ui, -apple-system, sans-serif;font-size:11.5px;font-weight:400;text-anchor:middle;dominant-baseline:auto">CLOUD OPTIMIZATION</text>
+
+  <!-- FAVICON SIZE demo — Light -->
+  <text x="510" y="435" text-anchor="middle" font-family="Inter, system-ui" font-size="10" fill="#9a9080" letter-spacing="0.05em" style="fill:rgb(154, 144, 128);stroke:none;color:rgb(255, 255, 255);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:Inter, system-ui;font-size:10px;font-weight:400;text-anchor:middle;dominant-baseline:auto">32×32 FAVICON</text>
+  <rect x="494" y="442" width="32" height="32" rx="5" fill="#e8e4d8" stroke="#c0baa8" stroke-width="0.5" style="fill:rgb(232, 228, 216);stroke:rgb(192, 186, 168);color:rgb(255, 255, 255);stroke-width:0.5px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
+  <path d="M 503 466 Q 503 461 508 459.5 Q 509 455 514 454.5 Q 510.5 448 510 447 Q 509.5 448 506.5 454.5 Q 511 455 512 459.5 Q 517 461 517 466 Z" fill="#bfba9e" style="fill:rgb(191, 186, 158);stroke:none;color:rgb(255, 255, 255);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
+  <polygon points="510,448 515.5,462 504.5,462" fill="url(#goldSheenLight)" style="stroke:none;color:rgb(255, 255, 255);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
+
+  <!-- ═══════════════════════════════════════════════════
+       ICON ONLY — Isolated mark demos
+  ═══════════════════════════════════════════════════ -->
+
+  <!-- Label row -->
+  <text x="340" y="530" text-anchor="middle" font-family="Inter, system-ui" font-size="10" fill="#6a6460" letter-spacing="0.08em" style="fill:rgb(106, 100, 96);stroke:none;color:rgb(255, 255, 255);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:Inter, system-ui;font-size:10px;font-weight:400;text-anchor:middle;dominant-baseline:auto">ICON MARK — ISOLATED</text>
+
+  <!-- Icon only — Dark bg pill -->
+  <rect x="240" y="540" width="80" height="80" rx="12" fill="#0a0a0a" style="fill:rgb(10, 10, 10);stroke:none;color:rgb(255, 255, 255);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
+  <path d="M 258 608 Q 258 598 265 595 Q 267 584 276 582 Q 278 574 284 573 Q 280 565 280 564 Q 280 565 276 572 Q 281 573 283 581 Q 291 584 293 595 Q 300 598 300 608 Z" fill="#333333" style="fill:rgb(51, 51, 51);stroke:none;color:rgb(255, 255, 255);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
+  <polygon points="280,564 291,594 269,594" fill="#c9a227" style="fill:rgb(201, 162, 39);stroke:none;color:rgb(255, 255, 255);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
+  <polygon points="280,564 269,594 280,583" fill="#7a5200" opacity="0.35" style="fill:rgb(122, 82, 0);stroke:none;color:rgb(255, 255, 255);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:0.35;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
+  <polygon points="280,564 285,580 275,580" fill="#f0d060" opacity="0.8" style="fill:rgb(240, 208, 96);stroke:none;color:rgb(255, 255, 255);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:0.8;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
+
+  <!-- Icon only — Light bg pill -->
+  <rect x="360" y="540" width="80" height="80" rx="12" fill="#f5f2eb" style="fill:rgb(245, 242, 235);stroke:none;color:rgb(255, 255, 255);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
+  <path d="M 378 608 Q 378 598 385 595 Q 387 584 396 582 Q 398 574 404 573 Q 400 565 400 564 Q 400 565 396 572 Q 401 573 403 581 Q 411 584 413 595 Q 420 598 420 608 Z" fill="#cec9ba" style="fill:rgb(206, 201, 186);stroke:none;color:rgb(255, 255, 255);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
+  <polygon points="400,564 411,594 389,594" fill="#b8860b" style="fill:rgb(184, 134, 11);stroke:none;color:rgb(255, 255, 255);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
+  <polygon points="400,564 389,594 400,583" fill="#7a5200" opacity="0.25" style="fill:rgb(122, 82, 0);stroke:none;color:rgb(255, 255, 255);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:0.25;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
+  <polygon points="400,564 405,580 395,580" fill="#e8c840" opacity="0.85" style="fill:rgb(232, 200, 64);stroke:none;color:rgb(255, 255, 255);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:0.85;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
+
+  <!-- ═══════════════════════════════════════════════════
+       CONSTRUCTION NOTES — bottom
+  ═══════════════════════════════════════════════════ -->
+  <line x1="40" y1="660" x2="640" y2="660" stroke="#333330" stroke-width="0.5" opacity="0.3" style="fill:rgb(0, 0, 0);stroke:rgb(51, 51, 48);color:rgb(255, 255, 255);stroke-width:0.5px;stroke-linecap:butt;stroke-linejoin:miter;opacity:0.3;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
+  <text x="340" y="678" text-anchor="middle" font-family="Inter, system-ui" font-size="10" fill="#6a6460" letter-spacing="0.04em" style="fill:rgb(106, 100, 96);stroke:none;color:rgb(255, 255, 255);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:Inter, system-ui;font-size:10px;font-weight:400;text-anchor:middle;dominant-baseline:auto">Colors: #1a1a1a · #c9a227 (gold) · #f0ead6 (cream) · #3d3d3d (cloud)</text>
+  <text x="340" y="694" text-anchor="middle" font-family="Inter, system-ui" font-size="10" fill="#6a6460" letter-spacing="0.04em" style="fill:rgb(106, 100, 96);stroke:none;color:rgb(255, 255, 255);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:Inter, system-ui;font-size:10px;font-weight:400;text-anchor:middle;dominant-baseline:auto">Typeface: Inter / Outfit · Weight 500 wordmark · Weight 400 subtitle</text>
+  <text x="340" y="710" text-anchor="middle" font-family="Inter, system-ui" font-size="10" fill="#6a6460" letter-spacing="0.04em" style="fill:rgb(106, 100, 96);stroke:none;color:rgb(255, 255, 255);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:Inter, system-ui;font-size:10px;font-weight:400;text-anchor:middle;dominant-baseline:auto">Works on: #030303 dark UI · #f5f2eb warm light UI · transparent bg</text>
+
+</svg>

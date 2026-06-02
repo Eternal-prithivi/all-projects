@@ -1,64 +1,68 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  
-  <!-- Homepage -->
   <url>
-    <loc>https://yourapp.com/</loc>
-    <lastmod>2025-11-30</lastmod>
-    <changefreq>daily</changefreq>
+    <loc>https://zenith-frontend.vercel.app/</loc>
+    <changefreq>weekly</changefreq>
     <priority>1.0</priority>
   </url>
-  
-  <!-- Authentication Pages -->
   <url>
-    <loc>https://yourapp.com/login</loc>
-    <lastmod>2025-11-30</lastmod>
+    <loc>https://zenith-frontend.vercel.app/login</loc>
     <changefreq>monthly</changefreq>
-    <priority>0.8</priority>
+    <priority>0.6</priority>
   </url>
-  
   <url>
-    <loc>https://yourapp.com/register</loc>
-    <lastmod>2025-11-30</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  
-  <!-- Public Pages -->
-  <url>
-    <loc>https://yourapp.com/about</loc>
-    <lastmod>2025-11-30</lastmod>
+    <loc>https://zenith-frontend.vercel.app/register</loc>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>
-  
   <url>
-    <loc>https://yourapp.com/contact</loc>
-    <lastmod>2025-11-30</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.7</priority>
+    <loc>https://zenith-frontend.vercel.app/pricing</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
   </url>
-  
   <url>
-    <loc>https://yourapp.com/help</loc>
-    <lastmod>2025-11-30</lastmod>
+    <loc>https://zenith-frontend.vercel.app/features</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://zenith-frontend.vercel.app/about</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://zenith-frontend.vercel.app/contact</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://zenith-frontend.vercel.app/help</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://zenith-frontend.vercel.app/docs</loc>
     <changefreq>weekly</changefreq>
     <priority>0.6</priority>
   </url>
-  
-  <!-- Legal Pages -->
   <url>
-    <loc>https://yourapp.com/legal/terms</loc>
-    <lastmod>2025-11-30</lastmod>
-    <changefreq>yearly</changefreq>
+    <loc>https://zenith-frontend.vercel.app/trust</loc>
+    <changefreq>monthly</changefreq>
     <priority>0.4</priority>
   </url>
-  
   <url>
-    <loc>https://yourapp.com/legal/privacy</loc>
-    <lastmod>2025-11-30</lastmod>
-    <changefreq>yearly</changefreq>
+    <loc>https://zenith-frontend.vercel.app/status</loc>
+    <changefreq>daily</changefreq>
     <priority>0.4</priority>
   </url>
-  
+  <url>
+    <loc>https://zenith-frontend.vercel.app/legal/privacy</loc>
+    <changefreq>yearly</changefreq>
+    <priority>0.3</priority>
+  </url>
+  <url>
+    <loc>https://zenith-frontend.vercel.app/legal/terms</loc>
+    <changefreq>yearly</changefreq>
+    <priority>0.3</priority>
+  </url>
 </urlset>

@@ -16,6 +16,7 @@ import { NavLink, Link } from 'react-router-dom';
 import { IconDashboard, IconBarChart, IconHardDrive, IconServer, IconShield } from './Icons.jsx';
 import { FaQuestionCircle, FaUserShield } from 'react-icons/fa';
 import '../../styles/sidebar.css';
+import ZenithLogo from '../brand/ZenithLogo.jsx';
 
 function Sidebar({ user }) {
   const userInitial = user && user.username ? user.username.charAt(0).toUpperCase() : '?';
@@ -49,9 +50,7 @@ function Sidebar({ user }) {
     <aside className="nav-rail" role="navigation" aria-label="Main navigation">
       {/* Logo mark */}
       <div className="rail-logo" data-tour="sidebar-logo">
-        <Link to="/" aria-label="Go to homepage">
-          <span className="rail-logo-mark">Z</span>
-        </Link>
+        <ZenithLogo size={28} linkTo="/" />
       </div>
 
       {/* Navigation items */}

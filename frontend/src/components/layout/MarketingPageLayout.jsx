@@ -6,6 +6,7 @@ import AnimatedBackground from '../AnimatedBackground.jsx';
 import { useLandingNav } from '../../hooks/useLandingNav.js';
 import { useLandingReveal } from '../../hooks/useLandingReveal.js';
 import '../../styles/marketing-shell.css';
+import ZenithLogo from '../brand/ZenithLogo.jsx';
 
 /**
  * Shared premium shell for public marketing pages (features, about, contact, help).
@@ -24,7 +25,7 @@ export default function MarketingPageLayout({ children, showFooter = true }) {
       <nav className={`landing-nav ${navScrolled ? 'landing-nav--scrolled' : ''}`}>
         <div className="nav-container">
           <Link to="/" className="nav-logo">
-            <h2>Zenith</h2>
+            <ZenithLogo variant="full" size={36} subtitle="Cloud" />
           </Link>
           <div className="nav-links">
             <Link to="/features">Features</Link>

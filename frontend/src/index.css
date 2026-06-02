@@ -1,6 +1,7 @@
 /* src/index.css — Zenith Design System */
 
 @import './styles/theme-light.css';
+@import './styles/zenith-brand.css';
 @import './styles/zenith-ui.css';
 @import './styles/zenith-experience.css';
 

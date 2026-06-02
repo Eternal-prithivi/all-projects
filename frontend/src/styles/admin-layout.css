@@ -26,7 +26,7 @@
 .admin-sidebar {
   width: 56px;
   height: 100vh;
-  background: linear-gradient(180deg, #0a0a0a 0%, #050505 100%);
+  background: var(--bg-elevated);
   border-right: 1px solid var(--border-subtle);
   display: flex;
   flex-direction: column;
@@ -53,7 +53,7 @@
   align-items: center;
   gap: 1rem;
   text-decoration: none;
-  color: #fff;
+  color: var(--text-primary);
   transition: opacity 0.3s;
 }
 
@@ -63,19 +63,19 @@
 
 .admin-brand-icon {
   font-size: 2rem;
-  color: #ffd700;
+  color: var(--gold-primary);
 }
 
 .admin-brand-text h3 {
   margin: 0;
   font-size: 1.2rem;
-  color: #fff;
+  color: var(--text-primary);
   font-weight: 700;
 }
 
 .admin-brand-text span {
   font-size: 0.75rem;
-  color: #888;
+  color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 1px;
 }
@@ -124,13 +124,13 @@
 .admin-sidebar-nav a:hover,
 .admin-rail-bottom a:hover {
   color: var(--text-primary);
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--surface-hover);
 }
 
 .admin-sidebar-nav a.active,
 .admin-rail-bottom a.active {
   color: var(--gold-primary);
-  background: rgba(212, 175, 55, 0.06);
+  background: var(--gold-glow);
 }
 
 .admin-sidebar-nav a.active::before,
@@ -222,7 +222,7 @@
   display: flex;
   align-items: center;
   gap: 1rem;
-  background: rgba(0, 0, 0, 0.2);
+  background: var(--surface-hover);
 }
 
 .admin-user-avatar {
@@ -241,74 +241,110 @@
 .admin-user-info h4 {
   margin: 0;
   font-size: 0.95rem;
-  color: #fff;
+  color: var(--text-primary);
 }
 
 .admin-badge {
   margin: 0.25rem 0 0 0;
   font-size: 0.75rem;
-  color: #ffd700;
+  color: var(--gold-primary);
   text-transform: uppercase;
   letter-spacing: 0.5px;
   font-weight: 600;
 }
 
-/* Admin Header */
+/* Admin Header — title | centered search | actions */
 .admin-header {
-  height: 70px;
-  background: rgba(3, 3, 3, 0.7);
+  min-height: 64px;
+  height: 64px;
+  background: var(--bg-surface);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   border-bottom: 1px solid var(--border-subtle);
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, max-content) minmax(12rem, 1fr) auto;
   align-items: center;
-  justify-content: space-between;
-  padding: 0 2rem;
+  gap: 1rem 1.25rem;
+  padding: 0 1.5rem;
   position: sticky;
   top: 0;
   z-index: 100;
 }
 
+.admin-header-left {
+  min-width: 0;
+  max-width: min(280px, 32vw);
+}
+
 .admin-header-left h1 {
   margin: 0;
-  font-size: 1.5rem;
+  font-size: 1.25rem;
   color: var(--text-primary);
   font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.admin-header-right {
+.admin-header-center {
   display: flex;
+  justify-content: center;
   align-items: center;
-  gap: 1.5rem;
+  min-width: 0;
+  width: 100%;
 }
 
-/* Shared header toolbar (same as dashboard) */
-.admin-header-right.header-actions {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  flex-shrink: 0;
+.admin-header-search.header-search-trigger {
+  width: 100%;
+  max-width: 640px;
+  min-width: 0;
+  flex: 1 1 auto;
 }
 
-.admin-header-right .notification-bell-container {
-  display: flex;
-  align-items: center;
+.admin-header-search .header-search-trigger-placeholder {
+  flex: 1;
+  text-align: left;
 }
 
-.header-search-trigger--compact {
-  min-width: auto;
-  max-width: none;
-  flex: 0 0 auto;
-  padding: 0.4rem 0.75rem;
+.admin-header-toolbar {
+  gap: 0.375rem;
+  justify-self: end;
 }
 
-.header-search-trigger--compact .header-search-trigger-label {
-  display: none;
+@media (max-width: 900px) {
+  .admin-header {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      'title actions'
+      'search search';
+    height: auto;
+    min-height: 64px;
+    padding-top: 0.75rem;
+    padding-bottom: 0.75rem;
+    row-gap: 0.75rem;
+  }
+
+  .admin-header-left {
+    grid-area: title;
+    max-width: none;
+  }
+
+  .admin-header-center {
+    grid-area: search;
+  }
+
+  .admin-header-toolbar {
+    grid-area: actions;
+  }
+
+  .admin-header-search.header-search-trigger {
+    max-width: none;
+  }
 }
 
-@media (min-width: 900px) {
-  .header-search-trigger--compact .header-search-trigger-label {
-    display: inline;
+@media (max-width: 768px) {
+  .admin-header-toolbar .profile-name {
+    display: none;
   }
 }
 
@@ -349,11 +385,11 @@
   position: absolute;
   top: calc(100% + 0.5rem);
   right: 0;
-  background: rgba(15, 15, 20, 0.96);
-  border: 1px solid var(--border-subtle);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
   border-radius: var(--radius-sm);
   min-width: 220px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  box-shadow: var(--shadow-elevated);
   z-index: 1000;
 }
 
@@ -395,15 +431,15 @@
 }
 
 .dropdown-item:hover {
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--surface-hover);
 }
 
 .dropdown-item.logout {
-  color: #ff6b6b;
+  color: var(--danger);
 }
 
 .dropdown-item.logout:hover {
-  background: rgba(255, 68, 68, 0.1);
+  background: rgba(220, 38, 38, 0.08);
 }
 
 /* Access Denied */
@@ -449,7 +485,7 @@
     overflow-x: auto;
     overflow-y: hidden;
     z-index: 200;
-    background: rgba(5, 5, 5, 0.95);
+    background: var(--bg-elevated);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
   }
@@ -526,7 +562,7 @@
 }
 
 .admin-loading-screen p {
-  color: #888;
+  color: var(--text-muted);
   font-size: 1rem;
 }
 
@@ -536,21 +572,21 @@
   align-items: center;
   justify-content: center;
   min-height: 100vh;
-  background: #0a0a0a;
-  color: #e0e0e0;
+  background: var(--bg-base);
+  color: var(--text-secondary);
   text-align: center;
   padding: 2rem;
 }
 
 .access-denied-icon {
   font-size: 5rem;
-  color: #ffd700;
+  color: var(--gold-primary);
   margin-bottom: 1.5rem;
   animation: pulse 2s infinite;
 }
 
 .access-denied-icon.warning {
-  color: #ff9800;
+  color: var(--warning);
 }
 
 @keyframes pulse {
@@ -564,14 +600,14 @@
 
 .admin-access-denied h1 {
   font-size: 2.5rem;
-  color: #fff;
+  color: var(--text-primary);
   margin: 0 0 1rem 0;
   font-weight: 700;
 }
 
 .admin-access-denied p {
   font-size: 1.1rem;
-  color: #888;
+  color: var(--text-muted);
   margin: 0.5rem 0;
   max-width: 500px;
 }

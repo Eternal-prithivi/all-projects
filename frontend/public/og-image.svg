@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0a0a0a"/>
+      <stop offset="100%" stop-color="#1a1a1a"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#e8c84a"/>
+      <stop offset="100%" stop-color="#9a6f00"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="50%" cy="30%" r="55%">
+      <stop offset="0%" stop-color="rgba(212,175,55,0.15)"/>
+      <stop offset="100%" stop-color="rgba(212,175,55,0)"/>
+    </radialGradient>
+  </defs>
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  <rect width="1200" height="630" fill="url(#glow)"/>
+  <g transform="translate(520 175) scale(3.2)">
+    <path fill="#3d3d3d" d="M 5 30 Q 5 28 6.5 27.5 Q 6.8 26 8.5 25.8 Q 8.9 24.5 10 24.3 Q 10.4 23 11.5 23.2 Q 12.6 23 13 24.3 Q 14.1 24.5 14.5 25.8 Q 16.2 26 16.5 27.5 Q 18 28 18 30 Q 19.5 30.5 19.5 32 L 4.5 32 Q 3 32 3 30 Q 3 28 5 30 Z"/>
+    <polygon fill="url(#gold)" points="11,14 17.5,27.5 4.5,27.5"/>
+    <polygon fill="#f0d060" opacity="0.85" points="11,14 13,20 9,20"/>
+  </g>
+  <text x="600" y="360" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="72" font-weight="700" fill="#f0ead6">Zenith</text>
+  <text x="600" y="420" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="28" font-weight="500" letter-spacing="0.2em" fill="#c9a227">CLOUD OPTIMIZATION</text>
+  <text x="600" y="500" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="22" fill="#8a8070">Multi-cloud cost, storage, and infrastructure management</text>
+</svg>

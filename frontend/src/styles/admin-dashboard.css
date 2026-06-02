@@ -4,7 +4,7 @@
   padding: 2rem;
   max-width: 1400px;
   margin: 0 auto;
-  color: #e0e0e0;
+  color: var(--text-secondary);
 }
 
 .admin-dashboard.loading {
@@ -31,11 +31,11 @@
 
 .admin-icon {
   font-size: 3rem;
-  color: #fff;
+  color: var(--text-primary);
 }
 
 .admin-header h1 {
-  color: #fff;
+  color: var(--text-primary);
   margin: 0;
   font-size: 2rem;
 }
@@ -50,14 +50,14 @@
   display: flex;
   gap: 1rem;
   margin-bottom: 2rem;
-  border-bottom: 2px solid #2a2a2a;
+  border-bottom: 2px solid var(--border-default);
   overflow-x: auto;
 }
 
 .admin-tabs button {
   background: none;
   border: none;
-  color: #888;
+  color: var(--text-muted);
   padding: 1rem 1.5rem;
   cursor: pointer;
   font-size: 1rem;
@@ -85,13 +85,13 @@
 }
 
 .stat-card {
-  background: #1e1e1e;
+  background: var(--bg-card);
   padding: 1.5rem;
   border-radius: 12px;
   display: flex;
   align-items: center;
   gap: 1.5rem;
-  border: 1px solid #2a2a2a;
+  border: 1px solid var(--border-default);
   transition: all 0.3s;
 }
 
@@ -109,7 +109,7 @@
   align-items: center;
   justify-content: center;
   font-size: 1.8rem;
-  color: #fff;
+  color: var(--text-primary);
 }
 
 .stat-icon.users {
@@ -135,12 +135,12 @@
 .stat-info h3 {
   margin: 0;
   font-size: 1.8rem;
-  color: #fff;
+  color: var(--text-primary);
 }
 
 .stat-info p {
   margin: 0.5rem 0 0 0;
-  color: #888;
+  color: var(--text-muted);
   font-size: 0.9rem;
 }
 
@@ -153,16 +153,16 @@
 
 /* Subscriptions Breakdown */
 .subscriptions-breakdown {
-  background: #1e1e1e;
+  background: var(--bg-card);
   padding: 2rem;
   border-radius: 12px;
-  border: 1px solid #2a2a2a;
+  border: 1px solid var(--border-default);
   margin-bottom: 2rem;
 }
 
 .subscriptions-breakdown h2 {
   margin-top: 0;
-  color: #fff;
+  color: var(--text-primary);
 }
 
 .subscription-bars {
@@ -180,7 +180,7 @@
 .bar-label {
   display: flex;
   justify-content: space-between;
-  color: #e0e0e0;
+  color: var(--text-secondary);
 }
 
 .plan-name {
@@ -188,12 +188,12 @@
 }
 
 .plan-count {
-  color: #888;
+  color: var(--text-muted);
   font-size: 0.9rem;
 }
 
 .bar-container {
-  background: #0a0a0a;
+  background: var(--bg-input);
   border-radius: 8px;
   height: 12px;
   overflow: hidden;
@@ -230,14 +230,14 @@
   display: flex;
   align-items: center;
   gap: 1rem;
-  background: #1e1e1e;
+  background: var(--bg-card);
   padding: 1rem;
   border-radius: 8px;
-  border: 1px solid #2a2a2a;
+  border: 1px solid var(--border-default);
 }
 
 .search-bar svg {
-  color: #888;
+  color: var(--text-muted);
   font-size: 1.2rem;
 }
 
@@ -245,7 +245,7 @@
   flex: 1;
   background: transparent;
   border: none;
-  color: #e0e0e0;
+  color: var(--text-secondary);
   font-size: 1rem;
   outline: none;
 }
@@ -253,7 +253,7 @@
 .search-bar button {
   background: linear-gradient(135deg, var(--gold-primary), var(--gold-light));
   border: none;
-  color: #fff;
+  color: var(--text-primary);
   padding: 0.6rem 1.5rem;
   border-radius: 6px;
   cursor: pointer;
@@ -266,9 +266,9 @@
 }
 
 .users-table-container {
-  background: #1e1e1e;
+  background: var(--bg-card);
   border-radius: 12px;
-  border: 1px solid #2a2a2a;
+  border: 1px solid var(--border-default);
   overflow-x: auto;
   margin-bottom: 1rem;
 }
@@ -279,8 +279,8 @@
 }
 
 .users-table th {
-  background: #0a0a0a;
-  color: #888;
+  background: var(--bg-input);
+  color: var(--text-muted);
   text-transform: uppercase;
   font-size: 0.85rem;
   padding: 1rem;
@@ -291,8 +291,8 @@
 
 .users-table td {
   padding: 1rem;
-  border-top: 1px solid #2a2a2a;
-  color: #e0e0e0;
+  border-top: 1px solid var(--border-default);
+  color: var(--text-secondary);
 }
 
 .users-table tbody tr:hover {
@@ -306,11 +306,11 @@
 }
 
 .user-info strong {
-  color: #fff;
+  color: var(--text-primary);
 }
 
 .user-info small {
-  color: #888;
+  color: var(--text-muted);
   font-size: 0.85rem;
 }
 
@@ -397,7 +397,7 @@
 
 .btn-activate:hover {
   background: #43e97b;
-  color: #fff;
+  color: var(--text-primary);
 }
 
 .btn-suspend {
@@ -408,7 +408,7 @@
 
 .btn-suspend:hover {
   background: #ffa500;
-  color: #fff;
+  color: var(--text-primary);
 }
 
 .btn-ban {
@@ -419,7 +419,7 @@
 
 .btn-ban:hover {
   background: #f5576c;
-  color: #fff;
+  color: var(--text-primary);
 }
 
 /* Pagination */
@@ -427,16 +427,16 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background: #1e1e1e;
+  background: var(--bg-card);
   padding: 1rem;
   border-radius: 8px;
-  border: 1px solid #2a2a2a;
+  border: 1px solid var(--border-default);
 }
 
 .pagination button {
   background: linear-gradient(135deg, var(--gold-primary), var(--gold-light));
   border: none;
-  color: #fff;
+  color: var(--text-primary);
   padding: 0.6rem 1.2rem;
   border-radius: 6px;
   cursor: pointer;
@@ -449,8 +449,8 @@
 }
 
 .pagination button:disabled {
-  background: #2a2a2a;
-  color: #555;
+  background: var(--surface-hover);
+  color: var(--text-muted);
   cursor: not-allowed;
 }
 
@@ -462,10 +462,10 @@
 }
 
 .activity-item {
-  background: #1e1e1e;
+  background: var(--bg-card);
   padding: 1.5rem;
   border-radius: 12px;
-  border: 1px solid #2a2a2a;
+  border: 1px solid var(--border-default);
   display: flex;
   align-items: center;
   gap: 1.5rem;
@@ -485,7 +485,7 @@
   align-items: center;
   justify-content: center;
   font-size: 1.5rem;
-  color: #fff;
+  color: var(--text-primary);
 }
 
 .activity-item.user_registration .activity-icon {
@@ -501,13 +501,13 @@
 }
 
 .activity-description {
-  color: #e0e0e0;
+  color: var(--text-secondary);
   margin: 0;
   font-size: 1rem;
 }
 
 .activity-time {
-  color: #888;
+  color: var(--text-muted);
   font-size: 0.85rem;
 }
 
@@ -520,15 +520,15 @@
 }
 
 .health-card {
-  background: #1e1e1e;
+  background: var(--bg-card);
   padding: 2rem;
   border-radius: 12px;
-  border: 1px solid #2a2a2a;
+  border: 1px solid var(--border-default);
 }
 
 .health-card h3 {
   margin-top: 0;
-  color: #fff;
+  color: var(--text-primary);
 }
 
 .health-status {
@@ -553,7 +553,7 @@
 }
 
 .health-card p {
-  color: #888;
+  color: var(--text-muted);
   margin: 0.5rem 0;
 }
 
@@ -564,9 +564,9 @@
 }
 
 .collections-list li {
-  color: #e0e0e0;
+  color: var(--text-secondary);
   padding: 0.5rem 0;
-  border-bottom: 1px solid #2a2a2a;
+  border-bottom: 1px solid var(--border-default);
 }
 
 .collections-list li:last-child {
@@ -574,7 +574,7 @@
 }
 
 .health-timestamp {
-  color: #888;
+  color: var(--text-muted);
   font-size: 0.9rem;
   text-align: center;
   margin-top: 1rem;

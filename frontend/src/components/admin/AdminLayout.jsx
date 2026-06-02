@@ -9,6 +9,7 @@ import AdminHeader from './AdminHeader';
 import Breadcrumbs from '../Breadcrumbs.jsx';
 import GlobalSearch from '../GlobalSearch.jsx';
 import KeyboardShortcuts from '../KeyboardShortcuts.jsx';
+import '../../styles/header-toolbar.css';
 import '../../styles/admin-layout.css';
 import '../../styles/dashboard-polish.css';
 import '../../styles/breadcrumbs.css';

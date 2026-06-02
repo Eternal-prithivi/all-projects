@@ -33,6 +33,7 @@ Set in **Render → Service → Environment**:
 Set in **Vercel → Project → Environment Variables**:
 
 - `VITE_API_URL` — backend base URL **without** `/api` (e.g. `https://zenith-backend-707i.onrender.com`)
+- `VITE_SITE_URL` — public frontend URL for canonical/OG tags (e.g. `https://zenith-frontend.vercel.app` or your custom domain). Update `index.html`, `robots.txt`, and `sitemap.xml` if you use a custom domain.
 - Optional: `VITE_SENTRY_DSN`
 
 ## CORS

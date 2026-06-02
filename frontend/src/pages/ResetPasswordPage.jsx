@@ -4,6 +4,7 @@ import { resetPasswordWithToken } from '../api';
 import { getValidationErrorMessage, validateResetPasswordForm } from '../utils/formValidation.js';
 import '../styles/auth.css';
 import '../styles/auth-polish.css';
+import ZenithLogo from '../components/brand/ZenithLogo.jsx';
 
 function ResetPasswordPage() {
   const [searchParams] = useSearchParams();
@@ -66,7 +67,10 @@ function ResetPasswordPage() {
       <div className="auth-brand-panel">
         <Link to="/login" className="auth-back-link">← Back to sign in</Link>
         <div className="brand-content">
-          <div className="brand-logo">Zenith</div>
+          <div className="brand-logo auth-brand-logo">
+            <ZenithLogo size={56} />
+            <span className="brand-logo-text">Zenith</span>
+          </div>
           <h1 className="brand-tagline">
             Choose a new <span>password.</span>
           </h1>

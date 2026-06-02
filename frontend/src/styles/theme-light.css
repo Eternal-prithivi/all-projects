@@ -904,10 +904,183 @@ html[data-theme="light"] .mobile-tab-bar .tab-item.active {
 }
 
 /* ============================================
+   ADMIN PORTAL
+   ============================================ */
+html[data-theme="light"] .admin-layout,
+html[data-theme="light"] .admin-content {
+  background-color: var(--bg-base);
+  color: var(--text-primary);
+}
+
+html[data-theme="light"] .admin-sidebar {
+  background: rgba(255, 255, 255, 0.96);
+  border-right-color: var(--border-default);
+  box-shadow: 1px 0 8px rgba(0, 0, 0, 0.04);
+}
+
+html[data-theme="light"] .admin-header {
+  background: rgba(255, 255, 255, 0.92);
+  border-bottom-color: var(--border-default);
+}
+
+html[data-theme="light"] .admin-breadcrumbs-wrapper {
+  background: var(--bg-surface);
+}
+
+html[data-theme="light"] .admin-sidebar-nav a:hover,
+html[data-theme="light"] .admin-rail-bottom a:hover {
+  background: var(--gold-glow);
+}
+
+html[data-theme="light"] .admin-stat-card,
+html[data-theme="light"] .admin-card,
+html[data-theme="light"] .stat-card,
+html[data-theme="light"] .analytics-section,
+html[data-theme="light"] .settings-section,
+html[data-theme="light"] .timeline-item,
+html[data-theme="light"] .search-input-group,
+html[data-theme="light"] .collection-item,
+html[data-theme="light"] .plan-stat,
+html[data-theme="light"] .setting-toggle {
+  background: var(--bg-card);
+  border-color: var(--border-default);
+  box-shadow: var(--shadow-card);
+}
+
+html[data-theme="light"] .admin-stat-card:hover,
+html[data-theme="light"] .stat-card:hover {
+  box-shadow: var(--shadow-gold);
+}
+
+html[data-theme="light"] .admin-table th {
+  background: var(--bg-input);
+  color: var(--text-secondary);
+}
+
+html[data-theme="light"] .admin-table td {
+  color: var(--text-primary);
+  border-color: var(--border-subtle);
+}
+
+html[data-theme="light"] .admin-table tbody tr:hover {
+  background: var(--gold-glow);
+}
+
+html[data-theme="light"] .filter-btn {
+  background: var(--bg-card);
+  color: var(--text-muted);
+  border-color: var(--border-default);
+}
+
+html[data-theme="light"] .filter-btn.active {
+  background: linear-gradient(135deg, var(--gold-primary), var(--gold-light));
+  color: #fff;
+  border-color: var(--gold-primary);
+}
+
+html[data-theme="light"] .setting-input {
+  background: var(--bg-input);
+  color: var(--text-primary);
+}
+
+html[data-theme="light"] .toggle-info h3 {
+  color: var(--text-primary);
+}
+
+html[data-theme="light"] .toggle-info p {
+  color: var(--text-muted);
+}
+
+html[data-theme="light"] .admin-overview .mc-kicker {
+  color: var(--gold-dark);
+  background: var(--gold-glow);
+}
+
+/* Profile dropdown + notifications (dashboard + admin) */
+html[data-theme="light"] .profile-menu {
+  background: var(--bg-elevated);
+  border-color: var(--border-default);
+  box-shadow: var(--shadow-elevated);
+}
+
+html[data-theme="light"] .profile-menu-header {
+  background: var(--surface-hover);
+}
+
+html[data-theme="light"] .profile-menu-item:hover {
+  background: var(--surface-hover);
+}
+
+html[data-theme="light"] .notification-dropdown {
+  background: var(--bg-elevated);
+  border-color: var(--border-default);
+  box-shadow: var(--shadow-elevated);
+}
+
+html[data-theme="light"] .notification-item:hover {
+  background: var(--surface-hover);
+}
+
+html[data-theme="light"] .notification-item.unread {
+  background: var(--gold-glow);
+}
+
+html[data-theme="light"] .mark-all-read-btn {
+  background: rgba(37, 99, 235, 0.1);
+  color: var(--info);
+}
+
+html[data-theme="light"] .clear-all-btn {
+  background: rgba(220, 38, 38, 0.08);
+  color: var(--danger);
+}
+
+/* Keyboard shortcuts modal */
+html[data-theme="light"] .keyboard-shortcuts-overlay {
+  background: rgba(0, 0, 0, 0.35);
+}
+
+/* React Toastify */
+html[data-theme="light"] .Toastify__toast {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+}
+
+html[data-theme="light"] .Toastify__toast-body {
+  color: var(--text-primary);
+}
+
+html[data-theme="light"] .Toastify__close-button {
+  color: var(--text-muted);
+}
+
+/* Profile page */
+html[data-theme="light"] .profile-page,
+html[data-theme="light"] .profile-container {
+  color: var(--text-primary);
+}
+
+html[data-theme="light"] .profile-card,
+html[data-theme="light"] .profile-section,
+html[data-theme="light"] .profile-stats-card {
+  background: var(--bg-card);
+  border-color: var(--border-default);
+  box-shadow: var(--shadow-card);
+}
+
+html[data-theme="light"] .profile-header {
+  background: linear-gradient(135deg, var(--gold-glow) 0%, var(--bg-card) 100%);
+}
+
+/* ============================================
    TRANSITIONS — smooth theme switch
    ============================================ */
 html[data-theme] body,
 html[data-theme] .nav-rail,
+html[data-theme] .admin-sidebar,
+html[data-theme] .admin-header,
+html[data-theme] .admin-card,
+html[data-theme] .admin-stat-card,
 html[data-theme] .dashboard-header,
 html[data-theme] .dashboard-content,
 html[data-theme] .dashboard-breadcrumbs-wrapper,
@@ -931,7 +1104,11 @@ html[data-theme] .global-search-modal,
 html[data-theme] .empty-state,
 html[data-theme] .vm-process-info,
 html[data-theme] .cluster-topology-section,
-html[data-theme] .cluster-card {
+html[data-theme] .cluster-card,
+html[data-theme] .profile-menu,
+html[data-theme] .notification-dropdown,
+html[data-theme] .keyboard-shortcuts-modal,
+html[data-theme] .global-search-modal {
   transition: background-color 0.35s ease,
               color 0.35s ease,
               border-color 0.35s ease,

@@ -4,7 +4,7 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.85);
+  background: rgba(0, 0, 0, 0.55);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -22,14 +22,14 @@
 }
 
 .keyboard-shortcuts-modal {
-  background: #1a1a1a;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
   border-radius: 16px;
   max-width: 600px;
   width: 90%;
   max-height: 80vh;
   overflow-y: auto;
-  box-shadow: 0 16px 64px rgba(0, 0, 0, 0.6);
+  box-shadow: var(--shadow-elevated);
   animation: slideUp 0.3s ease;
 }
 
@@ -49,22 +49,22 @@
   justify-content: space-between;
   align-items: center;
   padding: 1.5rem 2rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom: 1px solid var(--border-default);
 }
 
 .shortcuts-header h2 {
   margin: 0;
   font-size: 1.5rem;
-  color: #fff;
+  color: var(--text-primary);
 }
 
 .close-btn {
   width: 32px;
   height: 32px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  color: #fff;
+  background: var(--surface-hover);
+  border: 1px solid var(--border-default);
+  color: var(--text-primary);
   font-size: 1.25rem;
   cursor: pointer;
   transition: all 0.3s ease;
@@ -74,9 +74,9 @@
 }
 
 .close-btn:hover {
-  background: rgba(255, 107, 107, 0.2);
-  border-color: #ff6b6b;
-  color: #ff6b6b;
+  background: rgba(239, 68, 68, 0.12);
+  border-color: var(--danger);
+  color: var(--danger);
 }
 
 .shortcuts-list {
@@ -96,42 +96,42 @@
 .shortcut-key {
   min-width: 100px;
   padding: 0.5rem 1rem;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: var(--surface-hover);
+  border: 1px solid var(--border-default);
   border-radius: 6px;
   font-family: 'SF Mono', 'Monaco', 'Courier New', monospace;
   font-size: 0.9rem;
-  color: #f4c542;
+  color: var(--gold-primary);
   text-align: center;
   font-weight: 600;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  box-shadow: var(--shadow-card);
 }
 
 .shortcut-description {
   flex: 1;
-  color: #ccc;
+  color: var(--text-secondary);
   font-size: 0.95rem;
 }
 
 .shortcuts-footer {
   padding: 1.5rem 2rem;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  border-top: 1px solid var(--border-default);
   text-align: center;
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--surface-hover);
 }
 
 .shortcuts-footer p {
   margin: 0;
-  color: #888;
+  color: var(--text-muted);
   font-size: 0.9rem;
 }
 
 .shortcuts-footer kbd {
   padding: 0.25rem 0.5rem;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: var(--surface-hover);
+  border: 1px solid var(--border-default);
   border-radius: 4px;
   font-family: monospace;
   font-size: 0.85rem;
-  color: #f4c542;
+  color: var(--gold-primary);
 }

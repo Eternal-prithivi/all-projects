@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 280 64" role="img" aria-label="Zenith Cloud">
+  <defs>
+    <linearGradient id="zenithGoldLg" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#e8c84a"/>
+      <stop offset="100%" stop-color="#9a6f00"/>
+    </linearGradient>
+  </defs>
+  <g transform="translate(4 4) scale(0.46)">
+    <path fill="#3d3d3d" d="M18 78 Q18 66 30 62 Q33 48 48 45 Q52 34 64 32 Q68 22 80 25 Q92 22 96 32 Q108 34 112 45 Q126 48 129 62 Q141 66 141 78 Q154 82 154 95 Q154 108 141 108 L39 108 Q26 108 26 95 Q26 82 18 78 Z"/>
+    <polygon fill="url(#zenithGoldLg)" points="60,22 88,72 32,72"/>
+    <polygon fill="#f0d060" opacity="0.85" points="60,22 68,42 52,42"/>
+  </g>
+  <text x="68" y="38" font-family="Inter, Outfit, system-ui, sans-serif" font-size="26" font-weight="600" fill="currentColor">Zenith</text>
+  <text x="158" y="38" font-family="Inter, Outfit, system-ui, sans-serif" font-size="11" font-weight="600" letter-spacing="0.14em" fill="#c9a227">CLOUD</text>
+</svg>

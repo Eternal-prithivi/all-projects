@@ -2,6 +2,7 @@ import React from 'react';
 import { NavLink, Link } from 'react-router-dom';
 import { FaChartLine, FaUsers, FaDollarSign, FaServer, FaHome, FaQuestionCircle } from 'react-icons/fa';
 import '../../styles/admin-layout.css';
+import ZenithLogo from '../brand/ZenithLogo.jsx';
 
 const AdminSidebar = ({ user }) => {
   const userInitial = user?.username?.charAt(0).toUpperCase() || 'A';
@@ -9,9 +10,7 @@ const AdminSidebar = ({ user }) => {
   return (
     <aside className="admin-sidebar nav-rail admin-rail" role="navigation" aria-label="Admin navigation">
       <div className="rail-logo admin-rail-logo">
-        <Link to="/admin" aria-label="Go to admin overview">
-          <span className="rail-logo-mark">A</span>
-        </Link>
+        <ZenithLogo size={28} linkTo="/admin" />
       </div>
 
       <nav className="rail-nav admin-rail-nav">

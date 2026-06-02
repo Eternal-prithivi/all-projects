@@ -11,6 +11,7 @@ import { useLandingReveal } from '../hooks/useLandingReveal.js';
 import { MARKETING_PRICING } from '../data/marketingPricing.js';
 import '../styles/home.css';
 import '../styles/animated-background.css';
+import ZenithLogo from '../components/brand/ZenithLogo.jsx';
 
 const MARQUEE_ITEMS = [
   'AWS',
@@ -109,9 +110,9 @@ function HomePage() {
 
       <nav className={`landing-nav ${navScrolled ? 'landing-nav--scrolled' : ''}`}>
         <div className="nav-container">
-          <div className="nav-logo">
-            <h2>Zenith</h2>
-          </div>
+          <Link to="/" className="nav-logo">
+            <ZenithLogo variant="full" size={36} subtitle="Cloud" />
+          </Link>
           <div className="nav-links">
             <a href="#features">Features</a>
             <a href="#how-it-works">How it works</a>

@@ -4,6 +4,7 @@ import { requestPasswordReset } from '../api';
 import { getValidationErrorMessage, validateForgotPasswordForm } from '../utils/formValidation.js';
 import '../styles/auth.css';
 import '../styles/auth-polish.css';
+import ZenithLogo from '../components/brand/ZenithLogo.jsx';
 
 function ForgotPasswordPage() {
   const [identifier, setIdentifier] = useState('');
@@ -52,7 +53,10 @@ function ForgotPasswordPage() {
       <div className="auth-brand-panel">
         <Link to="/login" className="auth-back-link">← Back to sign in</Link>
         <div className="brand-content">
-          <div className="brand-logo">Zenith</div>
+          <div className="brand-logo auth-brand-logo">
+            <ZenithLogo size={56} />
+            <span className="brand-logo-text">Zenith</span>
+          </div>
           <h1 className="brand-tagline">
             Reset your <span>password.</span>
           </h1>

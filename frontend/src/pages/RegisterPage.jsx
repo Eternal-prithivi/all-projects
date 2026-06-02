@@ -4,6 +4,7 @@ import { registerUser } from '../api';
 import { getValidationErrorMessage, validateRegisterForm } from '../utils/formValidation.js';
 import '../styles/auth.css';
 import '../styles/auth-polish.css';
+import ZenithLogo from '../components/brand/ZenithLogo.jsx';
 
 function RegisterPage() {
   const navigate = useNavigate();
@@ -54,7 +55,10 @@ function RegisterPage() {
       <div className="auth-brand-panel">
         <Link to="/" className="auth-back-link">← Back to home</Link>
         <div className="brand-content">
-          <div className="brand-logo">Zenith</div>
+          <div className="brand-logo auth-brand-logo">
+            <ZenithLogo size={56} />
+            <span className="brand-logo-text">Zenith</span>
+          </div>
           <h1 className="brand-tagline">
             Start optimizing <span>your cloud today.</span>
           </h1>
