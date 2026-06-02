@@ -1,27 +1,32 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
   <defs>
     <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#0a0a0a"/>
+      <stop offset="0%" stop-color="#0c0c0c"/>
       <stop offset="100%" stop-color="#1a1a1a"/>
     </linearGradient>
-    <linearGradient id="gold" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#f0d060"/>
+    <linearGradient id="zBar" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#e6c558"/>
+      <stop offset="100%" stop-color="#b8860b"/>
+    </linearGradient>
+    <linearGradient id="zSlash" x1="100%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#fbe38a"/>
+      <stop offset="55%" stop-color="#e6c558"/>
       <stop offset="100%" stop-color="#9a6f00"/>
     </linearGradient>
-    <radialGradient id="glow" cx="50%" cy="30%" r="55%">
-      <stop offset="0%" stop-color="rgba(212,175,55,0.15)"/>
+    <radialGradient id="glow" cx="50%" cy="28%" r="55%">
+      <stop offset="0%" stop-color="rgba(212,175,55,0.18)"/>
       <stop offset="100%" stop-color="rgba(212,175,55,0)"/>
     </radialGradient>
   </defs>
   <rect width="1200" height="630" fill="url(#bg)"/>
   <rect width="1200" height="630" fill="url(#glow)"/>
-  <g transform="translate(548 168) scale(5.5)">
-    <path fill="#404040" d="M5 26.2c0-1.4 1.1-2.6 2.5-2.8.4-2.2 2.4-3.8 4.8-3.8 1.2 0 2.3.4 3.1 1.1.7-.3 1.5-.5 2.3-.5 2.8 0 5 2.2 5 5v.2H5v-.2z"/>
-    <path fill="#f0ead6" d="M7 7.5h18v3.25H7z"/>
-    <path fill="#f0ead6" d="M7 21.25h13.5v3.25H7z"/>
-    <path fill="url(#gold)" d="M21.2 8.2 25 10.4 10.8 24.6 7 22.4 21.2 8.2z"/>
+  <g transform="translate(528 150) scale(3)">
+    <rect x="11" y="11" width="26" height="5.2" rx="1.4" fill="url(#zBar)"/>
+    <rect x="11" y="31.6" width="26" height="5.2" rx="1.4" fill="url(#zBar)"/>
+    <polygon fill="url(#zSlash)" points="30,16.2 37,16.2 18,31.6 11,31.6"/>
+    <polygon fill="#fff3c4" opacity="0.35" points="30,16.2 32.4,16.2 13.4,31.6 11,31.6"/>
   </g>
-  <text x="600" y="360" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="72" font-weight="700" fill="#f0ead6">Zenith</text>
-  <text x="600" y="420" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="28" font-weight="500" letter-spacing="0.2em" fill="#c9a227">CLOUD OPTIMIZATION</text>
-  <text x="600" y="500" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="22" fill="#8a8070">Multi-cloud cost, storage, and infrastructure management</text>
+  <text x="600" y="368" text-anchor="middle" font-family="Outfit, Inter, system-ui, sans-serif" font-size="74" font-weight="700" fill="#f0ead6">Zenith</text>
+  <text x="600" y="426" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="27" font-weight="600" letter-spacing="0.22em" fill="#c9a227">CLOUD OPTIMIZATION</text>
+  <text x="600" y="504" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="22" fill="#8a8070">Multi-cloud cost, storage, and infrastructure management</text>
 </svg>

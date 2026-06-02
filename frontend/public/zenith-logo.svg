@@ -1,16 +1,20 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 48" role="img" aria-label="Zenith Cloud">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 250 52" role="img" aria-label="Zenith Cloud">
   <defs>
-    <linearGradient id="zenithGoldLg" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#f0d060"/>
+    <linearGradient id="zBarL" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#e6c558"/>
+      <stop offset="100%" stop-color="#b8860b"/>
+    </linearGradient>
+    <linearGradient id="zSlashL" x1="100%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#fbe38a"/>
+      <stop offset="55%" stop-color="#e6c558"/>
       <stop offset="100%" stop-color="#9a6f00"/>
     </linearGradient>
   </defs>
-  <g transform="translate(4 6) scale(1.15)">
-    <path fill="#404040" d="M5 26.2c0-1.4 1.1-2.6 2.5-2.8.4-2.2 2.4-3.8 4.8-3.8 1.2 0 2.3.4 3.1 1.1.7-.3 1.5-.5 2.3-.5 2.8 0 5 2.2 5 5v.2H5v-.2z"/>
-    <path fill="currentColor" d="M7 7.5h18v3.25H7z"/>
-    <path fill="currentColor" d="M7 21.25h13.5v3.25H7z"/>
-    <path fill="url(#zenithGoldLg)" d="M21.2 8.2 25 10.4 10.8 24.6 7 22.4 21.2 8.2z"/>
+  <g transform="translate(2 2) scale(0.95)">
+    <rect x="11" y="11" width="26" height="5.2" rx="1.4" fill="url(#zBarL)"/>
+    <rect x="11" y="31.6" width="26" height="5.2" rx="1.4" fill="url(#zBarL)"/>
+    <polygon fill="url(#zSlashL)" points="30,16.2 37,16.2 18,31.6 11,31.6"/>
   </g>
-  <text x="52" y="32" font-family="Inter, Outfit, system-ui, sans-serif" font-size="22" font-weight="600" fill="currentColor">Zenith</text>
-  <text x="128" y="32" font-family="Inter, Outfit, system-ui, sans-serif" font-size="10" font-weight="600" letter-spacing="0.14em" fill="#c9a227">CLOUD</text>
+  <text x="58" y="33" font-family="Outfit, Inter, system-ui, sans-serif" font-size="25" font-weight="700" letter-spacing="-0.01em" fill="currentColor">Zenith</text>
+  <text x="142" y="33" font-family="Inter, system-ui, sans-serif" font-size="10.5" font-weight="600" letter-spacing="0.18em" fill="#c9a227">CLOUD</text>
 </svg>
