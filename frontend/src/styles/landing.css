@@ -10,6 +10,7 @@
   font-family: 'Inter', system-ui, sans-serif;
   overflow-x: hidden;
   overflow-y: visible;
+  width: 100%;
 }
 
 .landing-page > *:not(.landing-backdrop) {
@@ -969,7 +970,7 @@
 
   .landing-hero__visual-wrap {
     width: 100%;
-    max-width: min(520px, 100%);
+    max-width: min(640px, 100%);
     margin-left: auto;
     margin-right: auto;
   }

@@ -3,16 +3,57 @@
  * Complements mobile-nav.css, landing-mobile.css, mobile-marketing-nav.css.
  */
 
-/* Public pages must scroll with document (not locked #root height) */
+/* Public pages grow with content; dashboard/admin lock to viewport */
 html,
 body {
   min-height: 100dvh;
 }
 
 .app-root {
+  flex: 1 0 auto;
+  width: 100%;
+  min-height: auto;
+  height: auto;
+  overflow: visible;
+}
+
+.app-root:has(.dashboard-page),
+.app-root:has(.admin-layout) {
   flex: 1 1 auto;
   min-height: 0;
+  height: 100%;
+  min-height: 100dvh;
+  overflow: hidden;
+}
+
+#root:has(.dashboard-page),
+#root:has(.admin-layout) {
+  height: 100dvh;
+  max-height: 100dvh;
+  overflow: hidden;
+}
+
+.landing-page,
+.marketing-page {
+  flex: 1 0 auto;
   width: 100%;
+}
+
+@media (max-width: 768px) {
+  html:has(.marketing-page),
+  body:has(.marketing-page),
+  #root:has(.marketing-page) {
+    overflow-y: auto !important;
+    height: auto !important;
+    max-height: none !important;
+  }
+
+  #root:has(.marketing-page) .app-root {
+    flex: 1 0 auto;
+    min-height: auto;
+    height: auto;
+    overflow: visible;
+  }
 }
 
 @media (max-width: 768px) {

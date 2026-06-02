@@ -8,7 +8,7 @@ function App() {
   useEffect(() => startRenderKeepAlive(), []);
 
   return (
-    <div className="app-root" style={{ flex: 1, minHeight: 0, width: "100%" }}>
+    <div className="app-root">
       <MaintenanceGate>
         <Outlet />
       </MaintenanceGate>

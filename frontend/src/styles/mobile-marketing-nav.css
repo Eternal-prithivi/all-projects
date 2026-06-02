@@ -6,6 +6,9 @@
   .mobile-marketing-nav {
     display: flex;
     align-items: center;
+    flex-shrink: 0;
+    position: relative;
+    z-index: 1202;
   }
 
   .marketing-page .nav-links.nav-links--desktop,
@@ -25,17 +28,22 @@
     justify-content: center;
     cursor: pointer;
     font-size: 1.1rem;
+    touch-action: manipulation;
     -webkit-tap-highlight-color: transparent;
+    position: relative;
+    z-index: 1203;
   }
 
   .mobile-marketing-nav__backdrop {
     position: fixed;
     inset: 0;
-    z-index: 1100;
-    background: rgba(0, 0, 0, 0.55);
+    z-index: 1998;
+    background: rgba(0, 0, 0, 0.6);
     border: none;
     padding: 0;
+    margin: 0;
     cursor: pointer;
+    touch-action: manipulation;
   }
 
   .mobile-marketing-nav__drawer {
@@ -44,12 +52,46 @@
     right: 0;
     bottom: 0;
     width: min(300px, 88vw);
-    z-index: 1101;
+    z-index: 1999;
     background: var(--bg-elevated);
     border-left: 1px solid var(--border-default);
-    padding: calc(1rem + var(--safe-top)) 0 calc(1rem + var(--safe-bottom));
+    padding: 0 0 calc(1rem + var(--safe-bottom));
+    padding-top: var(--safe-top);
     box-shadow: var(--shadow-elevated);
     animation: marketingDrawerIn 0.25s var(--ease-out);
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .mobile-marketing-nav__drawer-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.75rem 1rem 0.5rem;
+    border-bottom: 1px solid var(--border-subtle);
+    margin-bottom: 0.25rem;
+  }
+
+  .mobile-marketing-nav__drawer-title {
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+
+  .mobile-marketing-nav__close {
+    width: var(--touch-min);
+    height: var(--touch-min);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sm);
+    background: var(--surface-hover);
+    color: var(--text-primary);
+    cursor: pointer;
+    touch-action: manipulation;
   }
 
   @keyframes marketingDrawerIn {
