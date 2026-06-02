@@ -56,6 +56,22 @@
     flex: none;
     min-height: auto;
     height: auto;
+    display: block;
+  }
+
+  .dashboard-content-stack {
+    display: block;
+    min-height: 0;
+  }
+
+  .dashboard-content__body {
+    flex: none;
+    width: 100%;
+    min-height: 0;
+  }
+
+  .dashboard-content-stack .site-footer {
+    margin-top: 2.5rem;
   }
 
   .marketing-page__main {

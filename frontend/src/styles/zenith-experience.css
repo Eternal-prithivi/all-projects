@@ -69,7 +69,8 @@
   }
 }
 
-.dashboard-content > * {
+.dashboard-content > *,
+.dashboard-content-stack > * {
   position: relative;
   z-index: 1;
 }

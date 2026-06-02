@@ -6,6 +6,24 @@
   margin-top: auto;
   border-top: 1px solid var(--border-subtle);
   position: relative;
+  clear: both;
+}
+
+/* Dashboard / app shell: footer after all page content, pinned to bottom only when page is short */
+.dashboard-content-stack .site-footer {
+  flex-shrink: 0;
+  width: 100%;
+  margin-top: auto;
+  padding-top: 2.5rem;
+  background: var(--bg-base, #030303);
+  border-top: 1px solid var(--border-subtle);
+  box-sizing: border-box;
+}
+
+@media (max-width: 768px) {
+  .dashboard-content-stack .site-footer {
+    padding-bottom: calc(1.25rem + var(--mobile-shell-bottom, 56px));
+  }
 }
 
 /* Gold accent line at the top */
