@@ -1,4 +1,6 @@
 # Python/FastAPI
+venv/
+.venv/
 __pycache__/
 *.pyc
 *.pyo

@@ -13,7 +13,7 @@
 | Staging deploy | `STAGING.md` |
 | GitHub secrets | `../setup/DEPLOYMENT_SECRETS.md` |
 | Full roadmap Phases 21–27 | `../../ai-docs/PROGRESS.md`, `../../ai-docs/PROGRESS_HISTORY.md` |
-| Legacy improvement list | `../../PROFESSIONAL_IMPROVEMENTS.md` |
+| Historical improvement log | `../../ai-docs/PROGRESS_HISTORY.md` |
 
 ---
 

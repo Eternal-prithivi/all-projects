@@ -799,16 +799,12 @@ echo "gcp-credentials.json" >> .gitignore
 ### Test 1: MongoDB Connection
 
 ```bash
-cd /Users/a.prithiviraj/Documents/CloudResourceOptimizationPlatform/backend
-python3 test_mongo.py
+cd backend
+source .venv/bin/activate
+python -c "from app.core.database import get_db; next(get_db().command('ping')); print('Connected to MongoDB')"
 ```
 
-**Expected output:**
-```
-✓ Connected to MongoDB successfully
-✓ Database: CloudResourceOptimizationDB
-✓ Collections: ['users', 'vm_assignments', ...]
-```
+**Expected output:** `Connected to MongoDB`
 
 ---
 

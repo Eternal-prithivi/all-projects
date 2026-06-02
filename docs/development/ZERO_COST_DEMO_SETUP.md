@@ -234,7 +234,7 @@ TOTAL PROJECT COST:                   $0.70  ✅
    - Zero API cost during development
    - Realistic data for demo
 
-2. ✅ **`docs/CACHE_ANALYSIS_FOR_DEMO.md`**
+2. ✅ **`docs/development/CACHING_GUIDE.md`**
    - Complete cache analysis with pros/cons
    - Cost breakdown for each cache
    - Student-specific recommendations
@@ -323,5 +323,5 @@ Your caching implementation is **EXCELLENT** for a student project!
 
 ---
 
-**Questions?** Check `docs/CACHE_ANALYSIS_FOR_DEMO.md` for detailed analysis!
+**Questions?** See `docs/development/CACHING_GUIDE.md`.
 
