@@ -82,4 +82,9 @@
     animation: none !important;
     contain: none;
   }
+
+  /* Keep hero dashboard entrance on portrait */
+  .landing-hero__visual-wrap .hero-preview {
+    animation: landing-hero-preview-portrait 1s cubic-bezier(0.16, 1, 0.3, 1) 0.18s both !important;
+  }
 }

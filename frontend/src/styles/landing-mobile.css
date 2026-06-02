@@ -337,15 +337,130 @@
   }
 }
 
-@media (max-width: 480px) {
+/* Portrait phone — match landscape dashboard proportions (wide mock, not squashed) */
+@media (max-width: 768px) and (orientation: portrait) {
+  .landing-hero__visual-wrap {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .landing-hero__visual-wrap .hero-preview {
+    width: 100%;
+    max-width: 100%;
+    aspect-ratio: 16 / 10;
+    height: auto;
+    display: flex;
+    flex-direction: column;
+    animation: landing-hero-preview-portrait 1s cubic-bezier(0.16, 1, 0.3, 1) 0.18s both;
+  }
+
+  .hero-preview__chrome {
+    flex-shrink: 0;
+  }
+
   .hero-preview__body {
-    min-height: 200px;
+    flex: 1 1 auto;
+    min-height: 0;
+    width: 100%;
+    display: flex;
+    align-items: stretch;
+  }
+
+  .hero-preview__rail {
+    width: 40px;
+    padding: 0.75rem 0.45rem;
+    justify-content: flex-start;
+  }
+
+  .hero-preview__rail-item {
+    height: 24px;
+  }
+
+  .hero-preview__main {
+    flex: 1 1 auto;
+    min-height: 0;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+    padding: 0.7rem 0.65rem;
+  }
+
+  .hero-preview__metrics {
+    flex: 0 0 auto;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.4rem;
+    align-items: stretch;
+  }
+
+  .hero-preview__metric {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    min-height: 3.25rem;
+    padding: 0.45rem 0.4rem;
+  }
+
+  .hero-preview__metric-label {
+    font-size: 0.48rem;
+    line-height: 1.15;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .hero-preview__metric strong {
+    font-size: 0.82rem;
+    line-height: 1.1;
+    margin-top: 0.1rem;
+  }
+
+  .hero-preview__metric-delta {
+    font-size: 0.52rem;
+    margin-top: 0.1rem;
   }
 
   .hero-preview__chart {
-    min-height: 88px;
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    padding: 0.55rem 0.6rem 0.6rem;
   }
 
+  .hero-preview__chart-bars {
+    flex: 1 1 auto;
+    min-height: 4.25rem;
+    height: auto;
+    align-items: flex-end;
+    gap: 4px;
+  }
+
+  .hero-preview__bar {
+    min-height: 4px;
+  }
+
+  .hero-preview__rows {
+    flex: 0 0 auto;
+  }
+
+  .hero-preview__rows span {
+    height: 7px;
+    margin-bottom: 0.35rem;
+  }
+}
+
+@media (max-width: 480px) and (orientation: portrait) {
+  .hero-preview__metric {
+    min-height: 3rem;
+  }
+
+  .hero-preview__chart-bars {
+    min-height: 3.75rem;
+  }
+}
+
+@media (max-width: 480px) {
   .landing-hero {
     padding-top: 5.75rem;
   }
@@ -374,25 +489,28 @@
     max-width: 12rem;
   }
 
-  /* Keep 3-column metrics on small phones — larger type from parent block */
-  .hero-preview__metric-label {
-    font-size: 0.52rem;
-  }
-
-  .hero-preview__metric strong {
-    font-size: 0.8rem;
-  }
-
-  .hero-preview__metric-delta {
-    justify-self: end;
-    align-self: center;
-  }
-
   .hero-preview__url {
     display: none;
   }
 
   .hero-preview__chrome {
     justify-content: flex-start;
+  }
+}
+
+/* Landscape on phone — preserve wide layout (already reads well) */
+@media (max-width: 896px) and (orientation: landscape) {
+  .hero-preview {
+    aspect-ratio: 16 / 9;
+    max-height: min(72vh, 320px);
+  }
+
+  .hero-preview__body {
+    min-height: 0;
+    flex: 1;
+  }
+
+  .hero-preview__chart {
+    min-height: 5rem;
   }
 }
