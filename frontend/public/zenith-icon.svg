@@ -1,5 +1,9 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" role="img" aria-label="Zenith">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" role="img" aria-label="Zenith Cloud">
   <defs>
+    <linearGradient id="cloudFill" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#5e5c58"/>
+      <stop offset="100%" stop-color="#363432"/>
+    </linearGradient>
     <linearGradient id="zBar" x1="0%" y1="0%" x2="100%" y2="100%">
       <stop offset="0%" stop-color="#e6c558"/>
       <stop offset="100%" stop-color="#b8860b"/>
@@ -10,12 +14,23 @@
       <stop offset="100%" stop-color="#9a6f00"/>
     </linearGradient>
   </defs>
-  <!-- Z top bar -->
-  <rect x="11" y="11" width="26" height="5.2" rx="1.4" fill="url(#zBar)"/>
-  <!-- Z bottom bar -->
-  <rect x="11" y="31.6" width="26" height="5.2" rx="1.4" fill="url(#zBar)"/>
-  <!-- Z diagonal — hero stroke -->
-  <polygon fill="url(#zSlash)" points="30,16.2 37,16.2 18,31.6 11,31.6"/>
-  <!-- subtle highlight edge on diagonal -->
-  <polygon fill="#fff3c4" opacity="0.35" points="30,16.2 32.4,16.2 13.4,31.6 11,31.6"/>
+  <!-- Cloud base (multi-cloud platform) -->
+  <path
+    fill="url(#cloudFill)"
+    d="M6 36.2c0-2.4 2-4.2 4.5-4.4.6-2.6 3.2-4.4 6.2-4.4 1.6 0 3 .6 4 1.6 1-.25 2-.4 3.1-.4 3.6 0 6.5 2.8 6.5 6.2 0 .2-.02.4H6v-2.9z"
+  />
+  <ellipse cx="14" cy="30.5" rx="5" ry="3.2" fill="#6a6864" opacity="0.45"/>
+  <ellipse cx="27" cy="31" rx="6" ry="3.5" fill="#6a6864" opacity="0.35"/>
+  <path
+    fill="none"
+    stroke="#d4af37"
+    stroke-opacity="0.28"
+    stroke-width="0.7"
+    d="M6 36.2c0-2.4 2-4.2 4.5-4.4.6-2.6 3.2-4.4 6.2-4.4 1.6 0 3 .6 4 1.6 1-.25 2-.4 3.1-.4 3.6 0 6.5 2.8 6.5 6.2 0 .2-.02.4H6v-2.9z"
+  />
+  <!-- Z monogram -->
+  <rect x="11" y="9" width="26" height="5" rx="1.3" fill="url(#zBar)"/>
+  <rect x="11" y="28.8" width="26" height="5" rx="1.3" fill="url(#zBar)"/>
+  <polygon fill="url(#zSlash)" points="30,14.2 36.5,14.2 18,28.8 11.5,28.8"/>
+  <polygon fill="#fff3c4" opacity="0.32" points="30,14.2 32.2,14.2 13.7,28.8 11.5,28.8"/>
 </svg>

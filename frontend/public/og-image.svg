@@ -4,6 +4,10 @@
       <stop offset="0%" stop-color="#0c0c0c"/>
       <stop offset="100%" stop-color="#1a1a1a"/>
     </linearGradient>
+    <linearGradient id="cloudFill" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#4a4844"/>
+      <stop offset="100%" stop-color="#2a2926"/>
+    </linearGradient>
     <linearGradient id="zBar" x1="0%" y1="0%" x2="100%" y2="100%">
       <stop offset="0%" stop-color="#e6c558"/>
       <stop offset="100%" stop-color="#b8860b"/>
@@ -20,11 +24,15 @@
   </defs>
   <rect width="1200" height="630" fill="url(#bg)"/>
   <rect width="1200" height="630" fill="url(#glow)"/>
-  <g transform="translate(528 150) scale(3)">
-    <rect x="11" y="11" width="26" height="5.2" rx="1.4" fill="url(#zBar)"/>
-    <rect x="11" y="31.6" width="26" height="5.2" rx="1.4" fill="url(#zBar)"/>
-    <polygon fill="url(#zSlash)" points="30,16.2 37,16.2 18,31.6 11,31.6"/>
-    <polygon fill="#fff3c4" opacity="0.35" points="30,16.2 32.4,16.2 13.4,31.6 11,31.6"/>
+  <g transform="translate(516 138) scale(3.4)">
+    <path fill="url(#cloudFill)" d="M6 36.2c0-2.4 2-4.2 4.5-4.4.6-2.6 3.2-4.4 6.2-4.4 1.6 0 3 .6 4 1.6 1-.25 2-.4 3.1-.4 3.6 0 6.5 2.8 6.5 6.2 0 .2-.02.4H6v-2.9z"/>
+    <ellipse cx="14" cy="30.5" rx="5" ry="3.2" fill="#6a6864" opacity="0.45"/>
+    <ellipse cx="27" cy="31" rx="6" ry="3.5" fill="#6a6864" opacity="0.35"/>
+    <path fill="none" stroke="#d4af37" stroke-opacity="0.28" stroke-width="0.8" d="M6 36.2c0-2.4 2-4.2 4.5-4.4.6-2.6 3.2-4.4 6.2-4.4 1.6 0 3 .6 4 1.6 1-.25 2-.4 3.1-.4 3.6 0 6.5 2.8 6.5 6.2 0 .2-.02.4H6v-2.9z"/>
+    <rect x="11" y="9" width="26" height="5" rx="1.3" fill="url(#zBar)"/>
+    <rect x="11" y="28.8" width="26" height="5" rx="1.3" fill="url(#zBar)"/>
+    <polygon fill="url(#zSlash)" points="30,14.2 36.5,14.2 18,28.8 11.5,28.8"/>
+    <polygon fill="#fff3c4" opacity="0.32" points="30,14.2 32.2,14.2 13.7,28.8 11.5,28.8"/>
   </g>
   <text x="600" y="368" text-anchor="middle" font-family="Outfit, Inter, system-ui, sans-serif" font-size="74" font-weight="700" fill="#f0ead6">Zenith</text>
   <text x="600" y="426" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="27" font-weight="600" letter-spacing="0.22em" fill="#c9a227">CLOUD OPTIMIZATION</text>
