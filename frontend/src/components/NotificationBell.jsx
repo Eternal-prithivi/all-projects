@@ -53,7 +53,7 @@ const getNotificationIcon = (type) => {
   }
 };
 
-const NotificationBell = () => {
+const NotificationBell = ({ viewAllPath = '/dashboard/notifications' }) => {
   const {
     notifications,
     unreadCount,
@@ -213,7 +213,7 @@ const NotificationBell = () => {
           </div>
 
           <div className="notification-dropdown-footer">
-            <Link to="/dashboard/notifications" className="view-all-btn" onClick={() => setIsOpen(false)}>
+            <Link to={viewAllPath} className="view-all-btn" onClick={() => setIsOpen(false)}>
               View all notifications
             </Link>
           </div>

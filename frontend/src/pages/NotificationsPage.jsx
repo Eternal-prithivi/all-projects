@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import PageHeader from '../components/ui/PageHeader.jsx';
 import { useNotificationCenter } from '../context/NotificationContext.jsx';
 import '../styles/notifications-page.css';
@@ -28,6 +28,9 @@ const formatTime = (ts) => {
 };
 
 export default function NotificationsPage() {
+  const location = useLocation();
+  const isAdminRoute = location.pathname.startsWith('/admin');
+
   const {
     markAsRead,
     markAllAsRead,
@@ -72,7 +75,7 @@ export default function NotificationsPage() {
   return (
     <div className="notifications-page zenith-page-enter">
       <PageHeader
-        kicker="Account"
+        kicker={isAdminRoute ? 'Admin' : 'Account'}
         title="Notifications"
         subtitle={
           data.unread_count > 0

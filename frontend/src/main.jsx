@@ -157,6 +157,7 @@ const router = createBrowserRouter([
               { path: "payments", element: <Suspense fallback={<LazyLoadFallback />}><AdminPaymentsPage /></Suspense> },
               { path: "system", element: <Suspense fallback={<LazyLoadFallback />}><AdminSystemPage /></Suspense> },
               { path: "settings", element: <Suspense fallback={<LazyLoadFallback />}><AdminSettingsPage /></Suspense> },
+              { path: "notifications", element: <Suspense fallback={<LazyLoadFallback />}><NotificationsPage /></Suspense> },
               { path: "test", element: <Suspense fallback={<LazyLoadFallback />}><AdminTestPage /></Suspense> },
             ],
           },

@@ -1,7 +1,8 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { FaBell, FaUserCircle, FaSignOutAlt } from 'react-icons/fa';
+import { FaUserCircle, FaSignOutAlt } from 'react-icons/fa';
+import NotificationBell from '../NotificationBell.jsx';
 import '../../styles/admin-layout.css';
 
 const AdminHeader = ({ user }) => {
@@ -21,15 +22,14 @@ const AdminHeader = ({ user }) => {
       </div>
 
       <div className="admin-header-right">
-        <button className="admin-notification-btn">
-          <FaBell />
-          <span className="notification-badge">3</span>
-        </button>
+        <NotificationBell viewAllPath="/admin/notifications" />
 
         <div className="admin-user-menu">
-          <button 
+          <button
+            type="button"
             className="admin-user-btn"
             onClick={() => setShowDropdown(!showDropdown)}
+            aria-expanded={showDropdown}
           >
             <FaUserCircle />
             <span>{user?.username}</span>
@@ -41,8 +41,8 @@ const AdminHeader = ({ user }) => {
                 <p className="dropdown-name">{user?.username}</p>
                 <p className="dropdown-email">{user?.email}</p>
               </div>
-              <div className="dropdown-divider"></div>
-              <button onClick={handleLogout} className="dropdown-item logout">
+              <div className="dropdown-divider" />
+              <button type="button" onClick={handleLogout} className="dropdown-item logout">
                 <FaSignOutAlt />
                 <span>Logout</span>
               </button>

@@ -1,81 +1,75 @@
 import React from 'react';
 import { Outlet, useNavigate } from 'react-router-dom';
+import { ToastContainer } from 'react-toastify';
 import { useAuth } from '../../context/AuthContext';
+import { useTheme } from '../../context/ThemeContext';
+import { NotificationProvider } from '../../context/NotificationContext.jsx';
 import AdminSidebar from './AdminSidebar';
 import AdminHeader from './AdminHeader';
 import '../../styles/admin-layout.css';
 import '../../styles/dashboard-polish.css';
-import { FaShieldAlt, FaExclamationTriangle } from 'react-icons/fa';
+import '../../styles/notification-bell.css';
+import 'react-toastify/dist/ReactToastify.css';
+import '../../styles/toast-custom.css';
 
 const AdminLayout = () => {
   const { user, token, loading } = useAuth();
+  const { effectiveTheme } = useTheme();
   const navigate = useNavigate();
 
-  // Check authentication and authorization
   React.useEffect(() => {
-    console.log('🔍 AdminLayout check:', { 
-      loading,
-      hasToken: !!token, 
-      hasUser: !!user, 
-      userRole: user?.role
-    });
-
-    // Wait for auth loading to complete
-    if (loading) {
-      console.log('⏳ Waiting for auth to load...');
-      return;
-    }
-
-    // No token means not logged in - redirect to login with current path
+    if (loading) return;
     if (!token) {
-      console.log('❌ No token found, redirecting to login');
       navigate('/login', { replace: true, state: { from: window.location.pathname } });
       return;
     }
-
-    // Check if user is loaded and has admin role
-    if (user) {
-      console.log('✅ User loaded:', user.username, 'Role:', user.role);
-      if (user.role !== 'admin') {
-        console.log('⛔ Not an admin, redirecting to access denied page');
-        navigate('/access-denied', { replace: true });
-      } else {
-        console.log('🎉 Admin verified, showing admin portal');
-      }
+    if (user && user.role !== 'admin') {
+      navigate('/access-denied', { replace: true });
     }
   }, [user, token, loading, navigate]);
 
-  // Show loading while auth is being checked
   if (loading) {
     return (
       <div className="admin-loading-screen">
-        <div className="spinner"></div>
+        <div className="spinner" />
         <p>Loading admin portal...</p>
       </div>
     );
   }
 
-  // Block rendering for non-authenticated users
-  if (!token || !user) {
-    return null; // Will redirect via useEffect
+  if (!token || !user || user.role !== 'admin') {
+    return null;
   }
 
-  // Block rendering for non-admin users
-  if (user.role !== 'admin') {
-    return null; // Will redirect via useEffect
-  }
-
-  // Render admin portal for authorized users
   return (
-    <div className="admin-layout">
-      <AdminSidebar user={user} />
-      <div className="admin-main">
-        <AdminHeader user={user} />
-        <div className="admin-content">
-          <Outlet />
+    <NotificationProvider>
+      <div className="admin-layout">
+        <AdminSidebar user={user} />
+        <div className="admin-main">
+          <AdminHeader user={user} />
+          <div className="admin-content">
+            <Outlet />
+          </div>
         </div>
+        <ToastContainer
+          position="top-right"
+          autoClose={5000}
+          hideProgressBar={false}
+          newestOnTop
+          closeOnClick
+          pauseOnFocusLoss={false}
+          draggable={false}
+          pauseOnHover
+          theme={effectiveTheme === 'light' ? 'light' : 'dark'}
+          limit={5}
+          enableMultiContainer={false}
+          containerId="admin-toast-container"
+          role="alert"
+          aria-live="polite"
+          style={{ zIndex: 99999 }}
+        />
       </div>
-    </div>
+    </NotificationProvider>
   );
 };
 
