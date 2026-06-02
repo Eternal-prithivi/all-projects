@@ -9,4 +9,5 @@ export const SITE_DESCRIPTION =
   'Zenith is a multi-cloud resource optimization platform for AWS, GCP, and Azure — cost analytics, smart storage tiering, VM clusters, and secure infrastructure provisioning.';
 
 export const OG_IMAGE_PATH = '/og-image.png';
+/** Served from public/; source master is assets/brand/zenith-icon.png */
 export const LOGO_ICON_PATH = '/zenith-icon.png';

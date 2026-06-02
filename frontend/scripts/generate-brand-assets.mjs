@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/** Regenerate public/ favicons and og-image from ../Logos/zenith-icon.png */
+/** Regenerate public/ favicons and og-image from ../assets/brand/zenith-icon.png */
 import sharp from 'sharp';
 import { fileURLToPath } from 'url';
 import path from 'path';
@@ -9,7 +9,7 @@ const BRAND_BG = '#050505';
 
 const frontendRoot = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const publicRoot = path.join(frontendRoot, 'public');
-const sourceLogo = path.join(frontendRoot, '..', 'Logos', 'zenith-icon.png');
+const sourceLogo = path.join(frontendRoot, '..', 'assets', 'brand', 'zenith-icon.png');
 
 if (!fs.existsSync(sourceLogo)) {
   console.error('Missing source logo:', sourceLogo);

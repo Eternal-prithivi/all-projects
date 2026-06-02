@@ -258,7 +258,7 @@ Before your final demo, run through this:
 
 **Need help? Run:**
 ```bash
-bash quick_demo_test.sh   # Quick status check
-python3 test_demo_mode.py  # Full verification (requires backend running)
+cd backend && source .venv/bin/activate
+python docs/development/test_demo_mode.py   # Full verification (requires backend running)
 ```
 

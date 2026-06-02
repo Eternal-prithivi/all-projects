@@ -8,7 +8,7 @@ echo "🚀 Setting up Cost Management Features..."
 # Install Python dependencies
 echo "📦 Installing Python dependencies..."
 cd backend
-source venv/bin/activate 2>/dev/null || python3 -m venv venv && source venv/bin/activate
+source .venv/bin/activate 2>/dev/null || python3 -m venv .venv && source .venv/bin/activate
 pip install scikit-learn==1.7.0 numpy==2.2.6 --quiet
 
 # Check MongoDB
@@ -31,4 +31,4 @@ echo "   • Export Reports - Download cost data as CSV/JSON"
 echo "   • Custom Date Presets - Quick filters (Last 7 days, Last month, YTD)"
 echo "   • Cost Anomaly Detection - Alert when spending spikes unexpectedly"
 echo ""
-echo "📖 Documentation: docs/COST_FEATURES_IMPLEMENTATION.md"
+echo "📖 Documentation: docs/cost-analysis/COST_ANALYSIS_QUICKSTART.md"
