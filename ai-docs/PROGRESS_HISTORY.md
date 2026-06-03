@@ -726,6 +726,21 @@ Reference: 97-page project report (Chapter 4–6). Last cross-check: 2026-05-24.
 
 ---
 
+## Multi-cloud parity — Phase 3 (2026-06-03)
+
+**Goal:** BYOC onboarding parity — verify, discovery, Terraform resolver.
+
+**Completed:**
+- `POST /verify-credentials` for GCP (SA JSON + bucket list) and Azure (storage + optional Cost Management check).
+- `GET /gcp-buckets`, `POST /gcp-buckets/discover`, `GET /azure-containers`, `POST /azure-containers/discover`.
+- `resolve_credentials(username, provider)` returns GCP/Azure BYOC shapes for Terraform (`GOOGLE_CREDENTIALS`, `ARM_*` env).
+- Settings BYOC: verify-before-connect for GCP/Azure with bucket/container dropdowns.
+- Tests: extended `test_byoc_api.py`, `test_byoc_terraform_resolver.py`; 251 pytest green.
+
+**Next:** Phase 4 — secure vault multi-cloud.
+
+---
+
 ## Multi-cloud parity — Phase 2 (2026-06-03)
 
 **Goal:** Cost analysis + budgets behave like AWS when GCP/Azure billing credentials exist.

@@ -57,9 +57,11 @@ Legend: ✅ implemented · 🟡 partial · ❌ missing · 🔒 AWS-only today
 |----------|-----|-----|-------|-------|
 | `POST /connect` | ✅ | ✅ | ✅ | |
 | `POST /test` | ✅ | ✅ | ✅ | |
-| `POST /verify-credentials` | ✅ | ❌ | ❌ | Phase 3 |
-| `GET /aws-buckets` | ✅ | ❌ | ❌ | Phase 3: GCP/Azure list parity |
-| `resolve_credentials()` for TF | ✅ | ❌ | ❌ | Phase 3 / 6 |
+| `POST /verify-credentials` | ✅ | ✅ | ✅ | Phase 3 ✅ |
+| `GET /aws-buckets` | ✅ | — | — | AWS |
+| `GET /gcp-buckets` + `POST …/discover` | — | ✅ | — | Phase 3 ✅ |
+| `GET /azure-containers` + `POST …/discover` | — | — | ✅ | Phase 3 ✅ |
+| `resolve_credentials()` for TF | ✅ | ✅ | ✅ | Phase 3 ✅ (BYOC only) |
 
 ### Security (`/api/security`)
 
@@ -100,3 +102,4 @@ Legend: ✅ implemented · 🟡 partial · ❌ missing · 🔒 AWS-only today
 | 0 | Initial matrix + contract | 2026-06-03 |
 | 1 | Restore route, tier names, missing_config sync, tests | 2026-06-03 |
 | 2 | Billing Settings fields, setup APIs, cost UI wizard | 2026-06-03 |
+| 3 | BYOC verify tri-cloud, bucket/container discovery, TF resolver | 2026-06-03 |

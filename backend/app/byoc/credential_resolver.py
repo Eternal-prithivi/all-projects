@@ -268,15 +268,27 @@ def resolve_credentials(username: str, provider: str = "aws") -> Optional[Dict[s
     Returns None when BYOC is not configured for the provider. Does not include
     platform fallback credentials — callers may use server env when this returns None.
     """
-    if provider.lower() != "aws":
-        return None
+    from app.cloud.providers import normalize_provider_key
     from app.provision.byoc_credentials import (
+        resolve_azure_terraform_env,
         resolve_byoc_terraform_env,
+        resolve_gcp_terraform_env,
+        terraform_azure_env_to_api,
         terraform_env_to_api_credentials,
+        terraform_gcp_env_to_api,
     )
 
-    env = resolve_byoc_terraform_env(username)
-    return terraform_env_to_api_credentials(env)
+    key = normalize_provider_key(provider)
+    if key == "aws":
+        env = resolve_byoc_terraform_env(username)
+        return terraform_env_to_api_credentials(env)
+    if key == "gcp":
+        env = resolve_gcp_terraform_env(username)
+        return terraform_gcp_env_to_api(env)
+    if key == "azure":
+        env = resolve_azure_terraform_env(username)
+        return terraform_azure_env_to_api(env)
+    return None
 
 
 def get_byoc_status(username: str) -> Dict[str, Any]:

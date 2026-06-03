@@ -6,7 +6,7 @@
 
 ## 🔴 Active Task
 
-**None** — Phase 2 complete. **Next:** Phase 3 (BYOC verify + discovery).
+**None** — Phase 3 complete. **Next:** Phase 4 (secure vault tri-cloud).
 
 ---
 
@@ -14,18 +14,15 @@
 
 | Phase | Status |
 |-------|--------|
-| **0** | ✅ Foundation |
-| **1** | ✅ Storage |
-| **2** | ✅ Cost / billing |
-| **3–7** | ⬜ |
+| **0–3** | ✅ Complete |
+| **4–7** | ⬜ |
 
 ---
 
-## Phase 2 — Cost / billing ✅
+## Phase 3 — BYOC ✅
 
-- [x] **2.1** — `GCP_BILLING_*`, `AZURE_SUBSCRIPTION_ID` in Settings
-- [x] **2.2** — GCP setup wizard API + Cost Analysis UI
-- [x] **2.3** — Azure Cost Management via BYOC + setup API
-- [x] **2.4** — `group_by_supported` + UI note (AWS only)
-- [x] **2.5** — Billing status / setup tests
-- [x] **2.6** — Demo vs live billing probe separation
+- [x] **3.1** — `/verify-credentials` for GCP + Azure
+- [x] **3.2** — `gcp-buckets` / `azure-containers` discover + list
+- [x] **3.3** — `resolve_credentials()` for GCP/Azure Terraform env
+- [x] **3.4** — Settings BYOC verify + bucket/container pickers
+- [x] **3.5** — Integration + resolver tests

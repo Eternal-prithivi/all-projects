@@ -2,8 +2,8 @@
 
 ## 🔄 Current Resume State
 
-**Status:** COMPLETE — Phase **2** (2026-06-03)
+**Status:** COMPLETE — Phase **3** (2026-06-03)
 
-**Next:** Phase **3** — `/verify-credentials` GCP/Azure, bucket/container lists, Terraform resolver.
+**Next:** Phase **4** — secure vault on GCS/Azure (`SecureGcpStorage`, routes_security dispatch).
 
-**LKGS:** 243 pytest · `/api/cost/setup/{gcp|azure}` · PUT setup saves BYOC billing fields
+**LKGS:** 251 pytest · BYOC verify tri-cloud · TF resolver gcp/azure

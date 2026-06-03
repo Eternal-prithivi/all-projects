@@ -79,3 +79,75 @@ def terraform_env_to_api_credentials(env: dict[str, str]) -> Optional[dict[str, 
     if env.get("AWS_SESSION_TOKEN"):
         out["session_token"] = env["AWS_SESSION_TOKEN"]
     return out
+
+
+def resolve_gcp_terraform_env(username: str) -> dict[str, str]:
+    """Build GCP env vars for Terraform from BYOC service account JSON."""
+    import json as _json
+
+    byoc = _fetch_byoc_gcp_record(username)
+    if not byoc:
+        return {}
+    creds = byoc.get("credentials") or {}
+    sa_raw = creds.get("service_account_json") or ""
+    if not sa_raw:
+        return {}
+    try:
+        sa_info = _json.loads(sa_raw) if isinstance(sa_raw, str) else sa_raw
+    except _json.JSONDecodeError:
+        logger.warning("Invalid GCP SA JSON for %s", username)
+        return {}
+    return {
+        "GOOGLE_CREDENTIALS": _json.dumps(sa_info),
+        "GOOGLE_PROJECT": sa_info.get("project_id", ""),
+    }
+
+
+def resolve_azure_terraform_env(username: str) -> dict[str, str]:
+    """Build Azure Resource Manager env vars for Terraform from BYOC."""
+    byoc = _fetch_byoc_azure_record(username)
+    if not byoc:
+        return {}
+    creds = byoc.get("credentials") or {}
+    required = ("subscription_id", "tenant_id", "client_id", "client_secret")
+    if not all(creds.get(k) for k in required):
+        logger.warning("Azure BYOC missing Cost Management / ARM fields for %s", username)
+        return {}
+    return {
+        "ARM_SUBSCRIPTION_ID": creds["subscription_id"],
+        "ARM_TENANT_ID": creds["tenant_id"],
+        "ARM_CLIENT_ID": creds["client_id"],
+        "ARM_CLIENT_SECRET": creds["client_secret"],
+    }
+
+
+def _fetch_byoc_gcp_record(username: str) -> Optional[dict[str, Any]]:
+    from app.byoc.credential_resolver import get_user_cloud_credentials
+
+    return get_user_cloud_credentials(username, "GCP")
+
+
+def _fetch_byoc_azure_record(username: str) -> Optional[dict[str, Any]]:
+    from app.byoc.credential_resolver import get_user_cloud_credentials
+
+    return get_user_cloud_credentials(username, "Azure")
+
+
+def terraform_gcp_env_to_api(env: dict[str, str]) -> Optional[dict[str, Any]]:
+    if not env.get("GOOGLE_CREDENTIALS"):
+        return None
+    return {
+        "service_account_json": env["GOOGLE_CREDENTIALS"],
+        "project_id": env.get("GOOGLE_PROJECT", ""),
+    }
+
+
+def terraform_azure_env_to_api(env: dict[str, str]) -> Optional[dict[str, Any]]:
+    if not env.get("ARM_CLIENT_ID"):
+        return None
+    return {
+        "subscription_id": env.get("ARM_SUBSCRIPTION_ID", ""),
+        "tenant_id": env.get("ARM_TENANT_ID", ""),
+        "client_id": env.get("ARM_CLIENT_ID", ""),
+        "client_secret": env.get("ARM_CLIENT_SECRET", ""),
+    }

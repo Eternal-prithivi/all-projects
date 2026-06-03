@@ -32,6 +32,14 @@ from app.byoc.aws_bucket_discovery import (
     get_buckets_for_user,
     invalidate_bucket_cache,
 )
+from app.byoc.gcp_bucket_discovery import (
+    list_gcp_buckets_for_user,
+    list_gcp_buckets_from_json,
+)
+from app.byoc.azure_container_discovery import (
+    list_azure_containers_for_user,
+    list_azure_containers_from_keys,
+)
 from app.byoc.aws_bucket_helpers import SUPPORTED_AWS_REGIONS
 from app.byoc.aws_bucket_helpers import (
     REPLICA_REGION_DEFAULT,
@@ -225,13 +233,31 @@ class BYOCTestResult(BaseModel):
 
 
 class BYOCVerifyCredentialsRequest(BaseModel):
-    """Step 1: verify AWS credentials only (not persisted)."""
-    csp: str = Field("AWS", description="Cloud provider")
+    """Step 1: verify credentials only (not persisted)."""
+    csp: str = Field("AWS", description="Cloud provider: AWS, GCP, or Azure")
     connection_method: str = Field("access_keys", description="access_keys or iam_role")
     access_key_id: Optional[str] = None
     secret_access_key: Optional[str] = None
     role_arn: Optional[str] = None
     region: Optional[str] = "ap-south-1"
+    service_account_json: Optional[str] = None
+    gcp_bucket_name: Optional[str] = None
+    account_name: Optional[str] = None
+    account_key: Optional[str] = None
+    container_name: Optional[str] = None
+    azure_subscription_id: Optional[str] = None
+    azure_tenant_id: Optional[str] = None
+    azure_client_id: Optional[str] = None
+    azure_client_secret: Optional[str] = None
+
+
+class GcpBucketsDiscoverRequest(BaseModel):
+    service_account_json: str = Field(..., min_length=2)
+
+
+class AzureContainersDiscoverRequest(BaseModel):
+    account_name: str = Field(..., min_length=1)
+    account_key: str = Field(..., min_length=1)
 
 
 class BYOCCheckBucketRequest(BaseModel):
@@ -565,16 +591,144 @@ async def refresh_aws_buckets(
     }
 
 
+def _verify_azure_cost_management(
+    subscription_id: str,
+    tenant_id: str,
+    client_id: str,
+    client_secret: str,
+) -> tuple[bool, str]:
+    if not all([subscription_id, tenant_id, client_id, client_secret]):
+        return False, "Cost Management fields incomplete (optional for storage-only BYOC)."
+    try:
+        from azure.identity import ClientSecretCredential
+        from azure.mgmt.consumption import ConsumptionManagementClient
+
+        credential = ClientSecretCredential(
+            tenant_id=tenant_id,
+            client_id=client_id,
+            client_secret=client_secret,
+        )
+        ConsumptionManagementClient(credential, subscription_id)
+        return True, "Cost Management credentials validated."
+    except ImportError:
+        return False, "Azure SDK not installed on server."
+    except Exception as exc:
+        return False, f"Cost Management check failed: {str(exc)[:120]}"
+
+
+@router.get("/gcp-buckets", summary="List GCS buckets (BYOC or platform)")
+async def list_gcp_buckets(user: User = Depends(get_current_user)):
+    check_byoc_eligibility(user.username)
+    result = list_gcp_buckets_for_user(user.username)
+    if result.get("error") and not result.get("buckets"):
+        raise HTTPException(status_code=400, detail=result["error"])
+    return result
+
+
+@router.post("/gcp-buckets/discover", summary="List GCS buckets from service account JSON (wizard)")
+async def discover_gcp_buckets(
+    body: GcpBucketsDiscoverRequest,
+    user: User = Depends(get_current_user),
+):
+    check_byoc_eligibility(user.username)
+    result = list_gcp_buckets_from_json(body.service_account_json)
+    if result.get("error") and not result.get("buckets"):
+        raise HTTPException(status_code=400, detail=result["error"])
+    return result
+
+
+@router.get("/azure-containers", summary="List Azure Blob containers (BYOC or platform)")
+async def list_azure_containers(user: User = Depends(get_current_user)):
+    check_byoc_eligibility(user.username)
+    result = list_azure_containers_for_user(user.username)
+    if result.get("error") and not result.get("containers"):
+        raise HTTPException(status_code=400, detail=result["error"])
+    return result
+
+
+@router.post("/azure-containers/discover", summary="List containers from storage keys (wizard)")
+async def discover_azure_containers(
+    body: AzureContainersDiscoverRequest,
+    user: User = Depends(get_current_user),
+):
+    check_byoc_eligibility(user.username)
+    result = list_azure_containers_from_keys(body.account_name, body.account_key)
+    if result.get("error") and not result.get("containers"):
+        raise HTTPException(status_code=400, detail=result["error"])
+    return result
+
+
 @router.post("/verify-credentials", summary="Step 1 — Verify cloud credentials only")
 async def verify_credentials(
     request: BYOCVerifyCredentialsRequest,
     user: User = Depends(get_current_user),
 ):
-    """Validate credentials without saving. Returns suggested bucket names for Step 2."""
+    """Validate credentials without saving. AWS returns bucket suggestions; GCP/Azure return discovery lists."""
     check_byoc_eligibility(user.username)
     csp = request.csp.upper()
+
+    if csp == "GCP":
+        if not request.service_account_json:
+            raise HTTPException(status_code=400, detail="service_account_json is required for GCP.")
+        bucket = (request.gcp_bucket_name or "").strip()
+        message = "Service account validated. Select a bucket below."
+        if bucket:
+            test = test_gcp_credentials(request.service_account_json, bucket)
+            if not test.success:
+                raise HTTPException(status_code=400, detail=test.message)
+            message = test.message
+        discovery = list_gcp_buckets_from_json(request.service_account_json)
+        if discovery.get("error") and not discovery.get("buckets"):
+            raise HTTPException(status_code=400, detail=discovery["error"])
+        return {
+            "valid": True,
+            "message": message,
+            "csp": "GCP",
+            "project_id": discovery.get("project_id"),
+            "buckets": discovery.get("buckets", []),
+        }
+
+    if csp == "AZURE":
+        if not request.account_name or not request.account_key:
+            raise HTTPException(
+                status_code=400,
+                detail="account_name and account_key are required for Azure.",
+            )
+        container = (request.container_name or "").strip()
+        if container:
+            test = test_azure_credentials(
+                request.account_name, request.account_key, container
+            )
+            if not test.success:
+                raise HTTPException(status_code=400, detail=test.message)
+        else:
+            test = BYOCTestResult(
+                success=True,
+                message="Storage keys accepted. Select a container below.",
+                csp="Azure",
+            )
+        discovery = list_azure_containers_from_keys(
+            request.account_name, request.account_key
+        )
+        if discovery.get("error") and not discovery.get("containers"):
+            raise HTTPException(status_code=400, detail=discovery["error"])
+        cost_ok, cost_msg = _verify_azure_cost_management(
+            request.azure_subscription_id or "",
+            request.azure_tenant_id or "",
+            request.azure_client_id or "",
+            request.azure_client_secret or "",
+        )
+        return {
+            "valid": True,
+            "message": test.message,
+            "csp": "Azure",
+            "containers": discovery.get("containers", []),
+            "cost_management_verified": cost_ok,
+            "cost_management_message": cost_msg,
+        }
+
     if csp != "AWS":
-        raise HTTPException(status_code=400, detail="Step 1 verify is implemented for AWS only.")
+        raise HTTPException(status_code=400, detail=f"Unsupported CSP: {csp}")
 
     region = request.region or "ap-south-1"
     suggestions = suggest_aws_bucket_names(user.username)

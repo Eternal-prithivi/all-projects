@@ -68,6 +68,12 @@ const SettingsPage = () => {
   const [awsConnectStep, setAwsConnectStep] = useState(1);
   const [awsCredentialsVerified, setAwsCredentialsVerified] = useState(false);
   const [awsVerifying, setAwsVerifying] = useState(false);
+  const [gcpCredentialsVerified, setGcpCredentialsVerified] = useState(false);
+  const [gcpVerifying, setGcpVerifying] = useState(false);
+  const [gcpDiscoveredBuckets, setGcpDiscoveredBuckets] = useState([]);
+  const [azureCredentialsVerified, setAzureCredentialsVerified] = useState(false);
+  const [azureVerifying, setAzureVerifying] = useState(false);
+  const [azureDiscoveredContainers, setAzureDiscoveredContainers] = useState([]);
   const [bucketCheckStatus, setBucketCheckStatus] = useState({});
 
   // BYOC Form fields
@@ -120,6 +126,18 @@ const SettingsPage = () => {
     setAwsConnectStep(1);
     setAwsCredentialsVerified(false);
     setBucketCheckStatus({});
+    setByocTestResult(null);
+  };
+
+  const resetGcpConnectFlow = () => {
+    setGcpCredentialsVerified(false);
+    setGcpDiscoveredBuckets([]);
+    setByocTestResult(null);
+  };
+
+  const resetAzureConnectFlow = () => {
+    setAzureCredentialsVerified(false);
+    setAzureDiscoveredContainers([]);
     setByocTestResult(null);
   };
 
@@ -256,6 +274,86 @@ const SettingsPage = () => {
     }
   };
 
+  const handleGcpVerifyCredentials = async () => {
+    if (!gcpForm.service_account_json?.trim()) {
+      setByocTestResult({ success: false, message: 'Service account JSON is required.' });
+      return;
+    }
+    setGcpVerifying(true);
+    setByocTestResult(null);
+    try {
+      const response = await apiClient.post('/byoc/verify-credentials', {
+        csp: 'GCP',
+        connection_method: 'access_keys',
+        service_account_json: gcpForm.service_account_json,
+        gcp_bucket_name: gcpForm.gcp_bucket_name || undefined,
+      });
+      const buckets = response.data.buckets || [];
+      setGcpDiscoveredBuckets(buckets);
+      setGcpCredentialsVerified(true);
+      if (!gcpForm.gcp_bucket_name && buckets.length === 1) {
+        setGcpForm((prev) => ({ ...prev, gcp_bucket_name: buckets[0].name }));
+      }
+      setByocTestResult({
+        success: true,
+        message: response.data.message || 'GCP credentials verified.',
+      });
+    } catch (error) {
+      const detail = error.response?.data?.detail;
+      setByocTestResult({
+        success: false,
+        message: typeof detail === 'string' ? detail : detail?.message || 'Verification failed',
+      });
+    } finally {
+      setGcpVerifying(false);
+    }
+  };
+
+  const handleAzureVerifyCredentials = async () => {
+    if (!azureForm.account_name?.trim() || !azureForm.account_key?.trim()) {
+      setByocTestResult({ success: false, message: 'Storage account name and key are required.' });
+      return;
+    }
+    setAzureVerifying(true);
+    setByocTestResult(null);
+    try {
+      const response = await apiClient.post('/byoc/verify-credentials', {
+        csp: 'Azure',
+        connection_method: 'access_keys',
+        account_name: azureForm.account_name,
+        account_key: azureForm.account_key,
+        container_name: azureForm.container_name || undefined,
+        azure_subscription_id: azureForm.azure_subscription_id || undefined,
+        azure_tenant_id: azureForm.azure_tenant_id || undefined,
+        azure_client_id: azureForm.azure_client_id || undefined,
+        azure_client_secret: azureForm.azure_client_secret || undefined,
+      });
+      const containers = response.data.containers || [];
+      setAzureDiscoveredContainers(containers);
+      setAzureCredentialsVerified(true);
+      if (!azureForm.container_name && containers.length === 1) {
+        setAzureForm((prev) => ({ ...prev, container_name: containers[0].name }));
+      }
+      const costNote = response.data.cost_management_verified
+        ? ' Cost Management credentials OK.'
+        : response.data.cost_management_message
+          ? ` ${response.data.cost_management_message}`
+          : '';
+      setByocTestResult({
+        success: true,
+        message: (response.data.message || 'Azure credentials verified.') + costNote,
+      });
+    } catch (error) {
+      const detail = error.response?.data?.detail;
+      setByocTestResult({
+        success: false,
+        message: typeof detail === 'string' ? detail : detail?.message || 'Verification failed',
+      });
+    } finally {
+      setAzureVerifying(false);
+    }
+  };
+
   const handleAwsVerifyCredentials = async () => {
     const step1 = validateByocAwsStep1({ method: byocMethod, awsForm });
     if (!step1.isValid) {
@@ -347,6 +445,14 @@ const SettingsPage = () => {
       setByocTestResult({ success: false, message: 'Verify your credentials first (Step 1).' });
       return;
     }
+    if (byocActiveCSP === 'GCP' && !gcpCredentialsVerified) {
+      setByocTestResult({ success: false, message: 'Verify your GCP service account first.' });
+      return;
+    }
+    if (byocActiveCSP === 'Azure' && !azureCredentialsVerified) {
+      setByocTestResult({ success: false, message: 'Verify your Azure storage credentials first.' });
+      return;
+    }
 
     setByocConnecting(true);
     try {
@@ -365,6 +471,8 @@ const SettingsPage = () => {
       const response = await apiClient.post('/byoc/connect', payload);
       setByocActiveCSP(null);
       resetAwsConnectFlow();
+      resetGcpConnectFlow();
+      resetAzureConnectFlow();
       setByocTestResult({
         success: true,
         message: response.data.message || response.data.bucket_message || 'Connected successfully.',
@@ -619,6 +727,8 @@ const SettingsPage = () => {
                     <button className="btn-connect" onClick={() => {
                       setByocActiveCSP(csp);
                       resetAwsConnectFlow();
+                      resetGcpConnectFlow();
+                      resetAzureConnectFlow();
                       setByocMethod('access_keys');
                       if (!policyTemplates) fetchPolicyTemplates();
                     }}>Connect</button>
@@ -827,10 +937,26 @@ const SettingsPage = () => {
                         </div>
                         <div className="byoc-field">
                           <label>GCP Bucket Name</label>
-                          <input type="text" placeholder="my-company-bucket" value={gcpForm.gcp_bucket_name}
-                            onChange={(e) => setGcpForm({...gcpForm, gcp_bucket_name: e.target.value})}
-                            aria-invalid={!!byocValidation.errors.gcp_bucket_name}
-                            aria-describedby={byocValidation.errors.gcp_bucket_name ? 'byoc-gcp-bucket-error' : undefined} />
+                          {gcpDiscoveredBuckets.length > 0 ? (
+                            <select
+                              className="zenith-select"
+                              value={gcpForm.gcp_bucket_name}
+                              onChange={(e) => setGcpForm({ ...gcpForm, gcp_bucket_name: e.target.value })}
+                            >
+                              <option value="">Select a bucket…</option>
+                              {gcpDiscoveredBuckets.map((b) => (
+                                <option key={b.name} value={b.name}>
+                                  {b.name}
+                                  {b.location ? ` (${b.location})` : ''}
+                                </option>
+                              ))}
+                            </select>
+                          ) : (
+                            <input type="text" placeholder="my-company-bucket" value={gcpForm.gcp_bucket_name}
+                              onChange={(e) => setGcpForm({...gcpForm, gcp_bucket_name: e.target.value})}
+                              aria-invalid={!!byocValidation.errors.gcp_bucket_name}
+                              aria-describedby={byocValidation.errors.gcp_bucket_name ? 'byoc-gcp-bucket-error' : undefined} />
+                          )}
                           {byocValidation.errors.gcp_bucket_name && <p id="byoc-gcp-bucket-error" className="form-field-error">{byocValidation.errors.gcp_bucket_name}</p>}
                         </div>
                         <p className="byoc-section-hint">Optional — live billing in Cost hub (BigQuery export)</p>
@@ -867,10 +993,23 @@ const SettingsPage = () => {
                         </div>
                         <div className="byoc-field">
                           <label>Container Name</label>
-                          <input type="text" placeholder="my-container" value={azureForm.container_name}
-                            onChange={(e) => setAzureForm({...azureForm, container_name: e.target.value})}
-                            aria-invalid={!!byocValidation.errors.container_name}
-                            aria-describedby={byocValidation.errors.container_name ? 'byoc-azure-container-error' : undefined} />
+                          {azureDiscoveredContainers.length > 0 ? (
+                            <select
+                              className="zenith-select"
+                              value={azureForm.container_name}
+                              onChange={(e) => setAzureForm({ ...azureForm, container_name: e.target.value })}
+                            >
+                              <option value="">Select a container…</option>
+                              {azureDiscoveredContainers.map((c) => (
+                                <option key={c.name} value={c.name}>{c.name}</option>
+                              ))}
+                            </select>
+                          ) : (
+                            <input type="text" placeholder="my-container" value={azureForm.container_name}
+                              onChange={(e) => setAzureForm({...azureForm, container_name: e.target.value})}
+                              aria-invalid={!!byocValidation.errors.container_name}
+                              aria-describedby={byocValidation.errors.container_name ? 'byoc-azure-container-error' : undefined} />
+                          )}
                           {byocValidation.errors.container_name && <p id="byoc-azure-container-error" className="form-field-error">{byocValidation.errors.container_name}</p>}
                         </div>
                         <p className="byoc-section-hint">Optional — Cost Management API (separate from storage key)</p>
@@ -906,7 +1045,12 @@ const SettingsPage = () => {
 
                     {/* Action Buttons */}
                     <div className="byoc-actions">
-                      <button className="btn-secondary" onClick={() => { setByocActiveCSP(null); resetAwsConnectFlow(); }}>Cancel</button>
+                      <button className="btn-secondary" onClick={() => {
+                        setByocActiveCSP(null);
+                        resetAwsConnectFlow();
+                        resetGcpConnectFlow();
+                        resetAzureConnectFlow();
+                      }}>Cancel</button>
                       {byocActiveCSP === 'AWS' && awsConnectStep === 1 ? (
                         <button
                           className="btn-connect-save"
@@ -915,6 +1059,24 @@ const SettingsPage = () => {
                           disabled={awsVerifying || !byocValidation.isValid}
                         >
                           {awsVerifying ? '⏳ Verifying...' : '✓ Verify & continue'}
+                        </button>
+                      ) : byocActiveCSP === 'GCP' && !gcpCredentialsVerified ? (
+                        <button
+                          className="btn-connect-save"
+                          type="button"
+                          onClick={handleGcpVerifyCredentials}
+                          disabled={gcpVerifying || !gcpForm.service_account_json?.trim()}
+                        >
+                          {gcpVerifying ? '⏳ Verifying...' : '✓ Verify & pick bucket'}
+                        </button>
+                      ) : byocActiveCSP === 'Azure' && !azureCredentialsVerified ? (
+                        <button
+                          className="btn-connect-save"
+                          type="button"
+                          onClick={handleAzureVerifyCredentials}
+                          disabled={azureVerifying || !azureForm.account_name || !azureForm.account_key}
+                        >
+                          {azureVerifying ? '⏳ Verifying...' : '✓ Verify & pick container'}
                         </button>
                       ) : (
                         <>
@@ -926,7 +1088,13 @@ const SettingsPage = () => {
                           <button
                             className="btn-connect-save"
                             onClick={handleByocConnect}
-                            disabled={byocConnecting || !byocValidation.isValid || (byocActiveCSP === 'AWS' && !awsCredentialsVerified)}
+                            disabled={
+                              byocConnecting
+                              || !byocValidation.isValid
+                              || (byocActiveCSP === 'AWS' && !awsCredentialsVerified)
+                              || (byocActiveCSP === 'GCP' && !gcpCredentialsVerified)
+                              || (byocActiveCSP === 'Azure' && !azureCredentialsVerified)
+                            }
                           >
                             {byocConnecting ? '⏳ Connecting...' : '🔗 Complete connection'}
                           </button>

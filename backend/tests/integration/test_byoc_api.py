@@ -128,3 +128,86 @@ def test_byoc_status_isolated_per_user(mock_test, client, auth_headers, pro_subs
     status_b = client.get("/api/byoc/status", headers=headers_b).json()
     gcp_status = (status_b.get("connections") or {}).get("gcp") or {}
     assert gcp_status.get("connected") is not True
+
+
+@patch("app.byoc.routes_byoc.list_gcp_buckets_from_json")
+@patch("app.byoc.routes_byoc.test_gcp_credentials")
+def test_byoc_verify_gcp(mock_test, mock_list, client, auth_headers, pro_subscription):
+    mock_test.return_value = _gcp_ok_result(message="Bucket OK")
+    mock_list.return_value = {
+        "project_id": "test-proj",
+        "buckets": [{"name": "my-gcp-bucket", "location": "US"}],
+    }
+    headers, user = auth_headers()
+    pro_subscription(user["username"])
+    response = client.post(
+        "/api/byoc/verify-credentials",
+        headers=headers,
+        json={
+            "csp": "GCP",
+            "connection_method": "access_keys",
+            "service_account_json": '{"type": "service_account", "project_id": "test"}',
+            "gcp_bucket_name": "my-gcp-bucket",
+        },
+    )
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["valid"] is True
+    assert body["csp"] == "GCP"
+    assert len(body["buckets"]) == 1
+
+
+@patch("app.byoc.routes_byoc.test_azure_credentials")
+@patch("app.byoc.routes_byoc.list_azure_containers_from_keys")
+def test_byoc_verify_azure(mock_list, mock_test, client, auth_headers, pro_subscription):
+    mock_test.return_value = SimpleNamespace(
+        success=True,
+        message="Azure OK",
+        csp="Azure",
+        bucket_name="my-container",
+    )
+    mock_list.return_value = {
+        "containers": [{"name": "my-container"}],
+    }
+    headers, user = auth_headers()
+    pro_subscription(user["username"])
+    response = client.post(
+        "/api/byoc/verify-credentials",
+        headers=headers,
+        json={
+            "csp": "Azure",
+            "connection_method": "access_keys",
+            "account_name": "acct",
+            "account_key": "key123",
+            "container_name": "my-container",
+        },
+    )
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["valid"] is True
+    assert body["containers"][0]["name"] == "my-container"
+
+
+@patch("app.byoc.routes_byoc.list_gcp_buckets_from_json")
+def test_byoc_discover_gcp_buckets(mock_list, client, auth_headers, pro_subscription):
+    mock_list.return_value = {"buckets": [{"name": "b1"}], "project_id": "p1", "count": 1}
+    headers, user = auth_headers()
+    pro_subscription(user["username"])
+    response = client.post(
+        "/api/byoc/gcp-buckets/discover",
+        headers=headers,
+        json={"service_account_json": '{"type": "service_account"}'},
+    )
+    assert response.status_code == 200
+    assert response.json()["count"] == 1
+
+
+def test_verify_credentials_aws_only_rejects_unknown_csp(client, auth_headers, pro_subscription):
+    headers, user = auth_headers()
+    pro_subscription(user["username"])
+    response = client.post(
+        "/api/byoc/verify-credentials",
+        headers=headers,
+        json={"csp": "Oracle", "connection_method": "access_keys"},
+    )
+    assert response.status_code == 400
