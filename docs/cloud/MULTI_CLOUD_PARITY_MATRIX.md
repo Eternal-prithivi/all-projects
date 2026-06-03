@@ -67,8 +67,11 @@ Legend: ✅ implemented · 🟡 partial · ❌ missing · 🔒 AWS-only today
 
 | Endpoint | AWS | GCP | Azure | Notes |
 |----------|-----|-----|-------|-------|
-| Secure upload / list / sync | ✅ | ❌ | ❌ | Phase 4 |
-| OPA `aws_security.rego` | ✅ | — | — | Phase 4 stubs for GCP/Azure |
+| Secure upload / list / sync / download / delete | ✅ | ✅ | ✅ | Phase 4 ✅ |
+| `POST /security/sync/{csp}` | ✅ | ✅ | ✅ | Phase 4 ✅ |
+| AWS dual-bucket replica | ✅ | — | — | GCP/Azure replica deferred |
+| Browser CSE upload | ✅ | ❌ | ❌ | AWS-only (501 others) |
+| OPA security rego | ✅ | stub | stub | `aws_security`, `gcp_security`, `azure_security` |
 
 ### VM (`/api/vm`)
 

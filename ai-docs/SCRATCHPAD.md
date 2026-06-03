@@ -4,6 +4,6 @@
 
 **Status:** COMPLETE — Phase **3** (2026-06-03)
 
-**Next:** Phase **4** — secure vault on GCS/Azure (`SecureGcpStorage`, routes_security dispatch).
+**Next:** Phase **5** — VM AWS parity (lifecycle, clusters, metrics).
 
 **LKGS:** 251 pytest · BYOC verify tri-cloud · TF resolver gcp/azure

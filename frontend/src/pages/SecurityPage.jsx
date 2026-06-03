@@ -13,7 +13,7 @@
 //   - Remove sessionStorage caching (cache_2faStatus, cache_secureFiles) — prevents flicker
 //   - Skip the two-step upload flow (scan → choice modal → encrypt → S3)
 // =============================================================================
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useNotifications } from "../hooks/useNotifications";
 import EncryptionChoiceModal from "../components/EncryptionChoiceModal";
 import DecryptionPasswordModal from "../components/DecryptionPasswordModal";
@@ -35,7 +35,7 @@ import {
   deleteSecureFile,
   getSecureDownloadUrl,
   uploadSecureFile,
-  syncAwsSecureBucket,
+  syncSecureVault,
   chooseEncryption,
   uploadClientEncrypted,
   downloadClientCiphertext,
@@ -43,7 +43,11 @@ import {
 import "../styles/security-page.css";
 import LoadingSpinner from "../components/LoadingSpinner.jsx";
 import PageHeader from "../components/ui/PageHeader.jsx";
+import ByocStorageTargetBanner from "../components/ByocStorageTargetBanner.jsx";
 import BucketRegionSelector from "../components/BucketRegionSelector.jsx";
+import CloudProviderToolbar, {
+  filterFilesByCloudProvider,
+} from "../components/CloudProviderSelect.jsx";
 import EmptyState from "../components/EmptyState.jsx";
 import TwoFADialog from "../components/TwoFADialog.jsx";
 import { IconLock } from "../components/dashboard/Icons.jsx";
@@ -57,6 +61,7 @@ function SecurityPage() {
   const [encrypt, setEncrypt] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [cloudProvider, setCloudProvider] = useState("ALL");
   const [secureFiles, setSecureFiles] = useState(() => {
     try { return JSON.parse(sessionStorage.getItem('cache_secureFiles')) || []; } catch { return []; }
   });
@@ -306,19 +311,55 @@ function SecurityPage() {
 
   const handleSyncWithSecureBucket = async () => {
     if (!token || !canAccessSecureArea) return;
+    const targets =
+      cloudProvider === "ALL" ? ["AWS", "GCP", "Azure"] : [cloudProvider];
     setIsSyncing(true);
     try {
-      const result = await syncAwsSecureBucket(token, {
-        bucket: selectedBucket || undefined,
-        region: selectedRegion !== "all" ? selectedRegion : undefined,
-      });
-      const scanned = result.scanned_prefix
-        ? `prefix '${result.scanned_prefix}'`
-        : `bucket '${result.bucket_name}'`;
-      const removedMsg = result.removed > 0 ? ` Removed ${result.removed} stale record(s).` : "";
-      notifications.success(
-        `Secure sync complete. Added ${result.inserted} new file(s) from AWS after scanning ${scanned}.${removedMsg}`
-      );
+      let totalInserted = 0;
+      let totalRemoved = 0;
+      const skipped = [];
+
+      for (const csp of targets) {
+        try {
+          const syncOpts = {
+            bucket: selectedBucket || undefined,
+            region: selectedRegion !== "all" ? selectedRegion : undefined,
+          };
+          if (csp === "Azure" && selectedBucket) {
+            syncOpts.container = selectedBucket;
+          }
+          const result = await syncSecureVault(token, csp, syncOpts);
+          totalInserted += result.inserted || 0;
+          totalRemoved += result.removed || 0;
+        } catch (err) {
+          const msg = err.detail || err.message || "Secure vault sync failed.";
+          if (
+            cloudProvider === "ALL" &&
+            csp !== "AWS" &&
+            /not configured|credentials|missing/i.test(String(msg))
+          ) {
+            skipped.push(csp);
+            continue;
+          }
+          throw err;
+        }
+      }
+
+      const removedMsg =
+        totalRemoved > 0 ? ` Removed ${totalRemoved} stale record(s).` : "";
+      if (cloudProvider === "ALL") {
+        const skipMsg =
+          skipped.length > 0
+            ? ` Skipped ${skipped.join(", ")} (not configured).`
+            : "";
+        notifications.success(
+          `Secure sync complete (all providers). Added ${totalInserted} new file(s).${removedMsg}${skipMsg}`
+        );
+      } else {
+        notifications.success(
+          `Secure sync complete (${cloudProvider}). Added ${totalInserted} new file(s).${removedMsg}`
+        );
+      }
       await fetchSecureFiles();
     } catch (err) {
       notifications.error(err.detail || err.message || "Secure vault sync failed.");
@@ -327,12 +368,33 @@ function SecurityPage() {
     }
   };
 
+  const displayedSecureFiles = useMemo(() => {
+    const withCsp = (secureFiles || []).map((f) => ({ ...f, csp: f.csp || "AWS" }));
+    return filterFilesByCloudProvider(withCsp, cloudProvider);
+  }, [secureFiles, cloudProvider]);
+
+  const secureSyncActionLabel = useMemo(() => {
+    if (selectedBucket) {
+      return cloudProvider === "ALL"
+        ? `Sync ${selectedBucket}`
+        : `Sync ${selectedBucket} (${cloudProvider})`;
+    }
+    return cloudProvider === "ALL" ? "Sync secure vault (all)" : `Sync (${cloudProvider})`;
+  }, [cloudProvider, selectedBucket]);
+
   const handleUpload = async () => {
     if (!file || !token) return;
     setIsUploading(true);
     const uploadedFileName = file.name;
     try {
-      const response = await uploadSecureFile(file, encrypt, token, alwaysAskEncryption);
+      const uploadCsp = cloudProvider === "ALL" ? "AWS" : cloudProvider;
+      const response = await uploadSecureFile(
+        file,
+        encrypt,
+        token,
+        alwaysAskEncryption,
+        uploadCsp
+      );
 
       if (response.status === "auto_encrypted_sse") {
         notifications.success(
@@ -673,14 +735,21 @@ function SecurityPage() {
         </div>
 
         {canAccessSecureArea && (
-          <BucketRegionSelector
-            surface="security"
-            storageKeyPrefix="zenith.security"
-            selectedBucket={selectedBucket}
-            selectedRegion={selectedRegion}
-            onBucketChange={handleBucketSelect}
-            onRegionChange={handleRegionSelect}
-          />
+          <>
+            <BucketRegionSelector
+              surface="security"
+              storageKeyPrefix="zenith.security"
+              selectedBucket={selectedBucket}
+              selectedRegion={selectedRegion}
+              onBucketChange={handleBucketSelect}
+              onRegionChange={handleRegionSelect}
+            />
+            <ByocStorageTargetBanner
+              variant="security"
+              selectedBucket={selectedBucket}
+              selectedRegion={selectedRegion}
+            />
+          </>
         )}
         <div className="page-card zenith-surface zenith-surface--accent-security">
           <h3 className="page-title">Secure File Upload</h3>
@@ -783,20 +852,33 @@ function SecurityPage() {
         <div className="files-section zenith-surface zenith-surface--accent-security">
           <div className="list-header">
             <h3 className="section-title">Your Secure Files</h3>
-            <button
-              type="button"
-              className="btn sync-btn"
-              onClick={handleSyncWithSecureBucket}
-              disabled={isSyncing}
-            >
-              {isSyncing ? "Syncing..." : selectedBucket ? `Sync ${selectedBucket}` : "Sync with Bucket (AWS)"}
-            </button>
+            <CloudProviderToolbar
+              className="security-cloud-toolbar"
+              provider={cloudProvider}
+              onProviderChange={setCloudProvider}
+              onAction={handleSyncWithSecureBucket}
+              actionLabel={secureSyncActionLabel}
+              actionBusy={isSyncing}
+              actionDisabled={!canAccessSecureArea}
+              actionClassName="btn sync-btn"
+              selectAriaLabel="Filter secure files by cloud provider"
+            />
           </div>
           {!secureFiles || secureFiles.length === 0 ? (
             <EmptyState
               icon={<IconLock aria-hidden="true" />}
               title="No secure files yet"
               message="Upload a file to the vault. Sensitive content can be auto-protected with SSE-S3 or browser encryption."
+            />
+          ) : displayedSecureFiles.length === 0 ? (
+            <EmptyState
+              icon={<IconLock aria-hidden="true" />}
+              title={`No ${cloudProvider} secure files`}
+              message={
+                cloudProvider === "ALL"
+                  ? "No files match the current bucket filter."
+                  : "The secure vault is on AWS S3. Choose All or AWS to see vault files."
+              }
             />
           ) : (
           <div className="table-responsive-scroll">
@@ -811,7 +893,7 @@ function SecurityPage() {
               </tr>
             </thead>
             <tbody>
-              {secureFiles.map((f) => {
+              {displayedSecureFiles.map((f) => {
                   const showEncryptionChoice = f.awaiting_encryption_choice && f.encryption_status === 'awaiting_choice';
                   return (
                     <tr key={`${f.cloud_bucket || ""}-${f.s3_key || f.filename}`}>

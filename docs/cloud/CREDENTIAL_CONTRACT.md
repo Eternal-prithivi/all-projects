@@ -16,7 +16,7 @@ Provider strings in APIs should use canonical form **`AWS`**, **`GCP`**, **`Azur
 |----------|-----|-----|-------|
 | Bucket / container | `S3_BUCKET_NAME`, `REGULAR_S3_BUCKET_NAME` | `GCP_BUCKET_NAME` | `AZURE_STORAGE_CONTAINER_NAME` |
 | Access | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION` | `GCP_SERVICE_ACCOUNT_JSON_PATH`, `GCP_PROJECT_ID` | `AZURE_STORAGE_CONNECTION_STRING` or account + key |
-| Secure vault (AWS today) | `SECURE_S3_BUCKET_NAME`, replica region helpers | — (Phase 4) | — (Phase 4) |
+| Secure vault | `SECURE_S3_BUCKET_NAME`, replica region helpers | GCS bucket from BYOC/platform | Azure container from BYOC/platform |
 
 ### Cost / billing
 

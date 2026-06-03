@@ -13,7 +13,7 @@ def test_scan_detects_api_key():
     assert "credential_keywords" in result.reasons
 
 
-@patch("app.security.routes_security.put_secure_object_dual")
+@patch("app.security.routes_security.put_secure_vault_object")
 def test_persist_sse_secure_file_sets_metadata(mock_put):
     from app.security.routes_security import _persist_sse_secure_file
 

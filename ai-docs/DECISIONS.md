@@ -232,6 +232,16 @@
 
 ---
 
+### [DEC-025] Tri-cloud secure vault (AWS dual-write; GCP/Azure single-region)
+- **Date**: 2026-06-03
+- **Status**: Accepted (implemented)
+- **Context**: Secure vault routes and `SecurityPage` were AWS-only (`resolve_secure_aws_storage`, `POST /security/sync/aws`). Parity Phase 4 requires GCP/Azure upload, list, sync, download, and delete with consistent `csp` on MongoDB metadata.
+- **Decision**: Add `app/storage/secure_vault.py` with `SecureGcpStorage`, `SecureAzureStorage`, and `resolve_secure_storage(username, csp)`. Wire `routes_security.py` through `put_secure_vault_object` / `delete_secure_vault_object` / presigned helpers. Canonical sync: `POST /security/sync/{csp}` (aliases `/sync/aws`, `/sync/gcp`, `/sync/azure`). AWS keeps SSE dual-bucket replication; GCP/Azure use `secure/{username}/` prefix without cross-region replica in this phase (see `docs/cloud/SECURE_VAULT_REPLICATION.md`). Browser CSE upload remains AWS-only (501 on GCP/Azure).
+- **Consequences**: Frontend `syncSecureVault` + upload `csp` form field; OPA stubs `gcp_security.rego` / `azure_security.rego`.
+- **DO NOT**: Assume replica buckets exist for GCP/Azure until a follow-up phase implements replication.
+
+---
+
 ### [DEC-024] Standard storage archive restore API (tri-cloud path, AWS-only impl)
 - **Date**: 2026-06-03
 - **Status**: Accepted

@@ -741,6 +741,20 @@ Reference: 97-page project report (Chapter 4–6). Last cross-check: 2026-05-24.
 
 ---
 
+## Multi-cloud parity — Phase 4 (2026-06-03)
+
+**Goal:** Secure vault on AWS, GCP, and Azure with consistent `csp` metadata.
+
+**Completed:**
+- `app/storage/secure_vault.py` — `SecureGcpStorage`, `SecureAzureStorage`, vault CRUD helpers.
+- `routes_security.py` — `POST /security/sync/{csp}`, tri-cloud upload/list/download/delete.
+- Frontend `syncSecureVault`, upload `csp`; `SECURE_VAULT_REPLICATION.md`; DEC-025.
+- OPA stubs `gcp_security.rego`, `azure_security.rego`; 253 pytest green.
+
+**Next:** Phase 5 — VM AWS parity.
+
+---
+
 ## Multi-cloud parity — Phase 2 (2026-06-03)
 
 **Goal:** Cost analysis + budgets behave like AWS when GCP/Azure billing credentials exist.

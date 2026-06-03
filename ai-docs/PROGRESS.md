@@ -6,7 +6,7 @@
 
 ## 🔴 Active Task
 
-**None** — Phase 3 complete. **Next:** Phase 4 (secure vault tri-cloud).
+**None** — Phase 4 complete. **Next:** Phase 5 (VM AWS parity).
 
 ---
 
@@ -14,8 +14,18 @@
 
 | Phase | Status |
 |-------|--------|
-| **0–3** | ✅ Complete |
-| **4–7** | ⬜ |
+| **0–4** | ✅ Complete |
+| **5–7** | ⬜ |
+
+---
+
+## Phase 4 — Secure vault tri-cloud ✅
+
+- [x] **4.1** — `secure_vault.py` (`SecureGcpStorage`, `SecureAzureStorage`, vault helpers)
+- [x] **4.2** — `routes_security.py` provider dispatch + `POST /sync/{csp}`
+- [x] **4.3** — `SecurityPage.jsx` + `api.js` (`syncSecureVault`, upload `csp`)
+- [x] **4.4** — DEC-025, `SECURE_VAULT_REPLICATION.md`, OPA stubs
+- [x] **4.5** — Integration tests + matrix update
 
 ---
 

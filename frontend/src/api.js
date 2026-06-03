@@ -290,11 +290,18 @@ export const getDashboardStats = async (token) => {
 
 // ---------------- SECURE STORAGE ----------------
 
-export const uploadSecureFile = async (file, encrypt, token, alwaysAskEncryption = false) => {
+export const uploadSecureFile = async (
+  file,
+  encrypt,
+  token,
+  alwaysAskEncryption = false,
+  csp = "AWS"
+) => {
   const formData = new FormData();
   formData.append("file", file);
   formData.append("encrypt_manual", encrypt);
   formData.append("always_ask_encryption", alwaysAskEncryption);
+  formData.append("csp", csp);
 
   try {
     const response = await apiClient.post("/security/upload-secure", formData, {
@@ -351,20 +358,29 @@ export const deleteSecureFile = async (filename, token, { bucket } = {}) => {
   }
 };
 
-export const syncAwsSecureBucket = async (token, { bucket, region } = {}) => {
+export const syncSecureVault = async (token, csp, { bucket, region, container } = {}) => {
   try {
     const params = {};
     if (bucket) params.bucket = bucket;
+    if (container) params.container = container;
     if (region && region !== "all") params.region = region;
-    const response = await apiClient.post("/security/sync/aws", {}, {
-      params,
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    const response = await apiClient.post(
+      `/security/sync/${encodeURIComponent(csp)}`,
+      {},
+      {
+        params,
+        headers: { Authorization: `Bearer ${token}` },
+      }
+    );
     return response.data;
   } catch (error) {
     throw error.response?.data || error;
   }
 };
+
+/** @deprecated Use syncSecureVault(token, "AWS", opts) */
+export const syncAwsSecureBucket = async (token, opts = {}) =>
+  syncSecureVault(token, "AWS", opts);
 
 export const uploadClientEncrypted = async (
   encryptedBlob,
