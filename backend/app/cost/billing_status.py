@@ -33,11 +33,20 @@ def _probe_provider(
             "setup_steps": data.get("implementation_steps", []),
         }
 
+    if is_demo_mode():
+        return {
+            "provider": provider,
+            "live": True,
+            "status": "demo",
+            "message": "Demo mode — showing sample billing data",
+            "currency": data.get("Currency", "USD"),
+        }
+
     has_rows = bool(data.get("ResultsByTime") or data.get("Services"))
     return {
         "provider": provider,
-        "live": has_rows or is_demo_mode(),
-        "status": "demo" if is_demo_mode() else ("ok" if has_rows else "no_data"),
+        "live": has_rows,
+        "status": "ok" if has_rows else "no_data",
         "message": "Billing data available" if has_rows else "Connected but no rows in range",
         "currency": data.get("Currency", "USD"),
     }

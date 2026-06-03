@@ -71,6 +71,8 @@ async def get_aws_costs(
                 "data": cost_data,
                 "cached": False,
                 "demo_mode": True,
+                "configured": True,
+                "group_by_supported": True,
             }
 
         # Create cache key from query parameters
@@ -82,7 +84,13 @@ async def get_aws_costs(
             cached_data, cached_time = cost_cache[cache_key]
             if (current_time - cached_time) < CACHE_TTL:
                 logger.info(f"Using cached AWS cost data for {cache_key}")
-                return {"provider": "aws", "data": cached_data, "cached": True}
+                return {
+                    "provider": "aws",
+                    "data": cached_data,
+                    "cached": True,
+                    "configured": True,
+                    "group_by_supported": True,
+                }
         
         # Cache miss or expired - fetch fresh data
         logger.info(f"Fetching fresh AWS cost data for {cache_key} (Cost Explorer API call)")
@@ -108,7 +116,14 @@ async def get_aws_costs(
         add_to_cost_cache(cache_key, cost_data, current_time)
         logger.info(f"AWS cost data cached for {cache_key}")
         
-        return {"provider": "aws", "data": cost_data, "cached": False, "demo_mode": False}
+        return {
+            "provider": "aws",
+            "data": cost_data,
+            "cached": False,
+            "demo_mode": False,
+            "configured": True,
+            "group_by_supported": True,
+        }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch AWS costs: {e}")
 
@@ -123,11 +138,7 @@ async def get_gcp_costs(
     """
     try:
         cost_data = get_gcp_billing_data(user.username, start_date=start_date, end_date=end_date)
-        return {
-            "provider": "gcp",
-            "data": cost_data,
-            "demo_mode": is_demo_mode(),
-        }
+        return _cost_provider_response("gcp", cost_data)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch GCP costs: {e}")
 
@@ -142,13 +153,20 @@ async def get_azure_costs(
     """
     try:
         cost_data = get_azure_billing_data(user.username, start_date=start_date, end_date=end_date)
-        return {
-            "provider": "azure",
-            "data": cost_data,
-            "demo_mode": is_demo_mode(),
-        }
+        return _cost_provider_response("azure", cost_data)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch Azure costs: {e}")
+
+
+def _cost_provider_response(provider: str, cost_data: Dict[str, Any]) -> Dict[str, Any]:
+    status = cost_data.get("status")
+    return {
+        "provider": provider,
+        "data": cost_data,
+        "demo_mode": is_demo_mode(),
+        "configured": status not in ("missing_config", "missing_dependency"),
+        "group_by_supported": provider == "aws",
+    }
 
 @router.get("/cache/stats", summary="Get Cache Statistics")
 async def get_cache_stats():

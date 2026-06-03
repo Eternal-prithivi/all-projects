@@ -57,6 +57,10 @@ class Settings(BaseSettings):
     GCP_PROJECT_ID: str
     GCP_ZONE: str = "us-central1-a" # Free tier zone + a specific sub-zone
 
+    # GCP Billing (BigQuery export — Cost Analysis)
+    GCP_BILLING_DATASET_ID: str = ""
+    GCP_BILLING_TABLE_ID: str = ""
+
     # VM Cluster Configuration (for your demo)
     PERFORMANCE_CLUSTER_MAX_VMS: int = 2
     STORAGE_CLUSTER_MAX_VMS: int = 2
@@ -99,6 +103,7 @@ class Settings(BaseSettings):
     AZURE_STORAGE_ACCOUNT_NAME: str
     AZURE_STORAGE_ACCOUNT_KEY: str
     AZURE_CONTAINER_NAME: str
+    AZURE_SUBSCRIPTION_ID: str = ""
     AZURE_TENANT_ID: str
     AZURE_CLIENT_ID: str
     AZURE_CLIENT_SECRET: str

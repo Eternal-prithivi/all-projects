@@ -223,6 +223,8 @@ def resolve_gcp_credentials(username: str) -> Dict[str, str]:
     return {
         "service_account_key_path": settings.GCP_SERVICE_ACCOUNT_JSON_PATH,
         "bucket_name": settings.GCP_BUCKET_NAME,
+        "billing_dataset_id": (settings.GCP_BILLING_DATASET_ID or "").strip(),
+        "billing_table_id": (settings.GCP_BILLING_TABLE_ID or "").strip(),
         "is_byoc": False,
     }
 
@@ -240,6 +242,10 @@ def resolve_azure_credentials(username: str) -> Dict[str, str]:
             "account_name": creds.get("account_name", ""),
             "account_key": creds.get("account_key", ""),
             "container_name": byoc.get("container_name", settings.AZURE_CONTAINER_NAME),
+            "subscription_id": (creds.get("subscription_id") or "").strip(),
+            "tenant_id": (creds.get("tenant_id") or "").strip(),
+            "client_id": (creds.get("client_id") or "").strip(),
+            "client_secret": (creds.get("client_secret") or "").strip(),
             "is_byoc": True,
         }
     
@@ -247,6 +253,10 @@ def resolve_azure_credentials(username: str) -> Dict[str, str]:
         "account_name": settings.AZURE_STORAGE_ACCOUNT_NAME,
         "account_key": settings.AZURE_STORAGE_ACCOUNT_KEY,
         "container_name": settings.AZURE_CONTAINER_NAME,
+        "subscription_id": (settings.AZURE_SUBSCRIPTION_ID or "").strip(),
+        "tenant_id": (settings.AZURE_TENANT_ID or "").strip(),
+        "client_id": (settings.AZURE_CLIENT_ID or "").strip(),
+        "client_secret": (settings.AZURE_CLIENT_SECRET or "").strip(),
         "is_byoc": False,
     }
 

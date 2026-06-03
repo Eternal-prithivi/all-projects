@@ -11,7 +11,7 @@
 //   - Change CSV export format — ops team depends on the column order
 // =============================================================================
 import React, { useState, useEffect } from 'react';
-import { apiClient } from '../api.js';
+import { apiClient, getApiErrorMessage } from '../api.js';
 import { useNotifications } from "../hooks/useNotifications";
 import PageHeader from '../components/ui/PageHeader.jsx';
 import CostHubNav from '../components/dashboard/CostHubNav.jsx';
@@ -67,6 +67,16 @@ const CostAnalysisEnhancedPage = () => {
   const [anomalySummary, setAnomalySummary] = useState(null);
   const [showAnomalies, setShowAnomalies] = useState(false);
   const [billingStatus, setBillingStatus] = useState(null);
+  const [providerSetup, setProviderSetup] = useState(null);
+  const [setupForm, setSetupForm] = useState({
+    billing_dataset_id: '',
+    billing_table_id: '',
+    subscription_id: '',
+    tenant_id: '',
+    client_id: '',
+    client_secret: '',
+  });
+  const [savingSetup, setSavingSetup] = useState(false);
 
   const fetchBillingStatus = async () => {
     try {
@@ -92,6 +102,66 @@ const CostAnalysisEnhancedPage = () => {
     fetchAnomalySummary();
     fetchBillingStatus();
   }, []);
+
+  const fetchProviderSetup = async (provider) => {
+    if (provider === 'aws') {
+      setProviderSetup(null);
+      return;
+    }
+    try {
+      const res = await apiClient.get(`/cost/setup/${provider}`);
+      setProviderSetup(res.data);
+      if (provider === 'gcp') {
+        setSetupForm((f) => ({
+          ...f,
+          billing_dataset_id: res.data.billing_dataset_id || '',
+          billing_table_id: res.data.billing_table_id || '',
+        }));
+      } else if (provider === 'azure') {
+        setSetupForm((f) => ({
+          ...f,
+          subscription_id: res.data.subscription_id || '',
+          tenant_id: res.data.tenant_id || '',
+          client_id: res.data.client_id || '',
+          client_secret: '',
+        }));
+      }
+    } catch {
+      setProviderSetup(null);
+    }
+  };
+
+  useEffect(() => {
+    fetchProviderSetup(selectedProvider);
+  }, [selectedProvider]);
+
+  const saveProviderSetup = async (e) => {
+    e.preventDefault();
+    setSavingSetup(true);
+    try {
+      if (selectedProvider === 'gcp') {
+        await apiClient.put('/cost/setup/gcp', {
+          billing_dataset_id: setupForm.billing_dataset_id,
+          billing_table_id: setupForm.billing_table_id,
+        });
+      } else if (selectedProvider === 'azure') {
+        const body = {
+          subscription_id: setupForm.subscription_id,
+          tenant_id: setupForm.tenant_id,
+          client_id: setupForm.client_id,
+        };
+        if (setupForm.client_secret) body.client_secret = setupForm.client_secret;
+        await apiClient.put('/cost/setup/azure', body);
+      }
+      notifications.success('Billing settings saved.');
+      await fetchProviderSetup(selectedProvider);
+      await fetchBillingStatus();
+    } catch (error) {
+      notifications.error(getApiErrorMessage(error, 'Failed to save billing settings.'));
+    } finally {
+      setSavingSetup(false);
+    }
+  };
 
   // Quick date presets
   const applyDatePreset = (preset) => {
@@ -164,10 +234,20 @@ const CostAnalysisEnhancedPage = () => {
 
       setCostData(response.data);
       processCostData(response.data);
-      notifications.success(`${selectedProvider.toUpperCase()} cost data loaded successfully`);
+      const cfg = response.data?.data?.status;
+      if (cfg === 'missing_config' || cfg === 'missing_dependency') {
+        notifications.info(
+          getApiErrorMessage(
+            { detail: response.data?.data },
+            `${selectedProvider.toUpperCase()} billing is not configured yet.`
+          )
+        );
+      } else {
+        notifications.success(`${selectedProvider.toUpperCase()} cost data loaded successfully`);
+      }
     } catch (error) {
       console.error('Error fetching cost data:', error);
-      notifications.error(error.response?.data?.detail || 'Failed to fetch cost data');
+      notifications.error(getApiErrorMessage(error, 'Failed to fetch cost data'));
       setCostData(null);
     } finally {
       setLoading(false);
@@ -418,7 +498,107 @@ const CostAnalysisEnhancedPage = () => {
               </span>
             );
           })}
+          {billingStatus.demo_mode && (
+            <span className="billing-pill demo">Demo mode — sample billing data</span>
+          )}
         </div>
+      )}
+
+      {providerSetup && !providerSetup.configured && selectedProvider !== 'aws' && (
+        <div className="billing-setup-panel zenith-surface">
+          <h3>
+            {selectedProvider === 'gcp' ? 'GCP BigQuery billing export' : 'Azure Cost Management'}
+          </h3>
+          <p className="billing-setup-lead">
+            Complete these steps, then save IDs on your BYOC record (requires an active{' '}
+            {selectedProvider.toUpperCase()} BYOC connection) or set platform{' '}
+            <code>.env</code> on the server.
+          </p>
+          <ol className="billing-setup-steps">
+            {(providerSetup.setup_steps || []).map((step) => (
+              <li key={step}>{step}</li>
+            ))}
+          </ol>
+          {providerSetup.can_update_via_api ? (
+            <form className="billing-setup-form" onSubmit={saveProviderSetup}>
+              {selectedProvider === 'gcp' ? (
+                <>
+                  <input
+                    type="text"
+                    placeholder="Billing dataset ID"
+                    value={setupForm.billing_dataset_id}
+                    onChange={(e) =>
+                      setSetupForm({ ...setupForm, billing_dataset_id: e.target.value })
+                    }
+                    required
+                  />
+                  <input
+                    type="text"
+                    placeholder="Billing table ID (gcp_billing_export_v1_…)"
+                    value={setupForm.billing_table_id}
+                    onChange={(e) =>
+                      setSetupForm({ ...setupForm, billing_table_id: e.target.value })
+                    }
+                    required
+                  />
+                </>
+              ) : (
+                <>
+                  <input
+                    type="text"
+                    placeholder="Subscription ID"
+                    value={setupForm.subscription_id}
+                    onChange={(e) =>
+                      setSetupForm({ ...setupForm, subscription_id: e.target.value })
+                    }
+                    required
+                  />
+                  <input
+                    type="text"
+                    placeholder="Tenant ID"
+                    value={setupForm.tenant_id}
+                    onChange={(e) => setSetupForm({ ...setupForm, tenant_id: e.target.value })}
+                    required
+                  />
+                  <input
+                    type="text"
+                    placeholder="Client ID (app ID)"
+                    value={setupForm.client_id}
+                    onChange={(e) => setSetupForm({ ...setupForm, client_id: e.target.value })}
+                    required
+                  />
+                  <input
+                    type="password"
+                    placeholder={
+                      providerSetup.has_client_secret
+                        ? 'Client secret (leave blank to keep existing)'
+                        : 'Client secret'
+                    }
+                    value={setupForm.client_secret}
+                    onChange={(e) =>
+                      setSetupForm({ ...setupForm, client_secret: e.target.value })
+                    }
+                  />
+                </>
+              )}
+              <button type="submit" className="fetch-button" disabled={savingSetup}>
+                {savingSetup ? 'Saving…' : 'Save billing settings'}
+              </button>
+            </form>
+          ) : (
+            <p className="billing-setup-note">
+              Connect {selectedProvider.toUpperCase()} under BYOC to save billing fields here, or
+              ask your operator to set deployment environment variables.
+            </p>
+          )}
+        </div>
+      )}
+
+      {selectedProvider !== 'aws' && (
+        <p className="cost-api-note" role="note">
+          Service breakdown uses provider-native APIs for {selectedProvider.toUpperCase()}.{' '}
+          <strong>Group-by dimensions</strong> (Cost Explorer style) apply to <strong>AWS only</strong>.
+        </p>
       )}
       {/* Anomaly Alerts Banner */}
       {anomalySummary && anomalySummary.total_unacknowledged > 0 && (
@@ -598,8 +778,14 @@ const CostAnalysisEnhancedPage = () => {
         </div>
 
         <div className="filter-group">
-          <label>Granularity</label>
-          <select className="zenith-select filter-select" value={granularity} onChange={(e) => setGranularity(e.target.value)}>
+          <label>Granularity {selectedProvider !== 'aws' && '(AWS only)'}</label>
+          <select
+            className="zenith-select filter-select"
+            value={granularity}
+            onChange={(e) => setGranularity(e.target.value)}
+            disabled={selectedProvider !== 'aws'}
+            title={selectedProvider !== 'aws' ? 'Granularity applies to AWS Cost Explorer only' : ''}
+          >
             <option value="DAILY">Daily</option>
             <option value="MONTHLY">Monthly</option>
           </select>

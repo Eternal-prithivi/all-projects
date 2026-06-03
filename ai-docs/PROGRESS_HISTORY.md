@@ -726,6 +726,23 @@ Reference: 97-page project report (Chapter 4–6). Last cross-check: 2026-05-24.
 
 ---
 
+## Multi-cloud parity — Phase 2 (2026-06-03)
+
+**Goal:** Cost analysis + budgets behave like AWS when GCP/Azure billing credentials exist.
+
+**Completed:**
+- Settings: `GCP_BILLING_DATASET_ID`, `GCP_BILLING_TABLE_ID`, `AZURE_SUBSCRIPTION_ID`.
+- `billing_config.py` / `billing_setup.py` — resolve + persist BYOC billing fields.
+- APIs: `GET /api/cost/setup/{provider}`, `PUT /api/cost/setup/gcp`, `PUT /api/cost/setup/azure`.
+- `resolve_azure_credentials` exposes Cost Management fields; manager uses shared config helpers.
+- Cost routes return `configured` + `group_by_supported`; billing probe no longer marks demo as “live” when off.
+- Cost Analysis page: setup wizard panel, `getApiErrorMessage`, AWS-only granularity note.
+- Tests: `test_billing_setup.py`, `test_billing_setup_api.py`; 243 pytest green.
+
+**Next:** Phase 3 — BYOC verify + discovery parity.
+
+---
+
 ## Multi-cloud parity — Phase 1 (2026-06-03)
 
 **Goal:** Standard storage tri-cloud hardening — same UX as AWS when credentials exist.

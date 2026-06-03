@@ -214,7 +214,7 @@ Run in order. Do not end the session with an incomplete checklist.
 
 ```bash
 git status
-git add ai-docs/ backend/ frontend/src/ docs/ .github/ render.yaml PROFESSIONAL_IMPROVEMENTS.md
+git add ai-docs/ backend/ frontend/src/ docs/ .github/ render.yaml PROFESSIONAL_IMPROVEMENTS.md Later\ Developments.md
 git diff --cached --name-only | grep -E '\.env|secret|zenith-backend' && echo '⛔ STOP' || echo '✅ OK'
 git commit -m 'feat|fix|docs: summary
 

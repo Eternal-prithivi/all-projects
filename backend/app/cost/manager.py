@@ -85,30 +85,15 @@ def get_gcp_billing_data(username: str, start_date: str, end_date: str) -> Dict[
         from google.oauth2 import service_account
         
         from app.byoc.credential_resolver import resolve_gcp_credentials
+        from app.cost.billing_config import missing_gcp_config_payload, resolve_gcp_billing_ids
 
         gcp = resolve_gcp_credentials(username)
-        dataset_id = (
-            (gcp.get("billing_dataset_id") or "").strip()
-            or getattr(settings, "GCP_BILLING_DATASET_ID", None)
-        )
-        table_id = (
-            (gcp.get("billing_table_id") or "").strip()
-            or getattr(settings, "GCP_BILLING_TABLE_ID", None)
-        )
+        billing_ids = resolve_gcp_billing_ids(username)
+        dataset_id = billing_ids["dataset_id"]
+        table_id = billing_ids["table_id"]
 
         if not dataset_id or not table_id:
-            return {
-                "message": "GCP billing not configured",
-                "status": "missing_config",
-                "error": "Set GCP_BILLING_DATASET_ID and GCP_BILLING_TABLE_ID in .env",
-                "implementation_steps": [
-                    "Enable BigQuery billing export: https://console.cloud.google.com/billing/export",
-                    "Add to .env: GCP_BILLING_DATASET_ID=your_dataset",
-                    "Add to .env: GCP_BILLING_TABLE_ID=gcp_billing_export_v1_XXXXX"
-                ],
-                "estimated_cost": 0.00,
-                "currency": "USD"
-            }
+            return missing_gcp_config_payload()
         
         import json as _json
 
@@ -238,41 +223,20 @@ def get_azure_billing_data(username: str, start_date: str, end_date: str) -> Dic
         from azure.mgmt.consumption import ConsumptionManagementClient
         from datetime import datetime
         
-        # Check if Azure credentials are configured
-        subscription_id = getattr(settings, 'AZURE_SUBSCRIPTION_ID', None)
-        tenant_id = getattr(settings, 'AZURE_TENANT_ID', None)
-        client_id = getattr(settings, 'AZURE_CLIENT_ID', None)
-        client_secret = getattr(settings, 'AZURE_CLIENT_SECRET', None)
-        
-        from app.byoc.credential_resolver import get_user_cloud_credentials
+        from app.cost.billing_config import (
+            azure_billing_configured,
+            missing_azure_config_payload,
+            resolve_azure_billing_creds,
+        )
 
-        byoc = get_user_cloud_credentials(username, "Azure")
-        if byoc:
-            creds = byoc.get("credentials") or {}
-            subscription_id = creds.get("subscription_id") or subscription_id
-            tenant_id = creds.get("tenant_id") or tenant_id
-            client_id = creds.get("client_id") or client_id
-            client_secret = creds.get("client_secret") or client_secret
+        azure_creds = resolve_azure_billing_creds(username)
+        subscription_id = azure_creds["subscription_id"]
+        tenant_id = azure_creds["tenant_id"]
+        client_id = azure_creds["client_id"]
+        client_secret = azure_creds["client_secret"]
 
-        if not all([subscription_id, tenant_id, client_id, client_secret]):
-            steps = [
-                "Create Service Principal: az ad sp create-for-rbac --name cost-reader",
-                "Grant role: az role assignment create --assignee <app-id> --role 'Cost Management Reader'",
-                "Add to .env: AZURE_SUBSCRIPTION_ID, AZURE_TENANT_ID, AZURE_CLIENT_ID, AZURE_CLIENT_SECRET",
-            ]
-            if byoc:
-                steps.append(
-                    "For BYOC: store subscription_id, tenant_id, client_id, client_secret "
-                    "on the Azure BYOC record (storage keys alone cannot read billing)."
-                )
-            return {
-                "message": "Azure billing not configured",
-                "status": "missing_config",
-                "error": "Set Azure Cost Management credentials in .env or BYOC record",
-                "implementation_steps": steps,
-                "estimated_cost": 0.00,
-                "currency": "USD",
-            }
+        if not azure_billing_configured(username):
+            return missing_azure_config_payload(byoc_connected=azure_creds["is_byoc"])
         
         # Initialize Azure client
         credential = ClientSecretCredential(

@@ -20,7 +20,7 @@ For frontend context → read `AI_CONTEXT_FRONTEND.md`
 
 | Module | Route File(s) | Key Files | Notes |
 |--------|--------------|-----------|-------|
-| **auth** | `routes_auth.py`, `routes_password_reset.py` | `auth_service.py`, `auth_utils.py`, `auth_controller.py`, `password_reset_service.py` | JWT login, register, forgot/reset password (email link + SMS OTP), recovery contacts |
+| **auth** | `routes_auth.py`, `routes_password_reset.py` | `auth_service.py`, `auth_utils.py`, `password_reset_service.py` | JWT login, register, forgot/reset password (email link + SMS OTP), recovery contacts |
 | **users** | `routes_users.py`, `routes_profile.py`, `routes_settings.py` | `user_model.py` | Profile edit, recovery contacts, settings preferences, BYOC, theme, currency, audit log |
 | **security** | `routes_security.py`, `routes_2fa.py` | `encryption_handler.py`, `tasks_alerts.py` | 2FA, secure vault, **SSE-S3** on server-side path — **Phase 12:** auto SSE, **browser CSE**, detector (`PHASE_12_SECURITY_RESEARCH_PARITY.md` §2–§3) |
 | **storage** | `routes_storage.py` | `cloud_credentials.py`, `optimizer.py`, `uploader.py`, `manager.py`, `tasks.py`, `tiering_tasks.py`, `models_storage.py` | ML ensemble analysis, multi-cloud upload/download/delete, nightly lifecycle tiering; **BYOC** via `credential_resolver` |

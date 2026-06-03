@@ -23,6 +23,8 @@ Provider strings in APIs should use canonical form **`AWS`**, **`GCP`**, **`Azur
 | Variable | AWS | GCP | Azure |
 |----------|-----|-----|-------|
 | Billing read | Same AWS keys (Cost Explorer) | `GCP_BILLING_DATASET_ID`, `GCP_BILLING_TABLE_ID`, SA JSON | `AZURE_SUBSCRIPTION_ID`, `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET` |
+| In-app setup | — | `PUT /api/cost/setup/gcp` (requires GCP BYOC) | `PUT /api/cost/setup/azure` (requires Azure BYOC) |
+| Status | `GET /api/cost/billing-status` | `GET /api/cost/setup/gcp` | `GET /api/cost/setup/azure` |
 | Demo | `DEMO_MODE=true` mocks all three | | |
 
 ### VM (Phase 5+)

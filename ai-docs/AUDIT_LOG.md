@@ -23,6 +23,19 @@ Notes: [one line optional]
 ## Session Log (recent only)
 
 ---
+SESSION_ID: 20260603-multicloud-phase2
+Date: 2026-06-03
+Agent: Cursor Composer
+Task: Multi-cloud parity Phase 2 — cost/billing UX
+Changes:
+- Settings billing env vars; billing_config + setup APIs
+- GCP/Azure BYOC billing save; Cost Analysis setup wizard UI
+- Billing status demo vs live fix; 243 pytest
+Outcome: Done
+Notes: Next Phase 3 BYOC verify
+---
+
+---
 SESSION_ID: 20260603-multicloud-phase1
 Date: 2026-06-03
 Agent: Cursor Composer

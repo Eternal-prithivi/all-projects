@@ -14,7 +14,7 @@ Success criterion (every phase): With valid platform `.env` or per-user BYOC, th
 |------|-----|-----|-------|-------------|-------|
 | **Storage (standard)** | Full | Full | Full | `app/storage/uploader.py`, `cloud_credentials.py`, `routes_storage.py` | 1 |
 | **Storage restore** | Glacier (`POST /restore/AWS/{filename}`) | 501 not_supported | 501 not_supported | `routes_storage.py` | 1 ✅ |
-| **Cost / budgets** | Full + CE grouping | Code path; needs BigQuery export + env | Code path; needs subscription + SP | `app/cost/manager.py`, `billing_status.py` | 2 |
+| **Cost / budgets** | Full + CE grouping | BigQuery + setup wizard | Cost Management + setup wizard | `app/cost/manager.py`, `billing_config.py` | 2 ✅ |
 | **BYOC** | Full + verify + buckets | Connect + resolver; **no step-1 verify** | Same | `app/byoc/routes_byoc.py`, `credential_resolver.py` | 3 |
 | **Security vault** | Full (S3 SSE dual) | UI filter only | UI filter only | `app/security/routes_security.py` | 4 |
 | **VM / monitoring** | EC2 via provision only | **Full VM API** | None | `app/vm/manager.py`, `gcp_runtime.py` | 5 |
@@ -99,3 +99,4 @@ Legend: ✅ implemented · 🟡 partial · ❌ missing · 🔒 AWS-only today
 |-------|----------------|------|
 | 0 | Initial matrix + contract | 2026-06-03 |
 | 1 | Restore route, tier names, missing_config sync, tests | 2026-06-03 |
+| 2 | Billing Settings fields, setup APIs, cost UI wizard | 2026-06-03 |

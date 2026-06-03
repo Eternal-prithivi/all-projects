@@ -1,22 +1,18 @@
 # STATUS.md — Live Project Snapshot
 
-**Last Updated:** 2026-06-03 (Multi-cloud parity Phase 1 complete)
+**Last Updated:** 2026-06-03 (Multi-cloud parity Phase 2 complete)
 
 ---
 
 ## Identity
 
-| Field | Value |
-|-------|--------|
-| Project | CloudResourceOptimizationPlatform (**Zenith**) |
-| Phase | **Multi-cloud parity** — Phase 1 ✅; **next: Phase 2** (cost/billing) |
-| Paused | Phase **20.5.10** — branch protection (manual) |
+| Phase | **Parity 0–2** ✅ · **Next: Phase 3** (BYOC verify + discovery) · **20.5.10** paused |
 
 ---
 
 ## 🔴 Active Task
 
-**None** — Phase 1 complete. Start **Phase 2** when ready.
+**None** — Phase 2 complete.
 
 ---
 
@@ -24,11 +20,4 @@
 
 | Check | Status |
 |-------|--------|
-| Backend pytest | ✅ 236 passed (2026-06-03) |
-| Frontend lint | Pre-existing warnings in `CloudProviderSelect.jsx` (not Phase 1) |
-
----
-
-## Critical Warnings
-
-1. `backend/.env` — never commit
+| Backend pytest | ✅ 243 passed (2026-06-03) |

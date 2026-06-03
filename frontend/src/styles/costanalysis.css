@@ -1034,6 +1034,50 @@
   object-fit: contain;
 }
 
+.billing-pill.demo {
+  border-color: rgba(147, 197, 253, 0.35);
+  color: #93c5fd;
+}
+
+.billing-setup-panel {
+  margin-bottom: 1.25rem;
+  padding: 1rem 1.25rem;
+  border-radius: 10px;
+  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.1));
+}
+
+.billing-setup-lead {
+  margin: 0.5rem 0 0.75rem;
+  font-size: 0.9rem;
+  opacity: 0.9;
+}
+
+.billing-setup-steps {
+  margin: 0 0 1rem 1.1rem;
+  font-size: 0.88rem;
+}
+
+.billing-setup-form {
+  display: grid;
+  gap: 0.65rem;
+  max-width: 32rem;
+}
+
+.billing-setup-form input {
+  padding: 0.5rem 0.65rem;
+  border-radius: 6px;
+  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.15));
+  background: var(--surface-input, rgba(0, 0, 0, 0.2));
+  color: inherit;
+}
+
+.billing-setup-note,
+.cost-api-note {
+  font-size: 0.88rem;
+  opacity: 0.85;
+  margin: 0 0 1rem;
+}
+
 .anomaly-banner {
   background: linear-gradient(135deg, #dc3545, #c82333);
   padding: 1rem 1.5rem;

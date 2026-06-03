@@ -31,6 +31,7 @@ from app.security import routes_security
 from app.websockets import routes_ws
 from app.security import routes_2fa
 from app.cost import routes_cost
+from app.cost import routes_billing_setup
 from app.cost import routes_connectivity
 from app.cost import routes_export
 from app.cost import routes_forecast
@@ -206,6 +207,7 @@ app.include_router(routes_export.router, prefix="/api/cost", tags=["Cost Export"
 app.include_router(routes_forecast.router, prefix="/api/cost", tags=["Cost Forecast"])
 app.include_router(routes_anomaly.router, prefix="/api/cost", tags=["Cost Anomaly"])
 app.include_router(routes_connectivity.router, prefix="/api/cost", tags=["Cost Connectivity"])
+app.include_router(routes_billing_setup.router, prefix="/api/cost", tags=["Cost Billing Setup"])
 app.include_router(routes_pricing.router, prefix="/api", tags=["Pricing"])
 app.include_router(routes_budgets.router, prefix="/api/budgets", tags=["Budgets"])
 app.include_router(routes_vm.router, prefix="/api/vm", tags=["Virtual Machines"])

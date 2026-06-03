@@ -6,32 +6,26 @@
 
 ## 🔴 Active Task
 
-**None** — Phase 1 complete. **Next:** Multi-cloud parity **Phase 2** (cost / budgets / billing UX).
+**None** — Phase 2 complete. **Next:** Phase 3 (BYOC verify + discovery).
 
 ---
 
 ## Multi-cloud parity
 
-| Phase | Theme | Status |
-|-------|--------|--------|
-| **0** | Foundation | ✅ Complete |
-| **1** | Storage hardening | ✅ Complete |
-| **2** | Cost / budgets | ⬜ Not started |
-| **3–7** | BYOC → security → VM → provision → polish | ⬜ Not started |
+| Phase | Status |
+|-------|--------|
+| **0** | ✅ Foundation |
+| **1** | ✅ Storage |
+| **2** | ✅ Cost / billing |
+| **3–7** | ⬜ |
 
 ---
 
-## Phase 1 — Storage ✅
+## Phase 2 — Cost / billing ✅
 
-- [x] **1.1** — `storage_tiers.py` + lifecycle tier name alignment
-- [x] **1.2** — GCP/Azure upload/delete/download/sync tests (mocked)
-- [x] **1.3** — `missing_config` on GCP/Azure sync; BYOC resolvers unchanged paths
-- [x] **1.4** — `POST /restore/{csp}/{filename}`; 501 for GCP/Azure; legacy `/restore-aws/`
-- [x] **1.5** — `StoragePage` + `getApiErrorMessage` for structured errors
-- [x] **1.6** — DEC-024, matrix update, 236 pytest
-
----
-
-## Phase 20.5
-
-Paused at **20.5.10**.
+- [x] **2.1** — `GCP_BILLING_*`, `AZURE_SUBSCRIPTION_ID` in Settings
+- [x] **2.2** — GCP setup wizard API + Cost Analysis UI
+- [x] **2.3** — Azure Cost Management via BYOC + setup API
+- [x] **2.4** — `group_by_supported` + UI note (AWS only)
+- [x] **2.5** — Billing status / setup tests
+- [x] **2.6** — Demo vs live billing probe separation
