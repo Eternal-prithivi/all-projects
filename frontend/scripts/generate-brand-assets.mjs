@@ -50,36 +50,45 @@ await transparentPng
   .png()
   .toFile(path.join(publicRoot, 'zenith-icon.png'));
 
-/** Favicon / PWA: matte pad + optical center (mark sits slightly lower in box). */
+/**
+ * Favicon / PWA: matte pad — scale mark larger on small sizes so the full "Z" reads
+ * (avoids looking like a lone gold triangle in browser / Google search UI).
+ */
 const padIcon = async (size, bg = BRAND_BG) => {
-  const padTop = Math.round(size * 0.09);
-  const padBottom = Math.round(size * 0.04);
-  const padSide = Math.round(size * 0.06);
+  const padRatio = size <= 48 ? 0.06 : size <= 96 ? 0.07 : 0.08;
+  const pad = Math.max(2, Math.round(size * padRatio));
+  const inner = size - pad * 2;
   return transparentPng
     .clone()
-    .resize(size - padTop - padBottom, size - padSide * 2, {
+    .resize(inner, inner, {
       fit: 'contain',
       background: { r: 0, g: 0, b: 0, alpha: 0 },
     })
     .extend({
-      top: padTop,
-      bottom: padBottom,
-      left: padSide,
-      right: padSide,
+      top: pad,
+      bottom: pad,
+      left: pad,
+      right: pad,
       background: bg,
     })
     .png()
     .toBuffer();
 };
 
-const icon512 = await padIcon(512);
-const icon192 = await padIcon(192);
-const icon48 = await padIcon(48);
+const sizes = [16, 32, 48, 96, 192, 512];
+const icons = {};
+for (const size of sizes) {
+  icons[size] = await padIcon(size);
+}
 
-await sharp(icon512).toFile(path.join(publicRoot, 'icon-512.png'));
-await sharp(icon192).toFile(path.join(publicRoot, 'icon-192.png'));
-await sharp(icon48).toFile(path.join(publicRoot, 'favicon-48.png'));
-await sharp(icon192).toFile(path.join(publicRoot, 'favicon.ico'));
+await sharp(icons[512]).toFile(path.join(publicRoot, 'icon-512.png'));
+await sharp(icons[192]).toFile(path.join(publicRoot, 'icon-192.png'));
+await sharp(icons[96]).toFile(path.join(publicRoot, 'favicon-96.png'));
+await sharp(icons[48]).toFile(path.join(publicRoot, 'favicon-48.png'));
+await sharp(icons[32]).toFile(path.join(publicRoot, 'favicon-32.png'));
+await sharp(icons[16]).toFile(path.join(publicRoot, 'favicon-16.png'));
+/** Root favicon — 48px PNG (widely used by Google Search + browsers). */
+await sharp(icons[48]).toFile(path.join(publicRoot, 'favicon.ico'));
 
 const ogMarkSize = 300;
 const ogLogo = await transparentPng
@@ -102,4 +111,11 @@ await sharp(ogTextSvg)
   .png()
   .toFile(path.join(publicRoot, 'og-image.png'));
 
-console.log('Brand assets generated → frontend/public/ (UI transparent + SEO on #050505)');
+const BRAND_VERSION = '3';
+fs.writeFileSync(
+  path.join(publicRoot, 'brand-asset-version.txt'),
+  BRAND_VERSION,
+  'utf8',
+);
+
+console.log(`Brand assets generated → frontend/public/ (v${BRAND_VERSION})`);

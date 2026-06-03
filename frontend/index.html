@@ -10,14 +10,16 @@
     <meta name="msapplication-TileColor" content="#050505" />
     <link rel="canonical" href="https://rajverse.me/" />
 
-    <!-- Favicons (Google Search: favicon.ico + 48px + high-res; same mark as in-app) -->
-    <link rel="icon" href="/favicon.ico" sizes="any" />
-    <link rel="icon" type="image/png" sizes="48x48" href="/favicon-48.png" />
-    <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
-    <link rel="icon" type="image/png" sizes="512x512" href="/icon-512.png" />
-    <link rel="icon" type="image/png" sizes="512x512" href="/zenith-icon.png" />
-    <link rel="apple-touch-icon" sizes="512x512" href="/icon-512.png" />
-    <link rel="apple-touch-icon" sizes="192x192" href="/icon-192.png" />
+    <!-- Favicons — Zenith "Z" mark (same as in-app); ?v=3 busts stale pyramid/chevron cache -->
+    <link rel="icon" href="/favicon.ico?v=3" sizes="48x48" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png?v=3" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png?v=3" />
+    <link rel="icon" type="image/png" sizes="48x48" href="/favicon-48.png?v=3" />
+    <link rel="icon" type="image/png" sizes="96x96" href="/favicon-96.png?v=3" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png?v=3" />
+    <link rel="icon" type="image/png" sizes="512x512" href="/zenith-icon.png?v=3" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/icon-192.png?v=3" />
+    <link rel="apple-touch-icon" sizes="512x512" href="/icon-512.png?v=3" />
     <link rel="manifest" href="/manifest.json" />
 
     <!-- Open Graph / social (logo in link previews & some search surfaces) -->
@@ -26,7 +28,7 @@
     <meta property="og:title" content="Zenith Cloud Platform | Multi-Cloud Resource Optimization" />
     <meta property="og:description" content="Optimize AWS, GCP, and Azure costs with Zenith — analytics, storage tiering, VM clusters, and infrastructure provisioning in one platform." />
     <meta property="og:url" content="https://rajverse.me/" />
-    <meta property="og:image" content="https://rajverse.me/og-image.png" />
+    <meta property="og:image" content="https://rajverse.me/og-image.png?v=3" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
     <meta property="og:image:alt" content="Zenith Cloud Platform logo" />
@@ -35,7 +37,7 @@
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="Zenith Cloud Platform" />
     <meta name="twitter:description" content="Multi-cloud cost analytics, storage tiering, and infrastructure management for AWS, GCP, and Azure." />
-    <meta name="twitter:image" content="https://rajverse.me/og-image.png" />
+    <meta name="twitter:image" content="https://rajverse.me/og-image.png?v=3" />
 
     <!-- Structured data for organization logo in search -->
     <script type="application/ld+json">
@@ -45,10 +47,10 @@
         "name": "Zenith Cloud Platform",
         "alternateName": "Zenith",
         "url": "https://rajverse.me/",
-        "image": "https://rajverse.me/zenith-icon.png",
+        "image": "https://rajverse.me/zenith-icon.png?v=3",
         "logo": {
           "@type": "ImageObject",
-          "url": "https://rajverse.me/zenith-icon.png",
+          "url": "https://rajverse.me/zenith-icon.png?v=3",
           "width": 512,
           "height": 512,
           "caption": "Zenith Cloud Platform logo"
