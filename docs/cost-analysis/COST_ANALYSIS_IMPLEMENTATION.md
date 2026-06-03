@@ -44,7 +44,7 @@ Replaced placeholder with real implementation:
 - Daily cost tracking
 - Subscription-level cost queries
 
-### Frontend (`frontend/src/pages/CostAnalysisPage.jsx`)
+### Frontend (`frontend/src/pages/CostAnalysisEnhancedPage.jsx`)
 
 #### Updated Data Processing
 - Renamed `processAWSCostData()` to `processCostData()` - now works for all providers
@@ -213,7 +213,7 @@ The implementation handles these scenarios gracefully:
 backend/app/cost/manager.py              # Real GCP/Azure implementations
 backend/requirements.txt                  # Added cloud billing libraries
 backend/.env.example                      # Added GCP billing config
-frontend/src/pages/CostAnalysisPage.jsx  # Unified data processing
+frontend/src/pages/CostAnalysisEnhancedPage.jsx  # Unified data processing
 docs/COST_ANALYSIS_SETUP.md              # Setup guide (NEW)
 docs/COST_ANALYSIS_IMPLEMENTATION.md     # This file (NEW)
 ```

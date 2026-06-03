@@ -2,6 +2,8 @@
 
 Zenith background jobs (storage lifecycle, cost anomalies, ML retrain, VM adaptive agent) require **Celery worker** and **Beat** in addition to the FastAPI web service.
 
+**Current choice (2026):** Run Celery on **your Mac** for now; defer Render `zenith-celery` (~$7/month). See [Later Developments.md](../../Later%20Developments.md).
+
 ## Local
 
 ```bash

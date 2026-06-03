@@ -68,7 +68,9 @@ def platform_storage_configured(provider: CloudProvider) -> bool:
 
 def platform_vm_configured(provider: CloudProvider) -> bool:
     if provider == "Azure":
-        return False
+        from app.vm.azure_manager import azure_configured
+
+        return azure_configured()
     if provider == "AWS":
         from app.vm.aws_manager import aws_configured
 
@@ -111,16 +113,9 @@ def _provider_available(username: str, provider: CloudProvider, feature: CloudFe
     return _byoc_connected(username, provider) or _platform_configured(provider, feature)
 
 
-def _feature_filter(providers: List[CloudProvider], feature: CloudFeature) -> List[CloudProvider]:
-    if feature == CloudFeature.VM:
-        return [p for p in providers if p != "Azure"]
-    return list(providers)
-
-
 def available_providers(username: str, feature: CloudFeature) -> List[CloudProvider]:
     """Providers the user may use for this feature (hybrid union)."""
-    base = [p for p in _ALL if _provider_available(username, p, feature)]
-    return _feature_filter(base, feature)
+    return [p for p in _ALL if _provider_available(username, p, feature)]
 
 
 def default_provider(username: str, feature: CloudFeature) -> Optional[CloudProvider]:

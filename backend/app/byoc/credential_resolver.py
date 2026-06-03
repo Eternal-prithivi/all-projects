@@ -246,6 +246,8 @@ def resolve_azure_credentials(username: str) -> Dict[str, str]:
             "tenant_id": (creds.get("tenant_id") or "").strip(),
             "client_id": (creds.get("client_id") or "").strip(),
             "client_secret": (creds.get("client_secret") or "").strip(),
+            "resource_group": (creds.get("resource_group") or "").strip(),
+            "location": (creds.get("location") or creds.get("azure_location") or "").strip(),
             "is_byoc": True,
         }
     
@@ -257,6 +259,8 @@ def resolve_azure_credentials(username: str) -> Dict[str, str]:
         "tenant_id": (settings.AZURE_TENANT_ID or "").strip(),
         "client_id": (settings.AZURE_CLIENT_ID or "").strip(),
         "client_secret": (settings.AZURE_CLIENT_SECRET or "").strip(),
+        "resource_group": getattr(settings, "AZURE_RESOURCE_GROUP", "zenith-rg"),
+        "location": getattr(settings, "AZURE_LOCATION", "eastus"),
         "is_byoc": False,
     }
 

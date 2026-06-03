@@ -30,6 +30,7 @@ from app.cloud.availability import (
             CloudFeature.STORAGE,
             ["AWS", "GCP", "Azure"],
         ),
+        ([], {"AWS": True, "GCP": True, "Azure": True}, CloudFeature.VM, ["AWS", "GCP", "Azure"]),
         ([], {"AWS": True, "GCP": True, "Azure": False}, CloudFeature.VM, ["AWS", "GCP"]),
     ],
 )

@@ -31,6 +31,7 @@ from app.vm.manager import (
 )
 from app.vm.vm_provider import vm_runtime_context
 from app.vm.aws_runtime import set_aws_username, reset_aws_username
+from app.vm.azure_runtime import set_azure_username, reset_azure_username
 from app.vm.models import (
     VMRequestModel, VMAssignmentResponse, VMTransferRequest,
     VMMetricsResponse, ClusterType, MigrationRecommendation, VMStatus
@@ -57,7 +58,7 @@ async def get_vm_user(
     user: User = Depends(get_current_user),
     csp: str = Query("GCP"),
 ):
-    """Bind GCP or AWS compute context for BYOC (query param csp=AWS|GCP)."""
+    """Bind GCP, AWS, or Azure compute context for BYOC (query param csp)."""
     provider = normalize_provider(csp)
     if provider == "AWS":
         token = set_aws_username(user.username)
@@ -65,6 +66,12 @@ async def get_vm_user(
             yield user
         finally:
             reset_aws_username(token)
+    elif provider == "Azure":
+        token = set_azure_username(user.username)
+        try:
+            yield user
+        finally:
+            reset_azure_username(token)
     else:
         token = set_gcp_username(user.username)
         try:
@@ -109,7 +116,7 @@ def invalidate_cluster_health_cache():
 # --- Pydantic Models for Request/Response ---
 
 class VMCreateRequest(BaseModel):
-    csp: str = Field("GCP", description="Cloud provider: AWS or GCP")
+    csp: str = Field("GCP", description="Cloud provider: AWS, GCP, or Azure")
     cluster_type: str = Field(
         ...,
         description="Cluster to provision from: general, storage, memory, performance, or ai_ml",
@@ -249,15 +256,23 @@ async def _provision_or_assign_inner(
             machine_type = aws_manager.cluster_machine_type(cluster_type)
             disk_size = aws_manager.cluster_disk_gb(cluster_type)
             suffix = "aws"
+            source_image = ""
+        elif provider == "Azure":
+            from app.vm import azure_manager
+
+            machine_type = azure_manager.cluster_machine_type(cluster_type)
+            disk_size = azure_manager.cluster_disk_gb(cluster_type)
+            suffix = "azure"
+            source_image = ""
         else:
             machine_type = _cluster_machine_type(cluster_type)
             disk_size = _cluster_disk_size_gb(cluster_type)
             suffix = "vm"
+            source_image = "debian-cloud/debian-11"
         new_vm_name = f"{cluster_type.value}-{suffix}-{cluster_status['current_count'] + 1}"
         labels = {"cluster_type": cluster_type.value}
 
         logger.info(f"Provisioning new VM: {new_vm_name} for {cluster_type.value} cluster ({provider})")
-        source_image = "" if provider == "AWS" else "debian-cloud/debian-11"
         result = vm_provider.create_vm(
             provider,
             name=new_vm_name,
@@ -411,11 +426,6 @@ async def request_vm_assignment(
         from app.vm.workload_guidance import merge_follow_up_answers
 
         provider = normalize_provider(request.csp or "GCP")
-        if provider == "Azure":
-            raise HTTPException(
-                status_code=501,
-                detail="Azure VM lifecycle is planned for a later phase.",
-            )
         from app.cloud.availability import CloudFeature, assert_provider_available
 
         assert_provider_available(current_user.username, provider, CloudFeature.VM)
@@ -462,8 +472,9 @@ async def migrate_vm(
     """
     try:
         provider = normalize_provider(request.csp or "GCP")
-        if provider == "Azure":
-            raise HTTPException(status_code=501, detail="Azure VM migration not available yet.")
+        from app.cloud.availability import CloudFeature, assert_provider_available
+
+        assert_provider_available(current_user.username, provider, CloudFeature.VM)
         with vm_runtime_context(current_user.username, provider):
             result = migrate_user(
                 user_id=current_user.username,
@@ -599,6 +610,10 @@ async def _collect_vm_metrics(
             from app.vm.aws_metrics import AwsVMMetricsCollector
 
             collector = AwsVMMetricsCollector()
+        elif provider == "Azure":
+            from app.vm.azure_metrics import AzureVMMetricsCollector
+
+            collector = AzureVMMetricsCollector()
         else:
             collector = VMMetricsCollector()
         metrics_db = await collector.collect_all_metrics(

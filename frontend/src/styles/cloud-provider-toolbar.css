@@ -1,0 +1,38 @@
+/* Shared AWS / GCP / Azure / All toolbar — storage + security file lists */
+
+.cloud-provider-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  justify-content: flex-end;
+  max-width: 100%;
+}
+
+.cloud-provider-toolbar__select {
+  min-width: 6.5rem;
+  flex: 0 1 auto;
+}
+
+.cloud-provider-toolbar__action {
+  flex: 0 1 auto;
+  white-space: nowrap;
+}
+
+@media (max-width: 480px) {
+  .cloud-provider-toolbar {
+    width: 100%;
+    justify-content: stretch;
+  }
+
+  .cloud-provider-toolbar__select {
+    flex: 1 1 45%;
+    min-width: 0;
+  }
+
+  .cloud-provider-toolbar__action {
+    flex: 1 1 45%;
+    min-width: 0;
+    text-align: center;
+  }
+}

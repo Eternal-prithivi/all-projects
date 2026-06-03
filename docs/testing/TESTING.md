@@ -36,6 +36,7 @@ Related:
 | `test_notifications_api.py` | Notifications |
 | `test_platform_api.py` | Public status, maintenance |
 | `test_billing_api.py` | Invoices (mocked costs) |
+| `test_cost_api.py` | Billing connectivity (`/api/cost/billing-status`) |
 | `test_settings_api.py` | Preferences GET/PUT |
 | `test_profile_api.py` | Sessions list |
 

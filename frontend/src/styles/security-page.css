@@ -301,6 +301,21 @@ html.theme-light .security-2fa-badge--off {
   white-space: nowrap;
 }
 
+.security-page .security-cloud-toolbar {
+  flex-shrink: 0;
+}
+
+@media (max-width: 480px) {
+  .security-page .list-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .security-page .security-cloud-toolbar {
+    width: 100%;
+  }
+}
+
 .security-page .file-table {
   width: 100%;
   border-collapse: collapse;

@@ -107,5 +107,7 @@ class Settings(BaseSettings):
     AZURE_TENANT_ID: str
     AZURE_CLIENT_ID: str
     AZURE_CLIENT_SECRET: str
+    AZURE_RESOURCE_GROUP: str = "zenith-rg"
+    AZURE_LOCATION: str = "eastus"
 
 settings = Settings()

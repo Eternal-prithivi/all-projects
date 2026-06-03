@@ -1,9 +1,6 @@
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const USERNAME_PATTERN = /^[a-zA-Z0-9._-]+$/;
 const PHONE_PATTERN = /^\+?[1-9]\d{7,14}$/;
-const PASSWORD_LETTER_PATTERN = /[A-Za-z]/;
-const PASSWORD_NUMBER_PATTERN = /\d/;
-
 const trimValue = (value) => value.trim();
 
 const buildResult = (errors) => ({
@@ -47,10 +44,6 @@ export const validatePassword = (value, options = {}) => {
 
   if (trimmedValue.length < minLength) {
     return `Password must be at least ${minLength} characters.`;
-  }
-
-  if (!PASSWORD_LETTER_PATTERN.test(trimmedValue) || !PASSWORD_NUMBER_PATTERN.test(trimmedValue)) {
-    return 'Use at least one letter and one number.';
   }
 
   return '';

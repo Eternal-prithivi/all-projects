@@ -67,3 +67,14 @@ def test_audit_export_csv(client, auth_headers, db):
     assert response.status_code == 200
     assert "text/csv" in response.headers.get("content-type", "")
     assert b"action" in response.content or b"create_user" in response.content
+
+
+def test_admin_system_health_includes_celery(client, auth_headers):
+    headers, _admin = auth_headers(role="admin")
+    response = client.get("/api/admin/system-health", headers=headers)
+    assert response.status_code == 200, response.text
+    body = response.json()
+    platform = body.get("platform") or {}
+    celery = platform.get("celery") or {}
+    assert "broker" in celery
+    assert "beat_schedule" in celery

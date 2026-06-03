@@ -19,6 +19,11 @@
 - [DEMO_RUNBOOK.md](./DEMO_RUNBOOK.md) — viva / handoff walkthrough
 - [DEMO_MODE_VERIFICATION_GUIDE.md](./development/DEMO_MODE_VERIFICATION_GUIDE.md)
 - [ZERO_COST_DEMO_SETUP.md](./development/ZERO_COST_DEMO_SETUP.md)
+- [GCP_DEMO_SETUP.md](./development/GCP_DEMO_SETUP.md) — real VM metrics on GCP
+
+## Deferred / later work
+- [Later Developments.md](../Later%20Developments.md) — Celery on Render, CI gates, reminders
+- [enterprise/IMPROVEMENT_BACKLOG.md](./enterprise/IMPROVEMENT_BACKLOG.md) — modular enterprise sprints
 
 ## Features
 - [CACHING_GUIDE.md](./development/CACHING_GUIDE.md)

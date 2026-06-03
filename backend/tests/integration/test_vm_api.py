@@ -50,7 +50,16 @@ def test_vm_request_aws_csp(mock_assign, client, auth_headers):
     assert mock_assign.call_args.kwargs.get("csp") == "AWS"
 
 
-def test_vm_request_azure_returns_501(client, auth_headers):
+@patch("app.vm.routes_vm.assign_vm_to_user")
+def test_vm_request_azure_csp(mock_assign, client, auth_headers):
+    mock_assign.return_value = (
+        "general-azure-vm-1",
+        "10.0.0.4",
+        "ssh azureuser@10.0.0.4",
+        __import__("app.vm.models", fromlist=["ClusterType"]).ClusterType.GENERAL,
+        __import__("datetime").datetime.utcnow(),
+        __import__("datetime").datetime.utcnow(),
+    )
     headers, _user = auth_headers(two_fa_enabled=False)
     response = client.post(
         "/api/vm/request",
@@ -61,4 +70,7 @@ def test_vm_request_azure_returns_501(client, auth_headers):
             "priority_level": 1,
         },
     )
-    assert response.status_code == 501
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["csp"] == "Azure"
+    assert mock_assign.call_args.kwargs.get("csp") == "Azure"

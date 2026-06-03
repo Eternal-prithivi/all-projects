@@ -9,12 +9,13 @@ export default function CloudAvailabilityBanner({
   credentialMode,
   className = '',
 }) {
+  const isHybrid = credentialMode === 'hybrid';
   const isByoc = credentialMode === 'byoc';
   return (
     <div className={`cloud-availability-empty ${className}`.trim()} role="status">
       <h3>No cloud provider available</h3>
       <p>
-        {isByoc
+        {isByoc && !isHybrid
           ? `Connect at least one cloud account in Settings to use ${featureLabel}.`
           : `Zenith platform credentials are not configured for ${featureLabel}. Contact your administrator or connect your own account (BYOC) in Settings.`}
       </p>
