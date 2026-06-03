@@ -215,6 +215,8 @@ def resolve_gcp_credentials(username: str) -> Dict[str, str]:
         return {
             "service_account_json": creds.get("service_account_json", ""),
             "bucket_name": byoc.get("bucket_name", settings.GCP_BUCKET_NAME),
+            "billing_dataset_id": creds.get("billing_dataset_id", ""),
+            "billing_table_id": creds.get("billing_table_id", ""),
             "is_byoc": True,
         }
     

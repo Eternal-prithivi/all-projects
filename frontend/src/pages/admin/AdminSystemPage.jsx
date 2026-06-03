@@ -60,6 +60,11 @@ const AdminSystemPage = () => {
 
   const databaseHealth = systemHealth?.database ?? { healthy: false, size_mb: 0, collections: 0 };
   const collections = systemHealth?.collections ?? { users: 0, vm_assignments: 0, files: 0, payments: 0 };
+  const platform = systemHealth?.platform ?? {};
+  const celery = platform.celery ?? {};
+  const broker = celery.broker ?? {};
+  const workers = celery.workers ?? {};
+  const beat = celery.beat_schedule ?? {};
 
   return (
     <div className="admin-system-page">
@@ -122,6 +127,51 @@ const AdminSystemPage = () => {
               <div className="collection-item">
                 <span>Payments</span>
                 <strong>{collections.payments}</strong>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="admin-card">
+          <div className="card-header">
+            <FaServer />
+            <h2>Platform &amp; Celery</h2>
+          </div>
+          <div className="card-body">
+            <div className="health-details">
+              <div className="detail-row">
+                <span>Environment</span>
+                <strong>{platform.environment || '—'}</strong>
+              </div>
+              <div className="detail-row">
+                <span>Demo mode</span>
+                <strong>{platform.demo_mode ? 'On' : 'Off'}</strong>
+              </div>
+              <div className="detail-row">
+                <span>Build</span>
+                <strong>{platform.build?.git_commit?.slice(0, 12) || 'local'}</strong>
+              </div>
+              <div className="detail-row">
+                <span>Celery broker</span>
+                <strong>
+                  {broker.reachable ? 'Reachable' : broker.configured ? 'Unreachable' : 'Not configured'}
+                </strong>
+              </div>
+              <div className="detail-row">
+                <span>Workers online</span>
+                <strong>{workers.workers_online ?? 0}</strong>
+              </div>
+              <div className="detail-row">
+                <span>Beat tasks</span>
+                <strong>{beat.task_count ?? 0}</strong>
+              </div>
+              <div className="detail-row">
+                <span>BYOC active (AWS / GCP / Azure)</span>
+                <strong>
+                  {platform.byoc_active_connections
+                    ? `${platform.byoc_active_connections.AWS || 0} / ${platform.byoc_active_connections.GCP || 0} / ${platform.byoc_active_connections.Azure || 0}`
+                    : '—'}
+                </strong>
               </div>
             </div>
           </div>

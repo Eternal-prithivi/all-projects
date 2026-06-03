@@ -82,8 +82,21 @@ const SettingsPage = () => {
     region: 'ap-south-1',
     role_arn: '',
   });
-  const [gcpForm, setGcpForm] = useState({ service_account_json: '', gcp_bucket_name: '' });
-  const [azureForm, setAzureForm] = useState({ account_name: '', account_key: '', container_name: '' });
+  const [gcpForm, setGcpForm] = useState({
+    service_account_json: '',
+    gcp_bucket_name: '',
+    gcp_billing_dataset_id: '',
+    gcp_billing_table_id: '',
+  });
+  const [azureForm, setAzureForm] = useState({
+    account_name: '',
+    account_key: '',
+    container_name: '',
+    azure_subscription_id: '',
+    azure_tenant_id: '',
+    azure_client_id: '',
+    azure_client_secret: '',
+  });
 
   const byocValidation = useMemo(
     () => {
@@ -820,6 +833,17 @@ const SettingsPage = () => {
                             aria-describedby={byocValidation.errors.gcp_bucket_name ? 'byoc-gcp-bucket-error' : undefined} />
                           {byocValidation.errors.gcp_bucket_name && <p id="byoc-gcp-bucket-error" className="form-field-error">{byocValidation.errors.gcp_bucket_name}</p>}
                         </div>
+                        <p className="byoc-section-hint">Optional — live billing in Cost hub (BigQuery export)</p>
+                        <div className="byoc-field">
+                          <label>Billing dataset ID</label>
+                          <input type="text" placeholder="billing_export" value={gcpForm.gcp_billing_dataset_id}
+                            onChange={(e) => setGcpForm({ ...gcpForm, gcp_billing_dataset_id: e.target.value })} />
+                        </div>
+                        <div className="byoc-field">
+                          <label>Billing table ID</label>
+                          <input type="text" placeholder="gcp_billing_export_v1_XXXXX" value={gcpForm.gcp_billing_table_id}
+                            onChange={(e) => setGcpForm({ ...gcpForm, gcp_billing_table_id: e.target.value })} />
+                        </div>
                       </div>
                     )}
 
@@ -848,6 +872,27 @@ const SettingsPage = () => {
                             aria-invalid={!!byocValidation.errors.container_name}
                             aria-describedby={byocValidation.errors.container_name ? 'byoc-azure-container-error' : undefined} />
                           {byocValidation.errors.container_name && <p id="byoc-azure-container-error" className="form-field-error">{byocValidation.errors.container_name}</p>}
+                        </div>
+                        <p className="byoc-section-hint">Optional — Cost Management API (separate from storage key)</p>
+                        <div className="byoc-field">
+                          <label>Subscription ID</label>
+                          <input type="text" value={azureForm.azure_subscription_id}
+                            onChange={(e) => setAzureForm({ ...azureForm, azure_subscription_id: e.target.value })} />
+                        </div>
+                        <div className="byoc-field">
+                          <label>Tenant ID</label>
+                          <input type="text" value={azureForm.azure_tenant_id}
+                            onChange={(e) => setAzureForm({ ...azureForm, azure_tenant_id: e.target.value })} />
+                        </div>
+                        <div className="byoc-field">
+                          <label>Cost reader client ID</label>
+                          <input type="text" value={azureForm.azure_client_id}
+                            onChange={(e) => setAzureForm({ ...azureForm, azure_client_id: e.target.value })} />
+                        </div>
+                        <div className="byoc-field">
+                          <label>Cost reader client secret</label>
+                          <input type="password" value={azureForm.azure_client_secret}
+                            onChange={(e) => setAzureForm({ ...azureForm, azure_client_secret: e.target.value })} />
                         </div>
                       </div>
                     )}

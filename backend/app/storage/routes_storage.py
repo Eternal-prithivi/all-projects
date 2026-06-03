@@ -29,10 +29,13 @@ from app.storage.manager import (
     get_download_url_from_aws, get_download_url_from_gcp, get_download_url_from_azure,
     initiate_glacier_restore_aws,
     list_objects_aws,
+    list_objects_gcp,
+    list_objects_azure,
 )
 from app.storage.uploader import upload_to_aws, upload_to_gcp, upload_to_azure
 from app.storage.optimizer import get_initial_placement_recommendation
 from app.ml.repository import log_ensemble_storage_prediction
+from app.ml.workflow_orchestrator import run_storage_closed_loop_workflow
 from app.utils.config import settings
 from app.users.routes_users import get_current_user
 from app.users.user_model import User
@@ -69,12 +72,21 @@ class AnalyzeRequest(BaseModel):
 
 @router.post("/analyze")
 # ... (This function remains exactly the same)
-async def analyze_file_for_placement(request: AnalyzeRequest, user: User = Depends(get_current_user)):
+async def analyze_file_for_placement(
+    request: AnalyzeRequest,
+    user: User = Depends(get_current_user),
+    files_db: Collection = Depends(get_files_collection),
+):
     try:
-        recommendation = get_initial_placement_recommendation(
-            user_priority=request.user_priority, user_intent=request.user_intent,
-            filename=request.filename, file_size_mb=request.file_size_mb,
+        workflow = run_storage_closed_loop_workflow(
+            db=files_db.database,
+            username=user.username,
+            filename=request.filename,
+            file_size_mb=request.file_size_mb,
+            user_priority=request.user_priority,
+            user_intent=request.user_intent,
         )
+        recommendation = workflow["recommendation"]
         log_ensemble_storage_prediction(
             username=user.username,
             filename=request.filename,
@@ -83,7 +95,7 @@ async def analyze_file_for_placement(request: AnalyzeRequest, user: User = Depen
             user_intent=request.user_intent,
             recommendation=recommendation,
         )
-        return recommendation
+        return {**recommendation, "workflow": workflow["steps"]}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}")
 
@@ -349,6 +361,154 @@ async def sync_with_aws_bucket(
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to sync with AWS bucket: {str(e)}")
+
+
+def _sync_objects_into_db(
+    *,
+    user: User,
+    files_db: Collection,
+    csp: str,
+    objects: list,
+    bucket_name: str,
+    scanned_prefix: str,
+    is_byoc: bool,
+    region: str | None,
+) -> StorageSyncResponse:
+    user_prefix = f"{user.username}/"
+    inserted = 0
+    already_present = 0
+    skipped_non_user_prefix = 0
+    live_keys: set[str] = set()
+
+    for obj in objects:
+        object_key = obj.get("object_key") or ""
+        if not is_byoc and not object_key.startswith(user_prefix):
+            skipped_non_user_prefix += 1
+            continue
+        filename = (
+            object_key[len(user_prefix):]
+            if object_key.startswith(user_prefix)
+            else object_key
+        )
+        if not filename:
+            continue
+        live_keys.add(object_key)
+        existing = files_db.find_one(
+            {
+                "owner_username": user.username,
+                "cloud_bucket": bucket_name,
+                "$or": [{"s3_key": object_key}, {"filename": filename}],
+            },
+            {"_id": 1},
+        )
+        if existing:
+            already_present += 1
+            continue
+        doc = FileMetadata(
+            filename=filename,
+            s3_key=object_key,
+            owner_username=user.username,
+            size_bytes=int(obj.get("size_bytes", 0) or 0),
+            csp=csp,
+            storage_class=obj.get("storage_class") or "Standard",
+            cloud_bucket=bucket_name,
+            region=region,
+        ).model_dump()
+        files_db.insert_one(doc)
+        inserted += 1
+
+    removed = 0
+    stale_filter = {
+        "owner_username": user.username,
+        "csp": csp,
+        "cloud_bucket": bucket_name,
+    }
+    if live_keys:
+        stale_filter["s3_key"] = {"$nin": list(live_keys)}
+    stale_ids = [doc["_id"] for doc in files_db.find(stale_filter, {"_id": 1})]
+    if stale_ids:
+        removed = files_db.delete_many({"_id": {"$in": stale_ids}}).deleted_count
+
+    return StorageSyncResponse(
+        inserted=inserted,
+        already_present=already_present,
+        removed=removed,
+        skipped_non_user_prefix=skipped_non_user_prefix,
+        total_objects_seen=len(objects),
+        bucket_name=bucket_name,
+        scanned_prefix=scanned_prefix,
+    )
+
+
+@router.post("/sync/gcp", response_model=StorageSyncResponse)
+async def sync_with_gcp_bucket(
+    user: User = Depends(get_current_user),
+    files_db: Collection = Depends(get_files_collection),
+    bucket: Optional[str] = Query(None),
+):
+    """On-demand GCS sync — requires platform or BYOC GCP credentials."""
+    try:
+        gcp = resolve_gcp_credentials(user.username)
+        bucket_name = bucket or gcp.get("bucket_name")
+        if not bucket_name:
+            raise HTTPException(status_code=400, detail="GCP bucket not configured.")
+        user_prefix = f"{user.username}/"
+        scanned_prefix = "" if gcp.get("is_byoc") else user_prefix
+        objects = list_objects_gcp(
+            username=user.username,
+            bucket_name=bucket_name,
+            prefix=scanned_prefix,
+        )
+        return _sync_objects_into_db(
+            user=user,
+            files_db=files_db,
+            csp="GCP",
+            objects=objects,
+            bucket_name=bucket_name,
+            scanned_prefix=scanned_prefix,
+            is_byoc=bool(gcp.get("is_byoc")),
+            region=None,
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to sync with GCP bucket: {str(e)}")
+
+
+@router.post("/sync/azure", response_model=StorageSyncResponse)
+async def sync_with_azure_container(
+    user: User = Depends(get_current_user),
+    files_db: Collection = Depends(get_files_collection),
+    container: Optional[str] = Query(None),
+):
+    """On-demand Azure Blob sync — requires platform or BYOC Azure credentials."""
+    try:
+        azure = resolve_azure_credentials(user.username)
+        container_name = container or azure.get("container_name")
+        if not container_name:
+            raise HTTPException(status_code=400, detail="Azure container not configured.")
+        user_prefix = f"{user.username}/"
+        scanned_prefix = "" if azure.get("is_byoc") else user_prefix
+        objects = list_objects_azure(
+            username=user.username,
+            container_name=container_name,
+            prefix=scanned_prefix,
+        )
+        return _sync_objects_into_db(
+            user=user,
+            files_db=files_db,
+            csp="Azure",
+            objects=objects,
+            bucket_name=container_name,
+            scanned_prefix=scanned_prefix,
+            is_byoc=bool(azure.get("is_byoc")),
+            region=None,
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to sync with Azure container: {str(e)}")
+
 
 # --- CHANGE: The /download endpoint is now upgraded to track file access ---
 @router.get("/download/{filename:path}")

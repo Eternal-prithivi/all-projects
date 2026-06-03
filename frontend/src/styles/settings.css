@@ -770,6 +770,12 @@ input:disabled + .toggle-slider {
   background: rgba(34, 197, 94, 0.2);
 }
 
+.byoc-section-hint {
+  margin: 0.75rem 0 0.25rem;
+  font-size: 0.8rem;
+  color: var(--text-secondary, #a3a3a3);
+}
+
 /* Form Fields */
 .byoc-fields {
   display: grid;

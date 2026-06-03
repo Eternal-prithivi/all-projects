@@ -18,3 +18,17 @@ services:
         value: production
       - key: FRONTEND_URL
         value: https://rajverse.me
+
+  # Background jobs: storage tiering, cost anomalies, ML retrain, VM agent, drift checks.
+  # Copy the same env vars as zenith-backend in the Render dashboard (CELERY_BROKER_URL, Mongo, etc.).
+  - type: worker
+    name: zenith-celery
+    env: docker
+    region: singapore
+    plan: free
+    rootDir: backend
+    dockerfilePath: ./Dockerfile
+    dockerCommand: celery -A app.celery_worker worker --beat --loglevel=info --concurrency=2
+    envVars:
+      - key: ENVIRONMENT
+        value: production

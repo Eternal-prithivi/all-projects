@@ -69,6 +69,10 @@ class Settings(BaseSettings):
     # VM Metrics Configuration
     USE_REAL_METRICS: bool = False  # Set to True for real GCP metrics, False for simulated
 
+    # VM adaptive agent (enterprise Step 4) — off by default for safe rollout
+    VM_AUTO_MIGRATE_ENABLED: bool = False
+    VM_AUTO_MIGRATE_MIN_SCORE: int = 85
+
     # --- Demo Mode Configuration ---
     DEMO_MODE: bool = False  # Set to True to use mock data instead of real API calls (zero cost!)
     

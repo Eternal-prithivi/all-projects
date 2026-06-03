@@ -686,6 +686,8 @@ async def get_system_health(admin_user: dict = Depends(verify_admin)):
         # Get database sizes
         stats = DB.command("dbStats")
         
+        from app.ops.diagnostics import platform_diagnostics_snapshot
+
         health_data = {
             "database": {
                 "healthy": db_healthy,
@@ -698,6 +700,7 @@ async def get_system_health(admin_user: dict = Depends(verify_admin)):
                 "files": DB["files"].count_documents({}),
                 "payments": DB["payments"].count_documents({})
             },
+            "platform": platform_diagnostics_snapshot(),
             "timestamp": datetime.utcnow()
         }
         

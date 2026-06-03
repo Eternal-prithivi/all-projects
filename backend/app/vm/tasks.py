@@ -131,63 +131,52 @@ def auto_release_inactive_vms_task():
 @celery_app.task(name="cluster_health_check")
 def cluster_health_check_task():
     """
-    Periodic health check for all clusters.
-    Sends alerts if CPU > 80% or user count exceeds safe limits.
-    Runs every 15 minutes via Celery Beat.
+    Periodic health check + adaptive agent (recommendations, notifications,
+    optional auto-migrate when VM_AUTO_MIGRATE_ENABLED). Runs every 15 minutes.
     """
-    logger.info(f"Running cluster health checks")
-    
+    from app.vm.adaptive_agent import run_adaptive_control_cycle
     from app.vm.models import ClusterType
-    
-    alerts = []
-    
+
+    logger.info("Running cluster health checks and adaptive agent")
+    agent_result = run_adaptive_control_cycle()
+
+    legacy_alerts = list(agent_result.get("alerts") or [])
     for cluster_type in CLUSTER_VMS:
         try:
             health = asyncio.run(get_cluster_health(cluster_type))
-            
-            # Alert conditions
-            if health["average_cpu_usage"] > 80:
-                alerts.append({
-                    "severity": "HIGH",
-                    "cluster": cluster_type.value,
-                    "message": f"CPU overload: {health['average_cpu_usage']:.1f}% average",
-                    "recommendation": "Consider starting additional VM or load balancing"
-                })
-            
-            if health["total_active_users"] > health["total_vms"] * 4:  # More than 4 users per VM
-                alerts.append({
+            if health["total_active_users"] > health["total_vms"] * 4:
+                legacy_alerts.append({
                     "severity": "MEDIUM",
                     "cluster": cluster_type.value,
-                    "message": f"High user density: {health['total_active_users']} users on {health['running_vms']} VMs",
-                    "recommendation": "Start additional VM to distribute load"
+                    "message": (
+                        f"High user density: {health['total_active_users']} users on "
+                        f"{health['running_vms']} VMs"
+                    ),
+                    "recommendation": "Start additional VM to distribute load",
                 })
-            
             if health["running_vms"] == 0 and health["total_active_users"] > 0:
-                alerts.append({
+                legacy_alerts.append({
                     "severity": "CRITICAL",
                     "cluster": cluster_type.value,
                     "message": "No running VMs but users are assigned!",
-                    "recommendation": "Start VM immediately"
+                    "recommendation": "Start VM immediately",
                 })
-            
-            logger.info(f"{cluster_type.value} cluster: {health['running_vms']}/{health['total_vms']} VMs running, "
-                  f"{health['total_active_users']} users, {health['average_cpu_usage']:.1f}% avg CPU")
-            
+            logger.info(
+                "%s cluster: %s/%s VMs running, %s users, %.1f%% avg CPU",
+                cluster_type.value,
+                health["running_vms"],
+                health["total_vms"],
+                health["total_active_users"],
+                health["average_cpu_usage"],
+            )
         except Exception as e:
-            logger.error(f"Failed health check for {cluster_type.value}: {e}")
-    
-    if alerts:
-        logger.warning(f"{len(alerts)} alerts generated")
-        for alert in alerts:
-            logger.warning(f"[{alert['severity']}] {alert['cluster']}: {alert['message']}")
-            # TODO: Send alerts via email/Slack/SNS
-    else:
-        logger.info("All clusters healthy")
-    
+            logger.error("Failed health check for %s: %s", cluster_type.value, e)
+
     return {
         "success": True,
-        "alerts": alerts,
-        "timestamp": datetime.utcnow().isoformat()
+        "adaptive_agent": agent_result,
+        "alerts": legacy_alerts,
+        "timestamp": datetime.utcnow().isoformat(),
     }
 
 

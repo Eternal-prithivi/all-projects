@@ -15,6 +15,7 @@
 
 from fastapi import APIRouter, HTTPException, Depends, Body
 from typing import List, Dict, Any, Optional
+from datetime import datetime
 from pydantic import BaseModel, Field
 from google.cloud import compute_v1
 from app.vm.manager import (
@@ -1005,3 +1006,30 @@ async def get_ssh_instructions(
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get instructions: {str(e)}")
+
+
+@router.get("/agent/status", summary="VM adaptive agent status")
+async def get_vm_agent_status(
+    current_user: User = Depends(get_current_user),
+    limit: int = 20,
+) -> Dict[str, Any]:
+    """Recent adaptive-agent actions and whether auto-migrate is enabled."""
+    db = get_database()
+    actions = list(
+        db["vm_agent_actions"]
+        .find()
+        .sort("created_at", -1)
+        .limit(min(limit, 100))
+    )
+    for doc in actions:
+        doc["_id"] = str(doc["_id"])
+        if isinstance(doc.get("created_at"), datetime):
+            doc["created_at"] = doc["created_at"].isoformat()
+        if isinstance(doc.get("applied_at"), datetime):
+            doc["applied_at"] = doc["applied_at"].isoformat()
+
+    return {
+        "auto_migrate_enabled": bool(getattr(settings, "VM_AUTO_MIGRATE_ENABLED", False)),
+        "auto_migrate_min_score": int(getattr(settings, "VM_AUTO_MIGRATE_MIN_SCORE", 85)),
+        "recent_actions": actions,
+    }

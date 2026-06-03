@@ -203,11 +203,17 @@ class BYOCConnectRequest(BaseModel):
     # GCP
     service_account_json: Optional[str] = Field(None, description="GCP service account JSON content")
     gcp_bucket_name: Optional[str] = Field(None, description="GCP bucket name")
+    gcp_billing_dataset_id: Optional[str] = Field(None, description="BigQuery billing export dataset")
+    gcp_billing_table_id: Optional[str] = Field(None, description="BigQuery billing export table")
     
     # Azure
     account_name: Optional[str] = Field(None, description="Azure storage account name")
     account_key: Optional[str] = Field(None, description="Azure storage account key")
     container_name: Optional[str] = Field(None, description="Azure container name")
+    azure_subscription_id: Optional[str] = Field(None, description="Azure subscription for Cost Management")
+    azure_tenant_id: Optional[str] = Field(None, description="Azure AD tenant ID")
+    azure_client_id: Optional[str] = Field(None, description="Cost Management service principal app ID")
+    azure_client_secret: Optional[str] = Field(None, description="Cost Management service principal secret")
 
 
 class BYOCTestResult(BaseModel):
@@ -842,6 +848,10 @@ async def connect_cloud(request: BYOCConnectRequest, user: User = Depends(get_cu
         
         test_result = test_gcp_credentials(request.service_account_json, request.gcp_bucket_name)
         credentials_to_encrypt = {"service_account_json": request.service_account_json}
+        if request.gcp_billing_dataset_id:
+            credentials_to_encrypt["billing_dataset_id"] = request.gcp_billing_dataset_id.strip()
+        if request.gcp_billing_table_id:
+            credentials_to_encrypt["billing_table_id"] = request.gcp_billing_table_id.strip()
         bucket_or_container = request.gcp_bucket_name
     
     elif csp == "AZURE":
@@ -849,7 +859,18 @@ async def connect_cloud(request: BYOCConnectRequest, user: User = Depends(get_cu
             raise HTTPException(status_code=400, detail="Azure requires account_name, account_key, and container_name.")
         
         test_result = test_azure_credentials(request.account_name, request.account_key, request.container_name)
-        credentials_to_encrypt = {"account_name": request.account_name, "account_key": request.account_key}
+        credentials_to_encrypt = {
+            "account_name": request.account_name,
+            "account_key": request.account_key,
+        }
+        for field, key in (
+            (request.azure_subscription_id, "subscription_id"),
+            (request.azure_tenant_id, "tenant_id"),
+            (request.azure_client_id, "client_id"),
+            (request.azure_client_secret, "client_secret"),
+        ):
+            if field:
+                credentials_to_encrypt[key] = field.strip()
         bucket_or_container = request.container_name
     
     if not test_result.success:

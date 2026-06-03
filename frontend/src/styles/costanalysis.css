@@ -997,6 +997,43 @@
 }
 
 /* Anomaly Alerts */
+.billing-connectivity-banner {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+  padding: 0.75rem 1rem;
+  border-radius: 10px;
+  background: var(--surface-elevated, rgba(255, 255, 255, 0.04));
+  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.08));
+}
+
+.billing-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.85rem;
+  padding: 0.35rem 0.65rem;
+  border-radius: 999px;
+  border: 1px solid transparent;
+}
+
+.billing-pill.live {
+  border-color: rgba(34, 197, 94, 0.45);
+  color: #86efac;
+}
+
+.billing-pill.offline {
+  border-color: rgba(251, 191, 36, 0.35);
+  color: #fcd34d;
+}
+
+.billing-pill .provider-logo {
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+}
+
 .anomaly-banner {
   background: linear-gradient(135deg, #dc3545, #c82333);
   padding: 1rem 1.5rem;

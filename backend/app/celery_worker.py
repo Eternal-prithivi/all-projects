@@ -26,7 +26,7 @@ celery_app.conf.beat_schedule = {
     # Storage optimization (existing)
     'run-storage-optimization-nightly': {
         'task': 'app.storage.tiering_tasks.run_storage_optimization',
-        'schedule': crontab(hour=0, minute=0),
+        'schedule': crontab(hour=2, minute=0),  # Report §4.3 example: 02:00 UTC
     },
     
     # VM Management tasks (NEW)
@@ -87,6 +87,16 @@ celery_app.conf.beat_schedule = {
     'check-provision-drift-daily': {
         'task': 'app.provision.tasks.scheduled_drift_check',
         'schedule': crontab(hour=6, minute=0),  # Every day at 6 AM UTC
+    },
+
+    'update-rl-policy-daily': {
+        'task': 'update_rl_policy_from_feedback',
+        'schedule': crontab(hour=3, minute=15),  # After feedback evaluation
+    },
+
+    'federated-statistics-weekly': {
+        'task': 'federated_statistics_round',
+        'schedule': crontab(day_of_week=0, hour=4, minute=0),  # Sunday 04:00 UTC
     },
 }
 

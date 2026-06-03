@@ -73,6 +73,61 @@ def list_objects_aws(
 
     return results
 
+
+def list_objects_gcp(
+    *,
+    username: str,
+    bucket_name: str | None = None,
+    prefix: str = "",
+    max_results: int = 1000,
+) -> list[dict]:
+    """List GCS objects for sync (BYOC or platform credentials)."""
+    client, default_bucket, is_byoc = build_gcp_storage_client(username)
+    target_bucket = bucket_name or default_bucket
+    bucket = client.bucket(target_bucket)
+    results: list[dict] = []
+
+    for blob in bucket.list_blobs(prefix=prefix, max_results=max_results * 10):
+        results.append(
+            {
+                "object_key": blob.name,
+                "size_bytes": int(blob.size or 0),
+                "last_modified": blob.updated,
+                "storage_class": blob.storage_class or "STANDARD",
+            }
+        )
+        if len(results) >= max_results * 10:
+            break
+    return results
+
+
+def list_objects_azure(
+    *,
+    username: str,
+    container_name: str | None = None,
+    prefix: str = "",
+    max_results: int = 1000,
+) -> list[dict]:
+    """List Azure blob objects for sync (BYOC or platform credentials)."""
+    blob_service, default_container, is_byoc = build_azure_blob_service(username)
+    target_container = container_name or default_container
+    container_client = blob_service.get_container_client(target_container)
+    results: list[dict] = []
+
+    for blob in container_client.list_blobs(name_starts_with=prefix):
+        results.append(
+            {
+                "object_key": blob.name,
+                "size_bytes": int(blob.size or 0),
+                "last_modified": blob.last_modified,
+                "storage_class": "Hot",
+            }
+        )
+        if len(results) >= max_results * 10:
+            break
+    return results
+
+
 def delete_from_aws(
     username: str,
     object_key: str,

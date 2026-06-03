@@ -23,6 +23,8 @@ import {
   deleteFile,
   uploadFile as uploadFileToCSP,
   syncAwsBucket,
+  syncGcpBucket,
+  syncAzureContainer,
 } from "../api";
 import "../styles/storage.css";
 import PageHeader from "../components/ui/PageHeader.jsx";
@@ -79,6 +81,7 @@ function StoragePage() {
   const [files, setFiles] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [syncCsp, setSyncCsp] = useState("AWS");
   const [isUploading, setIsUploading] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const fileInputRef = useRef(null);
@@ -146,18 +149,34 @@ function StoragePage() {
     if (!token) return;
     setIsSyncing(true);
     try {
-      const result = await syncAwsBucket(token, {
-        bucket: selectedBucket || undefined,
-        region: selectedRegion !== "all" ? selectedRegion : undefined,
-      });
+      let result;
+      if (syncCsp === "GCP") {
+        result = await syncGcpBucket(token, { bucket: selectedBucket || undefined });
+      } else if (syncCsp === "Azure") {
+        result = await syncAzureContainer(token, { container: selectedBucket || undefined });
+      } else {
+        result = await syncAwsBucket(token, {
+          bucket: selectedBucket || undefined,
+          region: selectedRegion !== "all" ? selectedRegion : undefined,
+        });
+      }
       const scanned = result.scanned_prefix
         ? `prefix '${result.scanned_prefix}'`
         : `bucket '${result.bucket_name}'`;
       const removedMsg = result.removed > 0 ? ` Removed ${result.removed} stale record(s).` : "";
-      notifySuccess(`Sync complete. Added ${result.inserted} new file(s) from AWS after scanning ${scanned}.${removedMsg}`);
+      notifySuccess(
+        `Sync complete (${syncCsp}). Added ${result.inserted} new file(s) after scanning ${scanned}.${removedMsg}`
+      );
       await fetchFiles();
     } catch (error) {
-      notifyError(error.detail || error.message || "Sync failed.");
+      const msg = error.detail || error.message || "Sync failed.";
+      if (syncCsp !== "AWS" && /not configured|credentials/i.test(String(msg))) {
+        notifyInfo(
+          `${syncCsp} sync needs BYOC or platform keys in Settings — connect your ${syncCsp} account when ready.`
+        );
+      } else {
+        notifyError(msg);
+      }
     } finally {
       setIsSyncing(false);
     }
@@ -412,14 +431,26 @@ function StoragePage() {
       <div className="list-section zenith-surface">
         <div className="list-header">
           <h3 className="list-title">Your Files</h3>
-          <button
-            type="button"
-            className="action-btn"
-            onClick={handleSyncWithBucket}
-            disabled={isSyncing}
-          >
-            {isSyncing ? "Syncing..." : selectedBucket ? `Sync ${selectedBucket}` : "Sync with Bucket (AWS)"}
-          </button>
+          <div className="sync-toolbar">
+            <select
+              className="zenith-select sync-csp-select"
+              value={syncCsp}
+              onChange={(e) => setSyncCsp(e.target.value)}
+              aria-label="Cloud provider for sync"
+            >
+              <option value="AWS">AWS</option>
+              <option value="GCP">GCP</option>
+              <option value="Azure">Azure</option>
+            </select>
+            <button
+              type="button"
+              className="action-btn"
+              onClick={handleSyncWithBucket}
+              disabled={isSyncing}
+            >
+              {isSyncing ? "Syncing..." : selectedBucket ? `Sync ${selectedBucket}` : `Sync (${syncCsp})`}
+            </button>
+          </div>
         </div>
         {isLoading ? (
           <TableSkeleton rows={5} columns={5} />
@@ -541,6 +572,34 @@ function StoragePage() {
                   ))}
                 </div>
               </div>
+            )}
+
+            {recommendation.shap_explanation?.available && (
+              <div className="ensemble-box shap-box">
+                <div className="ensemble-summary">
+                  <span>Why this tier? (SHAP)</span>
+                </div>
+                <p className="shap-summary">{recommendation.shap_explanation.summary}</p>
+                <ul className="shap-features">
+                  {(recommendation.shap_explanation.top_features || []).map((row) => (
+                    <li key={row.feature}>
+                      <span>{row.feature.replace(/_/g, " ")}</span>
+                      <strong>
+                        {row.shap_value != null
+                          ? row.shap_value.toFixed(4)
+                          : row.impact?.toFixed?.(4) ?? row.impact}
+                      </strong>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {recommendation.rl_policy?.applied && (
+              <p className="rl-policy-note">
+                RL policy: {recommendation.rl_policy.blend_mode} (
+                {recommendation.rl_policy.visit_count} prior samples)
+              </p>
             )}
 
             <div className="override-section">

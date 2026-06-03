@@ -66,6 +66,16 @@ const CostAnalysisEnhancedPage = () => {
   const [anomalies, setAnomalies] = useState([]);
   const [anomalySummary, setAnomalySummary] = useState(null);
   const [showAnomalies, setShowAnomalies] = useState(false);
+  const [billingStatus, setBillingStatus] = useState(null);
+
+  const fetchBillingStatus = async () => {
+    try {
+      const res = await apiClient.get('/cost/billing-status');
+      setBillingStatus(res.data);
+    } catch {
+      setBillingStatus(null);
+    }
+  };
 
   // Set default dates (last 30 days)
   useEffect(() => {
@@ -80,6 +90,7 @@ const CostAnalysisEnhancedPage = () => {
     fetchBudgets();
     fetchAnomalies();
     fetchAnomalySummary();
+    fetchBillingStatus();
   }, []);
 
   // Quick date presets
@@ -394,6 +405,21 @@ const CostAnalysisEnhancedPage = () => {
         subtitle="Monitor and optimize your multi-cloud spending"
       />
       <CostHubNav />
+      {billingStatus?.providers && (
+        <div className="billing-connectivity-banner" role="status">
+          {['aws', 'gcp', 'azure'].map((key) => {
+            const p = billingStatus.providers[key];
+            const label = key.toUpperCase();
+            const ok = p?.live;
+            return (
+              <span key={key} className={`billing-pill ${ok ? 'live' : 'offline'}`}>
+                <ProviderLogo provider={key} />
+                {label}: {ok ? 'Live' : p?.status || 'Setup needed'}
+              </span>
+            );
+          })}
+        </div>
+      )}
       {/* Anomaly Alerts Banner */}
       {anomalySummary && anomalySummary.total_unacknowledged > 0 && (
         <div className="anomaly-banner">

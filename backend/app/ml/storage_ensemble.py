@@ -429,6 +429,21 @@ def predict_storage_ensemble(
         )
 
     final_tier, confidence, tier_scores = _weighted_vote(votes)
+
+    shap_explanation: Dict[str, Any] = {"available": False}
+    if model_status["available"] and model_status.get("random_forest") is not None:
+        from app.ml.explainability import build_storage_explanation
+
+        shap_explanation = build_storage_explanation(
+            ensemble_result={
+                "final_tier": final_tier,
+                "feature_vector": feature_vector,
+                "tier_scores": tier_scores,
+                "expert_votes": [vote.to_dict() for vote in votes],
+            },
+            rf_model=model_status["random_forest"],
+        )
+
     return {
         "model_version": MODEL_VERSION,
         "final_tier": final_tier,
@@ -437,6 +452,7 @@ def predict_storage_ensemble(
         "expert_votes": [vote.to_dict() for vote in votes],
         "input_features": features_by_name,
         "feature_vector": feature_vector,
+        "shap_explanation": shap_explanation,
         "model_status": {
             "mode": "ensemble" if model_status["available"] else "rule_fallback",
             "xgboost_backend": model_status["xgboost_backend"],

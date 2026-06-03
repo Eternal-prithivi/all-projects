@@ -31,6 +31,7 @@ from app.security import routes_security
 from app.websockets import routes_ws
 from app.security import routes_2fa
 from app.cost import routes_cost
+from app.cost import routes_connectivity
 from app.cost import routes_export
 from app.cost import routes_forecast
 from app.cost import routes_anomaly
@@ -204,6 +205,7 @@ app.include_router(routes_cost.router, prefix="/api/cost", tags=["Cost"])
 app.include_router(routes_export.router, prefix="/api/cost", tags=["Cost Export"])
 app.include_router(routes_forecast.router, prefix="/api/cost", tags=["Cost Forecast"])
 app.include_router(routes_anomaly.router, prefix="/api/cost", tags=["Cost Anomaly"])
+app.include_router(routes_connectivity.router, prefix="/api/cost", tags=["Cost Connectivity"])
 app.include_router(routes_pricing.router, prefix="/api", tags=["Pricing"])
 app.include_router(routes_budgets.router, prefix="/api/budgets", tags=["Budgets"])
 app.include_router(routes_vm.router, prefix="/api/vm", tags=["Virtual Machines"])
@@ -234,12 +236,16 @@ def health_check():
 @app.get("/health/ready", tags=["Health"])
 def health_ready():
     """Readiness probe — includes dependency status (may be slower)."""
+    from app.ops.celery_health import celery_health_snapshot
+
     mongo_ok = mongodb_client.is_connected() or mongodb_client.connect()
+    celery_status = celery_health_snapshot()
     return {
         "status": "ok" if mongo_ok else "degraded",
         "mongo_connected": mongo_ok,
         "gcp_credentials_present": gcp_credentials_file_present(),
         "environment": getattr(settings, "ENVIRONMENT", "development"),
+        "celery": celery_status,
     }
 
 

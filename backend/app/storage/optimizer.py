@@ -123,6 +123,7 @@ def get_initial_placement_recommendation(
         "feature_vector": ensemble["feature_vector"],
         "model_version": ensemble["model_version"],
         "model_status": ensemble["model_status"],
+        "shap_explanation": ensemble.get("shap_explanation"),
         # --- NEW: Provide all options so the frontend can make smart overrides ---
         "options_by_csp": {opt['csp']: opt for opt in all_options_for_tier}
     }

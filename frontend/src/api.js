@@ -239,6 +239,34 @@ export const syncAwsBucket = async (token, { bucket, region } = {}) => {
   }
 };
 
+export const syncGcpBucket = async (token, { bucket } = {}) => {
+  try {
+    const params = {};
+    if (bucket) params.bucket = bucket;
+    const response = await apiClient.post("/storage/sync/gcp", {}, {
+      params,
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    return response.data;
+  } catch (error) {
+    throw error.response?.data || error;
+  }
+};
+
+export const syncAzureContainer = async (token, { container } = {}) => {
+  try {
+    const params = {};
+    if (container) params.container = container;
+    const response = await apiClient.post("/storage/sync/azure", {}, {
+      params,
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    return response.data;
+  } catch (error) {
+    throw error.response?.data || error;
+  }
+};
+
 // ---------------- DASHBOARD ----------------
 
 export const getDashboardStats = async (token) => {
