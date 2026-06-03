@@ -51,11 +51,27 @@ class DriftStatus(str, Enum):
 
 class ProvisionConfig(BaseModel):
     """Infrastructure configuration submitted from the provisioning wizard."""
+    csp: str = Field(
+        default="AWS",
+        description="Cloud provider: AWS, GCP, or Azure",
+    )
     # Template selection (optional — if set, overrides module flags)
-    template: Optional[ProvisionTemplate] = None
+    template: Optional[str] = None
 
     # AWS region
     aws_region: str = "ap-south-1"
+
+    # GCP
+    gcp_region: str = "us-central1"
+    gcp_project: str = ""
+    enable_gcs: bool = False
+
+    # Azure
+    azure_location: str = "eastus"
+    resource_group_name: str = "zenith-rg"
+    storage_account_name: str = ""
+    container_name: str = "zenith-static"
+    enable_azure_storage: bool = False
 
     # Feature flags — which modules to deploy
     enable_vpc: bool = False
@@ -146,6 +162,7 @@ class DeploymentRecord(BaseModel):
     """MongoDB document schema for a provisioned deployment."""
     user_id: str
     deployment_name: str
+    csp: str = "AWS"
     template: Optional[str] = None
     config: dict[str, Any] = Field(default_factory=dict)
     enabled_modules: list[str] = Field(default_factory=list)

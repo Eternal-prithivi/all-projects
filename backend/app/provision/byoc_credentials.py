@@ -142,6 +142,42 @@ def terraform_gcp_env_to_api(env: dict[str, str]) -> Optional[dict[str, Any]]:
     }
 
 
+def resolve_provision_terraform_env(
+    username: str,
+    csp: str,
+    region: str = "ap-south-1",
+) -> tuple[dict[str, str], Optional[str]]:
+    """
+    Build full Terraform subprocess environment for AWS, GCP, or Azure BYOC.
+
+    Returns (env_dict, error_message). error_message is set when required creds are missing.
+    """
+    from app.cloud.providers import normalize_provider
+
+    provider = normalize_provider(csp)
+    if provider == "AWS":
+        env = resolve_byoc_terraform_env(username, region)
+        if not env.get("AWS_ACCESS_KEY_ID"):
+            return {}, (
+                "No AWS credentials available. Connect AWS under Settings (BYOC), then try again."
+            )
+        return env, None
+    if provider == "GCP":
+        env = resolve_gcp_terraform_env(username)
+        if not env.get("GOOGLE_CREDENTIALS"):
+            return {}, (
+                "No GCP credentials available. Connect GCP under Settings (BYOC), then try again."
+            )
+        return env, None
+    env = resolve_azure_terraform_env(username)
+    if not env.get("ARM_CLIENT_ID"):
+        return {}, (
+            "No Azure credentials available. Connect Azure under Settings (BYOC) "
+            "with subscription, tenant, client ID, and secret."
+        )
+    return env, None
+
+
 def terraform_azure_env_to_api(env: dict[str, str]) -> Optional[dict[str, Any]]:
     if not env.get("ARM_CLIENT_ID"):
         return None

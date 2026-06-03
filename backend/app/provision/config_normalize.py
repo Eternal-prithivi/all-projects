@@ -29,8 +29,34 @@ def validate_provision_s3_bucket(name: str) -> str | None:
     )
 
 
+def _sanitize_gcs_bucket_name(name: str) -> str:
+    cleaned = sanitize_s3_bucket_name(name)
+    return cleaned[:63] if cleaned else ""
+
+
+def _sanitize_azure_storage_account(name: str) -> str:
+    cleaned = re.sub(r"[^a-z0-9]", "", name.lower())
+    return cleaned[:24] if cleaned else ""
+
+
 def normalize_provision_config(config: dict[str, Any]) -> None:
     """In-place normalization for resource names used in terraform.tfvars."""
+    if config.get("enable_gcs"):
+        raw = config.get("bucket_name") or ""
+        config["bucket_name"] = _sanitize_gcs_bucket_name(str(raw))
+        if not config["bucket_name"]:
+            raise ValueError("GCS bucket name is required when Cloud Storage is enabled.")
+
+    if config.get("enable_azure_storage"):
+        sa = _sanitize_azure_storage_account(str(config.get("storage_account_name") or ""))
+        if len(sa) < 3:
+            raise ValueError(
+                "Storage account name is required when Azure Blob Storage is enabled (3–24 lowercase letters/numbers)."
+            )
+        config["storage_account_name"] = sa
+        container = re.sub(r"[^a-z0-9-]", "-", str(config.get("container_name") or "zenith-static").lower())
+        config["container_name"] = container.strip("-")[:63] or "zenith-static"
+
     if config.get("enable_s3"):
         raw = config.get("bucket_name") or ""
         sanitized = sanitize_s3_bucket_name(str(raw))

@@ -24,6 +24,8 @@ const TABS = [
 export default function ProvisionPage() {
   const [tab, setTab] = useState('manage');
   const [awsByocConnected, setAwsByocConnected] = useState(null);
+  const [gcpByocConnected, setGcpByocConnected] = useState(false);
+  const [azureByocConnected, setAzureByocConnected] = useState(false);
   const [terraformOk, setTerraformOk] = useState(null);
   const [userProvisionEngine, setUserProvisionEngine] = useState('boto3');
   const [hostingHint, setHostingHint] = useState('');
@@ -39,6 +41,8 @@ export default function ProvisionPage() {
         ]);
         if (cancelled) return;
         setAwsByocConnected(!!byocRes.data?.connections?.aws?.connected);
+        setGcpByocConnected(!!byocRes.data?.connections?.gcp?.connected);
+        setAzureByocConnected(!!byocRes.data?.connections?.azure?.connected);
         setTerraformOk(statusRes.data?.terraform_installed ?? false);
         setUserProvisionEngine(statusRes.data?.user_provision_engine || 'boto3');
         setHostingHint(statusRes.data?.hosting_hint || '');
@@ -60,27 +64,25 @@ export default function ProvisionPage() {
     );
   }
 
-  if (!awsByocConnected) {
+  const anyByocConnected = awsByocConnected || gcpByocConnected || azureByocConnected;
+
+  if (!anyByocConnected) {
     return (
       <div className="provision-page">
         <PageHeader
           kicker="Infrastructure"
           title="Infrastructure & optimization"
-          subtitle="Connect your AWS account once in Settings — Zenith uses it for cost, storage, and VM optimization. No separate setup needed here."
+          subtitle="Connect a cloud account in Settings to deploy stacks and use dashboard features."
         />
         <div className="provision-settings-cta">
-          <h3>AWS not connected</h3>
+          <h3>No cloud account connected</h3>
           <p>
-            Bring your own cloud credentials in <strong>Settings</strong> to unlock cost analysis,
-            storage tiering, VM cluster, and security features across the dashboard.
+            Connect AWS, GCP, or Azure under <strong>Settings</strong> (BYOC), then return here to
+            plan and apply Terraform stacks.
           </p>
           <Link to="/dashboard/settings" className="btn-provision primary">
-            Connect AWS in Settings →
+            Open Settings →
           </Link>
-          <p className="provision-empty-hint" style={{ marginTop: '1.5rem' }}>
-            Optional Terraform stacks (new VPC, EC2, S3, etc.) are available after AWS is connected,
-            under the <strong>New stack</strong> tab on this page.
-          </p>
         </div>
       </div>
     );
@@ -91,12 +93,21 @@ export default function ProvisionPage() {
       <PageHeader
         kicker="Infrastructure"
         title="Infrastructure governance"
-        subtitle="Deploy and manage stacks with Boto3 or Terraform. AWS credentials come from Settings — not configured again here."
+        subtitle="Deploy stacks on AWS (Boto3 or Terraform), GCP, or Azure (Terraform). Credentials come from Settings."
       />
 
       <div className="provision-status-bar">
         <span className="status-dot online" />
-        <span>AWS connected via Settings</span>
+        <span>
+          {[
+            awsByocConnected && 'AWS',
+            gcpByocConnected && 'GCP',
+            azureByocConnected && 'Azure',
+          ]
+            .filter(Boolean)
+            .join(' · ') || 'Cloud'}{' '}
+          connected
+        </span>
         <span className="provision-status-sep">·</span>
         <span>
           Engine: <strong>{userProvisionEngine === 'terraform' ? 'Terraform' : 'Boto3'}</strong>

@@ -35,13 +35,29 @@ def get_user_provision_engine(username: str) -> ProvisionEngine:
     return raw  # type: ignore[return-value]
 
 
-def resolve_provision_engine(username: str, config: dict) -> ProvisionEngine:
+def resolve_provision_engine(
+    username: str, config: dict, csp: str = "AWS"
+) -> ProvisionEngine:
     """
     Pick engine for this plan/apply.
 
     - terraform: always Terraform when CLI is available (localhost + Render Docker).
-    - boto3: modular composer when every enabled module is implemented.
+    - boto3: modular composer when every enabled module is implemented (AWS only).
     """
+    from app.cloud.providers import normalize_provider
+
+    provider = normalize_provider(csp or config.get("csp") or "AWS")
+    if provider != "AWS":
+        if not check_terraform_installed():
+            raise HTTPException(
+                status_code=503,
+                detail=(
+                    "Terraform CLI is required for GCP and Azure provisioning. "
+                    "Install Terraform on the server or use the Docker image."
+                ),
+            )
+        return "terraform"
+
     pref = get_user_provision_engine(username)
 
     if pref == "terraform":

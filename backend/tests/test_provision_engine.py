@@ -94,6 +94,12 @@ def test_boto3_implemented_modules_match_terraform_modules():
     )
 
 
+@patch("app.provision.engine_resolver.check_terraform_installed", return_value=True)
+def test_resolve_gcp_forces_terraform(mock_tf):
+  cfg = {"csp": "GCP", "enable_gcs": True}
+  assert resolve_provision_engine("alice", cfg, "GCP") == "terraform"
+
+
 def test_deployment_engine_from_record():
     assert deployment_engine({"provision_engine": "boto3"}) == "boto3"
     assert deployment_engine({"fast_path": True}) == "boto3"

@@ -769,6 +769,20 @@ Reference: 97-page project report (Chapter 4–6). Last cross-check: 2026-05-24.
 
 ---
 
+## Multi-cloud parity — Phase 6 (2026-06-03)
+
+**Goal:** Terraform plan/apply/destroy for GCP and Azure BYOC via `/api/provision`.
+
+**Completed:**
+- `terraform/gcp` (GCS), `terraform/azure` (Blob), `terraform_roots.py`.
+- `resolve_provision_terraform_env`, engine forces TF for non-AWS.
+- `provision_catalog.py`, `ProvisionConfig.csp`, wizard provider UI.
+- 260 pytest green.
+
+**Next:** Phase 7 — pricing / docs closure.
+
+---
+
 ## Multi-cloud parity — Phase 2 (2026-06-03)
 
 **Goal:** Cost analysis + budgets behave like AWS when GCP/Azure billing credentials exist.

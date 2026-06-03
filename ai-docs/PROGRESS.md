@@ -6,7 +6,7 @@
 
 ## 🔴 Active Task
 
-**None** — Phase 5 complete. **Next:** Phase 6 (provision GCP/Azure).
+**None** — Phase 6 complete. **Next:** Phase 7 (pricing parity / docs).
 
 ---
 
@@ -14,8 +14,18 @@
 
 | Phase | Status |
 |-------|--------|
-| **0–5** | ✅ Complete |
-| **6–7** | ⬜ |
+| **0–6** | ✅ Complete |
+| **7** | ⬜ |
+
+---
+
+## Phase 6 — Provision GCP/Azure ✅
+
+- [x] **6.1** — `terraform/gcp`, `terraform/azure`, `terraform_roots.py`
+- [x] **6.2** — `resolve_provision_terraform_env`, `TerraformRunner` cloud env
+- [x] **6.3** — `provision_catalog.py`, `csp` on plan/apply/deployments
+- [x] **6.4** — `ProvisionDeployWizard` + `ProvisionPage` provider UX
+- [x] **6.5** — DEC-027, matrix, tests (260 pytest)
 
 ---
 

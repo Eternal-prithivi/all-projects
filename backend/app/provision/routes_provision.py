@@ -100,12 +100,18 @@ _DEPLOYMENT_LIST_PROJECTION = {"plan_output": 0, "apply_output": 0}
 
 # ── Helper: resolve BYOC credentials for the current user ──
 
+def _resolve_provision_env(user: Any, config: dict) -> tuple[dict[str, str], Optional[str]]:
+    """Resolve BYOC Terraform env for AWS, GCP, or Azure from config.csp."""
+    from app.cloud.providers import normalize_provider
+    from app.provision.byoc_credentials import resolve_provision_terraform_env
+
+    csp = normalize_provider(config.get("csp") or "AWS")
+    region = config.get("aws_region", "ap-south-1")
+    return resolve_provision_terraform_env(user.username, csp, region)
+
+
 def _resolve_byoc_credentials(user: Any, region: str = "ap-south-1") -> dict:
-    """
-    Resolve AWS credentials from the user's BYOC configuration.
-    Returns dict with AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, etc.
-    Returns empty dict if BYOC is not configured.
-    """
+    """Legacy AWS-only helper — prefer _resolve_provision_env."""
     from app.provision.byoc_credentials import resolve_byoc_terraform_env
 
     return resolve_byoc_terraform_env(user.username, region)
@@ -159,15 +165,25 @@ MODULES = [
 
 
 @router.get("/templates")
-async def list_templates(user: dict = Depends(get_current_user)):
-    """List available deployment templates."""
-    return {"templates": TEMPLATES}
+async def list_templates(
+    csp: str = Query("AWS"),
+    user: dict = Depends(get_current_user),
+):
+    """List deployment templates for AWS, GCP, or Azure."""
+    from app.provision.provision_catalog import templates_for_csp
+
+    return {"templates": templates_for_csp(csp), "csp": csp}
 
 
 @router.get("/modules")
-async def list_modules(user: dict = Depends(get_current_user)):
-    """List all available AWS modules with their config schemas."""
-    return {"modules": MODULES}
+async def list_modules(
+    csp: str = Query("AWS"),
+    user: dict = Depends(get_current_user),
+):
+    """List provision modules for the selected cloud provider."""
+    from app.provision.provision_catalog import modules_for_csp
+
+    return {"modules": modules_for_csp(csp), "csp": csp}
 
 
 @router.get("/status")
@@ -391,10 +407,29 @@ async def run_plan(
     Plan deployment — boto3 (instant) or Terraform (background poll) per Settings.
     Works on localhost and Render; engine from users.settings.preferences.provision_engine.
     """
-    config_dict = config.model_dump()
-    _prepare_provision_config(config_dict)
+    from app.cloud.providers import normalize_provider
 
-    engine = resolve_provision_engine(user.username, config_dict)
+    config_dict = config.model_dump()
+    config_dict["csp"] = normalize_provider(config_dict.get("csp") or "AWS")
+    _prepare_provision_config(config_dict)
+    csp = config_dict["csp"]
+
+    cloud_env, cred_err = _resolve_provision_env(user, config_dict)
+    if cred_err:
+        policy_result = full_policy_check(config_dict, include_opa=False, username=user.username)
+        cost_result = estimate_cost(config_dict, use_infracost=False)
+        return {
+            "success": False,
+            "stage": "credentials",
+            "error": cred_err,
+            "csp": csp,
+            "policy_check": policy_result.model_dump(),
+            "cost_estimate": cost_result.model_dump(),
+        }
+    if csp == "GCP" and cloud_env.get("GOOGLE_PROJECT"):
+        config_dict["gcp_project"] = cloud_env["GOOGLE_PROJECT"]
+
+    engine = resolve_provision_engine(user.username, config_dict, csp)
 
     policy_result = full_policy_check(config_dict, include_opa=False, username=user.username)
     cost_result = estimate_cost(config_dict, use_infracost=False)
@@ -415,26 +450,17 @@ async def run_plan(
     config_dict["tags"]["Owner"] = user.username
     config_dict["tags"]["ManagedBy"] = "zenith-provision"
 
-    aws_creds = _resolve_byoc_credentials(user, config_dict.get("aws_region", "ap-south-1"))
-    if not aws_creds.get("AWS_ACCESS_KEY_ID"):
-        msg = (
-            "No AWS credentials available for Terraform. "
-            "Connect AWS under Settings (BYOC), then try again."
-        )
-        return {
-            "success": False,
-            "stage": "credentials",
-            "error": msg,
-            "policy_check": policy_result.model_dump(),
-            "cost_estimate": cost_result.model_dump(),
-        }
-
     if engine == "boto3":
-        fast_result = plan_fast(config_dict, aws_creds)
+        fast_result = plan_fast(config_dict, cloud_env)
         status = DeploymentStatus.AWAITING_APPLY if fast_result["success"] else DeploymentStatus.PLAN_FAILED
         _save_deployment(
-            user.username, deployment_id, config_dict, "boto3",
-            status, policy_result, cost_result,
+            user.username,
+            deployment_id,
+            config_dict,
+            "boto3",
+            status,
+            policy_result,
+            cost_result,
             plan_output=fast_result["output"] or fast_result.get("error", ""),
         )
         _get_deployments_collection().update_one(
@@ -478,7 +504,7 @@ async def run_plan(
 
     thread = threading.Thread(
         target=_run_plan_background,
-        args=(user.username, deployment_id, config_dict, "", aws_creds, policy_result, cost_result),
+        args=(user.username, deployment_id, config_dict, "", cloud_env, policy_result, cost_result, csp),
         daemon=True,
     )
     thread.start()
@@ -588,9 +614,9 @@ async def run_apply(
         raise HTTPException(status_code=400, detail="Cannot apply — policy check has blocking violations.")
 
     config_dict = deployment.get("config", {}) or {}
-    aws_creds = _resolve_byoc_credentials(
-        user, config_dict.get("aws_region", "ap-south-1")
-    )
+    cloud_env, cred_err = _resolve_provision_env(user, config_dict)
+    if cred_err:
+        raise HTTPException(status_code=400, detail=cred_err)
 
     collection.update_one(
         {"deployment_name": deployment_id},
@@ -601,7 +627,7 @@ async def run_apply(
 
     if engine == "boto3":
         boto3_ctx = deployment.get("boto3_context")
-        apply_result = apply_fast(config_dict, aws_creds, boto3_ctx)
+        apply_result = apply_fast(config_dict, cloud_env, boto3_ctx)
         ctx_out = apply_result.get("boto3_context") or {}
         resources_count = len(ctx_out) if apply_result["success"] else 0
         new_status = DeploymentStatus.DEPLOYED if apply_result["success"] else DeploymentStatus.APPLY_FAILED
@@ -636,7 +662,7 @@ async def run_apply(
     if not workspace:
         raise HTTPException(status_code=500, detail="Workspace path missing from deployment record.")
 
-    runner = TerraformRunner(workspace, aws_creds)
+    runner = TerraformRunner(workspace, cloud_env=cloud_env)
 
     apply_result = runner.apply()
 
@@ -688,9 +714,9 @@ async def run_destroy(
         )
 
     config_dict = deployment.get("config", {}) or {}
-    aws_creds = _resolve_byoc_credentials(
-        user, config_dict.get("aws_region", "ap-south-1")
-    )
+    cloud_env, cred_err = _resolve_provision_env(user, config_dict)
+    if cred_err:
+        raise HTTPException(status_code=400, detail=cred_err)
 
     collection.update_one(
         {"deployment_name": deployment_id},
@@ -700,7 +726,7 @@ async def run_destroy(
     engine = deployment_engine(deployment)
 
     if engine == "boto3":
-        destroy_result = destroy_fast(config_dict, aws_creds, deployment.get("boto3_context"))
+        destroy_result = destroy_fast(config_dict, cloud_env, deployment.get("boto3_context"))
     else:
         workspace = deployment.get("terraform_workspace", "")
         if not workspace or workspace in ("fast-path", "boto3"):
@@ -708,7 +734,7 @@ async def run_destroy(
                 status_code=400,
                 detail="Terraform workspace missing for this deployment. Cannot destroy via Terraform.",
             )
-        runner = TerraformRunner(workspace, aws_creds)
+        runner = TerraformRunner(workspace, cloud_env=cloud_env)
         destroy_result = runner.destroy()
 
     new_status = DeploymentStatus.DESTROYED if destroy_result["success"] else DeploymentStatus.DESTROY_FAILED
@@ -927,14 +953,14 @@ async def check_drift(
         raise HTTPException(status_code=400, detail="Drift check only available for deployed infrastructure.")
 
     config_dict = deployment.get("config", {}) or {}
-    aws_creds = _resolve_byoc_credentials(
-        user, config_dict.get("aws_region", "ap-south-1")
-    )
+    cloud_env, cred_err = _resolve_provision_env(user, config_dict)
+    if cred_err:
+        raise HTTPException(status_code=400, detail=cred_err)
 
     engine = deployment_engine(deployment)
     if engine == "boto3":
         drift_report = detect_drift_boto3(
-            config_dict, aws_creds, deployment.get("boto3_context")
+            config_dict, cloud_env, deployment.get("boto3_context")
         )
     else:
         workspace = deployment.get("terraform_workspace", "")
@@ -943,10 +969,10 @@ async def check_drift(
                 status_code=400,
                 detail=(
                     "This deployment has no Terraform workspace. "
-                    "Use Boto3 engine in Settings for new deployments, or redeploy with Terraform."
+                    "Use Boto3 engine in Settings for new AWS deployments, or redeploy with Terraform."
                 ),
             )
-        drift_report = detect_drift(workspace, aws_creds)
+        drift_report = detect_drift(workspace, cloud_env)
 
     # Append to drift history and update latest status
     collection.update_one(
@@ -1002,15 +1028,15 @@ async def remediate_deployment_drift(
         raise HTTPException(status_code=400, detail="Remediation only available for deployed infrastructure.")
 
     config_dict = deployment.get("config", {}) or {}
-    aws_creds = _resolve_byoc_credentials(
-        user, config_dict.get("aws_region", "ap-south-1")
-    )
+    cloud_env, cred_err = _resolve_provision_env(user, config_dict)
+    if cred_err:
+        raise HTTPException(status_code=400, detail=cred_err)
 
     engine = deployment_engine(deployment)
     if engine == "boto3":
         raw = remediate_drift_boto3(
             config_dict,
-            aws_creds,
+            cloud_env,
             deployment.get("boto3_context"),
             check_only=check_only,
         )
@@ -1033,7 +1059,7 @@ async def remediate_deployment_drift(
                 status_code=400,
                 detail="Terraform workspace missing — cannot remediate with Terraform.",
             )
-        result = remediate_drift(workspace, aws_creds, check_only=check_only)
+        result = remediate_drift(workspace, cloud_env, check_only=check_only)
 
     # If remediation was actually performed, update deployment record
     if result.performed and result.success:
@@ -1150,15 +1176,9 @@ async def export_audit_log_csv(
 
 def _apply_template_defaults(config: dict) -> None:
     """Apply template preset defaults to a config dict."""
-    template = config.get("template")
-    if not template or template == "custom":
-        return
+    from app.provision.provision_catalog import apply_template_defaults
 
-    for tmpl in TEMPLATES:
-        if tmpl["key"] == template:
-            for flag, value in tmpl["services"].items():
-                config[flag] = value
-            break
+    apply_template_defaults(config)
 
 
 def _prepare_provision_config(config: dict) -> None:
@@ -1183,12 +1203,14 @@ def _save_deployment(
     """Save or update a deployment record in MongoDB."""
     collection = _get_deployments_collection()
 
-    enabled = [m for m in ["vpc", "ec2", "s3", "iam", "cloudwatch", "dynamodb"]
-               if config.get(f"enable_{m}", False)]
+    from app.provision.provision_catalog import enabled_module_keys
+
+    enabled = enabled_module_keys(config)
 
     doc = {
         "user_id": user_id,
         "deployment_name": deployment_id,
+        "csp": config.get("csp", "AWS"),
         "template": config.get("template"),
         "config": config,
         "enabled_modules": enabled,
@@ -1277,9 +1299,10 @@ def _run_plan_background(
     deployment_id: str,
     config_dict: dict,
     workspace: str,
-    aws_creds: dict[str, str],
+    cloud_env: dict[str, str],
     policy_result: Any,
     cost_result: Any,
+    csp: str = "AWS",
 ) -> None:
     """Run terraform init/plan off the HTTP thread (avoids Render 502 on long requests)."""
     plan_t0 = time.monotonic()
@@ -1311,7 +1334,7 @@ def _run_plan_background(
                 "workspace",
                 "Copying terraform modules into workspace (first time can take ~30s on Render)…\n",
             )
-            workspace = create_workspace(deployment_id)
+            workspace = create_workspace(deployment_id, csp)
             write_tfvars(workspace, config_dict)
             _get_deployments_collection().update_one(
                 {"deployment_name": deployment_id},
@@ -1324,7 +1347,7 @@ def _run_plan_background(
             "Running terraform init on the server (may take 1–3 minutes on Render)…\n",
         )
 
-        runner = TerraformRunner(workspace, aws_creds)
+        runner = TerraformRunner(workspace, cloud_env=cloud_env)
 
         init_t0 = time.monotonic()
         init_result = runner.init()

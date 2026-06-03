@@ -1,18 +1,18 @@
 # STATUS.md — Live Project Snapshot
 
-**Last Updated:** 2026-06-03 (Multi-cloud parity Phase 5 complete)
+**Last Updated:** 2026-06-03 (Multi-cloud parity Phase 6 complete)
 
 ---
 
 ## Identity
 
-| Phase | **Parity 0–5** ✅ · **Next: Phase 6** (provision GCP/Azure) · **20.5.10** paused |
+| Phase | **Parity 0–6** ✅ · **Next: Phase 7** (pricing/docs) · **20.5.10** paused |
 
 ---
 
 ## 🔴 Active Task
 
-**None** — Phase 5 complete.
+**None** — Phase 6 complete.
 
 ---
 
@@ -20,4 +20,4 @@
 
 | Check | Status |
 |-------|--------|
-| Backend pytest | ✅ 257 passed (2026-06-03) |
+| Backend pytest | ✅ 260 passed (2026-06-03) |

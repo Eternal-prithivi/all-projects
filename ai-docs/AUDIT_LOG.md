@@ -23,6 +23,18 @@ Notes: [one line optional]
 ## Session Log (recent only)
 
 ---
+SESSION_ID: 20260603-multicloud-phase6
+Date: 2026-06-03
+Agent: Cursor Composer
+Task: Multi-cloud parity Phase 6 — provision GCP/Azure Terraform
+Changes:
+- terraform/gcp + azure roots; provision_catalog; csp on plan/apply
+- ProvisionDeployWizard provider UX; 260 pytest
+Outcome: Done
+Notes: Next Phase 7 pricing
+---
+
+---
 SESSION_ID: 20260603-multicloud-phase5
 Date: 2026-06-03
 Agent: Cursor Composer

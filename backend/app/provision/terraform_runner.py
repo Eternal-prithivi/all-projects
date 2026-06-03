@@ -74,15 +74,23 @@ class TerraformRunner:
     so multiple users' deployments don't collide.
     """
 
-    def __init__(self, workspace_dir: str, aws_credentials: Optional[dict] = None):
+    def __init__(
+        self,
+        workspace_dir: str,
+        aws_credentials: Optional[dict] = None,
+        *,
+        cloud_env: Optional[dict] = None,
+    ):
         """
         Args:
             workspace_dir: Absolute path to the workspace for this deployment.
-            aws_credentials: Dict with AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY,
-                             AWS_SESSION_TOKEN (from BYOC STS resolution).
+            aws_credentials: Legacy AWS-only env dict (alias for cloud_env).
+            cloud_env: Full BYOC env (AWS, GCP GOOGLE_*, Azure ARM_*).
         """
         self.workspace_dir = Path(workspace_dir)
-        self.aws_credentials = aws_credentials or {}
+        merged = dict(cloud_env or aws_credentials or {})
+        self.aws_credentials = merged
+        self.cloud_env = merged
 
     def _get_env(self) -> dict[str, str]:
         """Build environment variables for terraform subprocess."""
@@ -90,16 +98,9 @@ class TerraformRunner:
         cache = os.getenv("TF_PLUGIN_CACHE_DIR")
         if cache:
             env["TF_PLUGIN_CACHE_DIR"] = cache
-        # Inject BYOC AWS credentials if provided
-        if self.aws_credentials:
-            if "AWS_ACCESS_KEY_ID" in self.aws_credentials:
-                env["AWS_ACCESS_KEY_ID"] = self.aws_credentials["AWS_ACCESS_KEY_ID"]
-            if "AWS_SECRET_ACCESS_KEY" in self.aws_credentials:
-                env["AWS_SECRET_ACCESS_KEY"] = self.aws_credentials["AWS_SECRET_ACCESS_KEY"]
-            if "AWS_SESSION_TOKEN" in self.aws_credentials:
-                env["AWS_SESSION_TOKEN"] = self.aws_credentials["AWS_SESSION_TOKEN"]
-            if "AWS_DEFAULT_REGION" in self.aws_credentials:
-                env["AWS_DEFAULT_REGION"] = self.aws_credentials["AWS_DEFAULT_REGION"]
+        for key, value in self.cloud_env.items():
+            if value is not None and str(value).strip():
+                env[key] = str(value)
         return env
 
     def init(self) -> dict[str, Any]:
@@ -261,23 +262,24 @@ class TerraformRunner:
         yield f"data: {json.dumps({'done': True, 'exit_code': return_code})}\n\n"
 
 
-def create_workspace(deployment_id: str) -> str:
+def create_workspace(deployment_id: str, csp: str = "AWS") -> str:
     """
-    Create a new workspace directory for a deployment by copying TERRAFORM_ROOT.
+    Create a new workspace directory for a deployment by copying the provider root.
 
     Returns the absolute path to the new workspace.
     """
-    workspaces_dir = TERRAFORM_ROOT.parent / "terraform_workspaces"
+    from app.provision.terraform_roots import get_terraform_root
+
+    source_root = get_terraform_root(csp)
+    workspaces_dir = source_root.parent / "terraform_workspaces"
     workspaces_dir.mkdir(exist_ok=True)
 
     workspace_path = workspaces_dir / deployment_id
     if workspace_path.exists():
-        # Workspace already exists — reuse it
         return str(workspace_path)
 
-    # Copy all terraform files to the new workspace
     shutil.copytree(
-        str(TERRAFORM_ROOT),
+        str(source_root),
         str(workspace_path),
         ignore=shutil.ignore_patterns("__pycache__", "*.pyc", ".terraform"),
     )
@@ -294,7 +296,9 @@ def create_workspace(deployment_id: str) -> str:
 
 def _bootstrap_workspace_providers(workspace_path: Path) -> None:
     """Copy pre-downloaded .terraform providers from the template tree when available."""
-    src = TERRAFORM_ROOT / ".terraform"
+    from app.provision.terraform_roots import get_terraform_root
+
+    src = get_terraform_root("AWS") / ".terraform"
     dest = workspace_path / ".terraform"
     if not src.is_dir():
         return
@@ -327,12 +331,19 @@ def write_tfvars(workspace_dir: str, config: dict[str, Any]) -> str:
 
     Returns the path to the written file.
     """
+    from app.cloud.providers import normalize_provider
     from app.provision.config_normalize import normalize_provision_config
 
     try:
         normalize_provision_config(config)
     except ValueError:
-        pass  # routes should have validated already
+        pass
+
+    provider = normalize_provider(config.get("csp") or "AWS")
+    if provider == "GCP":
+        return _write_gcp_tfvars(workspace_dir, config)
+    if provider == "Azure":
+        return _write_azure_tfvars(workspace_dir, config)
 
     bucket_name = (config.get("bucket_name") or "").strip()
     lines: list[str] = [
@@ -374,4 +385,44 @@ def write_tfvars(workspace_dir: str, config: dict[str, Any]) -> str:
     tfvars_path = Path(workspace_dir) / "terraform.tfvars"
     tfvars_path.write_text("\n".join(lines), encoding="utf-8")
     logger.info(f"Wrote terraform.tfvars to {tfvars_path}")
+    return str(tfvars_path)
+
+
+def _write_gcp_tfvars(workspace_dir: str, config: dict[str, Any]) -> str:
+    bucket_name = (config.get("bucket_name") or "").strip()
+    lines = [
+        f'gcp_project = "{config.get("gcp_project", "")}"',
+        f'gcp_region  = "{config.get("gcp_region", "us-central1")}"',
+        "",
+        f'enable_gcs  = {str(config.get("enable_gcs", False)).lower()}',
+        f'bucket_name = "{bucket_name}"',
+        "",
+        "tags = {",
+    ]
+    for key, value in config.get("tags", {}).items():
+        lines.append(f'  {key} = "{value}"')
+    lines.append("}")
+    lines.append("")
+    tfvars_path = Path(workspace_dir) / "terraform.tfvars"
+    tfvars_path.write_text("\n".join(lines), encoding="utf-8")
+    return str(tfvars_path)
+
+
+def _write_azure_tfvars(workspace_dir: str, config: dict[str, Any]) -> str:
+    lines = [
+        f'azure_location = "{config.get("azure_location", "eastus")}"',
+        f'resource_group_name = "{config.get("resource_group_name", "zenith-rg")}"',
+        f'storage_account_name = "{config.get("storage_account_name", "")}"',
+        f'container_name = "{config.get("container_name", "zenith-static")}"',
+        "",
+        f'enable_azure_storage = {str(config.get("enable_azure_storage", False)).lower()}',
+        "",
+        "tags = {",
+    ]
+    for key, value in config.get("tags", {}).items():
+        lines.append(f'  {key} = "{value}"')
+    lines.append("}")
+    lines.append("")
+    tfvars_path = Path(workspace_dir) / "terraform.tfvars"
+    tfvars_path.write_text("\n".join(lines), encoding="utf-8")
     return str(tfvars_path)

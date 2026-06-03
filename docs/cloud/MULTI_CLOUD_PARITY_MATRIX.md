@@ -16,9 +16,9 @@ Success criterion (every phase): With valid platform `.env` or per-user BYOC, th
 | **Storage restore** | Glacier (`POST /restore/AWS/{filename}`) | 501 not_supported | 501 not_supported | `routes_storage.py` | 1 ✅ |
 | **Cost / budgets** | Full + CE grouping | BigQuery + setup wizard | Cost Management + setup wizard | `app/cost/manager.py`, `billing_config.py` | 2 ✅ |
 | **BYOC** | Full + verify + buckets | Connect + resolver; **no step-1 verify** | Same | `app/byoc/routes_byoc.py`, `credential_resolver.py` | 3 |
-| **Security vault** | Full (S3 SSE dual) | UI filter only | UI filter only | `app/security/routes_security.py` | 4 |
+| **Security vault** | Full (S3 SSE dual) | Full | Full | `app/security/routes_security.py` | 4 ✅ |
 | **VM / monitoring** | **Full VM API** (EC2) | **Full VM API** (GCE) | None | `aws_manager.py`, `manager.py`, `vm_provider.py` | 5 ✅ |
-| **Provision** | TF + Boto3 | None | None | `app/provision/engine_resolver.py`, `backend/terraform/` | 6 |
+| **Provision** | TF + Boto3 | TF (GCS) | TF (Blob) | `terraform/`, `provision_catalog.py` | 6 ✅ |
 | **Pricing** | Static table | Static table | Static table | `app/pricing/pricing_fetcher.py` | — (documented, non-live) |
 
 ---
@@ -85,8 +85,9 @@ Legend: ✅ implemented · 🟡 partial · ❌ missing · 🔒 AWS-only today
 
 | Endpoint | AWS | GCP | Azure | Notes |
 |----------|-----|-----|-------|-------|
-| Plan / apply / destroy / drift | ✅ | ❌ | ❌ | Phase 6 |
-| Engine resolver | boto3 \| terraform (AWS only) | — | — | |
+| Plan / apply / destroy / drift | ✅ | ✅ | ✅ | Phase 6 ✅ |
+| `GET /templates?csp=` / `GET /modules?csp=` | ✅ | ✅ | ✅ | Per-provider catalog |
+| Engine resolver | boto3 \| terraform | terraform only | terraform only | GCP/Azure require TF |
 
 ---
 

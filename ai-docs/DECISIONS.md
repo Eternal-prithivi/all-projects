@@ -232,6 +232,16 @@
 
 ---
 
+### [DEC-027] Tri-cloud provision (Terraform roots for GCP GCS + Azure Blob)
+- **Date**: 2026-06-03
+- **Status**: Accepted (implemented)
+- **Context**: Provision plan/apply/destroy was AWS-only (`backend/terraform/` + Boto3). Phase 6 requires GCP and Azure BYOC Terraform with the same `/api/provision/*` contract.
+- **Decision**: Add `terraform/gcp/` (GCS bucket) and `terraform/azure/` (storage account + container). `terraform_roots.get_terraform_root(csp)`, `resolve_provision_terraform_env()`, and `csp` on `ProvisionConfig`. GCP/Azure always use Terraform; Boto3 remains AWS-only. Templates: `static-gcs`, `static-blob`.
+- **Consequences**: `ProvisionDeployWizard` provider dropdown; deployments store `csp` in MongoDB.
+- **DO NOT**: Run Boto3 composer for GCP/Azure — engine resolver forces Terraform.
+
+---
+
 ### [DEC-026] Tri-cloud VM lifecycle — AWS EC2 parity with GCP
 - **Date**: 2026-06-03
 - **Status**: Accepted (implemented)

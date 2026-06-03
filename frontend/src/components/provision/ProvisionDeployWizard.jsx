@@ -118,14 +118,44 @@ async function waitForBackend(maxWaitMs = WAKE_MAX_WAIT_MS) {
   return { ok: false, attempts: attempt };
 }
 
+const CSP_OPTIONS = [
+  { value: 'AWS', label: 'AWS' },
+  { value: 'GCP', label: 'GCP' },
+  { value: 'Azure', label: 'Azure' },
+];
+
+const EMPTY_FLAGS = {
+  enable_vpc: false,
+  enable_ec2: false,
+  enable_s3: false,
+  enable_iam: false,
+  enable_cloudwatch: false,
+  enable_dynamodb: false,
+  enable_gcs: false,
+  enable_azure_storage: false,
+};
+
 export default function ProvisionDeployWizard({ terraformOk: _terraformOk, userProvisionEngine = 'boto3', onDeployed }) {
-  const engineLabel = userProvisionEngine === 'terraform' ? 'Terraform' : 'Boto3';
+  const [csp, setCsp] = useState('AWS');
+  const engineLabel =
+    csp !== 'AWS' ? 'Terraform' : userProvisionEngine === 'terraform' ? 'Terraform' : 'Boto3';
+  const [templates, setTemplates] = useState(TEMPLATES);
+  const [modules, setModules] = useState(MODULES);
   const [step, setStep] = useState(0);
   const [selectedTemplate, setSelectedTemplate] = useState(null);
 
   const [config, setConfig] = useState({
+    csp: 'AWS',
     template: null,
     aws_region: 'ap-south-1',
+    gcp_region: 'us-central1',
+    gcp_project: '',
+    azure_location: 'eastus',
+    resource_group_name: 'zenith-rg',
+    storage_account_name: '',
+    container_name: 'zenith-static',
+    enable_gcs: false,
+    enable_azure_storage: false,
     enable_vpc: false,
     enable_ec2: false,
     enable_s3: false,
@@ -158,6 +188,37 @@ export default function ProvisionDeployWizard({ terraformOk: _terraformOk, userP
   const [error, setError] = useState(null);
   const terminalRef = useRef(null);
 
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const [tRes, mRes] = await Promise.all([
+          api.get('/provision/templates', { params: { csp } }),
+          api.get('/provision/modules', { params: { csp } }),
+        ]);
+        if (!cancelled) {
+          setTemplates(tRes.data.templates || []);
+          setModules(mRes.data.modules || []);
+        }
+      } catch {
+        if (!cancelled) {
+          setTemplates([]);
+          setModules([]);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [csp]);
+
+  const handleCspChange = (next) => {
+    setCsp(next);
+    setSelectedTemplate(null);
+    setStep(0);
+    setConfig((prev) => ({ ...prev, csp: next, template: null, ...EMPTY_FLAGS }));
+  };
+
   // ── Step 1: Template Selection ──
   const selectTemplate = (tmpl) => {
     if (selectedTemplate === tmpl.key) {
@@ -166,20 +227,18 @@ export default function ProvisionDeployWizard({ terraformOk: _terraformOk, userP
       setConfig(prev => ({
         ...prev,
         template: null,
-        enable_vpc: false, enable_ec2: false, enable_s3: false,
-        enable_iam: false, enable_cloudwatch: false, enable_dynamodb: false,
+        ...EMPTY_FLAGS,
       }));
     } else {
       setSelectedTemplate(tmpl.key);
+      const services = { ...EMPTY_FLAGS };
+      Object.entries(tmpl.services || {}).forEach(([k, v]) => {
+        services[k] = !!v;
+      });
       setConfig(prev => ({
         ...prev,
         template: tmpl.key,
-        enable_vpc: !!tmpl.services.enable_vpc,
-        enable_ec2: !!tmpl.services.enable_ec2,
-        enable_s3: !!tmpl.services.enable_s3,
-        enable_iam: !!tmpl.services.enable_iam,
-        enable_cloudwatch: !!tmpl.services.enable_cloudwatch,
-        enable_dynamodb: !!tmpl.services.enable_dynamodb,
+        ...services,
       }));
     }
   };
@@ -199,8 +258,7 @@ export default function ProvisionDeployWizard({ terraformOk: _terraformOk, userP
     });
   };
 
-  const hasAnyModule = config.enable_vpc || config.enable_ec2 || config.enable_s3 ||
-    config.enable_iam || config.enable_cloudwatch || config.enable_dynamodb;
+  const hasAnyModule = modules.some((m) => config[m.flag]);
 
   // ── Step 2: Config field update ──
   const updateConfig = (key, value) => {
@@ -386,10 +444,26 @@ export default function ProvisionDeployWizard({ terraformOk: _terraformOk, userP
       <div className="section-header">
         <h3>Deploy a new stack (optional)</h3>
         <p>
-          Uses your AWS account from Settings. Deploy engine: <strong>{engineLabel}</strong>
-          {' '}(change in Settings → Infrastructure provisioning).
-          For day-to-day optimization, use Cost, Storage, and VM pages instead.
+          Uses BYOC credentials from Settings. Provider: <strong>{csp}</strong> · Engine:{' '}
+          <strong>{engineLabel}</strong>
+          {csp === 'AWS' && ' (change in Settings → Infrastructure provisioning)'}.
         </p>
+      </div>
+
+      <div className="provision-config-row" style={{ marginBottom: '1rem' }}>
+        <label className="provision-label" htmlFor="provision-csp">Cloud provider</label>
+        <select
+          id="provision-csp"
+          className="zenith-select"
+          value={csp}
+          onChange={(e) => handleCspChange(e.target.value)}
+        >
+          {CSP_OPTIONS.map((opt) => (
+            <option key={opt.value} value={opt.value}>
+              {opt.label}
+            </option>
+          ))}
+        </select>
       </div>
 
       <div className="wizard-steps">
@@ -419,7 +493,7 @@ export default function ProvisionDeployWizard({ terraformOk: _terraformOk, userP
           </div>
 
           <div className="template-grid">
-            {TEMPLATES.map(tmpl => (
+            {templates.map(tmpl => (
               <div
                 key={tmpl.key}
                 className={`template-card ${selectedTemplate === tmpl.key ? 'selected' : ''}`}
@@ -429,7 +503,7 @@ export default function ProvisionDeployWizard({ terraformOk: _terraformOk, userP
                 <div className="template-card-icon">{tmpl.icon}</div>
                 <h3>{tmpl.name}</h3>
                 <p>{tmpl.description}</p>
-                <span className="cost-badge">{tmpl.cost}</span>
+                <span className="cost-badge">{tmpl.estimated_cost || tmpl.cost}</span>
               </div>
             ))}
           </div>
@@ -438,11 +512,11 @@ export default function ProvisionDeployWizard({ terraformOk: _terraformOk, userP
 
           <div className="section-header">
             <h3>Individual Modules</h3>
-            <p>Toggle specific AWS services. Dependencies are auto-resolved.</p>
+            <p>Toggle modules for {csp}. Dependencies are auto-resolved where applicable.</p>
           </div>
 
           <div className="module-toggles">
-            {MODULES.map(mod => (
+            {modules.map(mod => (
               <div
                 key={mod.key}
                 className={`module-toggle ${config[mod.flag] ? 'enabled' : ''}`}
@@ -452,7 +526,7 @@ export default function ProvisionDeployWizard({ terraformOk: _terraformOk, userP
                 <div className="module-toggle-switch" />
                 <div className="module-toggle-info">
                   <h4>{mod.name}</h4>
-                  <p>{mod.desc}</p>
+                  <p>{mod.desc || mod.name}</p>
                 </div>
               </div>
             ))}
@@ -479,6 +553,7 @@ export default function ProvisionDeployWizard({ terraformOk: _terraformOk, userP
           </div>
 
           <div className="config-form">
+            {csp === 'AWS' && (
             <div className="config-field">
               <label>AWS Region</label>
               <select className="zenith-select" value={config.aws_region} onChange={e => updateConfig('aws_region', e.target.value)}>
@@ -489,6 +564,69 @@ export default function ProvisionDeployWizard({ terraformOk: _terraformOk, userP
                 <option value="ap-southeast-1">Asia Pacific (Singapore)</option>
               </select>
             </div>
+            )}
+
+            {csp === 'GCP' && (
+              <>
+                <div className="config-field">
+                  <label>GCP Region</label>
+                  <select className="zenith-select" value={config.gcp_region} onChange={e => updateConfig('gcp_region', e.target.value)}>
+                    <option value="us-central1">us-central1</option>
+                    <option value="us-east1">us-east1</option>
+                    <option value="europe-west1">europe-west1</option>
+                  </select>
+                </div>
+                {config.enable_gcs && (
+                  <div className="config-field">
+                    <label>GCS Bucket Name (globally unique)</label>
+                    <input
+                      type="text"
+                      value={config.bucket_name}
+                      onChange={e => updateConfig('bucket_name', e.target.value)}
+                      placeholder="my-zenith-static-site"
+                    />
+                  </div>
+                )}
+              </>
+            )}
+
+            {csp === 'Azure' && config.enable_azure_storage && (
+              <>
+                <div className="config-field">
+                  <label>Azure Region</label>
+                  <select className="zenith-select" value={config.azure_location} onChange={e => updateConfig('azure_location', e.target.value)}>
+                    <option value="eastus">East US</option>
+                    <option value="westeurope">West Europe</option>
+                    <option value="southeastasia">Southeast Asia</option>
+                  </select>
+                </div>
+                <div className="config-field">
+                  <label>Resource Group</label>
+                  <input
+                    type="text"
+                    value={config.resource_group_name}
+                    onChange={e => updateConfig('resource_group_name', e.target.value)}
+                  />
+                </div>
+                <div className="config-field">
+                  <label>Storage Account Name</label>
+                  <input
+                    type="text"
+                    value={config.storage_account_name}
+                    onChange={e => updateConfig('storage_account_name', e.target.value)}
+                    placeholder="zenithstorage01"
+                  />
+                </div>
+                <div className="config-field">
+                  <label>Container Name</label>
+                  <input
+                    type="text"
+                    value={config.container_name}
+                    onChange={e => updateConfig('container_name', e.target.value)}
+                  />
+                </div>
+              </>
+            )}
 
             {config.enable_ec2 && (
               <>
