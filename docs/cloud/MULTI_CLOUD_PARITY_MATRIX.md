@@ -17,7 +17,7 @@ Success criterion (every phase): With valid platform `.env` or per-user BYOC, th
 | **Cost / budgets** | Full + CE grouping | BigQuery + setup wizard | Cost Management + setup wizard | `app/cost/manager.py`, `billing_config.py` | 2 ✅ |
 | **BYOC** | Full + verify + buckets | Connect + resolver; **no step-1 verify** | Same | `app/byoc/routes_byoc.py`, `credential_resolver.py` | 3 |
 | **Security vault** | Full (S3 SSE dual) | UI filter only | UI filter only | `app/security/routes_security.py` | 4 |
-| **VM / monitoring** | EC2 via provision only | **Full VM API** | None | `app/vm/manager.py`, `gcp_runtime.py` | 5 |
+| **VM / monitoring** | **Full VM API** (EC2) | **Full VM API** (GCE) | None | `aws_manager.py`, `manager.py`, `vm_provider.py` | 5 ✅ |
 | **Provision** | TF + Boto3 | None | None | `app/provision/engine_resolver.py`, `backend/terraform/` | 6 |
 | **Pricing** | Static table | Static table | Static table | `app/pricing/pricing_fetcher.py` | — (documented, non-live) |
 
@@ -77,7 +77,9 @@ Legend: ✅ implemented · 🟡 partial · ❌ missing · 🔒 AWS-only today
 
 | Endpoint | AWS | GCP | Azure | Notes |
 |----------|-----|-----|-------|-------|
-| Lifecycle / clusters / metrics | 🟡 | ✅ | ❌ | Phase 5 |
+| Lifecycle / clusters / metrics | ✅ | ✅ | ❌ (501) | Phase 5 ✅ |
+| `csp` on request / assignment | ✅ | ✅ | — | Query or JSON body |
+| CloudWatch / GCP Monitoring metrics | ✅ | ✅ | — | `aws_metrics.py`, `metrics_collector.py` |
 
 ### Provision (`/api/provision`)
 

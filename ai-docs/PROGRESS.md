@@ -6,7 +6,7 @@
 
 ## 🔴 Active Task
 
-**None** — Phase 4 complete. **Next:** Phase 5 (VM AWS parity).
+**None** — Phase 5 complete. **Next:** Phase 6 (provision GCP/Azure).
 
 ---
 
@@ -14,8 +14,18 @@
 
 | Phase | Status |
 |-------|--------|
-| **0–4** | ✅ Complete |
-| **5–7** | ⬜ |
+| **0–5** | ✅ Complete |
+| **6–7** | ⬜ |
+
+---
+
+## Phase 5 — VM AWS parity ✅
+
+- [x] **5.1** — `aws_manager.py` + `aws_runtime.py` (EC2 lifecycle)
+- [x] **5.2** — `vm_provider.py` dispatch; `csp` on assignments
+- [x] **5.3** — CloudWatch metrics (`aws_metrics.py`)
+- [x] **5.4** — `VMClusterPage` provider toolbar + API `csp`
+- [x] **5.5** — DEC-026, matrix, integration tests (257 pytest)
 
 ---
 

@@ -13,16 +13,24 @@
 #   - Delete vm_assignments without updating vm_metrics records
 # =============================================================================
 
-from fastapi import APIRouter, HTTPException, Depends, Body
+from fastapi import APIRouter, HTTPException, Depends, Body, Query
 from typing import List, Dict, Any, Optional
 from datetime import datetime
 from pydantic import BaseModel, Field
 from google.cloud import compute_v1
+from app.cloud.providers import normalize_provider
+from app.vm import vm_provider
 from app.vm.manager import (
-    list_vms, create_vm, start_vm, stop_vm, delete_vm, get_vm_details,
-    assign_vm_to_user, migrate_user, release_vm_assignment, 
-    get_user_assignment, get_cluster_health, _get_instance_client, CLUSTER_VMS
+    assign_vm_to_user,
+    migrate_user,
+    release_vm_assignment,
+    get_user_assignment,
+    get_cluster_health,
+    _get_instance_client,
+    CLUSTER_VMS,
 )
+from app.vm.vm_provider import vm_runtime_context
+from app.vm.aws_runtime import set_aws_username, reset_aws_username
 from app.vm.models import (
     VMRequestModel, VMAssignmentResponse, VMTransferRequest,
     VMMetricsResponse, ClusterType, MigrationRecommendation, VMStatus
@@ -45,13 +53,24 @@ router = APIRouter()
 DB = get_database()
 
 
-async def get_vm_user(user: User = Depends(get_current_user)):
-    """Bind GCP Compute context to the authenticated user (BYOC GCP when configured)."""
-    token = set_gcp_username(user.username)
-    try:
-        yield user
-    finally:
-        reset_gcp_username(token)
+async def get_vm_user(
+    user: User = Depends(get_current_user),
+    csp: str = Query("GCP"),
+):
+    """Bind GCP or AWS compute context for BYOC (query param csp=AWS|GCP)."""
+    provider = normalize_provider(csp)
+    if provider == "AWS":
+        token = set_aws_username(user.username)
+        try:
+            yield user
+        finally:
+            reset_aws_username(token)
+    else:
+        token = set_gcp_username(user.username)
+        try:
+            yield user
+        finally:
+            reset_gcp_username(token)
 
 # Cache for metrics to reduce GCP API calls
 metrics_cache = {}
@@ -90,6 +109,7 @@ def invalidate_cluster_health_cache():
 # --- Pydantic Models for Request/Response ---
 
 class VMCreateRequest(BaseModel):
+    csp: str = Field("GCP", description="Cloud provider: AWS or GCP")
     cluster_type: str = Field(
         ...,
         description="Cluster to provision from: general, storage, memory, performance, or ai_ml",
@@ -116,17 +136,18 @@ class OperationStatusResponse(BaseModel):
     details: Optional[Dict[str, Any]] = None
 
 # --- Helper to get cluster counts and determine next action ---
-async def _get_cluster_vm_counts():
-    all_vms = list_vms()
+async def _get_cluster_vm_counts(csp: str = "GCP"):
+    all_vms = vm_provider.list_vms(csp)
     counts = {}
     active_statuses = {"RUNNING", "PROVISIONING", "STAGING"}
 
     for cluster_type in CLUSTER_VMS:
         cluster_name = cluster_type.value
+        pool_names = vm_provider.cluster_vms(csp, cluster_type)
         cluster_vms = [
             vm for vm in all_vms
             if vm.get("labels", {}).get("cluster_type") == cluster_name
-            or vm.get("name") in CLUSTER_VMS[cluster_type]
+            or vm.get("name") in pool_names
         ]
         running_vms = [vm for vm in cluster_vms if vm.get("status") in active_statuses]
         counts[cluster_name] = {
@@ -161,11 +182,15 @@ def _cluster_disk_size_gb(cluster_type: ClusterType) -> int:
 # --- API Endpoints ---
 
 @router.get("/status", summary="Get VM Cluster Status")
-async def get_vm_cluster_status() -> Dict[str, Any]:
+async def get_vm_cluster_status(
+    csp: str = Query("GCP"),
+    _user: User = Depends(get_vm_user),
+) -> Dict[str, Any]:
     """
     Returns the current status of VM clusters including counts and available slots.
     """
-    cluster_counts = await _get_cluster_vm_counts()
+    provider = normalize_provider(csp)
+    cluster_counts = await _get_cluster_vm_counts(provider)
     clusters = {
         cluster_name: {
             "running_vms": data["current_count"],
@@ -180,14 +205,19 @@ async def get_vm_cluster_status() -> Dict[str, Any]:
         "clusters": clusters,
         "performance_cluster": clusters.get("performance", {}),
         "storage_cluster": clusters.get("storage", {}),
-        "all_vms_in_zone": list_vms()
+        "all_vms_in_zone": vm_provider.list_vms(provider),
+        "csp": provider,
     }
 
 @router.post("/provision", response_model=OperationStatusResponse, summary="Provision or Assign VM")
-async def provision_or_assign_vm(request: VMCreateRequest) -> OperationStatusResponse:
+async def provision_or_assign_vm(
+    request: VMCreateRequest,
+    current_user: User = Depends(get_current_user),
+) -> OperationStatusResponse:
     """
     Provisions a new VM from a cluster or assigns/starts an existing one.
     """
+    provider = normalize_provider(request.csp)
     cluster_name = request.cluster_type.lower().replace("-", "_")
     try:
         cluster_type = ClusterType(cluster_name)
@@ -195,30 +225,46 @@ async def provision_or_assign_vm(request: VMCreateRequest) -> OperationStatusRes
         allowed = ", ".join(cluster.value for cluster in CLUSTER_VMS)
         raise HTTPException(status_code=400, detail=f"Invalid cluster_type. Must be one of: {allowed}.")
 
-    cluster_status = (await _get_cluster_vm_counts())[cluster_type.value]
+    with vm_runtime_context(current_user.username, provider):
+        return await _provision_or_assign_inner(request, cluster_type, provider)
+
+
+async def _provision_or_assign_inner(
+    request: VMCreateRequest, cluster_type: ClusterType, provider: str
+) -> OperationStatusResponse:
+    cluster_status = (await _get_cluster_vm_counts(provider))[cluster_type.value]
 
     # 1. Check for terminated VMs in the cluster that can be started
     if cluster_status['available_for_start'] > 0:
         vm_to_start = cluster_status['available_vms'][0] # Pick the first available
         logger.info(f"Starting existing VM: {vm_to_start['name']} for {cluster_type.value} cluster")
-        result = start_vm(vm_to_start['name'])
+        result = vm_provider.start_vm(provider, vm_to_start["name"])
         return OperationStatusResponse(name=vm_to_start['name'], status="STARTING_EXISTING", details=result['details'])
 
     # 2. If no terminated VMs, try to provision a new one if limits allow
     if cluster_status['current_count'] < cluster_status['max_vms']:
-        machine_type = _cluster_machine_type(cluster_type)
-        disk_size = _cluster_disk_size_gb(cluster_type)
+        if provider == "AWS":
+            from app.vm import aws_manager
 
-        new_vm_name = f"{cluster_type.value}-vm-{cluster_status['current_count'] + 1}"
+            machine_type = aws_manager.cluster_machine_type(cluster_type)
+            disk_size = aws_manager.cluster_disk_gb(cluster_type)
+            suffix = "aws"
+        else:
+            machine_type = _cluster_machine_type(cluster_type)
+            disk_size = _cluster_disk_size_gb(cluster_type)
+            suffix = "vm"
+        new_vm_name = f"{cluster_type.value}-{suffix}-{cluster_status['current_count'] + 1}"
         labels = {"cluster_type": cluster_type.value}
 
-        logger.info(f"Provisioning new VM: {new_vm_name} for {cluster_type.value} cluster")
-        result = create_vm(
+        logger.info(f"Provisioning new VM: {new_vm_name} for {cluster_type.value} cluster ({provider})")
+        source_image = "" if provider == "AWS" else "debian-cloud/debian-11"
+        result = vm_provider.create_vm(
+            provider,
             name=new_vm_name,
             machine_type=machine_type,
-            source_image="debian-cloud/debian-11", # Using a common free-tier eligible image
+            source_image=source_image,
             disk_size_gb=disk_size,
-            labels=labels
+            labels=labels,
         )
         return OperationStatusResponse(name=new_vm_name, status="PROVISIONING_NEW", details=result['details'])
     else:
@@ -228,53 +274,75 @@ async def provision_or_assign_vm(request: VMCreateRequest) -> OperationStatusRes
         )
 
 @router.get("/list", response_model=VMListResponse, summary="List all VMs")
-async def get_all_vms() -> VMListResponse:
+async def get_all_vms(
+    csp: str = Query("GCP"),
+    _user: User = Depends(get_vm_user),
+) -> VMListResponse:
     """
     Lists all VM instances managed by this application.
     """
-    vms = list_vms()
+    vms = vm_provider.list_vms(normalize_provider(csp))
     return VMListResponse(vms=[VMResponse(**vm) for vm in vms])
 
 @router.post("/{vm_name}/start", response_model=OperationStatusResponse, summary="Start a VM")
-async def start_single_vm(vm_name: str) -> OperationStatusResponse:
+async def start_single_vm(
+    vm_name: str,
+    csp: str = Query("GCP"),
+    _user: User = Depends(get_vm_user),
+) -> OperationStatusResponse:
     """
     Starts a specific VM instance.
     """
     try:
-        result = start_vm(vm_name)
+        result = vm_provider.start_vm(normalize_provider(csp), vm_name)
         return OperationStatusResponse(name=vm_name, status="STARTING", details=result['details'])
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to start VM: {e}")
 
 @router.post("/{vm_name}/stop", response_model=OperationStatusResponse, summary="Stop a VM")
-async def stop_single_vm(vm_name: str) -> OperationStatusResponse:
+async def stop_single_vm(
+    vm_name: str,
+    csp: str = Query("GCP"),
+    _user: User = Depends(get_vm_user),
+) -> OperationStatusResponse:
     """
     Stops a specific VM instance.
     """
     try:
-        result = stop_vm(vm_name)
+        result = vm_provider.stop_vm(normalize_provider(csp), vm_name)
         return OperationStatusResponse(name=vm_name, status="STOPPING", details=result['details'])
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to stop VM: {e}")
 
 @router.delete("/{vm_name}", response_model=OperationStatusResponse, summary="Delete a VM")
-async def delete_single_vm(vm_name: str) -> OperationStatusResponse:
+async def delete_single_vm(
+    vm_name: str,
+    csp: str = Query("GCP"),
+    _user: User = Depends(get_vm_user),
+) -> OperationStatusResponse:
     """
     Deletes a specific VM instance.
     """
     try:
-        result = delete_vm(vm_name)
+        result = vm_provider.delete_vm(normalize_provider(csp), vm_name)
         return OperationStatusResponse(name=vm_name, status="DELETING", details=result)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to delete VM: {e}")
 
 @router.get("/{vm_name}/details", response_model=VMResponse, summary="Get VM Details")
-async def get_single_vm_details(vm_name: str) -> VMResponse:
+async def get_single_vm_details(
+    vm_name: str,
+    csp: str = Query("GCP"),
+    _user: User = Depends(get_vm_user),
+) -> VMResponse:
     """
     Retrieves details for a specific VM instance.
     """
     try:
-        details = get_vm_details(vm_name, settings.GCP_ZONE)
+        provider = normalize_provider(csp)
+        details = vm_provider.get_vm_details(
+            provider, vm_name, vm_provider.vm_zone(provider)
+        )
         return VMResponse(**details)
     except Exception as e:
         raise HTTPException(status_code=404, detail=f"VM '{vm_name}' not found or error fetching details: {e}")
@@ -333,7 +401,7 @@ async def analyze_workload_description(
 @router.post("/request", response_model=VMAssignmentResponse, summary="Request VM Assignment")
 async def request_vm_assignment(
     request: VMRequestModel,
-    current_user: User = Depends(get_vm_user)
+    current_user: User = Depends(get_current_user),
 ) -> VMAssignmentResponse:
     """
     Intelligent VM assignment based on workload analysis.
@@ -342,21 +410,29 @@ async def request_vm_assignment(
     try:
         from app.vm.workload_guidance import merge_follow_up_answers
 
+        provider = normalize_provider(request.csp or "GCP")
+        if provider == "Azure":
+            raise HTTPException(
+                status_code=501,
+                detail="Azure VM lifecycle is planned for a later phase.",
+            )
         effective_workload = merge_follow_up_answers(
             request.workload_description or "",
             request.follow_up_answers,
         )
-        vm_name, vm_ip, ssh_command, cluster_type, assigned_at, expires_at = assign_vm_to_user(
-            user_id=current_user.username,
-            workload_description=effective_workload,
-            cluster_preference=request.cluster_preference,
-            priority_level=request.priority_level
-        )
-        
-        # Invalidate ALL caches to immediately reflect changes
+        with vm_runtime_context(current_user.username, provider):
+            vm_name, vm_ip, ssh_command, cluster_type, assigned_at, expires_at = assign_vm_to_user(
+                user_id=current_user.username,
+                workload_description=effective_workload,
+                cluster_preference=request.cluster_preference,
+                priority_level=request.priority_level,
+                csp=provider,
+            )
+
         invalidate_all_caches()
-        
+
         return VMAssignmentResponse(
+            csp=provider,
             vm_name=vm_name,
             vm_ip=vm_ip,
             ssh_command=ssh_command,
@@ -366,6 +442,8 @@ async def request_vm_assignment(
             expires_at=expires_at,
             message="VM assigned successfully"
         )
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"VM assignment failed: {str(e)}")
 
@@ -373,18 +451,23 @@ async def request_vm_assignment(
 @router.post("/migrate", response_model=dict)
 async def migrate_vm(
     request: VMTransferRequest,
-    current_user: User = Depends(get_vm_user)
+    current_user: User = Depends(get_current_user),
 ):
     """
     User-initiated or admin-forced migration to another VM.
     Supports both cluster-based auto-selection and manual VM selection.
     """
     try:
-        result = migrate_user(
-            user_id=current_user.username,
-            target_cluster=request.target_cluster,
-            target_vm_name=request.target_vm_name
-        )
+        provider = normalize_provider(request.csp or "GCP")
+        if provider == "Azure":
+            raise HTTPException(status_code=501, detail="Azure VM migration not available yet.")
+        with vm_runtime_context(current_user.username, provider):
+            result = migrate_user(
+                user_id=current_user.username,
+                target_cluster=request.target_cluster,
+                target_vm_name=request.target_vm_name,
+                csp=provider,
+            )
         
         # Invalidate ALL caches to immediately reflect changes
         invalidate_all_caches()
@@ -456,15 +539,26 @@ async def release_vm(
 
 
 @router.get("/metrics/{vm_name}", response_model=VMMetricsResponse, summary="Get VM Metrics")
-async def get_vm_metrics(vm_name: str, use_real: bool = False) -> VMMetricsResponse:
+async def get_vm_metrics(
+    vm_name: str,
+    use_real: bool = False,
+    csp: str = Query("GCP"),
+    current_user: User = Depends(get_current_user),
+) -> VMMetricsResponse:
     """
-    Fetch real-time performance metrics for a specific VM from GCP Monitoring API.
-    Uses cache for expensive GCP metrics (CPU, memory, disk, network) unless REAL_TIME_MODE=true.
-    Always fetches fresh user count from MongoDB (free, no cache).
-    
-    Query parameter:
-    - use_real: If true, uses real GCP metrics. If false (default), uses simulated metrics.
+    Fetch VM metrics from GCP Monitoring or AWS CloudWatch (simulated when unconfigured).
     """
+    provider = normalize_provider(csp)
+    try:
+        with vm_runtime_context(current_user.username, provider):
+            return await _collect_vm_metrics(vm_name, use_real, provider)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to collect metrics: {str(e)}")
+
+
+async def _collect_vm_metrics(
+    vm_name: str, use_real: bool, provider: str
+) -> VMMetricsResponse:
     try:
         # Always get fresh user count from MongoDB (no cost, always up-to-date)
         active_users = DB["vm_assignments"].count_documents({
@@ -474,7 +568,7 @@ async def get_vm_metrics(vm_name: str, use_real: bool = False) -> VMMetricsRespo
         
         # Check cache for expensive GCP metrics - include use_real in cache key
         # Skip cache if REAL_TIME_MODE is enabled
-        cache_key = f"metrics_{vm_name}_{'real' if use_real else 'sim'}"
+        cache_key = f"metrics_{provider}_{vm_name}_{'real' if use_real else 'sim'}"
         now = datetime.utcnow()
         
         if is_caching_enabled() and cache_key in metrics_cache:
@@ -491,14 +585,19 @@ async def get_vm_metrics(vm_name: str, use_real: bool = False) -> VMMetricsRespo
         # Determine cluster type
         cluster_type = ClusterType.GENERAL if "general" in vm_name else ClusterType.STORAGE
         
-        # Get VM details to check if running
-        vm_details = get_vm_details(vm_name, settings.GCP_ZONE)
+        vm_details = vm_provider.get_vm_details(
+            provider, vm_name, vm_provider.vm_zone(provider)
+        )
         last_started = None
         if vm_details.get("status") == "RUNNING":
             last_started = now
-        
-        # Collect metrics
-        collector = VMMetricsCollector()
+
+        if provider == "AWS":
+            from app.vm.aws_metrics import AwsVMMetricsCollector
+
+            collector = AwsVMMetricsCollector()
+        else:
+            collector = VMMetricsCollector()
         metrics_db = await collector.collect_all_metrics(
             vm_name=vm_name,
             cluster_type=cluster_type,
@@ -534,8 +633,8 @@ async def get_vm_metrics(vm_name: str, use_real: bool = False) -> VMMetricsRespo
         if is_caching_enabled():
             metrics_cache[cache_key] = (response_data, now)
         
-        return response_data
-        
+        return VMMetricsResponse(**response_data)
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to collect metrics: {str(e)}")
 
@@ -675,7 +774,7 @@ async def get_migration_recommendations(
         all_recommendations = []
         for cluster in clusters_to_analyze:
             # Get VM metrics for cluster
-            cluster_vms = ["general-vm-1", "general-vm-2"] if cluster == ClusterType.GENERAL else ["storage-vm-1", "storage-vm-2"]
+            cluster_vms = vm_provider.cluster_vms("GCP", cluster)
             vm_metrics = []
             
             for vm_name in cluster_vms:
@@ -686,8 +785,9 @@ async def get_migration_recommendations(
                         "status": "active"
                     })
                     
-                    # Get VM details (requires GCP)
-                    vm_details = get_vm_details(vm_name, settings.GCP_ZONE)
+                    vm_details = vm_provider.get_vm_details(
+                        "GCP", vm_name, vm_provider.vm_zone("GCP")
+                    )
                     last_started = None
                     if vm_details.get("status") == "RUNNING":
                         last_started = datetime.utcnow()  # Simplified for recommendations
@@ -752,14 +852,19 @@ async def apply_recommendation(recommendation_id: str) -> Dict[str, Any]:
 
 
 @router.get("/admin/cluster-metrics/{cluster_type}", summary="Get Cluster Health Dashboard")
-async def get_cluster_metrics(cluster_type: ClusterType) -> Dict[str, Any]:
+async def get_cluster_metrics(
+    cluster_type: ClusterType,
+    csp: str = Query("GCP"),
+    _user: User = Depends(get_vm_user),
+) -> Dict[str, Any]:
     """
     Admin endpoint: Get aggregated health metrics for entire cluster.
     Used by frontend dashboard for real-time monitoring.
     Cached for 1 minute to reduce GCP API calls (unless REAL_TIME_MODE=true).
     """
+    provider = normalize_provider(csp)
     try:
-        cache_key = f"cluster_health_{cluster_type.value}"
+        cache_key = f"cluster_health_{provider}_{cluster_type.value}"
         
         # Check cache only if caching is enabled
         if is_caching_enabled() and cache_key in cluster_health_cache:
@@ -768,7 +873,7 @@ async def get_cluster_metrics(cluster_type: ClusterType) -> Dict[str, Any]:
                 return cached_data
         
         # Fetch fresh data
-        health_data = get_cluster_health(cluster_type)
+        health_data = get_cluster_health(cluster_type, provider)
         
         # Update cache only if caching is enabled
         if is_caching_enabled():
@@ -789,22 +894,21 @@ async def predict_cluster_load(cluster_type: ClusterType) -> Dict[str, Any]:
         collector = VMMetricsCollector()
         
         # Get current metrics
-        cluster_vms = ["general-vm-1", "general-vm-2"] if cluster_type == ClusterType.GENERAL else ["storage-vm-1", "storage-vm-2"]
+        cluster_vms = vm_provider.cluster_vms("GCP", cluster_type)
         current_metrics = []
         
         for vm_name in cluster_vms:
             try:
-                # Get active user count
                 active_users = DB["vm_assignments"].count_documents({
                     "vm_name": vm_name,
                     "status": "active"
                 })
                 
-                # Determine cluster type from VM name
                 vm_cluster = ClusterType.GENERAL if "general" in vm_name else ClusterType.STORAGE
                 
-                # Get VM details
-                vm_details = get_vm_details(vm_name, settings.GCP_ZONE)
+                vm_details = vm_provider.get_vm_details(
+                    "GCP", vm_name, vm_provider.vm_zone("GCP")
+                )
                 last_started = None
                 if vm_details.get("status") == "RUNNING":
                     last_started = datetime.utcnow()

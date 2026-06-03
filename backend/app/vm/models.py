@@ -54,6 +54,10 @@ class RecommendationStatus(str, Enum):
 
 class VMRequestModel(BaseModel):
     """User request for VM assignment"""
+    csp: Optional[str] = Field(
+        "GCP",
+        description="Cloud provider for VM pool: AWS, GCP, or Azure (Azure planned).",
+    )
     workload_description: Optional[str] = Field(
         None,
         description="Description of workload (e.g., 'web app with database'). System will recommend cluster."
@@ -76,6 +80,10 @@ class VMRequestModel(BaseModel):
 
 class VMTransferRequest(BaseModel):
     """User-initiated migration request"""
+    csp: Optional[str] = Field(
+        None,
+        description="Cloud provider; defaults to the active assignment's csp.",
+    )
     target_cluster: Optional[ClusterType] = Field(None, description="Target cluster for auto-selection")
     target_vm_name: Optional[str] = Field(None, description="Specific target VM name (e.g., 'general-vm-2')")
     reason: Optional[str] = Field(None, description="Optional reason for transfer")
@@ -99,6 +107,7 @@ class VMAssignmentResponse(BaseModel):
     """Response after VM assignment"""
     vm_name: str
     vm_ip: str
+    csp: str = "GCP"
     cluster_type: ClusterType
     ssh_command: str
     status: str

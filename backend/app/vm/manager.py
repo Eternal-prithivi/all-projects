@@ -30,6 +30,7 @@ from app.ml.repository import (
     log_workload_classification,
 )
 from app.vm.metrics_collector import VMMetricsCollector
+from app.vm import vm_provider
 from app.vm.gcp_runtime import gcp_project_id, gcp_zone, _gcp_username, _resolve_byoc_compute
 import uuid
 
@@ -347,7 +348,8 @@ def assign_vm_to_user(
     user_id: str,
     workload_description: str,
     cluster_preference: Optional[ClusterType] = None,
-    priority_level: int = 1
+    priority_level: int = 1,
+    csp: str = "GCP",
 ) -> Tuple[str, str, str, ClusterType, datetime, datetime]:
     """
     Assign a VM to user using least-connections load balancing.
@@ -383,7 +385,8 @@ def assign_vm_to_user(
     )
 
     # Step 3: Find least loaded VM in cluster using least-connections algorithm
-    cluster_vms = CLUSTER_VMS[final_cluster]
+    cluster_vms = vm_provider.cluster_vms(csp, final_cluster)
+    zone = vm_provider.vm_zone(csp)
     vm_loads = []
     
     for vm_name in cluster_vms:
@@ -393,9 +396,8 @@ def assign_vm_to_user(
             "status": AssignmentStatus.ACTIVE.value
         })
         
-        # Get VM status from GCP
         try:
-            vm_details = get_vm_details(vm_name, gcp_zone())
+            vm_details = vm_provider.get_vm_details(csp, vm_name, zone)
             vm_status = vm_details["status"]
             vm_ip = vm_details["external_ip"]
         except Exception as e:
@@ -412,10 +414,10 @@ def assign_vm_to_user(
     # Filter running VMs, sort by active users
     running_vms = [vm for vm in vm_loads if vm["status"] == "RUNNING"]
     
-    if not running_vms and credentials is None:
+    if not running_vms and not vm_provider.cloud_configured(csp):
         vm_to_start = cluster_vms[0]
         logger.info(
-            f"GCP not configured. Assigning {user_id} to simulated {final_cluster.value} VM {vm_to_start}"
+            f"{csp} not configured. Assigning {user_id} to simulated {final_cluster.value} VM {vm_to_start}"
         )
         selected_vm = {
             "vm_name": vm_to_start,
@@ -426,7 +428,7 @@ def assign_vm_to_user(
         # No running VMs, start the first VM in cluster
         vm_to_start = cluster_vms[0]
         logger.info(f"No running VMs in {final_cluster} cluster. Starting {vm_to_start}")
-        start_result = start_vm(vm_to_start)
+        start_result = vm_provider.start_vm(csp, vm_to_start)
         selected_vm = {
             "vm_name": vm_to_start,
             "vm_ip": start_result["details"]["external_ip"],
@@ -454,7 +456,8 @@ def assign_vm_to_user(
         "expires_at": expires_at,
         "last_active": assigned_at,
         "status": AssignmentStatus.ACTIVE.value,
-        "recommendation_confidence": confidence
+        "recommendation_confidence": confidence,
+        "csp": csp,
     }
     vm_assignments_collection.insert_one(assignment_doc)
     
@@ -468,7 +471,8 @@ def assign_vm_to_user(
 def migrate_user(
     user_id: str,
     target_cluster: Optional[ClusterType] = None,
-    target_vm_name: Optional[str] = None
+    target_vm_name: Optional[str] = None,
+    csp: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Migrate user from current VM to another VM (workload transfer).
@@ -485,6 +489,8 @@ def migrate_user(
     
     source_vm_name = current_assignment["vm_name"]
     source_cluster = ClusterType(current_assignment["cluster_type"])
+    effective_csp = csp or current_assignment.get("csp") or "GCP"
+    zone = vm_provider.vm_zone(effective_csp)
     
     # Step 2: Determine target VM
     if target_vm_name:
@@ -492,7 +498,7 @@ def migrate_user(
         final_target_vm = target_vm_name
     elif target_cluster:
         # Auto-select least loaded VM in target cluster
-        cluster_vms = CLUSTER_VMS[target_cluster]
+        cluster_vms = vm_provider.cluster_vms(effective_csp, target_cluster)
         vm_loads = []
         
         for vm_name in cluster_vms:
@@ -514,9 +520,9 @@ def migrate_user(
         raise ValueError("Must specify either target_cluster or target_vm_name")
     
     # Step 3: Start target VM if stopped
-    target_vm_details = get_vm_details(final_target_vm, gcp_zone())
-    if credentials is None:
-        logger.info("GCP not configured. Performing simulated VM migration.")
+    target_vm_details = vm_provider.get_vm_details(effective_csp, final_target_vm, zone)
+    if not vm_provider.cloud_configured(effective_csp):
+        logger.info("%s not configured. Performing simulated VM migration.", effective_csp)
         target_vm_details = {
             "name": final_target_vm,
             "status": "UNKNOWN",
@@ -524,8 +530,8 @@ def migrate_user(
         }
     elif target_vm_details["status"] != "RUNNING":
         logger.info(f"Starting target VM {final_target_vm}")
-        start_vm(final_target_vm)
-        target_vm_details = get_vm_details(final_target_vm, gcp_zone())
+        vm_provider.start_vm(effective_csp, final_target_vm)
+        target_vm_details = vm_provider.get_vm_details(effective_csp, final_target_vm, zone)
     
     target_vm_ip = target_vm_details["external_ip"]
     
@@ -537,6 +543,7 @@ def migrate_user(
                 "vm_name": final_target_vm,
                 "vm_ip": target_vm_ip,
                 "cluster_type": target_cluster.value if target_cluster else current_assignment["cluster_type"],
+                "csp": effective_csp,
                 "migrated_at": datetime.utcnow(),
                 "last_active": datetime.utcnow()
             }
@@ -549,9 +556,9 @@ def migrate_user(
         "status": AssignmentStatus.ACTIVE.value
     })
     
-    if remaining_users == 0 and credentials is not None:
+    if remaining_users == 0 and vm_provider.cloud_configured(effective_csp):
         logger.info(f"No remaining users on {source_vm_name}. Stopping VM to save costs")
-        stop_vm(source_vm_name)
+        vm_provider.stop_vm(effective_csp, source_vm_name)
         source_vm_stopped = True
     else:
         logger.info(f"{remaining_users} users still active on {source_vm_name}. Keeping VM running")
@@ -608,10 +615,11 @@ def release_vm_assignment(user_id: str, assignment_id: Optional[str] = None) -> 
         "status": AssignmentStatus.ACTIVE.value
     })
     
+    effective_csp = assignment.get("csp") or "GCP"
     vm_stopped = False
-    if remaining_users == 0 and credentials is not None:
+    if remaining_users == 0 and vm_provider.cloud_configured(effective_csp):
         logger.info(f"No remaining users on {vm_name}. Stopping VM")
-        stop_vm(vm_name)
+        vm_provider.stop_vm(effective_csp, vm_name)
         vm_stopped = True
     
     return {
@@ -657,36 +665,12 @@ def get_all_user_assignments(user_id: str) -> List[Dict[str, Any]]:
     return result
 
 
-def get_cluster_health(cluster_type: ClusterType) -> Dict[str, Any]:
-    """
-    Get aggregated health metrics for a cluster.
-    Optimized with batch GCP status check to reduce API calls.
-    """
-    cluster_vms = CLUSTER_VMS[cluster_type]
+def get_cluster_health(cluster_type: ClusterType, csp: str = "GCP") -> Dict[str, Any]:
+    """Aggregated health metrics for a cluster (GCP or AWS)."""
+    cluster_vms = vm_provider.cluster_vms(csp, cluster_type)
     vm_health_data = []
-    
-    # Batch fetch all VM statuses at once (single API call) when GCP is configured.
-    vm_statuses = {}
-    if credentials is None:
-        logger.debug("GCP not configured; using stored VM metrics for cluster health")
-    else:
-        try:
-            logger.debug(f"Attempting batch fetch for cluster: {cluster_type.value}")
-            response = _get_instance_client().list(
-                request=compute_v1.ListInstancesRequest(
-                    project=gcp_project_id(),
-                    zone=gcp_zone()
-                )
-            )
-
-            # Convert iterator to list
-            instances_list = list(response)
-            for instance in instances_list:
-                vm_statuses[instance.name] = instance.status
-            logger.info(f"Batch fetched {len(vm_statuses)} VM statuses")
-        except Exception as e:
-            logger.error(f"Error in batch VM fetch: {type(e).__name__}: {e}")
-            logger.info(f"Falling back to individual VM status checks")
+    vm_statuses = {v["name"]: v["status"] for v in vm_provider.list_vms(csp)}
+    zone = vm_provider.vm_zone(csp)
     
     for vm_name in cluster_vms:
         # Get latest metrics from MongoDB (fast, local)
@@ -704,14 +688,12 @@ def get_cluster_health(cluster_type: ClusterType) -> Dict[str, Any]:
         # Get status from batch result, fallback to individual check
         if vm_name in vm_statuses:
             status = vm_statuses[vm_name]
-        elif credentials is None:
+        elif not vm_provider.cloud_configured(csp):
             status = "UNKNOWN"
         else:
-            # Fallback: individual VM status check
             try:
-                vm_details = get_vm_details(vm_name, gcp_zone())
+                vm_details = vm_provider.get_vm_details(csp, vm_name, zone)
                 status = vm_details.get("status", "UNKNOWN")
-                logger.debug(f"Individual fetch for {vm_name}: {status}")
             except Exception as e:
                 logger.error(f"Failed to get status for {vm_name}: {e}")
                 status = "UNKNOWN"
@@ -735,6 +717,7 @@ def get_cluster_health(cluster_type: ClusterType) -> Dict[str, Any]:
     
     return {
         "cluster_type": cluster_type.value,
+        "csp": csp,
         "total_vms": len(cluster_vms),
         "running_vms": running_vms,
         "total_active_users": total_users,

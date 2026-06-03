@@ -232,6 +232,16 @@
 
 ---
 
+### [DEC-026] Tri-cloud VM lifecycle — AWS EC2 parity with GCP
+- **Date**: 2026-06-03
+- **Status**: Accepted (implemented)
+- **Context**: VM routes and `manager.py` were GCP-only; AWS users could only provision EC2 via Terraform, not the VM Cluster UI.
+- **Decision**: Add `aws_manager.py`, `aws_runtime.py`, `vm_provider.py` dispatch, and `csp` on VM request/assignment/sync APIs. AWS uses tagged EC2 instances in the default VPC (`zenith_managed`, `zenith_cluster`); metrics via CloudWatch with simulated fallback. Azure returns **501** until a later phase.
+- **Consequences**: `VMClusterPage` cloud provider toolbar; `GET /api/vm/*?csp=AWS|GCP`.
+- **DO NOT**: Assume Azure VM pools exist; do not bypass `vm_runtime_context` for BYOC credential binding.
+
+---
+
 ### [DEC-025] Tri-cloud secure vault (AWS dual-write; GCP/Azure single-region)
 - **Date**: 2026-06-03
 - **Status**: Accepted (implemented)

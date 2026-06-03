@@ -31,8 +31,8 @@ Provider strings in APIs should use canonical form **`AWS`**, **`GCP`**, **`Azur
 
 | Variable | AWS | GCP | Azure |
 |----------|-----|-----|-------|
-| Compute | EC2 via BYOC or platform keys (TBD) | `GCP_PROJECT_ID`, `GCP_ZONE`, SA JSON | Subscription + SP (TBD) |
-| Metrics | CloudWatch (TBD) | GCP Monitoring (live) | Azure Monitor (TBD) |
+| Compute | EC2 via BYOC or platform keys (`aws_runtime`) | `GCP_PROJECT_ID`, `GCP_ZONE`, SA JSON | Subscription + SP (planned) |
+| Metrics | CloudWatch (`aws_metrics.py`) | GCP Monitoring (`metrics_collector.py`) | Azure Monitor (planned) |
 
 ### Provision (Phase 6+)
 
@@ -87,6 +87,7 @@ Common: `username`, `csp` (`AWS`|`GCP`|`Azure`), `is_active`, `connection_method
 | BYOC status | `get_byoc_status(username)` → `aws`, `gcp`, `azure` |
 | Provision (future) | `resolve_credentials(username, provider)` |
 | VM GCP | `gcp_runtime` + BYOC GCP record |
+| VM AWS | `aws_runtime` + `resolve_aws_credentials()` |
 
 ---
 

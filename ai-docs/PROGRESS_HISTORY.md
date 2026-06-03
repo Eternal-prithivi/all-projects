@@ -755,6 +755,20 @@ Reference: 97-page project report (Chapter 4–6). Last cross-check: 2026-05-24.
 
 ---
 
+## Multi-cloud parity — Phase 5 (2026-06-03)
+
+**Goal:** AWS EC2 VM lifecycle parity with existing GCP VM Cluster API.
+
+**Completed:**
+- `aws_manager.py`, `aws_runtime.py`, `vm_provider.py`, `aws_metrics.py`.
+- `routes_vm.py` + `manager.py` dispatch by `csp`; Azure request returns 501.
+- `VMClusterPage.jsx` cloud provider toolbar; `test_vm_api.py`.
+- 257 pytest green.
+
+**Next:** Phase 6 — provision GCP/Azure.
+
+---
+
 ## Multi-cloud parity — Phase 2 (2026-06-03)
 
 **Goal:** Cost analysis + budgets behave like AWS when GCP/Azure billing credentials exist.

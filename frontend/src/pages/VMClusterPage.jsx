@@ -16,7 +16,7 @@
 //   - Remove sessionStorage caching (cache_vm_*) — prevents flicker on re-navigation
 //   - Change raw fetch() to api.js — intentional VM-page API pattern
 // =============================================================================
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useNotifications } from "../hooks/useNotifications";
 import { useAuth } from "../context/AuthContext.jsx";
 import LoadingSpinner from "../components/LoadingSpinner.jsx";
@@ -33,6 +33,9 @@ import {
   IconServer,
   IconTrash,
 } from "../components/dashboard/Icons.jsx";
+import CloudProviderToolbar, {
+  filterFilesByCloudProvider,
+} from "../components/CloudProviderSelect.jsx";
 import "../styles/vmcluster.css";
 
 // API Functions
@@ -66,7 +69,10 @@ const requestVMAssignment = (data, token) =>
       "Content-Type": "application/json",
       Authorization: `Bearer ${token}`,
     },
-    body: JSON.stringify(data),
+    body: JSON.stringify({
+      csp: data.csp || "GCP",
+      ...data,
+    }),
   }).then(handleApiResponse);
 
 const getAllMyAssignments = (token) =>
@@ -81,18 +87,23 @@ const transferVM = (data, token) =>
       "Content-Type": "application/json",
       Authorization: `Bearer ${token}`,
     },
-    body: JSON.stringify(data),
+    body: JSON.stringify({
+      csp: data.csp || "GCP",
+      ...data,
+    }),
   }).then(handleApiResponse);
 
-const getVMMetrics = (vmName, token, useRealMetrics = false) =>
-  fetch(`${API_BASE_URL}/metrics/${vmName}?use_real=${useRealMetrics}`, {
-    headers: { Authorization: `Bearer ${token}` },
-  }).then(handleApiResponse);
+const getVMMetrics = (vmName, token, csp = "GCP", useRealMetrics = false) =>
+  fetch(
+    `${API_BASE_URL}/metrics/${encodeURIComponent(vmName)}?csp=${encodeURIComponent(csp)}&use_real=${useRealMetrics}`,
+    { headers: { Authorization: `Bearer ${token}` } }
+  ).then(handleApiResponse);
 
-const getClusterHealth = (clusterType, token) =>
-  fetch(`${API_BASE_URL}/admin/cluster-metrics/${clusterType}`, {
-    headers: { Authorization: `Bearer ${token}` },
-  }).then(handleApiResponse);
+const getClusterHealth = (clusterType, token, csp = "GCP") =>
+  fetch(
+    `${API_BASE_URL}/admin/cluster-metrics/${clusterType}?csp=${encodeURIComponent(csp)}`,
+    { headers: { Authorization: `Bearer ${token}` } }
+  ).then(handleApiResponse);
 
 const getRecommendations = (token, minScore = 50) =>
   fetch(`${API_BASE_URL}/admin/recommendations?min_score=${minScore}`, {
@@ -102,6 +113,7 @@ const getRecommendations = (token, minScore = 50) =>
 function VMClusterPage() {
   const { token } = useAuth();
   const notifications = useNotifications();
+  const [cloudProvider, setCloudProvider] = useState("GCP");
   const [, setCurrentAssignment] = useState(() => {
     try { const d = JSON.parse(sessionStorage.getItem('cache_vm_assignments')); return d?.[0] || null; } catch { return null; }
   });
@@ -167,21 +179,48 @@ function VMClusterPage() {
   }, [token]);
 
   // Fetch cluster health
+  const activeCsp = cloudProvider === "ALL" ? "GCP" : cloudProvider;
+
+  const displayedAssignments = useMemo(() => {
+    const withCsp = allAssignments.map((a) => ({ ...a, csp: a.csp || "GCP" }));
+    return filterFilesByCloudProvider(withCsp, cloudProvider);
+  }, [allAssignments, cloudProvider]);
+
   const fetchClusterHealth = useCallback(async () => {
     if (!token) return;
     try {
-      const [general, storage] = await Promise.all([
-        getClusterHealth("GENERAL", token),
-        getClusterHealth("STORAGE", token),
-      ]);
-      setGeneralClusterHealth(general);
-      setStorageClusterHealth(storage);
-      sessionStorage.setItem('cache_vm_clusterGeneral', JSON.stringify(general));
-      sessionStorage.setItem('cache_vm_clusterStorage', JSON.stringify(storage));
+      const providers =
+        cloudProvider === "ALL" ? ["GCP", "AWS"] : [activeCsp];
+      let general = null;
+      let storage = null;
+      for (const csp of providers) {
+        try {
+          const [g, s] = await Promise.all([
+            getClusterHealth("general", token, csp),
+            getClusterHealth("storage", token, csp),
+          ]);
+          if (!general || (g.running_vms || 0) > (general.running_vms || 0)) {
+            general = { ...g, csp };
+          }
+          if (!storage || (s.running_vms || 0) > (storage.running_vms || 0)) {
+            storage = { ...s, csp };
+          }
+        } catch (err) {
+          if (cloudProvider !== "ALL") throw err;
+        }
+      }
+      if (general) {
+        setGeneralClusterHealth(general);
+        sessionStorage.setItem("cache_vm_clusterGeneral", JSON.stringify(general));
+      }
+      if (storage) {
+        setStorageClusterHealth(storage);
+        sessionStorage.setItem("cache_vm_clusterStorage", JSON.stringify(storage));
+      }
     } catch (error) {
       console.error("Error fetching cluster health:", error);
     }
-  }, [token]);
+  }, [token, cloudProvider, activeCsp]);
 
   // Fetch recommendations
   const fetchRecommendations = useCallback(async () => {
@@ -200,8 +239,13 @@ function VMClusterPage() {
     if (!token || allAssignments.length === 0) return;
     try {
       // Fetch metrics for all assigned VMs
-      const metricsPromises = allAssignments.map(assignment =>
-        getVMMetrics(assignment.vm_name, token, useRealMetrics)
+      const metricsPromises = allAssignments.map((assignment) =>
+        getVMMetrics(
+          assignment.vm_name,
+          token,
+          assignment.csp || activeCsp,
+          useRealMetrics
+        )
       );
       const metricsResults = await Promise.all(metricsPromises);
       
@@ -214,7 +258,7 @@ function VMClusterPage() {
     } catch (error) {
       console.error("Error fetching VM metrics:", error);
     }
-  }, [token, allAssignments, useRealMetrics]);
+  }, [token, allAssignments, useRealMetrics, activeCsp]);
 
   // Single useEffect for initial load and polling
   useEffect(() => {
@@ -331,6 +375,7 @@ function VMClusterPage() {
     setIsRequesting(true);
     try {
       const data = {
+        csp: activeCsp,
         workload_description: workloadDescription,
         follow_up_answers: Object.keys(followUpAnswers).length ? followUpAnswers : null,
         cluster_preference: clusterPreference || null,
@@ -383,6 +428,7 @@ function VMClusterPage() {
     setIsTransferring(true);
     try {
       const data = {
+        csp: activeCsp,
         target_cluster: transferCluster,
         reason: "User-initiated migration",
       };
@@ -509,6 +555,17 @@ ${instructions.troubleshooting.map((item) => `
           <span className="live-text">Live</span>
         </div>
       </PageHeader>
+
+      <CloudProviderToolbar
+        provider={cloudProvider}
+        onProviderChange={setCloudProvider}
+        onAction={() =>
+          Promise.all([fetchClusterHealth(), fetchAssignment(), fetchVMMetrics()])
+        }
+        actionLabel="Refresh clusters"
+        selectAriaLabel="VM cloud provider"
+        className="vm-cloud-toolbar"
+      />
 
       {/* VM Process Flow */}
       <div className="vm-process-info">
@@ -646,7 +703,7 @@ ${instructions.troubleshooting.map((item) => `
           </div>
           
           <div className="assignments-grid">
-            {allAssignments.map((assignment, index) => (
+            {displayedAssignments.map((assignment, index) => (
               <div key={assignment.assignment_id} className="assignment-card">
                 <div className="assignment-header">
                   <h4>VM Assignment #{index + 1}</h4>

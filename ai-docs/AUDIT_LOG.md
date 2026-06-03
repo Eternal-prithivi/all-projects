@@ -23,6 +23,18 @@ Notes: [one line optional]
 ## Session Log (recent only)
 
 ---
+SESSION_ID: 20260603-multicloud-phase5
+Date: 2026-06-03
+Agent: Cursor Composer
+Task: Multi-cloud parity Phase 5 — VM AWS EC2 parity
+Changes:
+- aws_manager, vm_provider, CloudWatch metrics; routes + VMClusterPage csp
+- DEC-026; 257 pytest passed
+Outcome: Done
+Notes: Next Phase 6 provision
+---
+
+---
 SESSION_ID: 20260603-multicloud-phase4
 Date: 2026-06-03
 Agent: Cursor Composer
