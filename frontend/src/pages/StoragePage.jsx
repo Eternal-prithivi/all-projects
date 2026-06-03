@@ -451,6 +451,7 @@ function StoragePage() {
         variant="storage"
         selectedBucket={selectedBucket}
         selectedRegion={selectedRegion}
+        activeCsp={cloudProvider}
       />
 
       <div className="storage-process-info zenith-surface">

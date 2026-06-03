@@ -82,6 +82,7 @@ function DashboardPage() {
   const [error, setError] = useState(null);
   const [isRefreshingCosts, setIsRefreshingCosts] = useState(false);
   const [lastCostUpdate, setLastCostUpdate] = useState(null);
+  const [costByProvider, setCostByProvider] = useState({});
 
   const greeting = useMemo(getGreeting, []);
   const formattedDate = useMemo(() => formatDateFriendly(new Date()), [formatDateFriendly]);
@@ -112,6 +113,7 @@ function DashboardPage() {
     try {
       const statsData = await getDashboardStats(token);
       setStats(statsData);
+      setCostByProvider(statsData.cost_by_provider || {});
       
       if (statsData.vm_health) {
         setVmHealth(statsData.vm_health);
@@ -152,10 +154,12 @@ function DashboardPage() {
       async () => {
         const response = await apiClient.post('/dashboard/refresh-costs');
         if (response.data.success) {
-          setStats(prevStats => ({
+          setStats((prevStats) => ({
             ...prevStats,
-            monthly_costs: response.data.monthly_costs
+            monthly_costs: response.data.monthly_costs,
+            cost_by_provider: response.data.cost_by_provider,
           }));
+          setCostByProvider(response.data.cost_by_provider || {});
           setLastCostUpdate(new Date().toLocaleTimeString());
           return response.data;
         }
@@ -240,14 +244,24 @@ function DashboardPage() {
               type="button"
               onClick={refreshCosts}
               disabled={isRefreshingCosts}
-              aria-label="Refresh cost data from AWS"
-              title="Refresh cost data from AWS"
+              aria-label="Refresh cost data for all connected clouds"
+              title="Refresh cost data for all connected clouds"
             >
               <IconRefresh className={isRefreshingCosts ? 'refresh-icon is-spinning' : 'refresh-icon'} />
               Refresh
             </button>
           }
-          subtitle={lastCostUpdate ? `Updated: ${lastCostUpdate}` : '7-day spending trend'}
+          subtitle={
+            lastCostUpdate
+              ? `Updated: ${lastCostUpdate}${
+                  Object.keys(costByProvider).length > 0
+                    ? ` · ${Object.entries(costByProvider)
+                        .map(([k, v]) => `${k.toUpperCase()} ${formatCurrency(v)}`)
+                        .join(' + ')}`
+                    : ''
+                }`
+              : '30-day spend (all available clouds)'
+          }
         >
           <SparklineChart data={sparklineData} height={140} showXAxis={true} />
         </StatCard>

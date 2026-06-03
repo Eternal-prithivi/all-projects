@@ -770,6 +770,7 @@ function SecurityPage() {
               variant="security"
               selectedBucket={selectedBucket}
               selectedRegion={selectedRegion}
+              activeCsp={cloudProvider}
             />
           </>
         )}

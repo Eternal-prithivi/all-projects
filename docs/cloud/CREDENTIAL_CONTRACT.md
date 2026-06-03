@@ -6,14 +6,19 @@
 
 Provider strings in APIs should use canonical form **`AWS`**, **`GCP`**, **`Azure`** (see `app/cloud/providers.py`). Billing probes and Mongo BYOC status keys use lowercase **`aws`**, **`gcp`**, **`azure`**.
 
-### Availability rules (`GET /api/cloud/availability`)
+### Availability rules (`GET /api/cloud/availability`) — hybrid
 
-| Mode | When | Providers shown |
-|------|------|-------------------|
-| **BYOC** | User has ≥1 active BYOC connection | **Only** connected CSPs (no platform fallback for others) |
-| **Platform** | No BYOC connections | All CSPs Zenith has configured in `.env` for that feature |
+| Mode | When | Providers shown | Credentials used per CSP |
+|------|------|-----------------|--------------------------|
+| **Platform** | No BYOC | All platform-configured CSPs | Platform `.env` |
+| **BYOC** | BYOC only, no platform config | Connected CSPs only | BYOC |
+| **Hybrid** | ≥1 BYOC + platform has other CSPs | **Union** of connected + platform-configured | BYOC if connected, else platform |
 
-UI pages (Storage, Security, VM, Provision, Cost) use this endpoint so selectors match what upload/plan/sync APIs allow. Backend returns **403** `provider_not_available` if a disallowed CSP is submitted.
+Example: AWS BYOC only → user can still upload to GCP/Azure using **Zenith platform** keys; AWS uploads use **their** BYOC.
+
+UI pages use this endpoint. Backend returns **403** if a CSP is neither connected nor platform-available.
+
+`GET /byoc/storage-targets` returns per-provider bucket/container paths with `credential_source: byoc | platform`.
 
 ---
 

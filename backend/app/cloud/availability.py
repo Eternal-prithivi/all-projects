@@ -1,10 +1,12 @@
 """
-Per-user cloud provider availability — BYOC vs platform Zenith credentials.
+Per-user cloud provider availability — hybrid BYOC + platform.
 
 Rules:
-- If the user has **any** active BYOC connection → only BYOC-connected providers are available
-  (no platform fallback for providers they did not connect).
-- If the user has **no** BYOC → all platform-configured providers are available.
+- **Hybrid:** Union of BYOC-connected CSPs and platform-configured CSPs (per feature).
+  Example: AWS BYOC only → user still gets GCP/Azure via Zenith platform keys for storage/cost.
+- **Credential routing** (upload, billing): BYOC when connected for that CSP, else platform
+  (`credential_resolver.py` — unchanged).
+- **UI availability:** Same union — selectors show every CSP the user can actually use.
 """
 
 from __future__ import annotations
@@ -37,6 +39,11 @@ def _byoc_connected(username: str, provider: CloudProvider) -> bool:
 
 def user_has_any_byoc(username: str) -> bool:
     return any(_byoc_connected(username, p) for p in _ALL)
+
+
+def credential_source(username: str, provider: CloudProvider) -> str:
+    """Which credential bucket applies for this CSP: byoc | platform."""
+    return "byoc" if _byoc_connected(username, provider) else "platform"
 
 
 def platform_storage_configured(provider: CloudProvider) -> bool:
@@ -100,6 +107,10 @@ def _platform_configured(provider: CloudProvider, feature: CloudFeature) -> bool
     return False
 
 
+def _provider_available(username: str, provider: CloudProvider, feature: CloudFeature) -> bool:
+    return _byoc_connected(username, provider) or _platform_configured(provider, feature)
+
+
 def _feature_filter(providers: List[CloudProvider], feature: CloudFeature) -> List[CloudProvider]:
     if feature == CloudFeature.VM:
         return [p for p in providers if p != "Azure"]
@@ -107,11 +118,8 @@ def _feature_filter(providers: List[CloudProvider], feature: CloudFeature) -> Li
 
 
 def available_providers(username: str, feature: CloudFeature) -> List[CloudProvider]:
-    """Providers the user may use for this feature right now."""
-    if user_has_any_byoc(username):
-        base = [p for p in _ALL if _byoc_connected(username, p)]
-    else:
-        base = [p for p in _ALL if _platform_configured(p, feature)]
+    """Providers the user may use for this feature (hybrid union)."""
+    base = [p for p in _ALL if _provider_available(username, p, feature)]
     return _feature_filter(base, feature)
 
 
@@ -125,7 +133,6 @@ def provider_not_available_exception(
     provider: CloudProvider,
     feature: CloudFeature,
 ) -> HTTPException:
-    mode = "byoc" if user_has_any_byoc(username) else "platform"
     allowed = available_providers(username, feature)
     return HTTPException(
         status_code=403,
@@ -133,11 +140,11 @@ def provider_not_available_exception(
             "code": "provider_not_available",
             "message": (
                 f"{provider} is not available for {feature.value}. "
-                f"{'Connect this cloud in Settings (BYOC)' if mode == 'byoc' else 'Platform credentials for this cloud are not configured'}."
+                "Connect BYOC in Settings or ensure the platform has credentials for this cloud."
             ),
             "provider": provider,
             "feature": feature.value,
-            "credential_mode": mode,
+            "credential_mode": resolve_credential_mode(username),
             "available_providers": allowed,
         },
     )
@@ -155,10 +162,24 @@ def assert_provider_available(
     return provider
 
 
+def resolve_credential_mode(username: str) -> str:
+    """platform | byoc | hybrid — for UI copy."""
+    has_byoc = user_has_any_byoc(username)
+    has_platform_any = any(
+        _platform_configured(p, CloudFeature.STORAGE) for p in _ALL
+    )
+    if has_byoc and has_platform_any:
+        return "hybrid"
+    if has_byoc:
+        return "byoc"
+    return "platform"
+
+
 def build_availability_payload(username: str) -> Dict[str, Any]:
     """API response for GET /api/cloud/availability."""
-    byoc_mode = user_has_any_byoc(username)
     connected = [p for p in _ALL if _byoc_connected(username, p)]
+    mode = resolve_credential_mode(username)
+    sources = {p: credential_source(username, p) for p in _ALL}
 
     features: Dict[str, Any] = {}
     for feat in CloudFeature:
@@ -167,11 +188,15 @@ def build_availability_payload(username: str) -> Dict[str, Any]:
             "providers": providers,
             "default": providers[0] if providers else None,
             "multi_provider": len(providers) > 1,
+            "credential_sources": {
+                p: sources[p] for p in providers if p in sources
+            },
         }
 
     return {
-        "credential_mode": "byoc" if byoc_mode else "platform",
+        "credential_mode": mode,
         "byoc_connected": connected,
+        "credential_sources": sources,
         "features": features,
         "summary": {
             "any_provider": any(

@@ -507,46 +507,10 @@ async def get_status(user: User = Depends(get_current_user)):
 
 @router.get("/storage-targets", summary="Where Storage and Security files are stored")
 async def get_storage_targets(user: User = Depends(get_current_user)):
-    """Read-only destination info for Storage and Security pages."""
-    layout = get_aws_bucket_layout(user.username)
-    if layout:
-        storage = layout["storage_bucket_name"]
-        secure = layout["secure_bucket_name"]
-        return {
-            "mode": "byoc",
-            "csp": "AWS",
-            "storage": {
-                "bucket": storage,
-                "region": layout["primary_region"],
-                "key_prefix": f"{user.username}/",
-            },
-            "security": {
-                "bucket": secure,
-                "region": layout["primary_region"],
-                "key_prefix": f"{user.username}/"
-                if layout.get("uses_dedicated_secure_bucket")
-                else f"secure/{user.username}/",
-                "replica_bucket": layout.get("replica_bucket_name") or None,
-                "replica_region": layout.get("replica_region") or None,
-                "secure_dual_write": layout.get("secure_dual_write", True),
-            },
-        }
-    return {
-        "mode": "platform",
-        "storage": {
-            "bucket": getattr(settings, "REGULAR_S3_BUCKET_NAME", settings.S3_BUCKET_NAME),
-            "region": settings.PRIMARY_S3_REGION,
-            "key_prefix": f"{user.username}/",
-        },
-        "security": {
-            "bucket": settings.SECURE_S3_BUCKET_NAME,
-            "region": settings.PRIMARY_S3_REGION,
-            "key_prefix": f"{user.username}/",
-            "replica_bucket": settings.REPLICA_S3_BUCKET_NAME,
-            "replica_region": settings.REPLICA_S3_REGION,
-            "secure_dual_write": True,
-        },
-    }
+    """Read-only per-provider destination info (BYOC + platform hybrid)."""
+    from app.cloud.storage_targets import build_storage_targets_payload
+
+    return build_storage_targets_payload(user.username)
 
 
 @router.get("/aws-buckets", summary="List S3 buckets for Storage or Security UI")
