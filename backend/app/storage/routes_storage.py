@@ -57,6 +57,7 @@ from app.storage.file_queries import (
     build_storage_list_filter,
     find_storage_file,
 )
+from app.cloud.providers import normalize_provider
 
 logger = setup_logger(__name__)
 router = APIRouter(tags=["Storage"])
@@ -109,6 +110,11 @@ async def upload_file_to_csp(
     user: User = Depends(get_current_user),
     files_db: Collection = Depends(get_files_collection),
 ):
+    try:
+        csp = normalize_provider(csp)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
     upload_functions = {"AWS": upload_to_aws, "GCP": upload_to_gcp, "Azure": upload_to_azure}
     upload_function = upload_functions.get(csp)
     if not upload_function:

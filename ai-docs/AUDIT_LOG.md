@@ -23,6 +23,20 @@ Notes: [one line optional]
 ## Session Log (recent only)
 
 ---
+SESSION_ID: 20260603-multicloud-phase0
+Date: 2026-06-03
+Agent: Cursor Composer
+Task: Multi-cloud parity Phase 0 — foundation
+Changes:
+- Added docs/cloud parity matrix + credential contract
+- Added app/cloud/providers.py (normalize_provider); storage upload uses it
+- Removed stale backend/cost/; tri-cloud routing integration tests
+- Updated STATUS/PROGRESS/SCRATCHPAD; 218 pytest passed
+Outcome: Done
+Notes: Phase 20.5.10 still paused; next Phase 1 storage
+---
+
+---
 SESSION_ID: 20260530-scheduled-drift-boto3
 Date: 2026-05-30
 Agent: Cursor Composer

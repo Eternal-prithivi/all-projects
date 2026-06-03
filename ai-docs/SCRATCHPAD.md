@@ -2,10 +2,19 @@
 
 ## 🔄 Current Resume State
 
-**Status:** Phase **20.5** code landed — verify CI on `stage` push.
+**Status:** COMPLETE — Multi-cloud parity **Phase 0** (2026-06-03)
 
-**Done in repo:** CI-gated deploy, required Playwright, coverage 40%, audits, CodeQL, gitleaks, terraform plan PR job, ESLint zero warnings, jspdf 4.x, Trivy Dockerfile scan.
+**Delivered:** Parity matrix + credential contract; `app/cloud/providers.py`; removed duplicate `backend/cost/`; storage upload normalizes CSP; tri-cloud routing integration tests; **218 pytest passed**.
 
-**Manual (you):** **20.5.10** — GitHub → Settings → Branches → protect `stage` with checks: `backend`, `frontend`, `terraform-validate`, `playwright`, `security-audit`. Set secret `STAGE_API_URL` for post-deploy smoke.
+**Next session:** Phase **1** — storage tiering audit, GCP/Azure upload/list/delete mocks, restore API decision (`/restore/{csp}` vs 501), `StoragePage.jsx` error surfacing.
 
-**Next:** Confirm green CI, then start **Phase 21**.
+**Paused:** Phase 20.5 **20.5.10** (GitHub branch protection on `stage`).
+
+---
+
+## Last Known Good State
+
+- Branch: `stage` (push after Phase 0 commit)
+- Backend: `cd backend && ../venv/bin/python -m pytest -q` → 218 passed
+- Canonical cost: `backend/app/cost/` only
+- Provider helper: `normalize_provider("aws")` → `"AWS"`

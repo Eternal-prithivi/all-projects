@@ -1,62 +1,61 @@
 # PROGRESS.md — Task Tracker
 
-> **Last Updated:** 2026-05-30  
-> **Roadmap:** Phases **19–27** + **20.5**. Full checklists → `PROGRESS_HISTORY.md`.  
-> **Order rule:** **19 → 20 → 20.5 → 21**; **22+** need org foundation.
+> **Last Updated:** 2026-06-03  
+> **Roadmap:** Phases **19–27** + **20.5** + **Multi-cloud parity (Phases 0–7)**.
 
 
 ---
 
 ## 🔴 Active Task
 
-**Phase 20.5 — CI/CD enterprise gates** — implementation in progress on `stage`.
+**None** — Phase 0 complete. **Next:** Multi-cloud parity **Phase 1** (storage hardening).
 
-**Next after 20.5:** Phase 21 (observability & runbooks).
+---
+
+## Multi-cloud parity (plan)
+
+| Phase | Theme | Status |
+|-------|--------|--------|
+| **0** | Foundation, matrix, normalize provider, stale cleanup | ✅ Complete |
+| **1** | Storage hardening | ⬜ Not started |
+| **2** | Cost / budgets / billing UX | ⬜ Not started |
+| **3** | BYOC verify + discovery | ⬜ Not started |
+| **4** | Secure vault tri-cloud | ⬜ Not started |
+| **5** | VM tri-cloud | ⬜ Not started |
+| **6** | Provision tri-cloud | ⬜ Not started |
+| **7** | Cross-cutting polish | ⬜ Not started |
+
+---
+
+## Phase 0 — Foundation ✅
+
+- [x] **0.1** — PRE tracking
+- [x] **0.2** — `docs/cloud/MULTI_CLOUD_PARITY_MATRIX.md`
+- [x] **0.3** — `docs/cloud/CREDENTIAL_CONTRACT.md`
+- [x] **0.4** — Removed stale `backend/cost/`
+- [x] **0.5** — `app/cloud/providers.py`
+- [x] **0.6** — Tri-cloud routing tests (218 pytest green)
+- [x] **0.7** — POST + push
 
 ---
 
 ## Phase summary (19 → 27)
 
-| Phase | Theme | Depends on | Status |
-|-------|--------|------------|--------|
-| **19** | Isolated ops & hygiene | — | ✅ Complete |
-| **20** | Quality, CI depth & CD | 19 | ✅ Complete |
-| **20.5** | **CI/CD enterprise gates** | 20 | 🟡 In progress |
-| **21** | Observability & runbooks | 19, **20.5** | ⬜ Not started |
-| **22** | Org foundation (data model) | 19–21 recommended | ⬜ Not started |
-| **23** | Org-scoped product | **22** | ⬜ Not started |
-| **24** | Enterprise IdP & API governance | **22**, partial 23 | ⬜ Not started |
-| **25** | Scale-out & performance | 20, 21, 24.8 optional | ⬜ Not started |
-| **26** | Compliance & commercial | **22–23** | ⬜ Not started |
-| **27** | Cloud parity & deferred UI | BYOC/GCP billing active | ⬜ Not started |
+| Phase | Theme | Status |
+|-------|--------|------------|
+| **19** | Isolated ops & hygiene | ✅ Complete |
+| **20** | Quality, CI depth & CD | ✅ Complete |
+| **20.5** | CI/CD enterprise gates | 🟡 Paused at 20.5.10 |
+| **21** | Observability & runbooks | ⬜ Not started |
+| **22–27** | Org → scale → compliance → cloud parity | ⬜ / superseded by parity plan |
 
 ---
 
 ## Phase 20.5 — CI/CD enterprise gates
 
-*Detail: `docs/testing/PHASE_20_5_CI_GATES.md`*
-
-- [x] **20.5.1** — CI-gated stage deploy (`workflow_run` after CI)
-- [x] **20.5.2** — Playwright required (removed `continue-on-error`)
-- [x] **20.5.3** — Backend `--cov-fail-under=40`
-- [x] **20.5.4** — Post-deploy stage smoke (`STAGE_API_URL` secret)
-- [x] **20.5.5** — ESLint `--max-warnings 0` + warning fixes
-- [x] **20.5.6** — Dependabot (`.github/dependabot.yml`)
-- [x] **20.5.7** — `pip-audit` + `npm audit --audit-level=high` in CI
-- [x] **20.5.8** — CodeQL workflow
-- [x] **20.5.9** — Gitleaks + `.gitleaks.toml`
-- [ ] **20.5.10** — Apply GitHub branch protection on `stage` (manual in repo Settings)
-- [x] **20.5.11** — `STAGING.md` default branch + keep-alive notes
-- [x] **20.5.12** — `terraform-plan.yml` on PR
-- [x] **20.5.13** — Celery/Redis CI deferral documented in `PHASE_20_5_CI_GATES.md`
+- [x] **20.5.1–20.5.9**, **20.5.11–20.5.13**, **20.5.15**
+- [ ] **20.5.10** — Branch protection on `stage` (manual, paused)
 - [ ] **20.5.14** — *(Optional)* OpenAPI snapshot tests
-- [x] **20.5.15** — Trivy Dockerfile scan in CI
-
----
-
-## Phase 20 — Quality, CI depth & CD ✅
-
-*Complete — see `PROGRESS_HISTORY.md`.*
 
 ---
 
@@ -64,8 +63,8 @@
 
 | Topic | Doc |
 |-------|-----|
-| Phase 20.5 gap map | `docs/testing/PHASE_20_5_CI_GATES.md` |
-| Deferred enterprise checklist | `docs/testing/professional_standard.md` |
+| Multi-cloud matrix | `docs/cloud/MULTI_CLOUD_PARITY_MATRIX.md` |
+| Credential contract | `docs/cloud/CREDENTIAL_CONTRACT.md` |
 | Agent protocol | `AI_MASTER.md` |
 | Live snapshot | `STATUS.md` |
 | Resume | `SCRATCHPAD.md` |

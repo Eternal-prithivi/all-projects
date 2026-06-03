@@ -726,6 +726,24 @@ Reference: 97-page project report (Chapter 4–6). Last cross-check: 2026-05-24.
 
 ---
 
+## Multi-cloud parity — Phase 0 (2026-06-03)
+
+**Goal:** Single source of truth for tri-cloud parity before feature phases 1–7.
+
+**Completed:**
+- Added `docs/cloud/MULTI_CLOUD_PARITY_MATRIX.md` (area matrix + per-endpoint checklist with phase ownership).
+- Added `docs/cloud/CREDENTIAL_CONTRACT.md` (platform `.env`, BYOC fields, manual smoke steps).
+- Removed stale duplicate package `backend/cost/` (no imports; canonical `app/cost/`).
+- Introduced `app/cloud/providers.py` with `normalize_provider()` / `normalize_provider_key()`; wired storage upload to accept aliases (`aws`, `gcp`, etc.).
+- Tests: `test_cloud_providers.py`, `test_cloud_routing.py`, extended `test_storage_api.py` (GCP upload smoke).
+- Paused Phase 20.5.10 (branch protection) per parity plan; tracking docs updated.
+
+**Verification:** `pytest -q` → 218 passed.
+
+**Next:** Phase 1 — storage tri-cloud hardening (tiering audit, restore API, frontend errors).
+
+---
+
 ## Reference
 
 | Topic | Doc |
