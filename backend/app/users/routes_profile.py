@@ -259,32 +259,20 @@ async def upload_profile_picture(
     file: UploadFile = File(...),
     current_user: User = Depends(get_current_user)
 ):
-    """Upload profile picture"""
-    try:
-        # Validate file type
-        if not file.content_type.startswith("image/"):
-            raise HTTPException(status_code=400, detail="File must be an image")
-        
-        # Validate file size (max 2MB)
-        file_content = await file.read()
-        if len(file_content) > 2 * 1024 * 1024:
-            raise HTTPException(status_code=400, detail="File size must be less than 2MB")
-        
-        # TODO: Upload to cloud storage (S3, GCS, Azure Blob)
-        # For now, just store a placeholder URL
-        picture_url = f"/uploads/profiles/{current_user.username}_{file.filename}"
-        
-        users_collection = DB["users"]
-        users_collection.update_one(
-            {"username": current_user.username},
-            {"$set": {"profile_picture": picture_url, "updated_at": datetime.utcnow()}}
-        )
-        
-        return {"success": True, "picture_url": picture_url}
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to upload picture: {str(e)}")
+    """
+    Profile avatars are not yet stored in object storage (tri-cloud).
+    Use Settings → display name until S3/GCS/Blob upload ships (Phase 27 backlog).
+    """
+    raise HTTPException(
+        status_code=501,
+        detail={
+            "code": "not_implemented",
+            "message": (
+                "Profile picture upload is not available yet. "
+                "Tri-cloud object storage for avatars is planned; use display name for now."
+            ),
+        },
+    )
 
 
 @router.delete("/picture")

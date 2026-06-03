@@ -1,4 +1,6 @@
 # backend/app/pricing/pricing_fetcher.py
+# Static tri-cloud reference rates for Cost Simulator — not live Price List APIs.
+# See docs/cloud/PRICING_DATA_SOURCE.md
 
 import boto3
 import requests

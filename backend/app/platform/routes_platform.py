@@ -5,7 +5,7 @@ from datetime import datetime
 from fastapi import APIRouter
 
 from app.database.mongo_client import get_database, mongodb_client
-from app.utils.gcp_credentials import gcp_credentials_file_present
+from app.platform.cloud_connectivity import probe_platform_cloud_connectivity
 from app.utils.config import settings as app_settings
 from app.config.demo_mode import is_demo_mode
 
@@ -41,7 +41,7 @@ async def get_platform_status():
     except Exception:
         mongo_ok = False
 
-    gcp_configured = gcp_credentials_file_present()
+    cloud = probe_platform_cloud_connectivity()
 
     overall = "operational"
     if maintenance_mode:
@@ -60,9 +60,8 @@ async def get_platform_status():
         "services": {
             "api": "operational" if not maintenance_mode else "maintenance",
             "database": "operational" if mongo_ok else "degraded",
-            "gcp_integration": "configured" if gcp_configured else "not_configured",
             "billing_data": "demo_mock" if is_demo_mode() else "live_apis",
         },
-        "gcp_credentials_present": gcp_configured,
+        "cloud_connectivity": cloud,
         "checked_at": datetime.utcnow().isoformat() + "Z",
     }

@@ -1,7 +1,7 @@
 # AI_CONTEXT_BACKEND.md — Backend Architecture & Source Map
 
 > Read this for any backend, API, database, Celery, or ML task.
-> **Last Updated: 2026-05-29** — BYOC credential routing matrix added.
+> **Last Updated: 2026-06-03** — Multi-cloud parity Phases 0–7; platform `cloud_connectivity` on status.
 
 ---
 
@@ -22,16 +22,18 @@ For frontend context → read `AI_CONTEXT_FRONTEND.md`
 |--------|--------------|-----------|-------|
 | **auth** | `routes_auth.py`, `routes_password_reset.py` | `auth_service.py`, `auth_utils.py`, `password_reset_service.py` | JWT login, register, forgot/reset password (email link + SMS OTP), recovery contacts |
 | **users** | `routes_users.py`, `routes_profile.py`, `routes_settings.py` | `user_model.py` | Profile edit, recovery contacts, settings preferences, BYOC, theme, currency, audit log |
-| **security** | `routes_security.py`, `routes_2fa.py` | `encryption_handler.py`, `tasks_alerts.py` | 2FA, secure vault, **SSE-S3** on server-side path — **Phase 12:** auto SSE, **browser CSE**, detector (`PHASE_12_SECURITY_RESEARCH_PARITY.md` §2–§3) |
+| **security** | `routes_security.py`, `routes_2fa.py` | `secure_vault.py`, `encryption_handler.py` | Tri-cloud secure vault (AWS/GCP/Azure); browser CSE AWS-only |
 | **storage** | `routes_storage.py` | `cloud_credentials.py`, `optimizer.py`, `uploader.py`, `manager.py`, `tasks.py`, `tiering_tasks.py`, `models_storage.py` | ML ensemble analysis, multi-cloud upload/download/delete, nightly lifecycle tiering; **BYOC** via `credential_resolver` |
-| **vm** | `routes_vm.py`, `routes_admin_cleanup.py` | `manager.py`, `nlp_workload.py`, `models.py`, `metrics_collector.py`, `migration_recommender.py`, `workload_guidance.py`, `tasks.py` | NLP workload classification → five-cluster assignment, VM lifecycle, metrics, migration |
+| **vm** | `routes_vm.py`, `routes_admin_cleanup.py` | `manager.py`, `vm_provider.py`, `aws_manager.py`, `gcp_runtime.py`, `metrics_collector.py` | AWS EC2 + GCP GCE lifecycle; Azure 501 (`docs/cloud/VM_MULTI_CLOUD_SCOPE.md`) |
 | **cost** | `routes_cost.py`, `routes_forecast.py`, `routes_anomaly.py`, `routes_export.py` | `manager.py`, `forecasting.py`, `tasks_anomaly.py` | Decay-weighted linear regression forecast, Z-score anomaly detection, CSV export |
 | **ml** | `routes_feedback.py` | `storage_ensemble.py`, `feedback.py`, `retraining.py`, `repository.py`, `models.py`, `acceptance.py`, `sample_datasets.py`, `tasks_feedback.py` | RF+XGBoost ensemble, feedback outcome evaluation, guarded self-retraining |
 | **byoc** | `routes_byoc.py` | `credential_resolver.py`, `encryption.py` | Connect/test/disconnect AWS IAM + STS AssumeRole, AES-256-GCM credential encryption |
 | **admin** | `routes_admin.py` | — | Full user CRUD (create/delete/role/bulk), audit log query, CSV export, self-protection guards |
 | **billing** | `routes_billing.py` | — | Free plan display, billing history |
 | **payments** | `routes_payments.py` | — | Razorpay payment orders |
-| **pricing** | `routes_pricing.py` | `pricing_fetcher.py`, `tasks.py` | Live cloud pricing fetch |
+| **pricing** | `routes_pricing.py` | `pricing_fetcher.py`, `tasks.py` | Static tri-cloud tables for Cost Simulator (see `docs/cloud/PRICING_DATA_SOURCE.md`) |
+| **platform** | `routes_platform.py` | `cloud_connectivity.py` | Public status + per-CSP `.env` readiness flags |
+| **provision** | `routes_provision.py` | `engine_resolver.py`, `terraform_runner.py`, `provision_catalog.py` | TF plan/apply/destroy; AWS boto3 optional; GCP/Azure TF only |
 | **budgets** | `routes_budgets.py` | `models.py`, `tasks.py` | Budget alerts |
 | **contact** | `routes_contact.py` | `email_service.py` | Contact form → Gmail SMTP, security alert emails, password reset emails |
 | **dashboard** | `routes_dashboard.py` | — | Stats endpoint (partially hardcoded — see Known Issues) |
@@ -87,8 +89,10 @@ Database: `CloudResourceOptimizationDB`
 /api/users       → routes_users.py (GET /me)
 /api             → routes_profile.py, routes_settings.py, routes_billing.py, routes_pricing.py
 /api/dashboard   → routes_dashboard.py (stats, cost-trend)
-/api/storage     → routes_storage.py (analyze, upload, files, download, delete, sync/aws)
-/api/security    → routes_security.py (upload-secure, list-secure, download, delete, sync/aws)
+/api/storage     → routes_storage.py (analyze, upload, files, download, delete, sync/{aws|gcp|azure})
+/api/security    → routes_security.py (upload-secure, list-secure, download, delete, sync/{csp})
+/api/provision   → routes_provision.py (plan, apply, destroy, drift, templates?csp=, modules?csp=)
+/api/platform    → routes_platform.py (GET /status — cloud_connectivity per CSP)
 /api/2fa         → routes_2fa.py (status, enable, finalize, verify, disable)
 /api/vm          → routes_vm.py (request, release, clusters, assignment, analyze-workload, migrate)
 /api             → routes_admin_cleanup.py (cleanup)
@@ -152,7 +156,9 @@ Database: `CloudResourceOptimizationDB`
 
 | Method | Path | Purpose |
 |--------|------|---------|
-| GET | `/api/platform/status` | Maintenance flag, DB health, `overall` status (no auth) |
+| GET | `/api/platform/status` | Maintenance, DB health, `cloud_connectivity` (storage/billing/secure/provision/vm per aws/gcp/azure) |
+| GET | `/api/pricing` | Static simulator rates (aws/gcp/azure); cached in `pricing_cache` |
+| POST | `/api/profile/picture` | **501** — avatar upload deferred; tri-cloud object storage backlog |
 
 Auth: `POST /api/auth/verify-email?token=` — marks `email_verified` when `email_verify_token` matches user.
 
@@ -173,30 +179,26 @@ cd backend && source .venv/bin/activate   # venv is at backend/.venv — NOT pro
 uvicorn app.main:app --reload              # → http://localhost:8000 (Swagger: /docs)
 celery -A app.celery_worker worker --loglevel=info   # Terminal 3
 celery -A app.celery_worker beat --loglevel=info     # Terminal 4
-python -m pytest -q                                   # 34 tests
+python -m pytest -q                                   # 260+ tests (2026-06-03)
 ```
 
 ---
 
-## BYOC credential routing (2026-05-29)
+## BYOC credential routing (2026-06-03 — parity Phases 0–7)
 
-When a user connects BYOC for a CSP, **that user's** API operations should use their credentials and bucket/account where noted below.
+When a user connects BYOC, operations use **their** credentials per CSP (`credential_resolver.py`, `resolve_provision_terraform_env`).
 
 | Feature | AWS BYOC | GCP BYOC | Azure BYOC | Notes |
 |---------|----------|----------|------------|-------|
-| Storage upload/download/sync | Yes | Yes | Yes | `cloud_credentials.py` + `uploader.py` / `manager.py` |
-| Secure vault (2FA) | Yes (`secure/{user}/` prefix in user bucket) | N/A (AWS-only vault) | N/A | Platform dual-bucket when no AWS BYOC |
-| Cost Explorer / billing APIs | Yes | Yes (BigQuery export in user's project) | Platform SP only* | Azure BYOC stores storage keys only |
-| Dashboard cost refresh | Yes | — | — | Per-user cache |
-| VM cluster (Compute) | N/A | Yes** | N/A | Uses BYOC SA when `get_vm_user` context set |
-| Terraform provision | Yes | — | — | `provision/byoc_credentials.py` (DEC-019) |
-| Provision engine | Settings `provision_engine` | `boto3` \| `terraform` | boto3 default; full module parity via `boto3_modules/*` (DEC-022) |
-| Zenith subscription billing | — | — | — | Razorpay/invoices — not customer cloud |
+| Storage upload/download/sync | Yes | Yes | Yes | `cloud_credentials.py` |
+| Secure vault (2FA) | Yes | Yes | Yes | `secure_vault.py`; AWS dual-bucket replica optional |
+| Cost / billing | Yes (CE) | Yes (BigQuery export IDs on BYOC) | Yes (Cost Management fields on BYOC) | `routes_billing_setup.py` |
+| VM lifecycle | Yes (EC2) | Yes (GCE) | **501** | `vm_provider.py`; see `VM_MULTI_CLOUD_SCOPE.md` |
+| Terraform provision | Yes | Yes | Yes | `terraform/gcp`, `terraform/azure`; engine forces TF for non-AWS |
+| Boto3 fast path | Yes | No | No | `engine_resolver.py` |
+| Zenith subscription | — | — | — | Razorpay — not customer cloud |
 
-\* Azure cost still uses platform service principal until BYOC stores Cost Management credentials.  
-\** GCP BYOC SA must include Compute roles; storage-only SAs will fail VM APIs.
-
-Helpers: `app/storage/cloud_credentials.py`, `app/aws/cost_explorer.py`, `app/aws/s3_operations.py`.
+Helpers: `app/storage/cloud_credentials.py`, `app/provision/byoc_credentials.py`, `docs/cloud/CREDENTIAL_CONTRACT.md`.
 
 ---
 

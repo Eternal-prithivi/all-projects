@@ -167,8 +167,8 @@ function BillingPage() {
             });
 
             if (verifyResponse.data.success) {
-              toast.success('🎉 Payment successful! Subscription renewed.');
-              loadBillingData(); // Refresh data
+              navigate('/billing/success');
+              return;
             }
           } catch (error) {
             console.error('Payment verification failed:', error);
@@ -187,7 +187,7 @@ function BillingPage() {
         modal: {
           ondismiss: function() {
             setProcessingPayment(false);
-            toast.info('Payment cancelled');
+            navigate('/billing/cancel');
           }
         }
       };

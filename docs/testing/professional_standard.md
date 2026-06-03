@@ -208,6 +208,23 @@ Defer until free-tier limits hurt reliability or Terraform-on-Render is required
 | Load / perf gates in CI | 25 |
 | Coverage ratchet (e.g. 50% → 60% quarterly) | Ongoing after 40% floor |
 
+### Tier I — Multi-cloud E2E playbook (manual, post–parity Phases 0–7)
+
+Run when platform `.env` or BYOC accounts are available. CI uses mocked integration tests only.
+
+| # | Flow | Pass criteria |
+|---|------|----------------|
+| 1 | `GET /api/platform/status` | `cloud_connectivity.providers.*.storage` reflects your `.env` |
+| 2 | BYOC connect (each CSP) | `POST /api/byoc/test` + `POST /api/byoc/verify-credentials` succeed |
+| 3 | Storage | Upload → list → download → delete per CSP |
+| 4 | Cost | `GET /api/cost/billing-status` shows `live` or clear `missing_config` + setup wizard |
+| 5 | Secure vault | Upload + `POST /api/security/sync/{csp}` per connected CSP |
+| 6 | VM | AWS + GCP lifecycle; Azure returns 501 (expected) |
+| 7 | Provision | `POST /api/provision/plan` with `csp` GCP/Azure + `static-gcs` / `static-blob` templates |
+| 8 | Razorpay | Checkout → lands on `/billing/success` or `/billing/cancel` |
+
+Reference: `docs/cloud/MULTI_CLOUD_PARITY_MATRIX.md`, `docs/setup/CLOUD_CREDENTIAL_SETUP_GUIDE.md`.
+
 ---
 
 ## Suggested order (when you “go professional”)

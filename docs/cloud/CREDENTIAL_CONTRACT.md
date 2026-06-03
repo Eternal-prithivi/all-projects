@@ -1,6 +1,6 @@
 # Cloud Credential Contract
 
-**Last updated:** 2026-06-03 (Phase 0)  
+**Last updated:** 2026-06-03 (Phase 7)  
 **Setup guide:** [../setup/CLOUD_CREDENTIAL_SETUP_GUIDE.md](../setup/CLOUD_CREDENTIAL_SETUP_GUIDE.md)  
 **Env template:** `backend/.env.example`
 
@@ -41,11 +41,12 @@ Provider strings in APIs should use canonical form **`AWS`**, **`GCP`**, **`Azur
 | Terraform / SDK | AWS keys in TF env | GCP SA + project | Azure SP + subscription |
 | BYOC | `resolve_credentials(username, "AWS")` | GCP/Azure TF shape Phase 3 | |
 
-### Security vault (Phase 4+)
+### Security vault (Phase 4 ✅)
 
 | Variable | AWS | GCP | Azure |
 |----------|-----|-----|-------|
-| Primary + replica | Secure + replica S3 buckets | GCS buckets (planned) | Blob containers (planned) |
+| Primary + replica | Secure + replica S3 buckets | GCS secure bucket (BYOC/platform) | Blob secure container |
+| Replication doc | `SECURE_VAULT_REPLICATION.md` | GCP/Azure replica deferred | |
 
 ---
 

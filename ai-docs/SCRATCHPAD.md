@@ -2,8 +2,8 @@
 
 ## 🔄 Current Resume State
 
-**Status:** COMPLETE — Phase **3** (2026-06-03)
+**Status:** COMPLETE — Multi-cloud parity **Phases 0–7** (2026-06-03)
 
-**Next:** Phase **7** — Pricing parity / documentation closure.
+**Next:** Optional **20.5.10** branch protection on `stage`, or Phase 27 deferred UI (27.1 CloudFormation, 27.2 bucket migration).
 
-**LKGS:** 251 pytest · BYOC verify tri-cloud · TF resolver gcp/azure
+**LKGS:** 261 pytest · `cloud_connectivity` on platform status · parity matrix closed

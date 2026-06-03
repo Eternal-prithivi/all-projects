@@ -6,7 +6,7 @@
 
 ## 🔴 Active Task
 
-**None** — Phase 6 complete. **Next:** Phase 7 (pricing parity / docs).
+**None** — Multi-cloud parity Phases 0–7 complete.
 
 ---
 
@@ -14,8 +14,34 @@
 
 | Phase | Status |
 |-------|--------|
-| **0–6** | ✅ Complete |
-| **7** | ⬜ |
+| **0–7** | ✅ Complete |
+
+---
+
+## Phase 7 — Cross-cutting polish ✅
+
+- [x] **7.1** — `cloud_connectivity` on `GET /api/platform/status`
+- [x] **7.2** — Profile `POST /picture` → 501 (deferred tri-cloud avatars)
+- [x] **7.3** — `AI_CONTEXT_BACKEND.md` + `PRICING_DATA_SOURCE.md` + `VM_MULTI_CLOUD_SCOPE.md`
+- [x] **7.4** — Phase 27 checklist updated below
+- [x] **7.5** — Tier I multi-cloud E2E playbook in `professional_standard.md`
+- [x] **7.6** — Razorpay → `/billing/success` | `/billing/cancel` (27.6)
+- [x] **7.7** — DEC-028, matrix Phase 7 row
+
+---
+
+## Phase 27 — Cloud parity backlog (closure status)
+
+| ID | Item | Status |
+|----|------|--------|
+| 27.1 | CloudFormation one-click BYOC UI | ⬜ Deferred |
+| 27.2 | AWS bucket migration wizard | ⬜ Deferred |
+| 27.3 | GCP BigQuery billing wizard + Cost Analysis | ✅ Phase 2 |
+| 27.4 | Azure Cost Management BYOC | ✅ Phase 2 |
+| 27.5 | VM scope doc (AWS/GCP/Azure) | ✅ `docs/cloud/VM_MULTI_CLOUD_SCOPE.md` |
+| 27.6 | Razorpay redirect success/cancel | ✅ Phase 7 |
+| 27.7 | Secure vault multi-cloud | ✅ Phase 4 + `SECURE_VAULT_REPLICATION.md` |
+| 27.8 | Replication strategy doc | ✅ Phase 4 (AWS dual-bucket; GCP/Azure replica deferred) |
 
 ---
 

@@ -120,11 +120,8 @@ const PricingPage = () => {
             });
 
             if (verifyResponse.data.success) {
-              toast.success('🎉 Payment successful! Subscription activated.');
-              setTimeout(() => {
-                navigate('/dashboard');
-                window.location.reload(); // Reload to update limits
-              }, 2000);
+              navigate('/billing/success');
+              return;
             }
           } catch (error) {
             console.error('Payment verification failed:', error);
@@ -141,7 +138,7 @@ const PricingPage = () => {
         modal: {
           ondismiss: function() {
             setProcessingPlanId(null);
-            toast.info('Payment cancelled');
+            navigate('/billing/cancel');
           }
         }
       };

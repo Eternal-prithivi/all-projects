@@ -232,6 +232,16 @@
 
 ---
 
+### [DEC-028] Phase 7 polish — platform connectivity flags, deferred avatars, static pricing doc
+- **Date**: 2026-06-03
+- **Status**: Accepted (implemented)
+- **Context**: Multi-cloud parity plan Phase 7 closes cross-cutting gaps without new feature surface.
+- **Decision**: `GET /api/platform/status` exposes `cloud_connectivity` (env-based probes, no live API calls). Profile `POST /picture` returns **501** until tri-cloud avatar storage. Cost Simulator pricing documented as static tables (`PRICING_DATA_SOURCE.md`). Razorpay success/cancel routes to `/billing/success` and `/billing/cancel`.
+- **Consequences**: Status page and ops can see per-CSP readiness; simulator vs live billing clearly separated.
+- **DO NOT**: Treat `/api/pricing` as live Cost Explorer / BigQuery / Consumption data.
+
+---
+
 ### [DEC-027] Tri-cloud provision (Terraform roots for GCP GCS + Azure Blob)
 - **Date**: 2026-06-03
 - **Status**: Accepted (implemented)

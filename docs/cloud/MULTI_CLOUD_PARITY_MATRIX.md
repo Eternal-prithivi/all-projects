@@ -1,6 +1,6 @@
 # Multi-Cloud Parity Matrix
 
-**Last updated:** 2026-06-03 (Phase 0)  
+**Last updated:** 2026-06-03 (Phase 7 — parity complete)  
 **Plan:** Multi-cloud parity Phases 0–7  
 **Credential detail:** [CREDENTIAL_CONTRACT.md](./CREDENTIAL_CONTRACT.md)
 
@@ -19,7 +19,7 @@ Success criterion (every phase): With valid platform `.env` or per-user BYOC, th
 | **Security vault** | Full (S3 SSE dual) | Full | Full | `app/security/routes_security.py` | 4 ✅ |
 | **VM / monitoring** | **Full VM API** (EC2) | **Full VM API** (GCE) | None | `aws_manager.py`, `manager.py`, `vm_provider.py` | 5 ✅ |
 | **Provision** | TF + Boto3 | TF (GCS) | TF (Blob) | `terraform/`, `provision_catalog.py` | 6 ✅ |
-| **Pricing** | Static table | Static table | Static table | `app/pricing/pricing_fetcher.py` | — (documented, non-live) |
+| **Pricing** | Static table | Static table | Static table | `pricing_fetcher.py`, `PRICING_DATA_SOURCE.md` | 7 ✅ |
 
 ---
 
@@ -96,7 +96,7 @@ Legend: ✅ implemented · 🟡 partial · ❌ missing · 🔒 AWS-only today
 | Item | Action | Status |
 |------|--------|--------|
 | Duplicate `backend/cost/` (AWS placeholders) | Remove; canonical `app/cost/` | Phase 0 ✅ |
-| `resolve_credentials()` returns `None` for non-AWS | Extend in Phase 3 | Open |
+| `resolve_credentials()` returns `None` for non-AWS | Extend in Phase 3 | Phase 3 ✅ |
 | Mixed `"AWS"` / `"aws"` / `"GCP"` in APIs | `app/cloud/providers.py` | Phase 0 ✅ |
 
 ---
@@ -109,3 +109,4 @@ Legend: ✅ implemented · 🟡 partial · ❌ missing · 🔒 AWS-only today
 | 1 | Restore route, tier names, missing_config sync, tests | 2026-06-03 |
 | 2 | Billing Settings fields, setup APIs, cost UI wizard | 2026-06-03 |
 | 3 | BYOC verify tri-cloud, bucket/container discovery, TF resolver | 2026-06-03 |
+| 7 | Platform cloud_connectivity, docs closure, Phase 27 checklist | 2026-06-03 |
