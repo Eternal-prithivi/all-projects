@@ -416,6 +416,9 @@ async def request_vm_assignment(
                 status_code=501,
                 detail="Azure VM lifecycle is planned for a later phase.",
             )
+        from app.cloud.availability import CloudFeature, assert_provider_available
+
+        assert_provider_available(current_user.username, provider, CloudFeature.VM)
         effective_workload = merge_follow_up_answers(
             request.workload_description or "",
             request.follow_up_answers,

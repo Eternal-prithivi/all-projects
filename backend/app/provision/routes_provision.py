@@ -409,8 +409,11 @@ async def run_plan(
     """
     from app.cloud.providers import normalize_provider
 
+    from app.cloud.availability import CloudFeature, assert_provider_available
+
     config_dict = config.model_dump()
     config_dict["csp"] = normalize_provider(config_dict.get("csp") or "AWS")
+    assert_provider_available(user.username, config_dict["csp"], CloudFeature.PROVISION)
     _prepare_provision_config(config_dict)
     csp = config_dict["csp"]
 

@@ -48,6 +48,7 @@ from app.byoc import routes_byoc
 from app.ml import routes_feedback
 from app.provision import routes_provision
 from app.platform import routes_platform
+from app.cloud import routes_cloud
 from app.notifications import routes_notifications
 from app.organizations import routes_organizations
 from app.auth import routes_sso
@@ -219,6 +220,7 @@ app.include_router(routes_byoc.router, prefix="/api/byoc", tags=["BYOC"])
 app.include_router(routes_feedback.router, prefix="/api/ml", tags=["ML Feedback"])
 app.include_router(routes_provision.router, prefix="/api/provision", tags=["Provisioning"])
 app.include_router(routes_platform.router, prefix="/api/platform", tags=["Platform"])
+app.include_router(routes_cloud.router, prefix="/api/cloud", tags=["Cloud"])
 app.include_router(routes_notifications.router, prefix="/api")
 app.include_router(routes_organizations.router, prefix="/api")
 

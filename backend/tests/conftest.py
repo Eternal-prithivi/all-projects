@@ -10,6 +10,7 @@ import os
 import uuid
 from collections.abc import Generator
 from typing import Any
+from unittest.mock import patch
 
 import pytest
 from fastapi.testclient import TestClient
@@ -235,6 +236,19 @@ def auth_headers(client: TestClient, user_factory):
         return {"Authorization": f"Bearer {token}"}, user
 
     return _login
+
+
+@pytest.fixture(autouse=True)
+def integration_platform_tri_cloud(request):
+    """Integration tests use platform .env with AWS/GCP/Azure storage available (no BYOC)."""
+    if request.node.get_closest_marker("integration") is None:
+        yield
+        return
+    with patch(
+        "app.cloud.availability.gcp_credentials_file_present",
+        return_value=True,
+    ):
+        yield
 
 
 @pytest.fixture

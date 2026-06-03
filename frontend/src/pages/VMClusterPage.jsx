@@ -36,6 +36,12 @@ import {
 import CloudProviderToolbar, {
   filterFilesByCloudProvider,
 } from "../components/CloudProviderSelect.jsx";
+import CloudAvailabilityBanner from "../components/CloudAvailabilityBanner.jsx";
+import {
+  useCloudAvailability,
+  buildCloudProviderOptions,
+  coerceCloudProvider,
+} from "../hooks/useCloudAvailability.js";
 import "../styles/vmcluster.css";
 
 // API Functions
@@ -113,7 +119,14 @@ const getRecommendations = (token, minScore = 50) =>
 function VMClusterPage() {
   const { token } = useAuth();
   const notifications = useNotifications();
-  const [cloudProvider, setCloudProvider] = useState("GCP");
+  const { loading: availLoading, getFeature, credentialMode } = useCloudAvailability();
+  const vmProviders = getFeature("vm").providers || [];
+  const vmToolbarOptions = useMemo(
+    () => buildCloudProviderOptions(vmProviders),
+    [vmProviders]
+  );
+  const vmDefault = getFeature("vm").default || vmProviders[0] || "GCP";
+  const [cloudProvider, setCloudProvider] = useState(vmDefault);
   const [, setCurrentAssignment] = useState(() => {
     try { const d = JSON.parse(sessionStorage.getItem('cache_vm_assignments')); return d?.[0] || null; } catch { return null; }
   });
@@ -179,7 +192,7 @@ function VMClusterPage() {
   }, [token]);
 
   // Fetch cluster health
-  const activeCsp = cloudProvider === "ALL" ? "GCP" : cloudProvider;
+  const activeCsp = cloudProvider === "ALL" ? vmDefault : cloudProvider;
 
   const displayedAssignments = useMemo(() => {
     const withCsp = allAssignments.map((a) => ({ ...a, csp: a.csp || "GCP" }));
@@ -190,7 +203,7 @@ function VMClusterPage() {
     if (!token) return;
     try {
       const providers =
-        cloudProvider === "ALL" ? ["GCP", "AWS"] : [activeCsp];
+        cloudProvider === "ALL" ? vmProviders : [activeCsp];
       let general = null;
       let storage = null;
       for (const csp of providers) {
@@ -220,7 +233,14 @@ function VMClusterPage() {
     } catch (error) {
       console.error("Error fetching cluster health:", error);
     }
-  }, [token, cloudProvider, activeCsp]);
+  }, [token, cloudProvider, activeCsp, vmProviders]);
+
+  useEffect(() => {
+    const next = coerceCloudProvider(cloudProvider, vmProviders);
+    if (next != null && next !== cloudProvider) {
+      setCloudProvider(next);
+    }
+  }, [vmProviders, cloudProvider]);
 
   // Fetch recommendations
   const fetchRecommendations = useCallback(async () => {
@@ -538,8 +558,21 @@ ${instructions.troubleshooting.map((item) => `
     return "var(--success)";
   };
 
-  if (isLoading) {
+  if (isLoading || availLoading) {
     return <VMClusterSkeleton />;
+  }
+
+  if (vmProviders.length === 0) {
+    return (
+      <div className="vm-container">
+        <PageHeader
+          kicker="Compute"
+          title="VM Cluster Management"
+          subtitle="Connect a cloud with VM support (AWS or GCP)"
+        />
+        <CloudAvailabilityBanner featureLabel="virtual machines" credentialMode={credentialMode} />
+      </div>
+    );
   }
 
   return (
@@ -565,6 +598,7 @@ ${instructions.troubleshooting.map((item) => `
         actionLabel="Refresh clusters"
         selectAriaLabel="VM cloud provider"
         className="vm-cloud-toolbar"
+        providerOptions={vmToolbarOptions}
       />
 
       {/* VM Process Flow */}

@@ -22,6 +22,11 @@ import {
   IconDownload,
 } from '../components/dashboard/Icons.jsx';
 import '../styles/costanalysis.css';
+import {
+  useCloudAvailability,
+  CSP_TO_COST_KEY,
+  COST_KEY_TO_CSP,
+} from '../hooks/useCloudAvailability.js';
 
 const ProviderLogo = ({ provider }) => {
   const logoMap = {
@@ -35,7 +40,9 @@ const ProviderLogo = ({ provider }) => {
 
 const CostAnalysisEnhancedPage = () => {
   const notifications = useNotifications();
-  
+  const { getFeature } = useCloudAvailability();
+  const costProviderKeys = (getFeature('cost').providers || []).map((p) => CSP_TO_COST_KEY[p]).filter(Boolean);
+
   // Core state
   const [selectedProvider, setSelectedProvider] = useState('aws');
   const [startDate, setStartDate] = useState('');
@@ -130,6 +137,12 @@ const CostAnalysisEnhancedPage = () => {
       setProviderSetup(null);
     }
   };
+
+  useEffect(() => {
+    if (costProviderKeys.length && !costProviderKeys.includes(selectedProvider)) {
+      setSelectedProvider(costProviderKeys[0]);
+    }
+  }, [costProviderKeys, selectedProvider]);
 
   useEffect(() => {
     fetchProviderSetup(selectedProvider);
@@ -487,9 +500,9 @@ const CostAnalysisEnhancedPage = () => {
       <CostHubNav />
       {billingStatus?.providers && (
         <div className="billing-connectivity-banner" role="status">
-          {['aws', 'gcp', 'azure'].map((key) => {
+          {(costProviderKeys.length ? costProviderKeys : ['aws', 'gcp', 'azure']).map((key) => {
             const p = billingStatus.providers[key];
-            const label = key.toUpperCase();
+            const label = COST_KEY_TO_CSP[key] || key.toUpperCase();
             const ok = p?.live;
             return (
               <span key={key} className={`billing-pill ${ok ? 'live' : 'offline'}`}>
@@ -753,9 +766,11 @@ const CostAnalysisEnhancedPage = () => {
         <div className="filter-group">
           <label>Provider</label>
           <select className="zenith-select filter-select" value={selectedProvider} onChange={(e) => setSelectedProvider(e.target.value)}>
-            <option value="aws">AWS</option>
-            <option value="gcp">Google Cloud</option>
-            <option value="azure">Azure</option>
+            {(costProviderKeys.length ? costProviderKeys : ['aws']).map((key) => (
+              <option key={key} value={key}>
+                {key === 'aws' ? 'AWS' : key === 'gcp' ? 'Google Cloud' : 'Azure'}
+              </option>
+            ))}
           </select>
         </div>
 

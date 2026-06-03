@@ -135,8 +135,16 @@ const EMPTY_FLAGS = {
   enable_azure_storage: false,
 };
 
-export default function ProvisionDeployWizard({ terraformOk: _terraformOk, userProvisionEngine = 'boto3', onDeployed }) {
-  const [csp, setCsp] = useState('AWS');
+export default function ProvisionDeployWizard({
+  terraformOk: _terraformOk,
+  userProvisionEngine = 'boto3',
+  availableProviders = ['AWS', 'GCP', 'Azure'],
+  defaultProvider = 'AWS',
+  onDeployed,
+}) {
+  const [csp, setCsp] = useState(
+    availableProviders.includes(defaultProvider) ? defaultProvider : availableProviders[0] || 'AWS'
+  );
   const engineLabel =
     csp !== 'AWS' ? 'Terraform' : userProvisionEngine === 'terraform' ? 'Terraform' : 'Boto3';
   const [templates, setTemplates] = useState(TEMPLATES);
@@ -211,6 +219,13 @@ export default function ProvisionDeployWizard({ terraformOk: _terraformOk, userP
       cancelled = true;
     };
   }, [csp]);
+
+  useEffect(() => {
+    if (!availableProviders.includes(csp) && availableProviders.length > 0) {
+      setCsp(availableProviders[0]);
+      setConfig((prev) => ({ ...prev, csp: availableProviders[0] }));
+    }
+  }, [availableProviders, csp]);
 
   const handleCspChange = (next) => {
     setCsp(next);
@@ -458,7 +473,7 @@ export default function ProvisionDeployWizard({ terraformOk: _terraformOk, userP
           value={csp}
           onChange={(e) => handleCspChange(e.target.value)}
         >
-          {CSP_OPTIONS.map((opt) => (
+          {CSP_OPTIONS.filter((opt) => availableProviders.includes(opt.value)).map((opt) => (
             <option key={opt.value} value={opt.value}>
               {opt.label}
             </option>

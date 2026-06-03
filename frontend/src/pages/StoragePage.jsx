@@ -35,6 +35,12 @@ import EmptyState from "../components/EmptyState.jsx";
 import CloudProviderToolbar, {
   filterFilesByCloudProvider,
 } from "../components/CloudProviderSelect.jsx";
+import CloudAvailabilityBanner from "../components/CloudAvailabilityBanner.jsx";
+import {
+  useCloudAvailability,
+  buildCloudProviderOptions,
+  coerceCloudProvider,
+} from "../hooks/useCloudAvailability.js";
 import { IconHardDrive } from "../components/dashboard/Icons.jsx";
 
 // --- API FUNCTIONS (Missing from api.js) ---
@@ -86,6 +92,12 @@ function StoragePage() {
     success: notifySuccess,
     info: notifyInfo,
   } = useNotifications();
+  const { loading: availLoading, getFeature, credentialMode } = useCloudAvailability();
+  const storageProviders = getFeature("storage").providers || [];
+  const storageToolbarOptions = useMemo(
+    () => buildCloudProviderOptions(storageProviders),
+    [storageProviders]
+  );
   const [selectedFile, setSelectedFile] = useState(null);
   const [files, setFiles] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -173,7 +185,7 @@ function StoragePage() {
   const handleSyncWithBucket = async () => {
     if (!token) return;
     const targets =
-      cloudProvider === "ALL" ? ["AWS", "GCP", "Azure"] : [cloudProvider];
+      cloudProvider === "ALL" ? storageProviders : [cloudProvider];
     setIsSyncing(true);
     try {
       let totalInserted = 0;
@@ -246,6 +258,13 @@ function StoragePage() {
     fetchFiles();
   }, [fetchFiles]);
 
+  useEffect(() => {
+    const next = coerceCloudProvider(cloudProvider, storageProviders);
+    if (next != null && next !== cloudProvider) {
+      setCloudProvider(next);
+    }
+  }, [storageProviders, cloudProvider]);
+
   const handleFileChange = (e) => {
     setSelectedFile(e.target.files[0]);
   };
@@ -275,7 +294,14 @@ function StoragePage() {
     if (!selectedFile || !token || !recommendation) return;
 
     // Determine the final CSP choice
-    const finalCsp = manualCspSelection || recommendation.recommendation.csp;
+    const recommended = recommendation.recommendation.csp;
+    const finalCsp =
+      manualCspSelection ||
+      (storageProviders.includes(recommended) ? recommended : storageProviders[0]);
+    if (!finalCsp || !storageProviders.includes(finalCsp)) {
+      notifyError("No connected cloud provider available for upload. Connect a provider in Settings.");
+      return;
+    }
 
     // --- CRITICAL FIX: Look up the correct storage class name for the chosen CSP ---
     // It uses the new 'options_by_csp' dictionary from the backend.
@@ -382,7 +408,27 @@ function StoragePage() {
   };
 
   const finalUploadDestination =
-    manualCspSelection || (recommendation && recommendation.recommendation.csp);
+    manualCspSelection ||
+    (recommendation &&
+      (storageProviders.includes(recommendation.recommendation.csp)
+        ? recommendation.recommendation.csp
+        : storageProviders[0]));
+
+  if (!availLoading && storageProviders.length === 0) {
+    return (
+      <div className="storage-container zenith-page-enter">
+        <PageHeader
+          kicker="Object storage"
+          title="Standard Storage"
+          subtitle="Connect a cloud provider to upload and sync files"
+        />
+        <CloudAvailabilityBanner
+          featureLabel="storage"
+          credentialMode={credentialMode}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="storage-container zenith-page-enter">
@@ -512,6 +558,7 @@ function StoragePage() {
             actionLabel={syncActionLabel}
             actionBusy={isSyncing}
             selectAriaLabel="Filter and sync by cloud provider"
+            providerOptions={storageToolbarOptions}
           />
         </div>
         {isLoading ? (
@@ -678,9 +725,15 @@ function StoragePage() {
                 defaultValue={""}
               >
                 <option value="">Use Recommended</option>
-                <option value="AWS">Amazon Web Services</option>
-                <option value="GCP">Google Cloud Platform</option>
-                <option value="Azure">Microsoft Azure</option>
+                {storageProviders.map((p) => (
+                  <option key={p} value={p}>
+                    {p === "AWS"
+                      ? "Amazon Web Services"
+                      : p === "GCP"
+                        ? "Google Cloud Platform"
+                        : "Microsoft Azure"}
+                  </option>
+                ))}
               </select>
             </div>
 

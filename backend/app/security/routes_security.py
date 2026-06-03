@@ -32,6 +32,7 @@ from app.storage.tasks import apply_encryption_to_file
 from app.byoc.aws_bucket_discovery import classify_bucket_role
 from app.byoc.aws_bucket_helpers import REPLICA_REGION_DEFAULT
 from app.byoc.credential_resolver import get_aws_bucket_layout
+from app.cloud.availability import CloudFeature, assert_provider_available
 from app.cloud.providers import normalize_provider
 from app.storage.cloud_credentials import (
     SecureAwsStorage,
@@ -165,6 +166,7 @@ def _sync_secure_objects(
 ) -> SecureSyncResponse:
     """Reconcile secure vault objects into MongoDB for AWS, GCP, or Azure."""
     provider = normalize_provider(csp)
+    assert_provider_available(user.username, provider, CloudFeature.SECURITY)
     if provider == "AWS":
         sync_client, bucket_name, user_prefix, sync_region, storage = _resolve_secure_bucket_sync(
             user.username, bucket, region
@@ -429,6 +431,7 @@ async def upload_secure_file(
         provider = normalize_provider(csp)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    assert_provider_available(user.username, provider, CloudFeature.SECURITY)
     storage = resolve_secure_storage(user.username, provider)
 
     scan = scan_file_content(file_content, file.filename)

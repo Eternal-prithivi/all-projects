@@ -57,6 +57,7 @@ from app.storage.file_queries import (
     build_storage_list_filter,
     find_storage_file,
 )
+from app.cloud.availability import CloudFeature, assert_provider_available
 from app.cloud.providers import normalize_provider
 from app.storage.storage_errors import (
     restore_not_supported,
@@ -119,6 +120,8 @@ async def upload_file_to_csp(
         csp = normalize_provider(csp)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    assert_provider_available(user.username, csp, CloudFeature.STORAGE)
 
     upload_functions = {"AWS": upload_to_aws, "GCP": upload_to_gcp, "Azure": upload_to_azure}
     upload_function = upload_functions.get(csp)

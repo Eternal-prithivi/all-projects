@@ -6,6 +6,15 @@
 
 Provider strings in APIs should use canonical form **`AWS`**, **`GCP`**, **`Azure`** (see `app/cloud/providers.py`). Billing probes and Mongo BYOC status keys use lowercase **`aws`**, **`gcp`**, **`azure`**.
 
+### Availability rules (`GET /api/cloud/availability`)
+
+| Mode | When | Providers shown |
+|------|------|-------------------|
+| **BYOC** | User has ≥1 active BYOC connection | **Only** connected CSPs (no platform fallback for others) |
+| **Platform** | No BYOC connections | All CSPs Zenith has configured in `.env` for that feature |
+
+UI pages (Storage, Security, VM, Provision, Cost) use this endpoint so selectors match what upload/plan/sync APIs allow. Backend returns **403** `provider_not_available` if a disallowed CSP is submitted.
+
 ---
 
 ## Platform `.env` (Zenith defaults)

@@ -48,6 +48,12 @@ import BucketRegionSelector from "../components/BucketRegionSelector.jsx";
 import CloudProviderToolbar, {
   filterFilesByCloudProvider,
 } from "../components/CloudProviderSelect.jsx";
+import CloudAvailabilityBanner from "../components/CloudAvailabilityBanner.jsx";
+import {
+  useCloudAvailability,
+  buildCloudProviderOptions,
+  coerceCloudProvider,
+} from "../hooks/useCloudAvailability.js";
 import EmptyState from "../components/EmptyState.jsx";
 import TwoFADialog from "../components/TwoFADialog.jsx";
 import { IconLock } from "../components/dashboard/Icons.jsx";
@@ -57,6 +63,12 @@ import { IconLock } from "../components/dashboard/Icons.jsx";
 function SecurityPage() {
   const { token, user } = useAuth();
   const notifications = useNotifications();
+  const { loading: availLoading, getFeature, credentialMode } = useCloudAvailability();
+  const securityProviders = getFeature("security").providers || [];
+  const securityToolbarOptions = useMemo(
+    () => buildCloudProviderOptions(securityProviders),
+    [securityProviders]
+  );
   const [file, setFile] = useState(null);
   const [encrypt, setEncrypt] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -175,6 +187,13 @@ function SecurityPage() {
       if (pollId) clearInterval(pollId);
     };
   }, [user, token, canAccessSecureArea, fetchSecureFiles, loading]);
+
+  useEffect(() => {
+    const next = coerceCloudProvider(cloudProvider, securityProviders);
+    if (next != null && next !== cloudProvider) {
+      setCloudProvider(next);
+    }
+  }, [securityProviders, cloudProvider]);
 
   useEffect(() => {
     const check2FA = async () => {
@@ -312,7 +331,7 @@ function SecurityPage() {
   const handleSyncWithSecureBucket = async () => {
     if (!token || !canAccessSecureArea) return;
     const targets =
-      cloudProvider === "ALL" ? ["AWS", "GCP", "Azure"] : [cloudProvider];
+      cloudProvider === "ALL" ? securityProviders : [cloudProvider];
     setIsSyncing(true);
     try {
       let totalInserted = 0;
@@ -387,7 +406,10 @@ function SecurityPage() {
     setIsUploading(true);
     const uploadedFileName = file.name;
     try {
-      const uploadCsp = cloudProvider === "ALL" ? "AWS" : cloudProvider;
+      const uploadCsp =
+        cloudProvider === "ALL"
+          ? getFeature("security").default || securityProviders[0]
+          : cloudProvider;
       const response = await uploadSecureFile(
         file,
         encrypt,
@@ -862,6 +884,7 @@ function SecurityPage() {
               actionDisabled={!canAccessSecureArea}
               actionClassName="btn sync-btn"
               selectAriaLabel="Filter secure files by cloud provider"
+              providerOptions={securityToolbarOptions}
             />
           </div>
           {!secureFiles || secureFiles.length === 0 ? (
