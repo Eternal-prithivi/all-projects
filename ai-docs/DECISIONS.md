@@ -232,6 +232,15 @@
 
 ---
 
+### [DEC-024] Standard storage archive restore API (tri-cloud path, AWS-only impl)
+- **Date**: 2026-06-03
+- **Status**: Accepted
+- **Context**: Glacier restore was AWS-only at `POST /restore-aws/{filename}`; parity plan needs a CSP-aware contract.
+- **Decision**: Canonical route `POST /api/storage/restore/{csp}/{filename}` (AWS Glacier/Deep Archive). Legacy `POST /restore-aws/{filename}` delegates to `restore/AWS/...`. GCP/Azure archive restore returns **501** with `status: not_supported` until a later phase implements GCS/Azure rehydration.
+- **Consequences**: Frontend uses `/restore/AWS/...` only for AWS cold tiers; matrix documents 501 for other CSPs.
+
+---
+
 ### [DEC-021] BYOC Credential Routing Per User (Platform-Wide)
 - **Date**: 2026-05-29
 - **Status**: Accepted (implemented)

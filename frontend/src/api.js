@@ -63,7 +63,15 @@ export const getApiErrorMessage = (error, fallback = "Something went wrong.") =>
   if (!error) return fallback;
   const detail = error.detail ?? error.response?.data?.detail;
   if (typeof detail === "string") return detail;
-  if (detail && typeof detail === "object" && detail.message) return detail.message;
+  if (detail && typeof detail === "object") {
+    const parts = [];
+    if (detail.message) parts.push(detail.message);
+    if (Array.isArray(detail.setup_steps) && detail.setup_steps.length) {
+      parts.push(...detail.setup_steps);
+    }
+    if (parts.length) return parts.join(" ");
+    if (detail.error) return String(detail.error);
+  }
   if (error.message && !error.message.includes("Network Error")) return error.message;
   if (!error.response) {
     return "Cannot reach the server. Start the backend (http://localhost:8000) and try again.";

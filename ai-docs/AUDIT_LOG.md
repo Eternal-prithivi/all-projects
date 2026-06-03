@@ -23,6 +23,19 @@ Notes: [one line optional]
 ## Session Log (recent only)
 
 ---
+SESSION_ID: 20260603-multicloud-phase1
+Date: 2026-06-03
+Agent: Cursor Composer
+Task: Multi-cloud parity Phase 1 — storage hardening
+Changes:
+- storage_tiers.py + missing_config sync errors + restore/{csp} route (DEC-024)
+- GCP/Azure storage integration tests; StoragePage getApiErrorMessage
+- 236 pytest passed; matrix Phase 1 row updated
+Outcome: Done
+Notes: Next Phase 2 cost/billing
+---
+
+---
 SESSION_ID: 20260603-multicloud-phase0
 Date: 2026-06-03
 Agent: Cursor Composer

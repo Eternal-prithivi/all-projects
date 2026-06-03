@@ -7,7 +7,7 @@
 # DEPENDS ON:  optimizer.py (ML ensemble), uploader.py, manager.py,
 #              credential_resolver.py (BYOC support), ml/repository.py
 # MOUNTED AT:  /api/storage → analyze, upload, files, download/{filename},
-#              delete/{filename}, sync/aws, restore-aws/{filename}
+#              delete/{filename}, sync/{aws|gcp|azure}, restore/{csp}/{filename}
 # DO NOT:
 #   - Skip access tracking on download (access_frequency_score feeds ML tiering)
 #   - Change FileMetadata schema without updating tiering_tasks.py priority scoring
@@ -58,6 +58,11 @@ from app.storage.file_queries import (
     find_storage_file,
 )
 from app.cloud.providers import normalize_provider
+from app.storage.storage_errors import (
+    restore_not_supported,
+    validate_azure_storage_ready,
+    validate_gcp_storage_ready,
+)
 
 logger = setup_logger(__name__)
 router = APIRouter(tags=["Storage"])
@@ -455,9 +460,10 @@ async def sync_with_gcp_bucket(
     """On-demand GCS sync — requires platform or BYOC GCP credentials."""
     try:
         gcp = resolve_gcp_credentials(user.username)
+        config_error = validate_gcp_storage_ready(gcp)
+        if config_error:
+            raise config_error
         bucket_name = bucket or gcp.get("bucket_name")
-        if not bucket_name:
-            raise HTTPException(status_code=400, detail="GCP bucket not configured.")
         user_prefix = f"{user.username}/"
         scanned_prefix = "" if gcp.get("is_byoc") else user_prefix
         objects = list_objects_gcp(
@@ -490,9 +496,10 @@ async def sync_with_azure_container(
     """On-demand Azure Blob sync — requires platform or BYOC Azure credentials."""
     try:
         azure = resolve_azure_credentials(user.username)
+        config_error = validate_azure_storage_ready(azure)
+        if config_error:
+            raise config_error
         container_name = container or azure.get("container_name")
-        if not container_name:
-            raise HTTPException(status_code=400, detail="Azure container not configured.")
         user_prefix = f"{user.username}/"
         scanned_prefix = "" if azure.get("is_byoc") else user_prefix
         objects = list_objects_azure(
@@ -599,8 +606,9 @@ async def delete_file(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Could not delete file from {csp}: {e}")
 
-@router.post("/restore-aws/{filename:path}", status_code=status.HTTP_202_ACCEPTED)
-async def restore_aws_file(
+@router.post("/restore/{csp}/{filename:path}", status_code=status.HTTP_202_ACCEPTED)
+async def restore_archived_file(
+    csp: str,
     filename: str,
     user: User = Depends(get_current_user),
     files_db: Collection = Depends(get_files_collection),
@@ -608,22 +616,24 @@ async def restore_aws_file(
     days: int = Form(7),
     bucket: Optional[str] = Query(None),
 ):
-    """
-    Initiates a restore operation for a file stored in AWS Glacier/Deep Archive.
-    """
-    file_record = find_storage_file(files_db, user.username, filename, bucket)
+    """Initiate archive-tier restore. AWS Glacier/Deep Archive supported; GCP/Azure return 501."""
+    try:
+        provider = normalize_provider(csp)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    if file_record.get("csp") != "AWS":
-        raise HTTPException(status_code=400, detail="Restore operation is only for AWS files via this endpoint.")
-    
-    # Optional: You could add a check here to ensure the file is actually in Glacier
-    # by calling head_object, but get_download_url_from_aws already does this when download is attempted.
-    # The initiate_glacier_restore_aws function will also raise an error if it's not applicable.
+    if provider != "AWS":
+        raise restore_not_supported(provider)
+
+    file_record = find_storage_file(files_db, user.username, filename, bucket)
+    if normalize_provider(file_record.get("csp", "AWS")) != "AWS":
+        raise HTTPException(
+            status_code=400,
+            detail="File record CSP does not match AWS restore request.",
+        )
 
     object_key = file_record.get("s3_key")
-
     try:
-        # Call the manager function to initiate the restore
         restore_message = initiate_glacier_restore_aws(
             user.username,
             object_key,
@@ -632,8 +642,32 @@ async def restore_aws_file(
             bucket_name=file_record.get("cloud_bucket"),
             region_name=file_record.get("region"),
         )
-        return {"message": restore_message["message"]} # Return the message from the manager function
-    except HTTPException as e:
-        raise e # Re-raise HTTPExceptions from manager.py
+        return {"message": restore_message["message"], "provider": "aws"}
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to initiate restore for '{filename}': {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to initiate restore for '{filename}': {e}",
+        )
+
+
+@router.post("/restore-aws/{filename:path}", status_code=status.HTTP_202_ACCEPTED)
+async def restore_aws_file_legacy(
+    filename: str,
+    user: User = Depends(get_current_user),
+    files_db: Collection = Depends(get_files_collection),
+    tier: str = Form("Standard"),
+    days: int = Form(7),
+    bucket: Optional[str] = Query(None),
+):
+    """Backward-compatible alias for POST /restore/AWS/{filename}."""
+    return await restore_archived_file(
+        "AWS",
+        filename,
+        user=user,
+        files_db=files_db,
+        tier=tier,
+        days=days,
+        bucket=bucket,
+    )

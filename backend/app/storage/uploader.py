@@ -74,8 +74,11 @@ def upload_to_gcp(file: UploadFile, username: str, filename: str, storage_class:
 
     gcp_storage_class_map = {
         "Standard Storage": "STANDARD",
+        "STANDARD": "STANDARD",
         "Nearline Storage": "NEARLINE",
+        "NEARLINE": "NEARLINE",
         "Archive Storage": "ARCHIVE",
+        "ARCHIVE": "ARCHIVE",
     }
     api_storage_class = gcp_storage_class_map.get(storage_class, "STANDARD")
     blob.storage_class = api_storage_class
@@ -102,8 +105,11 @@ def upload_to_azure(file: UploadFile, username: str, filename: str, storage_clas
 
     azure_storage_class_map = {
         "Hot Blob Storage": StandardBlobTier.Hot,
+        "Hot": StandardBlobTier.Hot,
         "Cool Blob Storage": StandardBlobTier.Cool,
+        "Cool": StandardBlobTier.Cool,
         "Archive Storage": StandardBlobTier.Archive,
+        "Archive": StandardBlobTier.Archive,
     }
     api_storage_class = azure_storage_class_map.get(storage_class, StandardBlobTier.Hot)
 

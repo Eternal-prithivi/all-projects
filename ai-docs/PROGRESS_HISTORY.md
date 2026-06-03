@@ -726,6 +726,24 @@ Reference: 97-page project report (Chapter 4–6). Last cross-check: 2026-05-24.
 
 ---
 
+## Multi-cloud parity — Phase 1 (2026-06-03)
+
+**Goal:** Standard storage tri-cloud hardening — same UX as AWS when credentials exist.
+
+**Completed:**
+- `storage_tiers.py` — shared hot/warm/cold names (ML labels + provider API classes); tiering uses `normalize_provider`.
+- `storage_errors.py` — `missing_config` payloads for GCP/Azure sync; `restore_not_supported` (501).
+- Restore API: `POST /restore/{csp}/{filename}` (AWS Glacier); legacy `/restore-aws/` alias; DEC-024.
+- Uploader maps accept short GCP/Azure class names; integration tests for GCP/Azure upload/delete/download/sync/restore.
+- Frontend: `getApiErrorMessage` includes `setup_steps`; StoragePage uses structured errors; restore uses CSP-aware path (AWS-only button).
+- Matrix + DECISIONS updated.
+
+**Verification:** `pytest -q` → 236 passed.
+
+**Next:** Phase 2 — cost/billing GCP BigQuery + Azure Cost Management.
+
+---
+
 ## Multi-cloud parity — Phase 0 (2026-06-03)
 
 **Goal:** Single source of truth for tri-cloud parity before feature phases 1–7.

@@ -7,13 +7,13 @@
 // API: Uses api.js (listFiles, getDownloadUrl, deleteFile, uploadFile, syncAwsBucket)
 //      + local apiClient wrappers for analyzeFile and initiateGlacierRestore
 // STATE: files, recommendation, modals for delete/restore/recommendation
-// BACKEND: /api/storage/* — analyze, upload, files, download, delete, sync/aws, restore-aws
+// BACKEND: /api/storage/* — analyze, upload, files, download, delete, sync/*, restore/{csp}
 // DO NOT:
 //   - Skip the analyze → recommendation modal → confirm flow (ML prediction must be logged)
 //   - Hardcode CSP — always read from file.csp or recommendation.recommendation.csp
 //   - Remove access tracking in download (feeds access_frequency_score for ML tiering)
 // =============================================================================
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useNotifications } from "../hooks/useNotifications";
 import { TableSkeleton } from "../components/Skeletons.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
@@ -25,11 +25,16 @@ import {
   syncAwsBucket,
   syncGcpBucket,
   syncAzureContainer,
+  getApiErrorMessage,
 } from "../api";
 import "../styles/storage.css";
 import PageHeader from "../components/ui/PageHeader.jsx";
+import ByocStorageTargetBanner from "../components/ByocStorageTargetBanner.jsx";
 import BucketRegionSelector from "../components/BucketRegionSelector.jsx";
 import EmptyState from "../components/EmptyState.jsx";
+import CloudProviderToolbar, {
+  filterFilesByCloudProvider,
+} from "../components/CloudProviderSelect.jsx";
 import { IconHardDrive } from "../components/dashboard/Icons.jsx";
 
 // --- API FUNCTIONS (Missing from api.js) ---
@@ -38,11 +43,15 @@ const analyzeFile = async (data, _token) => {
   const response = await apiClient.post("/storage/analyze", data);
   return response.data;
 };
-const initiateGlacierRestore = async (filename, tier, days, _token) => {
+const initiateArchiveRestore = async (filename, csp, tier, days, _token) => {
   const formData = new FormData();
   formData.append("tier", tier);
   formData.append("days", days);
-  const response = await apiClient.post(`/storage/restore-aws/${encodeURIComponent(filename)}`, formData);
+  const provider = csp || "AWS";
+  const response = await apiClient.post(
+    `/storage/restore/${encodeURIComponent(provider)}/${encodeURIComponent(filename)}`,
+    formData
+  );
   return response.data;
 };
 
@@ -81,7 +90,7 @@ function StoragePage() {
   const [files, setFiles] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSyncing, setIsSyncing] = useState(false);
-  const [syncCsp, setSyncCsp] = useState("AWS");
+  const [cloudProvider, setCloudProvider] = useState("ALL");
   const [isUploading, setIsUploading] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const fileInputRef = useRef(null);
@@ -139,48 +148,99 @@ function StoragePage() {
       });
       setFiles(fileList);
     } catch (error) {
-      notifyError(error.message || "Failed to fetch files.");
+      notifyError(getApiErrorMessage(error, "Failed to fetch files."));
     } finally {
       setIsLoading(false);
     }
   }, [token, notifyError, selectedBucket, selectedRegion]);
 
+  const syncStorageProvider = useCallback(
+    async (csp) => {
+      if (csp === "GCP") {
+        return syncGcpBucket(token, { bucket: selectedBucket || undefined });
+      }
+      if (csp === "Azure") {
+        return syncAzureContainer(token, { container: selectedBucket || undefined });
+      }
+      return syncAwsBucket(token, {
+        bucket: selectedBucket || undefined,
+        region: selectedRegion !== "all" ? selectedRegion : undefined,
+      });
+    },
+    [token, selectedBucket, selectedRegion]
+  );
+
   const handleSyncWithBucket = async () => {
     if (!token) return;
+    const targets =
+      cloudProvider === "ALL" ? ["AWS", "GCP", "Azure"] : [cloudProvider];
     setIsSyncing(true);
     try {
-      let result;
-      if (syncCsp === "GCP") {
-        result = await syncGcpBucket(token, { bucket: selectedBucket || undefined });
-      } else if (syncCsp === "Azure") {
-        result = await syncAzureContainer(token, { container: selectedBucket || undefined });
-      } else {
-        result = await syncAwsBucket(token, {
-          bucket: selectedBucket || undefined,
-          region: selectedRegion !== "all" ? selectedRegion : undefined,
-        });
+      let totalInserted = 0;
+      let totalRemoved = 0;
+      const skipped = [];
+
+      for (const csp of targets) {
+        try {
+          const result = await syncStorageProvider(csp);
+          totalInserted += result.inserted || 0;
+          totalRemoved += result.removed || 0;
+        } catch (error) {
+          const msg = getApiErrorMessage(error, "Sync failed.");
+          if (
+            cloudProvider === "ALL" &&
+            csp !== "AWS" &&
+            /not configured|credentials/i.test(String(msg))
+          ) {
+            skipped.push(csp);
+            continue;
+          }
+          if (csp !== "AWS" && /not configured|credentials/i.test(String(msg))) {
+            notifyInfo(
+              `${csp} sync needs BYOC or platform keys in Settings — connect your ${csp} account when ready.`
+            );
+            return;
+          }
+          throw error;
+        }
       }
-      const scanned = result.scanned_prefix
-        ? `prefix '${result.scanned_prefix}'`
-        : `bucket '${result.bucket_name}'`;
-      const removedMsg = result.removed > 0 ? ` Removed ${result.removed} stale record(s).` : "";
-      notifySuccess(
-        `Sync complete (${syncCsp}). Added ${result.inserted} new file(s) after scanning ${scanned}.${removedMsg}`
-      );
-      await fetchFiles();
-    } catch (error) {
-      const msg = error.detail || error.message || "Sync failed.";
-      if (syncCsp !== "AWS" && /not configured|credentials/i.test(String(msg))) {
-        notifyInfo(
-          `${syncCsp} sync needs BYOC or platform keys in Settings — connect your ${syncCsp} account when ready.`
+
+      const removedMsg =
+        totalRemoved > 0 ? ` Removed ${totalRemoved} stale record(s).` : "";
+      if (cloudProvider === "ALL") {
+        const skipMsg =
+          skipped.length > 0
+            ? ` Skipped ${skipped.join(", ")} (not configured).`
+            : "";
+        notifySuccess(
+          `Sync complete (all providers). Added ${totalInserted} new file(s).${removedMsg}${skipMsg}`
         );
       } else {
-        notifyError(msg);
+        notifySuccess(
+          `Sync complete (${cloudProvider}). Added ${totalInserted} new file(s).${removedMsg}`
+        );
       }
+      await fetchFiles();
+    } catch (error) {
+      notifyError(getApiErrorMessage(error, "Sync failed."));
     } finally {
       setIsSyncing(false);
     }
   };
+
+  const displayedFiles = useMemo(
+    () => filterFilesByCloudProvider(files, cloudProvider),
+    [files, cloudProvider]
+  );
+
+  const syncActionLabel = useMemo(() => {
+    if (selectedBucket) {
+      return cloudProvider === "ALL"
+        ? `Sync ${selectedBucket} (all)`
+        : `Sync ${selectedBucket}`;
+    }
+    return cloudProvider === "ALL" ? "Sync all providers" : `Sync (${cloudProvider})`;
+  }, [cloudProvider, selectedBucket]);
 
   useEffect(() => {
     fetchFiles();
@@ -205,7 +265,7 @@ function StoragePage() {
       setRecommendation(result);
       setShowRecommendationModal(true);
     } catch (error) {
-      notifyError(error.message || "Analysis failed.");
+      notifyError(getApiErrorMessage(error, "Analysis failed."));
     } finally {
       setIsAnalyzing(false);
     }
@@ -235,7 +295,7 @@ function StoragePage() {
       if (fileInputRef.current) fileInputRef.current.value = "";
       await fetchFiles();
     } catch (error) {
-      notifyError(error.message || `Upload to ${finalCsp} failed.`);
+      notifyError(getApiErrorMessage(error, `Upload to ${finalCsp} failed.`));
     } finally {
       setIsUploading(false);
     }
@@ -255,7 +315,7 @@ function StoragePage() {
       notifySuccess(`'${fileToDelete.filename}' deleted successfully.`);
       await fetchFiles();
     } catch (error) {
-      notifyError(error.message || "Failed to delete file.");
+      notifyError(getApiErrorMessage(error, "Failed to delete file."));
     } finally {
       setShowDeleteModal(false);
       setFileToDelete(null);
@@ -283,7 +343,7 @@ function StoragePage() {
         notifyInfo(error.message); // Inform user it's already restoring
       }
       else {
-        notifyError(error.message || "Could not get download link.");
+        notifyError(getApiErrorMessage(error, "Could not get download link."));
       }
     }
   };
@@ -300,14 +360,22 @@ function StoragePage() {
 
     setIsRestoring(true);
     try {
-      const result = await initiateGlacierRestore(fileToRestore, restoreTier, restoreDays, token);
+      const record = files.find((f) => f.filename === fileToRestore);
+      const restoreCsp = record?.csp || "AWS";
+      const result = await initiateArchiveRestore(
+        fileToRestore,
+        restoreCsp,
+        restoreTier,
+        restoreDays,
+        token
+      );
       notifySuccess(result.message || `'${fileToRestore}' restore initiated.`);
       setShowRestoreModal(false);
       setFileToRestore(null);
       // Re-fetch files to potentially update their status in the UI
       await fetchFiles();
     } catch (error) {
-      notifyError(error.message || `Failed to initiate restore for '${fileToRestore}'.`);
+      notifyError(getApiErrorMessage(error, `Failed to initiate restore for '${fileToRestore}'.`));
     } finally {
       setIsRestoring(false);
     }
@@ -331,6 +399,12 @@ function StoragePage() {
         selectedRegion={selectedRegion}
         onBucketChange={handleBucketSelect}
         onRegionChange={handleRegionSelect}
+      />
+
+      <ByocStorageTargetBanner
+        variant="storage"
+        selectedBucket={selectedBucket}
+        selectedRegion={selectedRegion}
       />
 
       <div className="storage-process-info zenith-surface">
@@ -431,34 +505,28 @@ function StoragePage() {
       <div className="list-section zenith-surface">
         <div className="list-header">
           <h3 className="list-title">Your Files</h3>
-          <div className="sync-toolbar">
-            <select
-              className="zenith-select sync-csp-select"
-              value={syncCsp}
-              onChange={(e) => setSyncCsp(e.target.value)}
-              aria-label="Cloud provider for sync"
-            >
-              <option value="AWS">AWS</option>
-              <option value="GCP">GCP</option>
-              <option value="Azure">Azure</option>
-            </select>
-            <button
-              type="button"
-              className="action-btn"
-              onClick={handleSyncWithBucket}
-              disabled={isSyncing}
-            >
-              {isSyncing ? "Syncing..." : selectedBucket ? `Sync ${selectedBucket}` : `Sync (${syncCsp})`}
-            </button>
-          </div>
+          <CloudProviderToolbar
+            provider={cloudProvider}
+            onProviderChange={setCloudProvider}
+            onAction={handleSyncWithBucket}
+            actionLabel={syncActionLabel}
+            actionBusy={isSyncing}
+            selectAriaLabel="Filter and sync by cloud provider"
+          />
         </div>
         {isLoading ? (
           <TableSkeleton rows={5} columns={5} />
-        ) : files.length === 0 ? (
+        ) : displayedFiles.length === 0 ? (
           <EmptyState
             icon={<IconHardDrive aria-hidden="true" />}
-            title="No files yet"
-            message="Upload a file above to see it listed here with storage class and actions."
+            title={files.length === 0 ? "No files yet" : `No ${cloudProvider === "ALL" ? "" : `${cloudProvider} `}files`}
+            message={
+              files.length === 0
+                ? "Upload a file above to see it listed here with storage class and actions."
+                : cloudProvider === "ALL"
+                  ? "No files match the current bucket or region filter."
+                  : `No files stored on ${cloudProvider}. Choose All or sync ${cloudProvider} when connected.`
+            }
           />
         ) : (
           <div className="table-responsive-scroll">
@@ -473,7 +541,7 @@ function StoragePage() {
               </tr>
             </thead>
             <tbody>
-              {files.map((file) => (
+              {displayedFiles.map((file) => (
                   <tr key={`${file.cloud_bucket || ""}-${file.s3_key || file.filename}`}>
                     <td>{file.filename}</td>
                     <td>{(file.size_bytes / 1024).toFixed(2)}</td>

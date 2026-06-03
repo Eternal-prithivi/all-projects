@@ -2,19 +2,18 @@
 
 ## 🔄 Current Resume State
 
-**Status:** COMPLETE — Multi-cloud parity **Phase 0** (2026-06-03)
+**Status:** COMPLETE — Multi-cloud parity **Phase 1** (2026-06-03)
 
-**Delivered:** Parity matrix + credential contract; `app/cloud/providers.py`; removed duplicate `backend/cost/`; storage upload normalizes CSP; tri-cloud routing integration tests; **218 pytest passed**.
+**Delivered:** Shared tier normalization; restore `POST /restore/{csp}/{filename}` (AWS + 501 others); `missing_config` on GCP/Azure sync; StoragePage uses `getApiErrorMessage`; **236 pytest passed**.
 
-**Next session:** Phase **1** — storage tiering audit, GCP/Azure upload/list/delete mocks, restore API decision (`/restore/{csp}` vs 501), `StoragePage.jsx` error surfacing.
+**Next:** Phase **2** — promote billing env vars to Settings, GCP BigQuery wizard, Azure Cost Management BYOC, cost UI `group_by` honesty.
 
-**Paused:** Phase 20.5 **20.5.10** (GitHub branch protection on `stage`).
+**Paused:** Phase 20.5 **20.5.10**.
 
 ---
 
 ## Last Known Good State
 
-- Branch: `stage` (push after Phase 0 commit)
-- Backend: `cd backend && ../venv/bin/python -m pytest -q` → 218 passed
-- Canonical cost: `backend/app/cost/` only
-- Provider helper: `normalize_provider("aws")` → `"AWS"`
+- `stage` @ latest push after Phase 1
+- Restore: `/api/storage/restore/AWS/{file}` (legacy `/restore-aws/` still works)
+- Matrix: `docs/cloud/MULTI_CLOUD_PARITY_MATRIX.md` updated for Phase 1

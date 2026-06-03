@@ -19,25 +19,21 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from app.cloud.providers import normalize_provider
 from app.utils.config import settings
 from app.config.demo_mode import is_demo_mode
 from app.storage.manager import change_tier_on_aws, change_tier_on_gcp, change_tier_on_azure
+from app.storage.storage_tiers import (
+    ALL_TIER_NAMES,
+    COLD_TIER_NAMES,
+    HOT_TIER_NAMES,
+    TIER_MAP,
+    WARM_TIER_NAMES,
+    normalize_lifecycle_tier,
+)
 from app.utils.logger import setup_logger
 
 logger = setup_logger(__name__)
-
-# This map is now used for both demotions and promotions across all tiers.
-TIER_MAP = {
-    "AWS": {"hot": "STANDARD", "warm": "STANDARD_IA", "cold": "GLACIER"},
-    "GCP": {"hot": "STANDARD", "warm": "NEARLINE", "cold": "ARCHIVE"},
-    "Azure": {"hot": "Hot", "warm": "Cool", "cold": "Archive"}
-}
-
-# Helper lists for easier querying
-HOT_TIER_NAMES = ["Standard", "S3 Standard", "Standard Storage", "Hot Blob Storage"]
-WARM_TIER_NAMES = ["STANDARD_IA", "NEARLINE", "Cool"]
-COLD_TIER_NAMES = ["GLACIER", "ARCHIVE", "Archive"]
-ALL_TIER_NAMES = HOT_TIER_NAMES + WARM_TIER_NAMES + COLD_TIER_NAMES
 
 TIER_MONTHLY_COST_PER_GB = {
     "hot": 0.023,
@@ -55,21 +51,6 @@ FILE_TYPE_PRIORITY_POINTS = {
     "log": 8,
     "active": 4,
 }
-
-
-def normalize_lifecycle_tier(storage_class: Optional[str]) -> Optional[str]:
-    """Map provider-specific storage classes into the report's hot/warm/cold tiers."""
-    if not storage_class:
-        return None
-
-    normalized = storage_class.strip().lower()
-    if normalized in {tier.lower() for tier in HOT_TIER_NAMES} or normalized == "hot":
-        return "hot"
-    if normalized in {tier.lower() for tier in WARM_TIER_NAMES} or normalized == "warm":
-        return "warm"
-    if normalized in {tier.lower() for tier in COLD_TIER_NAMES} or normalized == "cold":
-        return "cold"
-    return None
 
 
 def _as_utc_datetime(value: Any) -> Optional[datetime]:
@@ -324,7 +305,12 @@ def _perform_tier_change(
     """A helper function to perform and log the tier change for a single file."""
     filename = file_record.get("filename")
     owner_username = file_record.get("owner_username")
-    csp = file_record.get("csp", "AWS")
+    raw_csp = file_record.get("csp", "AWS")
+    try:
+        csp = normalize_provider(raw_csp)
+    except ValueError:
+        logger.warning("Skipping tier change for %s: unknown CSP %r", filename, raw_csp)
+        return False
     object_key = file_record.get("s3_key") or file_record.get("object_key") or file_record.get("blob_name")
 
     if not owner_username:

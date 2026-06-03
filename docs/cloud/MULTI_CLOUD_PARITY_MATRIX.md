@@ -13,7 +13,7 @@ Success criterion (every phase): With valid platform `.env` or per-user BYOC, th
 | Area | AWS | GCP | Azure | Key modules | Phase |
 |------|-----|-----|-------|-------------|-------|
 | **Storage (standard)** | Full | Full | Full | `app/storage/uploader.py`, `cloud_credentials.py`, `routes_storage.py` | 1 |
-| **Storage restore** | Glacier (`POST /restore-aws/{filename}`) | Not implemented | Not implemented | `routes_storage.py` | 1 |
+| **Storage restore** | Glacier (`POST /restore/AWS/{filename}`) | 501 not_supported | 501 not_supported | `routes_storage.py` | 1 ✅ |
 | **Cost / budgets** | Full + CE grouping | Code path; needs BigQuery export + env | Code path; needs subscription + SP | `app/cost/manager.py`, `billing_status.py` | 2 |
 | **BYOC** | Full + verify + buckets | Connect + resolver; **no step-1 verify** | Same | `app/byoc/routes_byoc.py`, `credential_resolver.py` | 3 |
 | **Security vault** | Full (S3 SSE dual) | UI filter only | UI filter only | `app/security/routes_security.py` | 4 |
@@ -39,7 +39,7 @@ Legend: ✅ implemented · 🟡 partial · ❌ missing · 🔒 AWS-only today
 | `POST /sync/aws` | ✅ | — | — | |
 | `POST /sync/gcp` | — | ✅ | — | |
 | `POST /sync/azure` | — | — | ✅ | |
-| `POST /restore-aws/{filename}` | ✅ | ❌ | ❌ | Phase 1: rename or 501 for non-AWS |
+| `POST /restore/{csp}/{filename}` | ✅ AWS | 501 | 501 | Legacy `/restore-aws/` → AWS; DEC-024 |
 
 ### Cost (`/api/cost`)
 
@@ -98,4 +98,4 @@ Legend: ✅ implemented · 🟡 partial · ❌ missing · 🔒 AWS-only today
 | Phase | Matrix updated | Date |
 |-------|----------------|------|
 | 0 | Initial matrix + contract | 2026-06-03 |
-| 1 | — | — |
+| 1 | Restore route, tier names, missing_config sync, tests | 2026-06-03 |
