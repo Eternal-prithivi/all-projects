@@ -40,9 +40,17 @@
   border: 1px solid var(--border-default);
   border-radius: var(--radius-lg);
   padding: 2.5rem;
-  margin-bottom: 3rem;
+  margin-bottom: 1.25rem;
   box-shadow: var(--shadow-card);
   transition: border-color var(--duration-normal) var(--ease-out);
+}
+
+.storage-container .storage-destination-panel {
+  margin-bottom: 3rem;
+}
+
+.storage-container .storage-destination-panel .bucket-selector {
+  margin-bottom: 1rem;
 }
 
 .upload-title {
@@ -320,16 +328,20 @@
 /* --- Modal Styles --- */
 .modal-overlay {
   position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
+  inset: 0;
   background: rgba(0, 0, 0, 0.8);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 1000;
   animation: fadeIn 0.3s ease;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: max(1rem, env(safe-area-inset-top, 0px))
+    max(1rem, env(safe-area-inset-right, 0px))
+    max(1rem, env(safe-area-inset-bottom, 0px))
+    max(1rem, env(safe-area-inset-left, 0px));
+  box-sizing: border-box;
 }
 
 .modal-content {
@@ -343,7 +355,206 @@
   border: 1px solid var(--border-default);
   animation: slideIn 0.4s ease;
   max-width: 550px;
-  width: 90%;
+  width: min(550px, 100%);
+  margin: auto;
+  box-sizing: border-box;
+  flex-shrink: 0;
+}
+
+/* Storage analysis modal — compact card, scrollable body, sticky actions */
+.modal-content--analysis {
+  display: flex;
+  flex-direction: column;
+  max-width: min(620px, calc(100% - 2rem));
+  width: min(620px, calc(100% - 2rem));
+  max-height: min(85dvh, 500px);
+  padding: 0;
+  text-align: left;
+  overflow: hidden;
+}
+
+.modal-analysis-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-shrink: 0;
+  padding: 1rem 1.125rem 0.625rem;
+  border-bottom: 1px solid var(--border-default);
+}
+
+.modal-analysis-header .recommendation-title {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 600;
+  text-align: left;
+  line-height: 1.3;
+}
+
+.modal-close-btn {
+  flex-shrink: 0;
+  background: transparent;
+  border: 1px solid var(--border-default);
+  color: var(--text-secondary);
+  font-size: 1.35rem;
+  line-height: 1;
+  cursor: pointer;
+  width: 2rem;
+  height: 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  padding: 0;
+  transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+}
+
+.modal-close-btn:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-primary);
+  border-color: var(--gold-border, var(--border-default));
+}
+
+.modal-content__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0.875rem 1.125rem;
+}
+
+.modal-content--analysis .recommendation-text--compact {
+  margin: 0 0 0.625rem;
+  font-size: 0.875rem;
+  line-height: 1.45;
+}
+
+.recommendation-box--compact {
+  margin: 0 0 0.625rem;
+  padding: 0.75rem 0.875rem;
+}
+
+.recommendation-box__label {
+  display: block;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  margin-bottom: 0.35rem;
+}
+
+.modal-content--analysis .recommendation-csp {
+  font-size: 1rem;
+  margin: 0;
+  justify-content: flex-start;
+}
+
+.modal-content--analysis .recommendation-csp img {
+  width: 22px;
+  height: 22px;
+}
+
+.analysis-details {
+  margin: 0.5rem 0 0;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.analysis-details summary {
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  user-select: none;
+}
+
+.analysis-details summary::-webkit-details-marker {
+  display: none;
+}
+
+.analysis-details summary::after {
+  content: "▾";
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  transition: transform 0.2s ease;
+}
+
+.analysis-details[open] summary::after {
+  transform: rotate(180deg);
+}
+
+.analysis-details__meta {
+  font-weight: 500;
+  font-size: 0.75rem;
+  color: var(--gold-primary);
+}
+
+.ensemble-box--compact {
+  margin: 0;
+  padding: 0 0.75rem 0.75rem;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+}
+
+.expert-votes--compact {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+.expert-votes--compact .expert-vote {
+  padding: 0.5rem;
+}
+
+.override-section--compact {
+  margin-top: 0.625rem;
+}
+
+.override-section--compact label {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-bottom: 0.35rem;
+}
+
+.override-section--compact .override-select {
+  width: 100%;
+  font-size: 0.875rem;
+}
+
+.modal-content--analysis .rl-policy-note {
+  margin: 0.5rem 0 0;
+  font-size: 0.72rem;
+}
+
+.modal-buttons--sticky {
+  flex-shrink: 0;
+  padding: 0.75rem 1.125rem 1rem;
+  border-top: 1px solid var(--border-default);
+  background: var(--bg-card);
+}
+
+.modal-buttons--analysis {
+  flex-direction: row;
+  justify-content: stretch;
+  align-items: stretch;
+  gap: 0.75rem;
+  margin-top: 0;
+}
+
+.modal-buttons--analysis .modal-btn {
+  flex: 1 1 0;
+  min-width: 0;
+  width: auto;
+  padding: 0.625rem 1rem;
+  font-size: 0.875rem;
 }
 
 .recommendation-title {
@@ -794,6 +1005,16 @@
   .modal-content {
     padding: 2rem;
     max-width: 95%;
+  }
+
+  .modal-content--analysis {
+    max-width: calc(100% - 1rem);
+    width: calc(100% - 1rem);
+    max-height: min(88dvh, 480px);
+  }
+
+  .expert-votes--compact {
+    grid-template-columns: 1fr;
   }
 
   .recommendation-title {

@@ -54,11 +54,9 @@ def platform_storage_configured(provider: CloudProvider) -> bool:
             and settings.S3_BUCKET_NAME
         )
     if provider == "GCP":
-        return bool(
-            gcp_credentials_file_present()
-            and settings.GCP_BUCKET_NAME
-            and settings.GCP_PROJECT_ID
-        )
+        # Same pattern as Azure: list when bucket + project are configured;
+        # service account JSON path is required at upload time (see build_gcp_storage_client).
+        return bool(settings.GCP_BUCKET_NAME and settings.GCP_PROJECT_ID)
     return bool(
         settings.AZURE_STORAGE_ACCOUNT_NAME
         and settings.AZURE_STORAGE_ACCOUNT_KEY
@@ -70,14 +68,26 @@ def platform_vm_configured(provider: CloudProvider) -> bool:
     if provider == "Azure":
         from app.vm.azure_manager import azure_configured
 
-        return azure_configured()
+        if azure_configured():
+            return True
+        # List when storage + SP are set (like GCP project/zone); subscription required at provision time.
+        return bool(
+            settings.AZURE_TENANT_ID
+            and settings.AZURE_CLIENT_ID
+            and settings.AZURE_CLIENT_SECRET
+            and platform_storage_configured("Azure")
+        )
     if provider == "AWS":
         from app.vm.aws_manager import aws_configured
 
         return aws_configured()
-    from app.vm import manager as gcp_manager
+    if provider == "GCP":
+        from app.vm import manager as gcp_manager
 
-    return gcp_manager.credentials is not None
+        if gcp_credentials_file_present() and gcp_manager.credentials is not None:
+            return True
+        return bool(settings.GCP_PROJECT_ID and settings.GCP_ZONE)
+    return False
 
 
 def platform_provision_configured(provider: CloudProvider) -> bool:
@@ -114,7 +124,7 @@ def _provider_available(username: str, provider: CloudProvider, feature: CloudFe
 
 
 def available_providers(username: str, feature: CloudFeature) -> List[CloudProvider]:
-    """Providers the user may use for this feature (hybrid union)."""
+    """Hybrid union of BYOC-connected and platform-configured providers (all features)."""
     return [p for p in _ALL if _provider_available(username, p, feature)]
 
 

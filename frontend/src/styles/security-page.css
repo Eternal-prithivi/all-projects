@@ -28,6 +28,14 @@
   box-shadow: var(--shadow-gold);
 }
 
+.security-page .security-destination-panel {
+  margin-bottom: var(--space-xl);
+}
+
+.security-page .security-destination-panel .bucket-selector {
+  margin-bottom: var(--space-md);
+}
+
 .security-page .page-title,
 .security-page .section-title {
   font-size: 1.75rem;
@@ -177,16 +185,35 @@ html.theme-light .security-2fa-badge--off {
   gap: var(--space-lg);
 }
 
-.security-page .form-group.horizontal-form {
+.security-page .form-group.horizontal-form,
+.security-page .security-upload-row {
   flex-wrap: nowrap;
   justify-content: flex-start;
-  align-items: center;
+  align-items: stretch;
   gap: var(--space-md);
 }
 
-.security-page .form-group.horizontal-form .file-input {
-  flex: 1;
+.security-page .security-upload-row .file-input {
+  flex: 1 1 auto;
   min-width: 0;
+}
+
+.security-page .security-upload-row .upload-btn {
+  flex: 0 0 auto;
+  align-self: center;
+  white-space: nowrap;
+}
+
+.security-page .security-upload-csp {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-width: 10rem;
+}
+
+.security-page .security-upload-csp label {
+  font-size: 0.75rem;
+  color: var(--text-muted);
 }
 
 .security-page .form-group input[type="file"] {

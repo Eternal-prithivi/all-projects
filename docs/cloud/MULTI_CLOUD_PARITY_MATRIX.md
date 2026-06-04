@@ -85,9 +85,11 @@ Legend: ✅ implemented · 🟡 partial · ❌ missing · 🔒 AWS-only today
 
 | Endpoint | AWS | GCP | Azure | Notes |
 |----------|-----|-----|-------|-------|
-| Plan / apply / destroy / drift | ✅ | ✅ | ✅ | Phase 6 ✅ |
+| Plan / apply / destroy / drift | ✅ | ✅ | ✅ | Templates: static-site, backend-app, serverless-db per CSP |
+| Provision templates | 3 (S3, VPC+EC2, DynamoDB) | 3 (GCS, GCE+VPC, Firestore) | 3 (Blob, VM+VNet, Cosmos) | Legacy keys static-gcs / static-blob kept |
 | `GET /templates?csp=` / `GET /modules?csp=` | ✅ | ✅ | ✅ | Per-provider catalog |
-| Engine resolver | boto3 \| terraform | terraform only | terraform only | GCP/Azure require TF |
+| Engine resolver | boto3 \| terraform | sdk \| terraform | sdk \| terraform | SDK = GCS/Blob fast path (Settings → Boto3) |
+| Scheduled drift | ✅ BYOC per CSP | ✅ | ✅ | Celery uses `resolve_provision_terraform_env` |
 
 ---
 

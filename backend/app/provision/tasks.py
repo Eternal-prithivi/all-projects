@@ -2,10 +2,10 @@
 # MODULE: provision/tasks.py
 # PURPOSE: Celery background tasks for provisioning — scheduled drift detection
 # USED BY: celery_worker.py Beat schedule (daily 06:00 UTC)
-# DEPENDS ON: drift_detector.py, boto3_drift.py, engine_resolver.py, byoc_credentials.py
+# DEPENDS ON: drift_detector.py, boto3_drift.py, sdk_drift.py, engine_resolver.py
 # DO NOT:
 #   - Run drift checks on destroyed deployments
-#   - Use platform AWS credentials when owner BYOC is missing
+#   - Use platform credentials when owner BYOC is missing
 # =============================================================================
 from __future__ import annotations
 
@@ -15,17 +15,18 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
-_TERRAFORM_PLACEHOLDER_WORKSPACES = frozenset({"fast-path", "boto3", ""})
+_FAST_PATH_WORKSPACE_MARKERS = frozenset({"fast-path", "boto3", "sdk", ""})
 
 
 def _run_scheduled_drift(
     deployment: dict[str, Any],
-    aws_creds: dict[str, str],
+    cloud_env: dict[str, str],
 ):
-    """Run drift check using the engine recorded at plan time (Terraform or Boto3)."""
+    """Run drift check using the engine recorded at plan time (Terraform, Boto3, or SDK)."""
     from app.provision.boto3_drift import detect_drift_boto3
     from app.provision.drift_detector import detect_drift
     from app.provision.engine_resolver import deployment_engine
+    from app.provision.sdk_drift import detect_drift_sdk
 
     config = deployment.get("config") or {}
     engine = deployment_engine(deployment)
@@ -33,12 +34,19 @@ def _run_scheduled_drift(
     if engine == "boto3":
         return detect_drift_boto3(
             config,
-            aws_creds,
+            cloud_env,
             deployment.get("boto3_context"),
         )
 
+    if engine == "sdk":
+        return detect_drift_sdk(
+            config,
+            cloud_env,
+            deployment.get("sdk_context"),
+        )
+
     workspace = deployment.get("terraform_workspace", "")
-    if not workspace or workspace in _TERRAFORM_PLACEHOLDER_WORKSPACES:
+    if not workspace or workspace in _FAST_PATH_WORKSPACE_MARKERS:
         from app.provision.models import DriftReport, DriftStatus
 
         return DriftReport(
@@ -46,24 +54,25 @@ def _run_scheduled_drift(
             changes_detected=0,
             details=[
                 "Scheduled drift skipped: no Terraform workspace for this deployment. "
-                "Redeploy with Terraform or use a Boto3 deployment (detected via provision_engine)."
+                "Redeploy with Terraform or use the SDK/Boto3 fast path."
             ],
             checked_at=datetime.utcnow(),
         )
 
-    return detect_drift(workspace, aws_credentials=aws_creds)
+    return detect_drift(workspace, cloud_env=cloud_env)
 
 
 def scheduled_drift_check():
     """
     Celery Beat task: check all active deployments for drift.
 
-    Uses each deployment owner's BYOC AWS credentials. Routes to boto3_drift or
-    terraform plan per deployment provision_engine.
+    Resolves BYOC credentials per deployment CSP (AWS, GCP, Azure). Routes to
+    boto3_drift, sdk_drift, or terraform plan per provision_engine.
     """
+    from app.cloud.providers import normalize_provider
     from app.database.mongo_client import get_database
     from app.config.demo_mode import is_demo_mode
-    from app.provision.byoc_credentials import resolve_byoc_terraform_env
+    from app.provision.byoc_credentials import resolve_provision_terraform_env
     from app.provision.models import DeploymentStatus, DriftReport, DriftStatus
 
     if is_demo_mode():
@@ -89,6 +98,7 @@ def scheduled_drift_check():
         deployment_name = deployment.get("deployment_name", "unknown")
         owner = deployment.get("user_id", "")
         config = deployment.get("config") or {}
+        csp = normalize_provider(config.get("csp") or "AWS")
         region = config.get("aws_region", "ap-south-1")
 
         if not owner:
@@ -96,18 +106,20 @@ def scheduled_drift_check():
             skipped += 1
             continue
 
-        aws_creds = resolve_byoc_terraform_env(owner, region)
-        if not aws_creds:
+        cloud_env, cred_err = resolve_provision_terraform_env(owner, csp, region)
+        if cred_err or not cloud_env:
             logger.info(
-                "Scheduled drift skipped for %s: BYOC AWS not configured for %s",
+                "Scheduled drift skipped for %s: BYOC %s not configured for %s",
                 deployment_name,
+                csp,
                 owner,
             )
             skip_report = DriftReport(
                 status=DriftStatus.CHECK_FAILED,
                 changes_detected=0,
                 details=[
-                    "Scheduled drift skipped: deployment owner has no active BYOC AWS credentials.",
+                    cred_err
+                    or f"Scheduled drift skipped: no active BYOC {csp} credentials for owner.",
                 ],
                 checked_at=datetime.utcnow(),
             )
@@ -125,7 +137,7 @@ def scheduled_drift_check():
             continue
 
         try:
-            drift_report = _run_scheduled_drift(deployment, aws_creds)
+            drift_report = _run_scheduled_drift(deployment, cloud_env)
 
             if drift_report.status == DriftStatus.CHECK_FAILED and drift_report.details:
                 detail0 = drift_report.details[0]

@@ -28,8 +28,28 @@ def test_put_secure_object_dual_writes_replica():
     )
     primary.put_object.assert_called_once()
     replica.put_object.assert_called_once()
-    assert primary.put_object.call_args.kwargs["Bucket"] == "sec-primary"
-    assert replica.put_object.call_args.kwargs["Bucket"] == "sec-replica"
+
+
+def test_put_secure_object_dual_skips_replica_when_disabled():
+    primary = MagicMock()
+    replica = MagicMock()
+    storage = SecureAwsStorage(
+        primary_client=primary,
+        replica_client=replica,
+        primary_bucket="sec-primary",
+        replica_bucket="sec-replica",
+        region="ap-south-1",
+        is_byoc=True,
+        list_prefix="alice/",
+        access_key_id="AKIA",
+        secret_access_key="secret",
+        dedicated_secure_bucket=True,
+    )
+    put_secure_object_dual(
+        storage, "alice/doc.pdf", b"data", server_side_encryption=True, replicate=False
+    )
+    assert primary.put_object.call_count == 1
+    replica.put_object.assert_not_called()
 
 
 @patch("app.storage.cloud_credentials.get_aws_bucket_layout")

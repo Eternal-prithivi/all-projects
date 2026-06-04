@@ -99,6 +99,7 @@ def put_secure_object_dual(
     *,
     server_side_encryption: bool = False,
     metadata: Optional[dict] = None,
+    replicate: bool = True,
 ) -> None:
     """Write to primary secure bucket and replica when BYOC/platform dual-write is on."""
     put_kwargs: dict = {
@@ -112,7 +113,7 @@ def put_secure_object_dual(
         put_kwargs["Metadata"] = metadata
     storage.primary_client.put_object(**put_kwargs)
 
-    if not storage.dual_write_enabled:
+    if not replicate or not storage.dual_write_enabled:
         return
 
     replica_kwargs: dict = {
@@ -251,9 +252,16 @@ def build_gcp_storage_client(username: str) -> Tuple[gcp_storage.Client, str, bo
         )
         return client, gcp["bucket_name"], True
 
-    client = gcp_storage.Client.from_service_account_json(
-        gcp["service_account_key_path"]
-    )
+    from app.utils.gcp_credentials import gcp_credentials_file_present
+
+    path = (gcp.get("service_account_key_path") or "").strip()
+    if not path or not gcp_credentials_file_present():
+        raise ValueError(
+            "Google Cloud storage is configured (bucket + project) but "
+            "GCP_SERVICE_ACCOUNT_JSON_PATH is missing or points to a file that does not exist. "
+            "Add your service account JSON path in server .env (same idea as Azure storage keys)."
+        )
+    client = gcp_storage.Client.from_service_account_json(path)
     return client, gcp["bucket_name"], False
 
 

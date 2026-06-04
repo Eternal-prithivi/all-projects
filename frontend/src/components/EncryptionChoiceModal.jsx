@@ -120,14 +120,14 @@ const EncryptionChoiceModal = ({ file, onClose, onChoose }) => {
                   checked={selectedMethod === 'server-side'}
                   onChange={() => handleMethodSelect('server-side')}
                 />
-                <h3>Server-Side Encryption (SSE-S3)</h3>
+                <h3>Cloud-managed encryption</h3>
               </div>
               <div className="option-description">
-                <p><strong>AWS S3 encrypts at rest with managed keys (AES-256)</strong></p>
+                <p><strong>Your cloud encrypts at rest with managed keys (AES-256)</strong></p>
                 <ul>
                   <li className="pro">No password to remember</li>
-                  <li className="pro">Fast upload — encryption handled by S3</li>
-                  <li className="pro">Copied to replica bucket for redundancy</li>
+                  <li className="pro">Fast upload — encryption handled by the provider</li>
+                  <li className="pro">Optional replica region on AWS when configured</li>
                   <li className="caution">Zenith operators could access plaintext via cloud controls</li>
                 </ul>
                 <p className="recommendation">

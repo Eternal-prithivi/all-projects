@@ -17,7 +17,7 @@ import React, { useState, useEffect, useCallback, useRef, useMemo } from "react"
 import { useNotifications } from "../hooks/useNotifications";
 import EncryptionChoiceModal from "../components/EncryptionChoiceModal";
 import DecryptionPasswordModal from "../components/DecryptionPasswordModal";
-import EncryptSensitivePromptModal from "../components/EncryptSensitivePromptModal";
+import SecureUploadWizard from "../components/SecureUploadWizard";
 import {
   encryptFileInBrowser,
   decryptBlobInBrowser,
@@ -53,6 +53,7 @@ import {
   useCloudAvailability,
   buildCloudProviderOptions,
   coerceCloudProvider,
+  CSP_LABELS,
 } from "../hooks/useCloudAvailability.js";
 import EmptyState from "../components/EmptyState.jsx";
 import TwoFADialog from "../components/TwoFADialog.jsx";
@@ -101,7 +102,8 @@ function SecurityPage() {
   const [fileAwaitingEncryption, setFileAwaitingEncryption] = useState(null);
   const [showDecryptionModal, setShowDecryptionModal] = useState(false);
   const [fileToDecrypt, setFileToDecrypt] = useState(null);
-  const [showEncryptPrompt, setShowEncryptPrompt] = useState(false);
+  const [showSecureWizard, setShowSecureWizard] = useState(false);
+  const [wizardSubmitting, setWizardSubmitting] = useState(false);
   const [pendingLocalFile, setPendingLocalFile] = useState(null);
   const [pendingFileMeta, setPendingFileMeta] = useState(null);
   const [alwaysAskEncryption, setAlwaysAskEncryption] = useState(() => {
@@ -401,59 +403,80 @@ function SecurityPage() {
     return cloudProvider === "ALL" ? "Sync secure vault (all)" : `Sync (${cloudProvider})`;
   }, [cloudProvider, selectedBucket]);
 
-  const handleUpload = async () => {
-    if (!file || !token) return;
-    setIsUploading(true);
-    const uploadedFileName = file.name;
-    try {
-      const uploadCsp =
-        cloudProvider === "ALL"
-          ? getFeature("security").default || securityProviders[0]
-          : cloudProvider;
-      const response = await uploadSecureFile(
-        file,
-        encrypt,
-        token,
-        alwaysAskEncryption,
-        uploadCsp
-      );
+  const resetUploadState = () => {
+    setPendingLocalFile(null);
+    setPendingFileMeta(null);
+    setShowSecureWizard(false);
+    setFile(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
 
-      if (response.status === "auto_encrypted_sse") {
-        notifications.success(
-          response.message ||
-            `'${uploadedFileName}' was auto-protected with SSE-S3 (sensitive data detected).`
+  const handleStartSecureWizard = () => {
+    if (!file) {
+      notifications.info("Choose a file first, then open the upload wizard.");
+      fileInputRef.current?.click();
+      return;
+    }
+    if (!token) {
+      notifications.error("Sign in to upload secure files.");
+      return;
+    }
+    if (!securityProviders.length) {
+      notifications.error(
+        "No cloud is available for secure upload. Configure platform credentials in server .env or connect BYOC in Settings."
+      );
+      return;
+    }
+    setPendingLocalFile(file);
+    setPendingFileMeta({ filename: file.name });
+    setShowSecureWizard(true);
+  };
+
+  const handleWizardComplete = async ({
+    encryptionMethod,
+    password,
+    csp,
+    enableReplication,
+    replicaRegion,
+    isSensitive,
+  }) => {
+    if (!pendingLocalFile || !token) return;
+    const filename = pendingLocalFile.name;
+    setWizardSubmitting(true);
+    try {
+      if (encryptionMethod === "server-side") {
+        await uploadSecureFile(
+          pendingLocalFile,
+          true,
+          token,
+          true,
+          csp
         );
-        setPendingLocalFile(null);
-        setPendingFileMeta(null);
-        setShowEncryptPrompt(false);
-        await fetchSecureFiles();
-        setFile(null);
-        if (fileInputRef.current) fileInputRef.current.value = "";
-      } else if (response.needs_encryption && response.status === "awaiting_encryption_choice") {
-        setPendingLocalFile(file);
-        setPendingFileMeta({
-          filename: uploadedFileName,
-          is_sensitive: response.is_sensitive,
-          scan_reasons: response.scan_reasons || [],
+        await chooseEncryption(filename, "server-side", null, token, {
+          csp,
+          enableReplication,
+          replicaRegion,
         });
-        setShowEncryptPrompt(true);
-        notifications.warning(
-          `Sensitive data detected in '${uploadedFileName}'. Please encrypt this file.`
+        notifications.success(
+          `'${filename}' stored with cloud-managed encryption on ${CSP_LABELS[csp] || csp}.`
         );
-        await fetchSecureFiles();
       } else {
-        notifications.success(`'${uploadedFileName}' uploaded to your secure vault.`);
-        setPendingLocalFile(null);
-        setPendingFileMeta(null);
-        setShowEncryptPrompt(false);
-        await fetchSecureFiles();
-        setFile(null);
-        if (fileInputRef.current) fileInputRef.current.value = "";
+        const encryptedBlob = await encryptFileInBrowser(pendingLocalFile, password);
+        await uploadClientEncrypted(encryptedBlob, filename, Boolean(isSensitive), token, {
+          csp,
+          enableReplication,
+        });
+        notifications.success(
+          `'${filename}' encrypted in your browser and stored on ${CSP_LABELS[csp] || csp}.`
+        );
       }
+      resetUploadState();
+      await fetchSecureFiles();
     } catch (err) {
-      notifications.error(err.detail || "Secure upload failed.");
+      const msg = err.detail || err.message || "Secure upload failed";
+      notifications.error(typeof msg === "string" ? msg : "Secure upload failed");
     } finally {
-      setIsUploading(false);
+      setWizardSubmitting(false);
     }
   };
 
@@ -464,7 +487,6 @@ function SecurityPage() {
       scan_reasons: pendingFileMeta?.scan_reasons,
     };
     setFileAwaitingEncryption(meta);
-    setShowEncryptPrompt(false);
     setShowEncryptionModal(true);
   };
 
@@ -504,7 +526,7 @@ function SecurityPage() {
       setFileAwaitingEncryption(null);
       setPendingLocalFile(null);
       setPendingFileMeta(null);
-      setShowEncryptPrompt(false);
+      setShowSecureWizard(false);
       setFile(null);
       if (fileInputRef.current) fileInputRef.current.value = "";
       await fetchSecureFiles();
@@ -756,31 +778,19 @@ function SecurityPage() {
           </div>
         </div>
 
-        {canAccessSecureArea && (
-          <>
-            <BucketRegionSelector
-              surface="security"
-              storageKeyPrefix="zenith.security"
-              selectedBucket={selectedBucket}
-              selectedRegion={selectedRegion}
-              onBucketChange={handleBucketSelect}
-              onRegionChange={handleRegionSelect}
-            />
-            <ByocStorageTargetBanner
-              variant="security"
-              selectedBucket={selectedBucket}
-              selectedRegion={selectedRegion}
-              activeCsp={cloudProvider}
-            />
-          </>
-        )}
         <div className="page-card zenith-surface zenith-surface--accent-security">
           <h3 className="page-title">Secure File Upload</h3>
           <p className="page-description">
-            Files are scanned for sensitive data. By default, sensitive files are
-            auto-protected with SSE-S3. Enable the option below to always choose
-            server-side vs browser encryption.
+            Files are scanned for sensitive data. When sensitive content is found, you
+            choose encryption (cloud-managed or browser), optional regional replication,
+            and the target cloud (AWS, Google Cloud, or Azure).
           </p>
+          {!availLoading && securityProviders.length === 0 && (
+            <CloudAvailabilityBanner
+              featureLabel="secure vault"
+              credentialMode={credentialMode}
+            />
+          )}
 
           {/* Security Process Flow */}
           <div className="security-process-info">
@@ -793,8 +803,8 @@ function SecurityPage() {
                 </svg>
               </div>
               <div className="process-text">
-                <strong>AI-Powered Scan</strong>
-                <span>Automatic detection of sensitive data</span>
+                <strong>Pattern-Based Scan</strong>
+                <span>Regex detection across AWS, Azure, GCP, cards, credentials, and PII</span>
               </div>
             </div>
 
@@ -837,40 +847,43 @@ function SecurityPage() {
               </div>
               <div className="process-text">
                 <strong>Secure Storage</strong>
-                <span>AWS S3 with 2FA protection</span>
+                <span>Multi-cloud vault with 2FA protection</span>
               </div>
             </div>
           </div>
 
-          <div className="form-group horizontal-form">
+          <div className="form-group horizontal-form security-upload-row">
             <input ref={fileInputRef} type="file" onChange={handleFileChange} className="file-input" />
-            <div className="checkbox-group">
-              <input
-                type="checkbox"
-                id="encrypt-manual"
-                checked={encrypt}
-                onChange={() => setEncrypt(!encrypt)}
-              />
-              <label htmlFor="encrypt-manual">Choose encryption method (SSE or browser)</label>
-            </div>
-            <div className="checkbox-group">
-              <input
-                type="checkbox"
-                id="always-ask-encryption"
-                checked={alwaysAskEncryption}
-                onChange={(e) => handleAlwaysAskChange(e.target.checked)}
-              />
-              <label htmlFor="always-ask-encryption">Always ask before encrypting sensitive files</label>
-            </div>
             <button
-              onClick={handleUpload}
-              disabled={isUploading || !file}
+              type="button"
+              onClick={handleStartSecureWizard}
+              disabled={wizardSubmitting || (!file && securityProviders.length === 0)}
               className="btn upload-btn"
             >
-              {isUploading ? "Uploading..." : "Upload Secure File"}
+              {file ? "Configure & upload →" : "Select a file first"}
             </button>
           </div>
         </div>
+
+        {canAccessSecureArea && (
+          <div className="security-destination-panel">
+            <BucketRegionSelector
+              surface="security"
+              storageKeyPrefix="zenith.security"
+              selectedBucket={selectedBucket}
+              selectedRegion={selectedRegion}
+              onBucketChange={handleBucketSelect}
+              onRegionChange={handleRegionSelect}
+            />
+            <ByocStorageTargetBanner
+              variant="security"
+              selectedBucket={selectedBucket}
+              selectedRegion={selectedRegion}
+              activeCsp={cloudProvider}
+            />
+          </div>
+        )}
+
         {/* Secure Files Table */}
         <div className="files-section zenith-surface zenith-surface--accent-security">
           <div className="list-header">
@@ -901,7 +914,7 @@ function SecurityPage() {
               message={
                 cloudProvider === "ALL"
                   ? "No files match the current bucket filter."
-                  : "The secure vault is on AWS S3. Choose All or AWS to see vault files."
+                  : `No secure files on ${cloudProvider}. Try another cloud or sync the vault.`
               }
             />
           ) : (
@@ -952,17 +965,26 @@ function SecurityPage() {
           </table>
           </div>
           )}
+        </div>
 
-        {showEncryptPrompt && pendingFileMeta && (
-          <EncryptSensitivePromptModal
-            file={{ filename: pendingFileMeta.filename }}
-            scanReasons={pendingFileMeta.scan_reasons}
-            onEncrypt={() => handleStartEncryptFlow(pendingFileMeta)}
-            onDismiss={() => setShowEncryptPrompt(false)}
+        {showSecureWizard && pendingLocalFile && (
+          <SecureUploadWizard
+            file={pendingLocalFile}
+            token={token}
+            providers={securityProviders}
+            selectedBucket={selectedBucket}
+            selectedRegion={selectedRegion}
+            onBucketChange={handleBucketSelect}
+            onRegionChange={handleRegionSelect}
+            isSubmitting={wizardSubmitting}
+            onClose={() => {
+              setShowSecureWizard(false);
+              setPendingLocalFile(null);
+            }}
+            onComplete={handleWizardComplete}
           />
         )}
 
-        {/* Encryption Choice Modal */}
         {showEncryptionModal && fileAwaitingEncryption && (
           <EncryptionChoiceModal
             file={fileAwaitingEncryption}
@@ -974,7 +996,6 @@ function SecurityPage() {
           />
         )}
 
-        {/* Decryption Password Modal */}
         {showDecryptionModal && fileToDecrypt && (
           <DecryptionPasswordModal
             file={fileToDecrypt}
@@ -1008,7 +1029,6 @@ function SecurityPage() {
             </div>
           </div>
         )}
-        </div>
         </div>
     </div>
   );

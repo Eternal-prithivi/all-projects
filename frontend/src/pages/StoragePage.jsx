@@ -30,6 +30,7 @@ import {
 import "../styles/storage.css";
 import PageHeader from "../components/ui/PageHeader.jsx";
 import ByocStorageTargetBanner from "../components/ByocStorageTargetBanner.jsx";
+import StorageUploadWizard from "../components/StorageUploadWizard.jsx";
 import BucketRegionSelector from "../components/BucketRegionSelector.jsx";
 import EmptyState from "../components/EmptyState.jsx";
 import CloudProviderToolbar, {
@@ -110,6 +111,15 @@ function StoragePage() {
   const [userPriority, setUserPriority] = useState("balanced");
   const [userIntent, setUserIntent] = useState("active");
   const [showRecommendationModal, setShowRecommendationModal] = useState(false);
+
+  useEffect(() => {
+    if (!showRecommendationModal) return undefined;
+    const onKeyDown = (e) => {
+      if (e.key === "Escape") setShowRecommendationModal(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [showRecommendationModal]);
   const [recommendation, setRecommendation] = useState(null);
   const [manualCspSelection, setManualCspSelection] = useState(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -290,12 +300,12 @@ function StoragePage() {
     }
   };
 
-  const confirmAndUpload = async () => {
+  const confirmAndUpload = async (overrideCsp) => {
     if (!selectedFile || !token || !recommendation) return;
 
-    // Determine the final CSP choice
     const recommended = recommendation.recommendation.csp;
     const finalCsp =
+      overrideCsp ||
       manualCspSelection ||
       (storageProviders.includes(recommended) ? recommended : storageProviders[0]);
     if (!finalCsp || !storageProviders.includes(finalCsp)) {
@@ -303,9 +313,11 @@ function StoragePage() {
       return;
     }
 
-    // --- CRITICAL FIX: Look up the correct storage class name for the chosen CSP ---
-    // It uses the new 'options_by_csp' dictionary from the backend.
-    const storageClass = recommendation.options_by_csp[finalCsp].service_name;
+    const storageClass = recommendation.options_by_csp?.[finalCsp]?.service_name;
+    if (!storageClass) {
+      notifyError(`No storage class mapping for ${finalCsp}.`);
+      return;
+    }
 
     setShowRecommendationModal(false);
     setIsUploading(true);
@@ -314,10 +326,9 @@ function StoragePage() {
       await uploadFileToCSP(selectedFile, finalCsp, storageClass, token, {
         bucket: finalCsp === "AWS" && selectedBucket ? selectedBucket : undefined,
       });
-      notifySuccess(
-        `'${selectedFile.name}' uploaded successfully to ${finalCsp}!`
-      );
+      notifySuccess(`'${selectedFile.name}' uploaded successfully to ${finalCsp}!`);
       setSelectedFile(null);
+      setManualCspSelection(null);
       if (fileInputRef.current) fileInputRef.current.value = "";
       await fetchFiles();
     } catch (error) {
@@ -438,22 +449,6 @@ function StoragePage() {
         subtitle="Upload, analyze, and sync files across your connected cloud providers"
       />
 
-      <BucketRegionSelector
-        surface="storage"
-        storageKeyPrefix="zenith.storage"
-        selectedBucket={selectedBucket}
-        selectedRegion={selectedRegion}
-        onBucketChange={handleBucketSelect}
-        onRegionChange={handleRegionSelect}
-      />
-
-      <ByocStorageTargetBanner
-        variant="storage"
-        selectedBucket={selectedBucket}
-        selectedRegion={selectedRegion}
-        activeCsp={cloudProvider}
-      />
-
       <div className="storage-process-info zenith-surface">
         <div className="process-step">
           <div className="process-icon analyze">
@@ -547,6 +542,23 @@ function StoragePage() {
             {isAnalyzing ? "Analyzing..." : "Analyze & Upload"}
           </button>
         </div>
+      </div>
+
+      <div className="storage-destination-panel">
+        <BucketRegionSelector
+          surface="storage"
+          storageKeyPrefix="zenith.storage"
+          selectedBucket={selectedBucket}
+          selectedRegion={selectedRegion}
+          onBucketChange={handleBucketSelect}
+          onRegionChange={handleRegionSelect}
+        />
+        <ByocStorageTargetBanner
+          variant="storage"
+          selectedBucket={selectedBucket}
+          selectedRegion={selectedRegion}
+          activeCsp={cloudProvider}
+        />
       </div>
 
       <div className="list-section zenith-surface">
@@ -654,109 +666,21 @@ function StoragePage() {
         </div>
       )}
 
-      {showRecommendationModal && recommendation && (
-        <div className="modal-overlay">
-          <div className="modal-content">
-            <h4 className="recommendation-title">Analysis Complete</h4>
-            <p className="recommendation-text">
-              We've analyzed <strong>{selectedFile.name}</strong>. Based on its
-              profile and your preferences, we've classified it as{" "}
-              <strong>{recommendation.determined_tier} storage</strong>.
-            </p>
-            <div className="recommendation-box">
-              <p>The most cost-effective option is:</p>
-              <p className="recommendation-csp">
-                <CspIcon csp={recommendation.recommendation.csp} />
-                {recommendation.recommendation.csp} -{" "}
-                {recommendation.recommendation.service_name}
-              </p>
-            </div>
-
-            {recommendation.expert_votes?.length > 0 && (
-              <div className="ensemble-box">
-                <div className="ensemble-summary">
-                  <span>Ensemble confidence</span>
-                  <strong>{formatPercent(recommendation.ensemble_confidence)}</strong>
-                </div>
-                <div className="expert-votes">
-                  {recommendation.expert_votes.map((vote) => (
-                    <div className="expert-vote" key={vote.expert}>
-                      <span>{formatExpertName(vote.expert)}</span>
-                      <strong>{vote.predicted_tier}</strong>
-                      <small>{formatPercent(vote.confidence)}</small>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {recommendation.shap_explanation?.available && (
-              <div className="ensemble-box shap-box">
-                <div className="ensemble-summary">
-                  <span>Why this tier? (SHAP)</span>
-                </div>
-                <p className="shap-summary">{recommendation.shap_explanation.summary}</p>
-                <ul className="shap-features">
-                  {(recommendation.shap_explanation.top_features || []).map((row) => (
-                    <li key={row.feature}>
-                      <span>{row.feature.replace(/_/g, " ")}</span>
-                      <strong>
-                        {row.shap_value != null
-                          ? row.shap_value.toFixed(4)
-                          : row.impact?.toFixed?.(4) ?? row.impact}
-                      </strong>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            {recommendation.rl_policy?.applied && (
-              <p className="rl-policy-note">
-                RL policy: {recommendation.rl_policy.blend_mode} (
-                {recommendation.rl_policy.visit_count} prior samples)
-              </p>
-            )}
-
-            <div className="override-section">
-              <label>Or, manually select a different provider:</label>
-              <select
-                className="zenith-select override-select"
-                onChange={(e) => setManualCspSelection(e.target.value)}
-                defaultValue={""}
-              >
-                <option value="">Use Recommended</option>
-                {storageProviders.map((p) => (
-                  <option key={p} value={p}>
-                    {p === "AWS"
-                      ? "Amazon Web Services"
-                      : p === "GCP"
-                        ? "Google Cloud Platform"
-                        : "Microsoft Azure"}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="modal-buttons">
-              <button
-                className="modal-btn cancel"
-                onClick={() => setShowRecommendationModal(false)}
-              >
-                Cancel
-              </button>
-              <button
-                className="modal-btn confirm"
-                onClick={confirmAndUpload}
-                disabled={isUploading}
-              >
-                {isUploading
-                  ? "Uploading..."
-                  : `Confirm & Upload to ${finalUploadDestination}`}
-              </button>
-            </div>
-          </div>
-        </div>
+      {showRecommendationModal && recommendation && selectedFile && (
+        <StorageUploadWizard
+          file={selectedFile}
+          recommendation={recommendation}
+          providers={storageProviders}
+          selectedBucket={selectedBucket}
+          selectedRegion={selectedRegion}
+          onBucketChange={handleBucketSelect}
+          onRegionChange={handleRegionSelect}
+          manualCsp={manualCspSelection}
+          onManualCspChange={setManualCspSelection}
+          isUploading={isUploading}
+          onClose={() => setShowRecommendationModal(false)}
+          onConfirmUpload={confirmAndUpload}
+        />
       )}
 
       {/* --- NEW: Glacier Restore Confirmation Modal --- */}

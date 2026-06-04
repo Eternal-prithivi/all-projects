@@ -94,10 +94,39 @@ def test_boto3_implemented_modules_match_terraform_modules():
     )
 
 
+@patch("app.provision.engine_resolver.get_database")
 @patch("app.provision.engine_resolver.check_terraform_installed", return_value=True)
-def test_resolve_gcp_forces_terraform(mock_tf):
-  cfg = {"csp": "GCP", "enable_gcs": True}
-  assert resolve_provision_engine("alice", cfg, "GCP") == "terraform"
+def test_resolve_gcp_uses_sdk_when_boto3_pref(mock_tf, mock_db):
+    mock_db.return_value["users"].find_one.return_value = {
+        "settings": {"preferences": {"provision_engine": "boto3"}}
+    }
+    cfg = {"csp": "GCP", "enable_gcs": True, "bucket_name": "zenith-demo-bucket"}
+    assert resolve_provision_engine("alice", cfg, "GCP") == "sdk"
+
+
+@patch("app.provision.engine_resolver.get_database")
+@patch("app.provision.engine_resolver.check_terraform_installed", return_value=True)
+def test_resolve_gcp_terraform_when_preferred(mock_tf, mock_db):
+    mock_db.return_value["users"].find_one.return_value = {
+        "settings": {"preferences": {"provision_engine": "terraform"}}
+    }
+    cfg = {"csp": "GCP", "enable_gcs": True, "bucket_name": "zenith-demo-bucket"}
+    assert resolve_provision_engine("alice", cfg, "GCP") == "terraform"
+
+
+def test_sdk_can_handle_static_gcs():
+    from app.provision.sdk_composer import sdk_can_handle
+
+    ok, unsupported = sdk_can_handle(
+        {"csp": "GCP", "enable_gcs": True, "bucket_name": "x"}
+    )
+    assert ok is True
+    assert unsupported == set()
+
+
+def test_deployment_engine_sdk():
+    assert deployment_engine({"provision_engine": "sdk"}) == "sdk"
+    assert deployment_engine({"fast_path": True, "config": {"csp": "GCP"}}) == "sdk"
 
 
 def test_deployment_engine_from_record():

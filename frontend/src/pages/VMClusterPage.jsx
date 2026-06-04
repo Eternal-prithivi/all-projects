@@ -24,6 +24,7 @@ import EmptyState from "../components/EmptyState.jsx";
 import PageHeader from "../components/ui/PageHeader.jsx";
 import { VMClusterSkeleton } from "../components/Skeletons.jsx";
 import WorkloadGuidancePanel from "../components/vm/WorkloadGuidancePanel.jsx";
+import ZenithModal from "../components/ui/ZenithModal.jsx";
 import {
   IconArrowRightLeft,
   IconClipboardList,
@@ -156,6 +157,7 @@ function VMClusterPage() {
   const [clusterPreference, setClusterPreference] = useState("");
   const [priorityLevel, setPriorityLevel] = useState(1);
   const [isRequesting, setIsRequesting] = useState(false);
+  const [isRefreshingClusters, setIsRefreshingClusters] = useState(false);
 
   // Metrics mode toggle
   const [useRealMetrics, setUseRealMetrics] = useState(false);
@@ -326,6 +328,11 @@ function VMClusterPage() {
     setClusterPreference("");
     setPriorityLevel(1);
   }, []);
+
+  const closeRequestModal = useCallback(() => {
+    setShowRequestModal(false);
+    resetRequestModalState();
+  }, [resetRequestModalState]);
 
   const runWorkloadAnalysis = useCallback(async () => {
     const trimmed = workloadDescription.trim();
@@ -568,34 +575,43 @@ ${instructions.troubleshooting.map((item) => `
         <PageHeader
           kicker="Compute"
           title="VM Cluster Management"
-          subtitle="Connect a cloud with VM support (AWS or GCP)"
+          subtitle="Connect AWS, Google Cloud, or Azure with VM credentials in server .env or BYOC"
         />
         <CloudAvailabilityBanner featureLabel="virtual machines" credentialMode={credentialMode} />
       </div>
     );
   }
 
+  const handleRefreshClusters = async () => {
+    setIsRefreshingClusters(true);
+    try {
+      await Promise.all([fetchClusterHealth(), fetchAssignment(), fetchVMMetrics()]);
+    } finally {
+      setIsRefreshingClusters(false);
+    }
+  };
+
   return (
     <div className="vm-container">
-      <PageHeader
-        className="zenith-page-header--row"
-        kicker="Compute"
-        title="VM Cluster Management"
-        subtitle="Intelligent workload assignment with auto-scaling and migration"
-      >
-        <div className="zenith-page-header-actions live-indicator">
-          <span className="live-dot"></span>
+      <div className="vm-page-header-wrap">
+        <PageHeader
+          kicker="Compute"
+          title="VM Cluster Management"
+          subtitle="Intelligent workload assignment with auto-scaling and migration"
+        />
+        <div className="vm-page-header-live live-indicator" aria-live="polite">
+          <span className="live-dot" />
           <span className="live-text">Live</span>
         </div>
-      </PageHeader>
+      </div>
 
       <CloudProviderToolbar
         provider={cloudProvider}
         onProviderChange={setCloudProvider}
-        onAction={() =>
-          Promise.all([fetchClusterHealth(), fetchAssignment(), fetchVMMetrics()])
-        }
+        onAction={handleRefreshClusters}
         actionLabel="Refresh clusters"
+        actionBusy={isRefreshingClusters}
+        actionClassName="btn btn-request vm-toolbar-refresh"
         selectAriaLabel="VM cloud provider"
         className="vm-cloud-toolbar"
         providerOptions={vmToolbarOptions}
@@ -1053,129 +1069,143 @@ ${instructions.troubleshooting.map((item) => `
         </div>
       )}
 
-      {/* Request VM Modal */}
-      {showRequestModal && (
-        <div
-          className="modal-overlay"
-          onClick={() => {
-            setShowRequestModal(false);
-            resetRequestModalState();
+      <ZenithModal
+        open={showRequestModal}
+        onClose={closeRequestModal}
+        title="Request VM Assignment"
+        subtitle="Describe your workload. Zenith analyzes your prompt and suggests a cluster before provisioning."
+        titleId="vm-request-modal-title"
+        wide
+        footer={
+          <>
+            <button className="btn-cancel" type="button" onClick={closeRequestModal}>
+              Cancel
+            </button>
+            <button
+              className="btn-confirm"
+              type="button"
+              onClick={handleRequestVM}
+              disabled={isRequesting || !workloadDescription.trim()}
+            >
+              {isRequesting ? "Requesting…" : "Request VM"}
+            </button>
+          </>
+        }
+      >
+        <form
+          className="vm-request-form"
+          onSubmit={(e) => {
+            e.preventDefault();
+            handleRequestVM();
           }}
         >
-          <div className="modal-content modal-content--wide" onClick={(e) => e.stopPropagation()}>
-            <h3>Request VM Assignment</h3>
-            <div className="modal-form">
-              <div className="form-group">
-                <label>Workload Description</label>
-                <textarea
-                  value={workloadDescription}
-                  onChange={(e) => setWorkloadDescription(e.target.value)}
-                  placeholder="Describe your workload (e.g., 'Running a PostgreSQL database with 500GB data')"
-                  rows="4"
-                />
-              </div>
-              <WorkloadGuidancePanel
-                analysis={workloadAnalysis}
-                isAnalyzing={isAnalyzingWorkload}
-                followUpAnswers={followUpAnswers}
-                onFollowUpChange={handleFollowUpChange}
-              />
-              <div className="form-group">
-                <label>Cluster Preference (Optional)</label>
-                <select
-                  value={clusterPreference}
-                  onChange={(e) => setClusterPreference(e.target.value)}
-                >
-                  <option value="">Auto-Recommend</option>
-                  <option value="GENERAL">General Cluster</option>
-                  <option value="STORAGE">Storage Cluster</option>
-                </select>
-              </div>
-              <div className="form-group">
-                <label>Priority Level</label>
-                <select
-                  value={priorityLevel}
-                  onChange={(e) => setPriorityLevel(Number(e.target.value))}
-                >
-                  <option value="1">High (1)</option>
-                  <option value="2">Normal (2)</option>
-                  <option value="3">Low (3)</option>
-                </select>
-              </div>
+          <div className="form-group">
+            <label htmlFor="vm-workload-description">Workload description</label>
+            <textarea
+              id="vm-workload-description"
+              value={workloadDescription}
+              onChange={(e) => setWorkloadDescription(e.target.value)}
+              placeholder="e.g. PostgreSQL database ~500GB, nightly backups, 50 concurrent users"
+              rows={4}
+            />
+          </div>
+          <WorkloadGuidancePanel
+            analysis={workloadAnalysis}
+            isAnalyzing={isAnalyzingWorkload}
+            followUpAnswers={followUpAnswers}
+            onFollowUpChange={handleFollowUpChange}
+          />
+          <div className="vm-request-form__row">
+            <div className="form-group">
+              <label htmlFor="vm-cluster-preference">Cluster preference (optional)</label>
+              <select
+                id="vm-cluster-preference"
+                className="zenith-select"
+                value={clusterPreference}
+                onChange={(e) => setClusterPreference(e.target.value)}
+              >
+                <option value="">Auto-recommend</option>
+                <option value="GENERAL">General cluster</option>
+                <option value="STORAGE">Storage cluster</option>
+              </select>
             </div>
-            <div className="modal-actions">
-              <button
-                className="btn-cancel"
-                type="button"
-                onClick={() => {
-                  setShowRequestModal(false);
-                  resetRequestModalState();
-                }}
+            <div className="form-group">
+              <label htmlFor="vm-priority-level">Priority</label>
+              <select
+                id="vm-priority-level"
+                className="zenith-select"
+                value={priorityLevel}
+                onChange={(e) => setPriorityLevel(Number(e.target.value))}
               >
-                Cancel
-              </button>
-              <button
-                className="btn-confirm"
-                type="button"
-                onClick={handleRequestVM}
-                disabled={isRequesting}
-              >
-                {isRequesting ? "Requesting..." : "Request VM"}
-              </button>
+                <option value={1}>High</option>
+                <option value={2}>Normal</option>
+                <option value={3}>Low</option>
+              </select>
             </div>
           </div>
-        </div>
-      )}
+        </form>
+      </ZenithModal>
 
-      {/* Transfer VM Modal */}
-      {showTransferModal && (
-        <div className="modal-overlay" onClick={() => setShowTransferModal(false)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <h3>Migrate to Another Cluster</h3>
-            <div className="modal-form">
-              <div className="form-group">
-                <label>Target Cluster</label>
-                <select
-                  value={transferCluster}
-                  onChange={(e) => setTransferCluster(e.target.value)}
-                >
-                  <option value="">Select Cluster</option>
-                  <option value="GENERAL">General Cluster</option>
-                  <option value="STORAGE">Storage Cluster</option>
-                </select>
-              </div>
-              <p className="modal-note">
-                Your workload will be transferred to the least-loaded VM in the
-                target cluster. Source VM will be stopped if no other users
-                remain.
-              </p>
-            </div>
-            <div className="modal-actions">
-              <button
-                className="btn-cancel"
-                type="button"
-                onClick={() => setShowTransferModal(false)}
-              >
-                Cancel
-              </button>
-              <button
-                className="btn-confirm"
-                type="button"
-                onClick={handleTransferVM}
-                disabled={isTransferring}
-              >
-                {isTransferring ? "Migrating..." : "Migrate Now"}
-              </button>
-            </div>
+      <ZenithModal
+        open={showTransferModal}
+        onClose={() => setShowTransferModal(false)}
+        title="Migrate to another cluster"
+        subtitle="Moves your VM to a different cluster. Brief downtime may occur."
+        titleId="vm-transfer-modal-title"
+        footer={
+          <>
+            <button
+              className="btn-cancel"
+              type="button"
+              onClick={() => setShowTransferModal(false)}
+            >
+              Cancel
+            </button>
+            <button
+              className="btn-confirm"
+              type="button"
+              onClick={handleTransferVM}
+              disabled={isTransferring || !transferCluster}
+            >
+              {isTransferring ? "Migrating…" : "Migrate now"}
+            </button>
+          </>
+        }
+      >
+        <div className="vm-request-form">
+          <div className="form-group">
+            <label htmlFor="vm-transfer-cluster">Target cluster</label>
+            <select
+              id="vm-transfer-cluster"
+              className="zenith-select"
+              value={transferCluster}
+              onChange={(e) => setTransferCluster(e.target.value)}
+            >
+              <option value="">Select cluster</option>
+              <option value="GENERAL">General cluster</option>
+              <option value="STORAGE">Storage cluster</option>
+            </select>
           </div>
+          <p className="modal-note">
+            Your workload will be transferred to the least-loaded VM in the target cluster.
+            The source VM will be stopped if no other users remain.
+          </p>
         </div>
-      )}
+      </ZenithModal>
 
-      {/* VM Configuration Modal */}
-      {showConfigModal && selectedVMConfig && (
-        <div className="modal-overlay" onClick={() => setShowConfigModal(false)}>
-          <div className="modal-content modal-large" onClick={(e) => e.stopPropagation()}>
-            <h3>VM Configuration: {selectedVMConfig.vm_name}</h3>
+      <ZenithModal
+        open={showConfigModal && Boolean(selectedVMConfig)}
+        onClose={() => setShowConfigModal(false)}
+        title={selectedVMConfig ? `VM configuration: ${selectedVMConfig.vm_name}` : "VM configuration"}
+        titleId="vm-config-modal-title"
+        large
+        footer={
+          <button className="btn-cancel" type="button" onClick={() => setShowConfigModal(false)}>
+            Close
+          </button>
+        }
+      >
+        {selectedVMConfig && (
             <div className="vm-config-details">
               
               {/* Basic Information */}
@@ -1327,18 +1357,8 @@ ${instructions.troubleshooting.map((item) => `
               </div>
 
             </div>
-            <div className="modal-actions">
-              <button
-                className="btn-cancel"
-                type="button"
-                onClick={() => setShowConfigModal(false)}
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+        )}
+      </ZenithModal>
     </div>
   );
 }

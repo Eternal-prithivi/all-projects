@@ -179,21 +179,41 @@
 .template-card-icon {
   width: 48px;
   height: 48px;
+  min-width: 48px;
+  min-height: 48px;
   border-radius: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.5rem;
   margin-bottom: 1rem;
   background: rgba(212,168,67,0.1);
   color: var(--gold-primary, #D4A843);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.template-card-icon-svg {
+  width: 1.35rem;
+  height: 1.35rem;
+  flex-shrink: 0;
+}
+
+.template-card-icon-emoji {
+  font-size: 1.35rem;
+  line-height: 1;
 }
 
 .template-card h3 {
-  font-size: 1.05rem;
+  font-size: 1rem;
   font-weight: 600;
   color: var(--text-primary);
   margin-bottom: 0.5rem;
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  word-break: break-word;
 }
 
 .template-card p {

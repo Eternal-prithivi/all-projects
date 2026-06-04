@@ -10,6 +10,8 @@ from app.cloud.availability import (
     assert_provider_available,
     available_providers,
     build_availability_payload,
+    platform_storage_configured,
+    platform_vm_configured,
     resolve_credential_mode,
 )
 
@@ -64,6 +66,56 @@ def test_assert_provider_available_raises_403():
         with pytest.raises(HTTPException) as exc:
             assert_provider_available("alice", "GCP", CloudFeature.STORAGE)
         assert exc.value.status_code == 403
+
+
+def test_security_uses_hybrid_union_like_storage():
+    """Security lists platform + BYOC clouds (same hybrid rules as storage)."""
+
+    def fake_byoc(username):
+        return {
+            "aws": {"connected": True},
+            "gcp": {"connected": False},
+            "azure": {"connected": False},
+        }
+
+    def fake_platform(provider, feat):
+        return provider in ("GCP", "Azure")
+
+    with patch("app.cloud.availability.get_byoc_status", side_effect=fake_byoc):
+        with patch("app.cloud.availability._platform_configured", side_effect=fake_platform):
+            assert available_providers("alice", CloudFeature.SECURITY) == [
+                "AWS",
+                "GCP",
+                "Azure",
+            ]
+
+
+def test_platform_gcp_listed_without_service_account_file():
+    with patch("app.cloud.availability.gcp_credentials_file_present", return_value=False):
+        assert platform_storage_configured("GCP") is True
+
+
+def test_platform_gcp_vm_listed_without_service_account_file():
+    with patch("app.cloud.availability.gcp_credentials_file_present", return_value=False):
+        with patch("app.cloud.availability.settings.GCP_PROJECT_ID", "proj"), patch(
+            "app.cloud.availability.settings.GCP_ZONE", "us-central1-a"
+        ):
+            assert platform_vm_configured("GCP") is True
+
+
+def test_platform_azure_vm_listed_with_storage_and_sp_without_subscription():
+    with patch("app.cloud.availability.settings.AZURE_SUBSCRIPTION_ID", ""), patch(
+        "app.cloud.availability.settings.AZURE_TENANT_ID", "tenant"
+    ), patch("app.cloud.availability.settings.AZURE_CLIENT_ID", "client"), patch(
+        "app.cloud.availability.settings.AZURE_CLIENT_SECRET", "secret"
+    ), patch(
+        "app.cloud.availability.settings.AZURE_STORAGE_ACCOUNT_NAME", "acct"
+    ), patch(
+        "app.cloud.availability.settings.AZURE_STORAGE_ACCOUNT_KEY", "key"
+    ), patch(
+        "app.cloud.availability.settings.AZURE_CONTAINER_NAME", "container"
+    ):
+        assert platform_vm_configured("Azure") is True
 
 
 def test_build_payload_hybrid():

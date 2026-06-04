@@ -1,7 +1,7 @@
 # =============================================================================
 # MODULE: provision/engine_resolver.py
-# PURPOSE: Resolve Boto3 vs Terraform from user Settings + deployment config.
-# Works on localhost and Render — Boto3 needs no CLI; Terraform checks PATH.
+# PURPOSE: Resolve Boto3 / SDK / Terraform from user Settings + deployment config.
+# Works on localhost and Render — Boto3/SDK need no CLI; Terraform checks PATH.
 # =============================================================================
 from __future__ import annotations
 
@@ -11,12 +11,13 @@ from fastapi import HTTPException
 
 from app.database.mongo_client import get_database
 from app.provision.boto3_composer import boto3_can_handle, enabled_modules
+from app.provision.sdk_composer import sdk_can_handle
 from app.provision.terraform_runner import check_terraform_installed
 
-ProvisionEngine = Literal["boto3", "terraform"]
+ProvisionEngine = Literal["boto3", "terraform", "sdk"]
 
 DEFAULT_ENGINE: ProvisionEngine = "boto3"
-VALID_ENGINES = frozenset({"boto3", "terraform"})
+VALID_ENGINES = frozenset({"boto3", "terraform", "sdk"})
 
 
 def get_user_provision_engine(username: str) -> ProvisionEngine:
@@ -41,24 +42,51 @@ def resolve_provision_engine(
     """
     Pick engine for this plan/apply.
 
-    - terraform: always Terraform when CLI is available (localhost + Render Docker).
-    - boto3: modular composer when every enabled module is implemented (AWS only).
+    - AWS + boto3 preference: Boto3 when modules supported.
+    - GCP/Azure + boto3 preference: cloud SDK fast path when modules supported.
+    - terraform: always Terraform when CLI is available.
     """
     from app.cloud.providers import normalize_provider
 
     provider = normalize_provider(csp or config.get("csp") or "AWS")
+    pref = get_user_provision_engine(username)
+
     if provider != "AWS":
-        if not check_terraform_installed():
+        if pref == "terraform":
+            if not check_terraform_installed():
+                raise HTTPException(
+                    status_code=503,
+                    detail=(
+                        "Terraform CLI is required for GCP and Azure provisioning. "
+                        "Install Terraform on the server or use the Docker image."
+                    ),
+                )
+            return "terraform"
+
+        ok, unsupported = sdk_can_handle(config)
+        if ok:
+            return "sdk"
+
+        if pref == "boto3" and unsupported:
+            names = ", ".join(sorted(unsupported)) or "unknown"
             raise HTTPException(
-                status_code=503,
+                status_code=400,
                 detail=(
-                    "Terraform CLI is required for GCP and Azure provisioning. "
-                    "Install Terraform on the server or use the Docker image."
+                    f"Cloud SDK fast path cannot provision: {names}. "
+                    "Switch to Terraform in Settings or use a supported template (GCS / Blob)."
                 ),
             )
-        return "terraform"
 
-    pref = get_user_provision_engine(username)
+        if check_terraform_installed():
+            return "terraform"
+
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "Terraform CLI is required for this GCP/Azure configuration. "
+                "Install Terraform or use static-gcs / static-blob templates with Boto3/SDK in Settings."
+            ),
+        )
 
     if pref == "terraform":
         if not check_terraform_installed():
@@ -97,5 +125,10 @@ def deployment_engine(deployment: dict) -> ProvisionEngine:
     if raw in VALID_ENGINES:
         return raw  # type: ignore[return-value]
     if deployment.get("fast_path"):
-        return "boto3"
+        csp = (deployment.get("config") or {}).get("csp") or "AWS"
+        from app.cloud.providers import normalize_provider
+
+        if normalize_provider(csp) == "AWS":
+            return "boto3"
+        return "sdk"
     return "terraform"

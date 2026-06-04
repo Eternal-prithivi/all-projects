@@ -1,14 +1,33 @@
 // ProvisionDeployWizard.jsx — optional Terraform deploy (uses BYOC from Settings)
 import React, { useState, useEffect, useRef } from 'react';
+import { FaDatabase, FaGlobe, FaServer } from 'react-icons/fa';
 import api from '../../api';
 import { getApiBaseUrl, getApiRoot } from '../../config/apiBase.js';
+
+/** API catalog uses icon keys; map to react-icons for consistent 48×48 tiles. */
+const TEMPLATE_ICON_MAP = {
+  globe: FaGlobe,
+  server: FaServer,
+  database: FaDatabase,
+};
+
+function TemplateCardIcon({ icon }) {
+  const Icon = TEMPLATE_ICON_MAP[icon];
+  if (Icon) {
+    return <Icon className="template-card-icon-svg" aria-hidden />;
+  }
+  if (icon && typeof icon === 'string' && icon.length <= 4) {
+    return <span className="template-card-icon-emoji">{icon}</span>;
+  }
+  return <FaGlobe className="template-card-icon-svg" aria-hidden />;
+}
 
 const TEMPLATES = [
   {
     key: 'static-site',
     name: 'Static Website',
     description: 'Host a static HTML/CSS/JS website on S3. Private, encrypted, free tier eligible.',
-    icon: '🌐',
+    icon: 'globe',
     cost: '$0.00/month',
     services: { enable_s3: true },
   },
@@ -16,7 +35,7 @@ const TEMPLATES = [
     key: 'backend-app',
     name: 'Backend Application',
     description: 'EC2 instance with VPC networking, IAM role, and CloudWatch monitoring.',
-    icon: '🖥️',
+    icon: 'server',
     cost: '$0.00/month',
     services: { enable_vpc: true, enable_ec2: true, enable_iam: true, enable_cloudwatch: true },
   },
@@ -24,7 +43,7 @@ const TEMPLATES = [
     key: 'serverless-db',
     name: 'Serverless Database',
     description: 'DynamoDB table with provisioned capacity within AWS always-free limits.',
-    icon: '🗄️',
+    icon: 'database',
     cost: '$0.00/month',
     services: { enable_dynamodb: true },
   },
@@ -132,7 +151,16 @@ const EMPTY_FLAGS = {
   enable_cloudwatch: false,
   enable_dynamodb: false,
   enable_gcs: false,
+  enable_gcp_network: false,
+  enable_gce: false,
+  enable_gcp_service_account: false,
+  enable_gcp_monitoring: false,
+  enable_firestore: false,
   enable_azure_storage: false,
+  enable_vnet: false,
+  enable_azure_vm: false,
+  enable_azure_monitor: false,
+  enable_cosmos: false,
 };
 
 export default function ProvisionDeployWizard({
@@ -146,7 +174,13 @@ export default function ProvisionDeployWizard({
     availableProviders.includes(defaultProvider) ? defaultProvider : availableProviders[0] || 'AWS'
   );
   const engineLabel =
-    csp !== 'AWS' ? 'Terraform' : userProvisionEngine === 'terraform' ? 'Terraform' : 'Boto3';
+    csp === 'AWS'
+      ? userProvisionEngine === 'terraform'
+        ? 'Terraform'
+        : 'Boto3'
+      : userProvisionEngine === 'terraform'
+        ? 'Terraform'
+        : 'Cloud SDK';
   const [templates, setTemplates] = useState(TEMPLATES);
   const [modules, setModules] = useState(MODULES);
   const [step, setStep] = useState(0);
@@ -163,7 +197,22 @@ export default function ProvisionDeployWizard({
     storage_account_name: '',
     container_name: 'zenith-static',
     enable_gcs: false,
+    enable_gcp_network: false,
+    enable_gce: false,
+    enable_gcp_service_account: false,
+    enable_gcp_monitoring: false,
+    enable_firestore: false,
+    machine_type: 'e2-micro',
+    service_account_id: 'zenith-app-sa',
+    firestore_database_id: '(default)',
     enable_azure_storage: false,
+    enable_vnet: false,
+    enable_azure_vm: false,
+    enable_azure_monitor: false,
+    enable_cosmos: false,
+    vm_size: 'Standard_B1s',
+    cosmos_account_name: '',
+    cosmos_database_name: 'zenith-db',
     enable_vpc: false,
     enable_ec2: false,
     enable_s3: false,
@@ -269,6 +318,12 @@ export default function ProvisionDeployWizard({
         next.enable_ec2 = true;
         next.enable_vpc = true;
       }
+      if (flag === 'enable_gce' && next.enable_gce) next.enable_gcp_network = true;
+      if (flag === 'enable_gcp_monitoring' && next.enable_gcp_monitoring) {
+        next.enable_gce = true;
+        next.enable_gcp_network = true;
+      }
+      if (flag === 'enable_azure_vm' && next.enable_azure_vm) next.enable_vnet = true;
       return next;
     });
   };
@@ -515,7 +570,9 @@ export default function ProvisionDeployWizard({
                 onClick={() => selectTemplate(tmpl)}
                 id={`template-${tmpl.key}`}
               >
-                <div className="template-card-icon">{tmpl.icon}</div>
+                <div className="template-card-icon">
+                  <TemplateCardIcon icon={tmpl.icon} />
+                </div>
                 <h3>{tmpl.name}</h3>
                 <p>{tmpl.description}</p>
                 <span className="cost-badge">{tmpl.estimated_cost || tmpl.cost}</span>
@@ -602,10 +659,64 @@ export default function ProvisionDeployWizard({
                     />
                   </div>
                 )}
+                {config.enable_gce && (
+                  <>
+                    <div className="config-field">
+                      <label>Machine Type</label>
+                      <select className="zenith-select" value={config.machine_type} onChange={e => updateConfig('machine_type', e.target.value)}>
+                        <option value="e2-micro">e2-micro (Free tier eligible)</option>
+                        <option value="e2-small">e2-small</option>
+                        <option value="e2-medium">e2-medium</option>
+                      </select>
+                    </div>
+                    <div className="config-field">
+                      <label>VM Name</label>
+                      <input
+                        type="text"
+                        value={config.instance_name}
+                        onChange={e => updateConfig('instance_name', e.target.value)}
+                        placeholder="zenith-gce-app"
+                      />
+                    </div>
+                  </>
+                )}
+                {config.enable_gcp_service_account && (
+                  <div className="config-field">
+                    <label>Service Account ID</label>
+                    <input
+                      type="text"
+                      value={config.service_account_id}
+                      onChange={e => updateConfig('service_account_id', e.target.value)}
+                      placeholder="zenith-app-sa"
+                    />
+                  </div>
+                )}
+                {config.enable_gcp_monitoring && (
+                  <div className="config-field">
+                    <label>Alert Email</label>
+                    <input
+                      type="email"
+                      value={config.alarm_email}
+                      onChange={e => updateConfig('alarm_email', e.target.value)}
+                      placeholder="admin@example.com"
+                    />
+                  </div>
+                )}
+                {config.enable_firestore && (
+                  <div className="config-field">
+                    <label>Firestore Database ID</label>
+                    <input
+                      type="text"
+                      value={config.firestore_database_id}
+                      onChange={e => updateConfig('firestore_database_id', e.target.value)}
+                      placeholder="(default)"
+                    />
+                  </div>
+                )}
               </>
             )}
 
-            {csp === 'Azure' && config.enable_azure_storage && (
+            {csp === 'Azure' && (
               <>
                 <div className="config-field">
                   <label>Azure Region</label>
@@ -623,23 +734,80 @@ export default function ProvisionDeployWizard({
                     onChange={e => updateConfig('resource_group_name', e.target.value)}
                   />
                 </div>
-                <div className="config-field">
-                  <label>Storage Account Name</label>
-                  <input
-                    type="text"
-                    value={config.storage_account_name}
-                    onChange={e => updateConfig('storage_account_name', e.target.value)}
-                    placeholder="zenithstorage01"
-                  />
-                </div>
-                <div className="config-field">
-                  <label>Container Name</label>
-                  <input
-                    type="text"
-                    value={config.container_name}
-                    onChange={e => updateConfig('container_name', e.target.value)}
-                  />
-                </div>
+                {config.enable_azure_storage && (
+                  <>
+                    <div className="config-field">
+                      <label>Storage Account Name</label>
+                      <input
+                        type="text"
+                        value={config.storage_account_name}
+                        onChange={e => updateConfig('storage_account_name', e.target.value)}
+                        placeholder="zenithstorage01"
+                      />
+                    </div>
+                    <div className="config-field">
+                      <label>Container Name</label>
+                      <input
+                        type="text"
+                        value={config.container_name}
+                        onChange={e => updateConfig('container_name', e.target.value)}
+                      />
+                    </div>
+                  </>
+                )}
+                {config.enable_azure_vm && (
+                  <>
+                    <div className="config-field">
+                      <label>VM Size</label>
+                      <select className="zenith-select" value={config.vm_size} onChange={e => updateConfig('vm_size', e.target.value)}>
+                        <option value="Standard_B1s">Standard_B1s (Free tier eligible)</option>
+                        <option value="Standard_B2s">Standard_B2s</option>
+                      </select>
+                    </div>
+                    <div className="config-field">
+                      <label>VM Name</label>
+                      <input
+                        type="text"
+                        value={config.instance_name}
+                        onChange={e => updateConfig('instance_name', e.target.value)}
+                        placeholder="zenith-linux-vm"
+                      />
+                    </div>
+                  </>
+                )}
+                {config.enable_azure_monitor && (
+                  <div className="config-field">
+                    <label>Alert Email</label>
+                    <input
+                      type="email"
+                      value={config.alarm_email}
+                      onChange={e => updateConfig('alarm_email', e.target.value)}
+                      placeholder="admin@example.com"
+                    />
+                  </div>
+                )}
+                {config.enable_cosmos && (
+                  <>
+                    <div className="config-field">
+                      <label>Cosmos DB Account Name</label>
+                      <input
+                        type="text"
+                        value={config.cosmos_account_name}
+                        onChange={e => updateConfig('cosmos_account_name', e.target.value)}
+                        placeholder="zenithcosmos01"
+                      />
+                    </div>
+                    <div className="config-field">
+                      <label>Cosmos Database Name</label>
+                      <input
+                        type="text"
+                        value={config.cosmos_database_name}
+                        onChange={e => updateConfig('cosmos_database_name', e.target.value)}
+                        placeholder="zenith-db"
+                      />
+                    </div>
+                  </>
+                )}
               </>
             )}
 

@@ -71,3 +71,26 @@ def normalize_provision_config(config: dict[str, Any]) -> None:
 
     role = str(config.get("role_name") or "app-role").strip()
     config["role_name"] = re.sub(r"[^a-zA-Z0-9+=,.@_-]", "-", role)[:64] or "app-role"
+
+    if config.get("enable_gcp_service_account"):
+        sa_id = re.sub(r"[^a-z0-9-]", "-", str(config.get("service_account_id") or "zenith-app-sa").lower())
+        config["service_account_id"] = sa_id.strip("-")[:30] or "zenith-app-sa"
+
+    if config.get("enable_firestore"):
+        fs_id = str(config.get("firestore_database_id") or "(default)").strip()
+        config["firestore_database_id"] = fs_id[:63] or "(default)"
+
+    if config.get("enable_cosmos"):
+        cosmos = re.sub(r"[^a-z0-9-]", "", str(config.get("cosmos_account_name") or "").lower())
+        if len(cosmos) < 3:
+            raise ValueError(
+                "Cosmos DB account name is required when Cosmos is enabled (3–44 lowercase letters/numbers)."
+            )
+        config["cosmos_account_name"] = cosmos[:44]
+        db = re.sub(r"[^a-zA-Z0-9_-]", "-", str(config.get("cosmos_database_name") or "zenith-db"))
+        config["cosmos_database_name"] = db.strip("-")[:63] or "zenith-db"
+
+    if config.get("enable_azure_vm") and not config.get("enable_vnet"):
+        config["enable_vnet"] = True
+    if config.get("enable_gce") and not config.get("enable_gcp_network"):
+        config["enable_gcp_network"] = True

@@ -24,14 +24,17 @@ logger = logging.getLogger(__name__)
 def detect_drift(
     workspace_dir: str,
     aws_credentials: Optional[dict] = None,
+    *,
+    cloud_env: Optional[dict] = None,
 ) -> DriftReport:
     """
     Run terraform plan on an existing deployment to detect configuration drift.
 
-    Drift = any difference between the real AWS state and the Terraform state file.
+    Drift = any difference between live cloud state and the Terraform state file.
     Returns a DriftReport with status, change count, and details.
     """
-    runner = TerraformRunner(workspace_dir, aws_credentials)
+    env = cloud_env if cloud_env is not None else aws_credentials
+    runner = TerraformRunner(workspace_dir, cloud_env=env)
 
     try:
         plan_result = runner.plan()
@@ -110,6 +113,8 @@ def remediate_drift(
     workspace_dir: str,
     aws_credentials: Optional[dict] = None,
     check_only: bool = True,
+    *,
+    cloud_env: Optional[dict] = None,
 ) -> RemediationResult:
     """
     Remediate detected drift by re-applying the Terraform configuration.
@@ -122,13 +127,15 @@ def remediate_drift(
 
     Args:
         workspace_dir: Path to the Terraform workspace with state files.
-        aws_credentials: AWS env vars for Terraform subprocess.
+        aws_credentials: Legacy AWS env vars for Terraform subprocess.
+        cloud_env: Full BYOC env (AWS, GCP, Azure) for Terraform subprocess.
         check_only: If True, only show plan — do not apply.
 
     Returns:
         RemediationResult with success/performed flags and output text.
     """
-    runner = TerraformRunner(workspace_dir, aws_credentials)
+    env = cloud_env if cloud_env is not None else aws_credentials
+    runner = TerraformRunner(workspace_dir, cloud_env=env)
 
     try:
         # Step 1: terraform init (ensure plugins are ready)

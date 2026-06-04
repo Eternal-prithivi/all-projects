@@ -71,12 +71,14 @@ from app.provision.policy_overrides import (
 from app.provision.cost_estimator import estimate_cost
 from app.provision.drift_detector import RemediationResult, detect_drift, remediate_drift
 from app.provision.boto3_drift import detect_drift_boto3, remediate_drift_boto3
+from app.provision.sdk_drift import detect_drift_sdk, remediate_drift_sdk
 from app.provision.engine_resolver import (
     deployment_engine,
     get_user_provision_engine,
     resolve_provision_engine,
 )
 from app.provision.boto3_composer import BOTO3_IMPLEMENTED, boto3_can_handle
+from app.provision.sdk_composer import SDK_AZURE_MODULES, SDK_GCP_MODULES
 from app.provision.audit_logger import (
     AUDIT_RETENTION_DAYS,
     export_user_audit_csv_rows,
@@ -89,6 +91,13 @@ from app.provision.boto3_deployer import (
     apply_fast,
     destroy_fast,
 )
+from app.provision.sdk_composer import (
+    plan_fast_sdk,
+    apply_fast_sdk,
+    destroy_fast_sdk,
+)
+
+_FAST_PATH_WORKSPACE_MARKERS = frozenset({"fast-path", "boto3", "sdk", ""})
 
 logger = logging.getLogger(__name__)
 
@@ -188,7 +197,7 @@ async def list_modules(
 
 @router.get("/status")
 async def provisioning_status(user: dict = Depends(get_current_user)):
-    """Terraform CLI status, user engine preference, and boto3 module support."""
+    """Terraform CLI status, user engine preference, and fast-path module support."""
     import os
 
     tf_installed = check_terraform_installed()
@@ -201,12 +210,16 @@ async def provisioning_status(user: dict = Depends(get_current_user)):
         "policy_rules_count": len(get_yaml_rules()),
         "user_provision_engine": user_engine,
         "boto3_supported_modules": sorted(BOTO3_IMPLEMENTED),
+        "sdk_supported_modules": {
+            "GCP": sorted(SDK_GCP_MODULES),
+            "Azure": sorted(SDK_AZURE_MODULES),
+        },
         "environment": environment,
         "hosting_hint": (
-            "Boto3 is recommended on Render free tier (fast, low memory). "
+            "Boto3 (AWS) and cloud SDK (GCP GCS / Azure Blob) are recommended on Render free tier. "
             "Terraform works on localhost and Render Docker when the CLI is installed."
             if environment == "production"
-            else "Both engines work on localhost; use Boto3 for quick tests without Terraform installed."
+            else "Fast paths work without Terraform; use Terraform for full module sets."
         ),
     }
 
@@ -495,6 +508,48 @@ async def run_plan(
             "cost_estimate": cost_result.model_dump(),
         }
 
+    if engine == "sdk":
+        fast_result = plan_fast_sdk(config_dict, cloud_env)
+        status = DeploymentStatus.AWAITING_APPLY if fast_result["success"] else DeploymentStatus.PLAN_FAILED
+        _save_deployment(
+            user.username,
+            deployment_id,
+            config_dict,
+            "sdk",
+            status,
+            policy_result,
+            cost_result,
+            plan_output=fast_result["output"] or fast_result.get("error", ""),
+        )
+        _get_deployments_collection().update_one(
+            {"deployment_name": deployment_id},
+            {"$set": {
+                "plan_error": fast_result.get("error") or "",
+                "plan_stage": "plan",
+                "has_plan_changes": fast_result.get("has_changes", False),
+                "provision_engine": "sdk",
+                "fast_path": True,
+            }},
+        )
+        log_provision_action(
+            action="plan", actor=user.username, deployment_id=deployment_id,
+            status="success" if fast_result["success"] else "failed",
+            details={"provision_engine": "sdk", "csp": csp, "template": config_dict.get("template")},
+            error=fast_result.get("error"),
+        )
+        return {
+            "success": fast_result["success"],
+            "status": "done",
+            "deployment_id": deployment_id,
+            "stage": "plan",
+            "provision_engine": "sdk",
+            "fast_path": True,
+            "plan_output": fast_result["output"],
+            "error": fast_result.get("error"),
+            "policy_check": policy_result.model_dump(),
+            "cost_estimate": cost_result.model_dump(),
+        }
+
     _save_deployment(
         user.username, deployment_id, config_dict, "",
         DeploymentStatus.PLANNING, policy_result, cost_result,
@@ -661,6 +716,39 @@ async def run_apply(
             "provision_engine": "boto3",
         }
 
+    if engine == "sdk":
+        sdk_ctx = deployment.get("sdk_context")
+        apply_result = apply_fast_sdk(config_dict, cloud_env, sdk_ctx)
+        ctx_out = apply_result.get("sdk_context") or {}
+        resources_count = len(ctx_out) if apply_result["success"] else 0
+        new_status = DeploymentStatus.DEPLOYED if apply_result["success"] else DeploymentStatus.APPLY_FAILED
+        collection.update_one(
+            {"deployment_name": deployment_id},
+            {"$set": {
+                "status": new_status,
+                "apply_output": apply_result.get("output", ""),
+                "resources_count": resources_count,
+                "provision_engine": "sdk",
+                "fast_path": True,
+                "sdk_context": ctx_out,
+                "updated_at": datetime.utcnow(),
+            }},
+        )
+        log_provision_action(
+            action="apply", actor=user.username, deployment_id=deployment_id,
+            status="success" if apply_result["success"] else "failed",
+            details={"resources_count": resources_count, "provision_engine": "sdk"},
+            error=apply_result.get("error"),
+        )
+        return {
+            "success": apply_result["success"],
+            "status": new_status,
+            "resources_count": resources_count,
+            "output": apply_result.get("output", ""),
+            "error": apply_result.get("error"),
+            "provision_engine": "sdk",
+        }
+
     workspace = deployment.get("terraform_workspace", "")
     if not workspace:
         raise HTTPException(status_code=500, detail="Workspace path missing from deployment record.")
@@ -730,9 +818,11 @@ async def run_destroy(
 
     if engine == "boto3":
         destroy_result = destroy_fast(config_dict, cloud_env, deployment.get("boto3_context"))
+    elif engine == "sdk":
+        destroy_result = destroy_fast_sdk(config_dict, cloud_env, deployment.get("sdk_context"))
     else:
         workspace = deployment.get("terraform_workspace", "")
-        if not workspace or workspace in ("fast-path", "boto3"):
+        if not workspace or workspace in _FAST_PATH_WORKSPACE_MARKERS:
             raise HTTPException(
                 status_code=400,
                 detail="Terraform workspace missing for this deployment. Cannot destroy via Terraform.",
@@ -965,17 +1055,21 @@ async def check_drift(
         drift_report = detect_drift_boto3(
             config_dict, cloud_env, deployment.get("boto3_context")
         )
+    elif engine == "sdk":
+        drift_report = detect_drift_sdk(
+            config_dict, cloud_env, deployment.get("sdk_context")
+        )
     else:
         workspace = deployment.get("terraform_workspace", "")
-        if not workspace or workspace in ("fast-path", "boto3"):
+        if not workspace or workspace in _FAST_PATH_WORKSPACE_MARKERS:
             raise HTTPException(
                 status_code=400,
                 detail=(
                     "This deployment has no Terraform workspace. "
-                    "Use Boto3 engine in Settings for new AWS deployments, or redeploy with Terraform."
+                    "Use the SDK/Boto3 fast path in Settings or redeploy with Terraform."
                 ),
             )
-        drift_report = detect_drift(workspace, cloud_env)
+        drift_report = detect_drift(workspace, cloud_env=cloud_env)
 
     # Append to drift history and update latest status
     collection.update_one(
@@ -1055,9 +1149,28 @@ async def remediate_deployment_drift(
                 {"deployment_name": deployment_id},
                 {"$set": {"boto3_context": raw["boto3_context"]}},
             )
+    elif engine == "sdk":
+        raw = remediate_drift_sdk(
+            config_dict,
+            cloud_env,
+            deployment.get("sdk_context"),
+            check_only=check_only,
+        )
+        result = RemediationResult(
+            success=raw.get("success", False),
+            performed=raw.get("performed", False),
+            message=raw.get("message", ""),
+            plan_output=raw.get("plan_output", ""),
+            apply_output=raw.get("apply_output", ""),
+        )
+        if raw.get("sdk_context"):
+            collection.update_one(
+                {"deployment_name": deployment_id},
+                {"$set": {"sdk_context": raw["sdk_context"]}},
+            )
     else:
         workspace = deployment.get("terraform_workspace", "")
-        if not workspace or workspace in ("fast-path", "boto3"):
+        if not workspace or workspace in _FAST_PATH_WORKSPACE_MARKERS:
             raise HTTPException(
                 status_code=400,
                 detail="Terraform workspace missing — cannot remediate with Terraform.",

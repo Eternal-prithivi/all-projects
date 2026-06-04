@@ -290,6 +290,22 @@ export const getDashboardStats = async (token) => {
 
 // ---------------- SECURE STORAGE ----------------
 
+export const scanSecureFile = async (file, token) => {
+  const formData = new FormData();
+  formData.append("file", file);
+  try {
+    const response = await apiClient.post("/security/scan", formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    return response.data;
+  } catch (error) {
+    throw error.response?.data || error;
+  }
+};
+
 export const uploadSecureFile = async (
   file,
   encrypt,
@@ -386,12 +402,15 @@ export const uploadClientEncrypted = async (
   encryptedBlob,
   originalFilename,
   isSensitive,
-  token
+  token,
+  { csp = "AWS", enableReplication = false } = {}
 ) => {
   const formData = new FormData();
   formData.append("file", encryptedBlob, `${originalFilename}.enc`);
   formData.append("original_filename", originalFilename);
   formData.append("is_sensitive", isSensitive ? "true" : "false");
+  formData.append("csp", csp);
+  formData.append("enable_replication", enableReplication ? "true" : "false");
 
   try {
     const response = await apiClient.post("/security/upload-client-encrypted", formData, {
@@ -424,14 +443,23 @@ export const downloadClientCiphertext = async (filename, token, { bucket } = {})
   }
 };
 
-export const chooseEncryption = async (filename, encryptionMethod, password, token) => {
+export const chooseEncryption = async (
+  filename,
+  encryptionMethod,
+  password,
+  token,
+  { csp, enableReplication = false, replicaRegion } = {}
+) => {
   try {
     const response = await apiClient.post(
       "/security/choose-encryption",
       {
         filename,
         encryption_method: encryptionMethod,
-        password: null,
+        password: password || null,
+        csp: csp || null,
+        enable_replication: enableReplication,
+        replica_region: replicaRegion || null,
       },
       {
         headers: {

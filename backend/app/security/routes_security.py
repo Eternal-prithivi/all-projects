@@ -14,7 +14,6 @@
 #   - Use the same S3 bucket as regular storage (SECURE_S3_BUCKET_NAME is separate)
 # =============================================================================
 from datetime import datetime
-from typing import Optional
 from typing import Any, Optional, Tuple
 
 from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException, Query, status
@@ -45,6 +44,7 @@ from app.storage.secure_vault import (
     presigned_secure_download_url,
     put_secure_vault_object,
     resolve_secure_storage,
+    secure_replication_requested,
     vault_csp,
 )
 from app.storage.manager import list_objects_azure, list_objects_gcp
@@ -60,6 +60,16 @@ from app.security.sensitive_file_detector import scan_file_content
 
 # The prefix is removed here as it is handled in main.py
 router = APIRouter(tags=["Security"])
+
+
+class SecureSyncResponse(BaseModel):
+    inserted: int
+    already_present: int
+    removed: int
+    skipped_non_user_prefix: int
+    total_objects_seen: int
+    bucket_name: str
+    scanned_prefix: str
 
 
 def get_secure_files_collection() -> Collection:
@@ -109,11 +119,18 @@ def _persist_sse_secure_file(
     is_sensitive: bool,
     storage,
     scan_reasons: Optional[list] = None,
+    enable_replication: bool = False,
+    replica_region: Optional[str] = None,
 ) -> dict:
     """Upload bytes to secure vault with provider-managed encryption at rest."""
     object_key = storage.object_key(owner_username, filename)
+    replicate = secure_replication_requested(storage, enable_replication)
     put_secure_vault_object(
-        storage, object_key, file_content, server_side_encryption=True
+        storage,
+        object_key,
+        file_content,
+        server_side_encryption=True,
+        replicate=replicate,
     )
     csp = vault_csp(storage)
     encrypt_msg = (
@@ -140,6 +157,9 @@ def _persist_sse_secure_file(
     doc["is_byoc"] = storage.is_byoc
     if scan_reasons is not None:
         doc["scan_reasons"] = scan_reasons
+    doc["replication_enabled"] = replicate
+    if replica_region:
+        doc["replica_region"] = replica_region
     doc.pop("awaiting_encryption_choice", None)
     files_db.update_one(
         {"filename": filename, "owner_username": owner_username},
@@ -316,21 +336,14 @@ class EncryptionChoiceRequest(BaseModel):
     filename: str
     encryption_method: str  # "server-side" or "client-side"
     password: Optional[str] = None  # Required for client-side
+    csp: Optional[str] = None
+    enable_replication: bool = False
+    replica_region: Optional[str] = None
 
 
 class DecryptionRequest(BaseModel):
     filename: str
     password: str  # User's password for decryption
-
-
-class SecureSyncResponse(BaseModel):
-    inserted: int
-    already_present: int
-    removed: int
-    skipped_non_user_prefix: int
-    total_objects_seen: int
-    bucket_name: str
-    scanned_prefix: str
 
 
 def _encryption_flags_from_s3_head(head: dict) -> dict:
@@ -412,6 +425,22 @@ async def sync_secure_azure_container(
     return await sync_secure_vault("Azure", user, files_db, bucket=container)
 
 
+@router.post("/scan", status_code=status.HTTP_200_OK)
+async def scan_secure_file(
+    user: UserInDB = Depends(require_2fa),
+    file: UploadFile = File(...),
+):
+    """Scan file for sensitive content before vault upload (no storage)."""
+    file_content = await file.read()
+    scan = scan_file_content(file_content, file.filename)
+    return {
+        "filename": file.filename,
+        "is_sensitive": scan.is_sensitive,
+        "scan_reasons": scan.reasons,
+        "size_bytes": len(file_content),
+    }
+
+
 @router.post("/upload-secure", status_code=status.HTTP_200_OK)
 async def upload_secure_file(
     user: UserInDB = Depends(require_2fa),
@@ -437,24 +466,8 @@ async def upload_secure_file(
     scan = scan_file_content(file_content, file.filename)
     is_sensitive = scan.is_sensitive
 
-    if is_sensitive and not encrypt_manual and not always_ask_encryption:
-        try:
-            return _persist_sse_secure_file(
-                files_db,
-                filename=file.filename,
-                owner_username=user.username,
-                file_content=file_content,
-                is_sensitive=True,
-                storage=storage,
-                scan_reasons=scan.reasons,
-            )
-        except Exception as e:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Auto SSE-S3 upload failed: {str(e)}",
-            ) from e
-
-    needs_encryption = is_sensitive or encrypt_manual
+    # Sensitive files always enter the encryption wizard (no silent auto-upload).
+    needs_encryption = is_sensitive or encrypt_manual or always_ask_encryption
 
     if needs_encryption:
         # Store file temporarily in database (not S3 yet) and ask user for encryption choice
@@ -513,6 +526,7 @@ async def upload_client_encrypted(
     original_filename: str = Form(...),
     is_sensitive: bool = Form(False),
     csp: str = Form("AWS"),
+    enable_replication: bool = Form(False),
 ):
     """
     Accept ciphertext from browser (zero-knowledge). Password never sent to API.
@@ -526,25 +540,23 @@ async def upload_client_encrypted(
         provider = normalize_provider(csp)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    if provider != "AWS":
-        raise HTTPException(
-            status_code=501,
-            detail="Browser-side encrypted upload is supported on AWS secure vault only in this release.",
-        )
+    assert_provider_available(user.username, provider, CloudFeature.SECURITY)
     storage = resolve_secure_storage(user.username, provider)
     object_key = storage.object_key(user.username, original_filename)
+    replicate = secure_replication_requested(storage, enable_replication)
     try:
         put_secure_vault_object(
             storage,
             object_key,
             encrypted_body,
             metadata={"encryption": "client-side", "algorithm": "AES-256-CBC"},
+            replicate=replicate,
         )
     except Exception as e:
         raise HTTPException(
             status_code=500,
             detail=f"Failed to store encrypted file: {str(e)}",
-        )
+        ) from e
 
     doc = {
         "filename": original_filename,
@@ -561,6 +573,7 @@ async def upload_client_encrypted(
         "encryption_status": "encrypted",
         "client_side_encrypted": True,
         "awaiting_encryption_choice": False,
+        "replication_enabled": replicate,
     }
     files_db.update_one(
         {"filename": original_filename, "owner_username": user.username},
@@ -571,7 +584,9 @@ async def upload_client_encrypted(
         "filename": original_filename,
         "encryption_method": "client-side",
         "client_side_encrypted": True,
-        "message": "Encrypted file stored in secure vault.",
+        "csp": provider,
+        "replication_enabled": replicate,
+        "message": f"Encrypted file stored in {provider} secure vault.",
     }
 
 @router.get("/list-secure")
@@ -644,8 +659,13 @@ async def choose_encryption_method(
     if not file_content:
         raise HTTPException(status_code=400, detail="Temporary file content not found")
     
-    file_csp = file_doc.get("csp") or "AWS"
-    storage = resolve_secure_storage(user.username, file_csp)
+    file_csp = request.csp or file_doc.get("csp") or "AWS"
+    try:
+        provider = normalize_provider(file_csp)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    assert_provider_available(user.username, provider, CloudFeature.SECURITY)
+    storage = resolve_secure_storage(user.username, provider)
     try:
         result = _persist_sse_secure_file(
             files_db,
@@ -655,6 +675,8 @@ async def choose_encryption_method(
             is_sensitive=bool(file_doc.get("is_sensitive")),
             storage=storage,
             scan_reasons=file_doc.get("scan_reasons"),
+            enable_replication=request.enable_replication,
+            replica_region=request.replica_region,
         )
         return {
             "message": "Server-side encryption (SSE-S3) applied successfully",

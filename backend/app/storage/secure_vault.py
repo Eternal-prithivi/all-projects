@@ -26,6 +26,7 @@ class SecureGcpStorage:
     is_byoc: bool
     list_prefix: str
     project_id: str = ""
+    replica_bucket: Optional[str] = None
 
     def object_key(self, username: str, filename: str) -> str:
         return f"{self.list_prefix}{filename}"
@@ -37,6 +38,10 @@ class SecureGcpStorage:
     @property
     def region(self) -> str:
         return ""
+
+    @property
+    def dual_write_enabled(self) -> bool:
+        return bool(self.replica_bucket)
 
 
 @dataclass
@@ -59,15 +64,31 @@ class SecureAzureStorage:
 
 
 def resolve_secure_gcp_storage(username: str) -> SecureGcpStorage:
+    from app.utils.config import settings
+
     client, bucket_name, is_byoc = build_gcp_storage_client(username)
     prefix = f"{username}/" if is_byoc else f"secure/{username}/"
     project_id = getattr(client, "project", None) or ""
+    replica_bucket: Optional[str] = None
+    if is_byoc:
+        from app.byoc.credential_resolver import get_user_cloud_credentials
+
+        byoc = get_user_cloud_credentials(username, "GCP")
+        if byoc:
+            replica = (byoc.get("replica_bucket_name") or "").strip()
+            if replica:
+                replica_bucket = replica
+    else:
+        replica = (getattr(settings, "GCP_REPLICA_BUCKET_NAME", None) or "").strip()
+        if replica:
+            replica_bucket = replica
     return SecureGcpStorage(
         client=client,
         bucket_name=bucket_name,
         is_byoc=is_byoc,
         list_prefix=prefix,
         project_id=str(project_id or ""),
+        replica_bucket=replica_bucket,
     )
 
 
@@ -91,6 +112,17 @@ def resolve_secure_storage(username: str, csp: str = "AWS") -> SecureVaultStorag
     return resolve_secure_aws_storage(username)
 
 
+def secure_replication_requested(storage: SecureVaultStorage, enabled: bool) -> bool:
+    """True when caller asked for replication and this vault supports a second copy."""
+    if not enabled:
+        return False
+    if isinstance(storage, SecureAwsStorage):
+        return True
+    if isinstance(storage, SecureGcpStorage):
+        return storage.dual_write_enabled
+    return False
+
+
 def vault_csp(storage: SecureVaultStorage) -> str:
     if isinstance(storage, SecureAwsStorage):
         return "AWS"
@@ -106,6 +138,7 @@ def put_secure_vault_object(
     *,
     server_side_encryption: bool = False,
     metadata: Optional[dict] = None,
+    replicate: bool = True,
 ) -> None:
     if isinstance(storage, SecureAwsStorage):
         put_secure_object_dual(
@@ -114,6 +147,7 @@ def put_secure_vault_object(
             body,
             server_side_encryption=server_side_encryption,
             metadata=metadata,
+            replicate=replicate,
         )
         return
 
@@ -121,6 +155,10 @@ def put_secure_vault_object(
         blob = storage.client.bucket(storage.bucket_name).blob(object_key)
         blob.metadata = metadata or {}
         blob.upload_from_string(body, content_type="application/octet-stream")
+        if replicate and storage.replica_bucket:
+            replica_blob = storage.client.bucket(storage.replica_bucket).blob(object_key)
+            replica_blob.metadata = metadata or {}
+            replica_blob.upload_from_string(body, content_type="application/octet-stream")
         return
 
     blob_client = storage.blob_service.get_blob_client(
@@ -139,6 +177,8 @@ def delete_secure_vault_object(storage: SecureVaultStorage, object_key: str) -> 
         return
     if isinstance(storage, SecureGcpStorage):
         storage.client.bucket(storage.bucket_name).blob(object_key).delete()
+        if storage.replica_bucket:
+            storage.client.bucket(storage.replica_bucket).blob(object_key).delete()
         return
     storage.blob_service.get_blob_client(
         container=storage.container_name, blob=object_key

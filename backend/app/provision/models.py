@@ -65,6 +65,14 @@ class ProvisionConfig(BaseModel):
     gcp_region: str = "us-central1"
     gcp_project: str = ""
     enable_gcs: bool = False
+    enable_gcp_network: bool = False
+    enable_gce: bool = False
+    enable_gcp_service_account: bool = False
+    enable_gcp_monitoring: bool = False
+    enable_firestore: bool = False
+    machine_type: str = "e2-micro"
+    service_account_id: str = "zenith-app-sa"
+    firestore_database_id: str = "(default)"
 
     # Azure
     azure_location: str = "eastus"
@@ -72,6 +80,13 @@ class ProvisionConfig(BaseModel):
     storage_account_name: str = ""
     container_name: str = "zenith-static"
     enable_azure_storage: bool = False
+    enable_vnet: bool = False
+    enable_azure_vm: bool = False
+    enable_azure_monitor: bool = False
+    enable_cosmos: bool = False
+    vm_size: str = "Standard_B1s"
+    cosmos_account_name: str = ""
+    cosmos_database_name: str = "zenith-db"
 
     # Feature flags — which modules to deploy
     enable_vpc: bool = False

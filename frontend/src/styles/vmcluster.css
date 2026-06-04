@@ -19,7 +19,28 @@
   margin: 0 auto;
 }
 
-/* Live status badge (paired with PageHeader) */
+/* Page header — stacked title/subtitle (like Storage), live badge top-right */
+.vm-page-header-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-md);
+  margin-bottom: var(--space-xl);
+}
+
+.vm-page-header-wrap .zenith-page-header {
+  margin-bottom: 0;
+  flex: 1 1 16rem;
+  min-width: 0;
+}
+
+.vm-page-header-live.live-indicator {
+  flex-shrink: 0;
+  margin-top: 0.35rem;
+}
+
+/* Live status badge */
 .vm-container .live-indicator {
   display: inline-flex;
   align-items: center;
@@ -28,6 +49,39 @@
   border-radius: var(--radius-full);
   background: rgba(34, 197, 94, 0.12);
   border: 1px solid rgba(34, 197, 94, 0.35);
+}
+
+/* Cloud provider toolbar — full-width bar under header */
+.vm-container .vm-cloud-toolbar {
+  width: 100%;
+  margin-bottom: var(--space-xl);
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-default);
+  background: rgba(0, 0, 0, 0.22);
+  box-sizing: border-box;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.vm-container .vm-cloud-toolbar .cloud-provider-toolbar__select {
+  min-width: 10rem;
+  flex: 0 1 auto;
+}
+
+.vm-container .vm-toolbar-refresh {
+  min-height: 42px;
+  padding: 0.55rem 1.15rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  border-radius: var(--radius-md);
+  white-space: nowrap;
+}
+
+.vm-container .vm-toolbar-refresh:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 
 .vm-header h2 {

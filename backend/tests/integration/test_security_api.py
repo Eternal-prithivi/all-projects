@@ -27,6 +27,23 @@ def test_list_secure_ok_without_2fa(client, auth_headers):
     assert isinstance(response.json(), list)
 
 
+@patch("app.security.routes_security.scan_file_content")
+def test_scan_secure_file(mock_scan, client, auth_headers):
+    mock_scan.return_value = SimpleNamespace(
+        is_sensitive=True, reasons=["credit_card_pattern"]
+    )
+    headers, _user = auth_headers(two_fa_enabled=False)
+    response = client.post(
+        "/api/security/scan",
+        headers=headers,
+        files={"file": ("secret.txt", b"4111111111111111", "text/plain")},
+    )
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["is_sensitive"] is True
+    assert "credit_card" in body["scan_reasons"][0]
+
+
 @patch("app.security.routes_security.put_secure_vault_object")
 @patch("app.security.routes_security.resolve_secure_storage")
 def test_upload_client_encrypted_smoke(mock_storage, mock_put, client, auth_headers):

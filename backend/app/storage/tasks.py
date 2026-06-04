@@ -1,4 +1,3 @@
-import re
 import requests
 import io
 from pymongo import MongoClient
@@ -14,6 +13,7 @@ from app.security.encryption_handler import (
     encrypt_file_client_side,
     prepare_encrypted_file_for_storage
 )
+from app.security.sensitive_file_detector import scan_file_content
 # We no longer import the global mongodb_client to prevent connection sharing issues.
 
 logger = setup_logger(__name__)
@@ -49,20 +49,23 @@ def process_secure_file(s3_key: str, owner_username: str, encrypt_manual: bool):
             logger.debug("Condition met. Proceeding to download and scan file from S3")
             response = s3_client_primary.get_object(Bucket=bucket_name, Key=s3_key)
             content_bytes = response['Body'].read()
-            content_str = content_bytes.decode('utf-8', errors='ignore')
-
-            logger.debug(f"File content sample (first 200 chars): {content_str[:200]}")
-
-            credit_card_pattern = r'\b(?:\d[ -]*?){13,16}\b'
-            secret_keywords_pattern = r'(?i)\b(password|secret|key|pwd|token|credentials|apikeys|private_key|auth_token)\b'
-
-            cc_match = re.search(credit_card_pattern, content_str)
-            keyword_match = re.search(secret_keywords_pattern, content_str)
-
-            logger.debug(f"RegEx Scan Results - CC Match: {cc_match}, Keyword Match: {keyword_match}")
-
-            if cc_match or keyword_match:
+            scan_result = scan_file_content(content_bytes, filename=filename)
+            is_sensitive = scan_result.is_sensitive
+            logger.debug(
+                "Sensitive scan for %s: is_sensitive=%s reasons=%s",
+                filename,
+                is_sensitive,
+                scan_result.reasons,
+            )
+        elif not encrypt_manual:
+            filename_only = scan_file_content(b"", filename=filename)
+            if filename_only.is_sensitive:
                 is_sensitive = True
+                logger.debug(
+                    "Sensitive filename for %s: reasons=%s",
+                    filename,
+                    filename_only.reasons,
+                )
 
         logger.debug(f"Status before encryption block - is_sensitive: {is_sensitive}, encrypt_manual: {encrypt_manual}")
 

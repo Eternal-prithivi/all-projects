@@ -22,6 +22,7 @@ export function useAwsBuckets({
   selectedBucket,
   selectedRegion,
   onBucketChange,
+  onRegionChange,
   onBucketsLoaded,
 }) {
   const [buckets, setBuckets] = useState([]);
@@ -38,10 +39,31 @@ export function useAwsBuckets({
       try {
         const regionParam =
           selectedRegion && selectedRegion !== 'all' ? selectedRegion : undefined;
-        const data = forceRefresh
+        let data = forceRefresh
           ? await refreshAwsBuckets(surface, { region: regionParam })
           : await getAwsBuckets(surface, { region: regionParam });
-        const list = data.buckets || [];
+        let list = data.buckets || [];
+
+        // Stale session region (e.g. from BYOC) with platform mode → retry without filter
+        if (
+          !list.length &&
+          regionParam &&
+          (data.mode === 'platform' || data.discovery_error)
+        ) {
+          data = forceRefresh
+            ? await refreshAwsBuckets(surface, {})
+            : await getAwsBuckets(surface, {});
+          list = data.buckets || [];
+          if (list.length && onRegionChange) {
+            try {
+              sessionStorage.setItem(`${storageKeyPrefix}.region`, 'all');
+            } catch {
+              /* ignore */
+            }
+            onRegionChange('all');
+          }
+        }
+
         setBuckets(list);
         onBucketsLoaded?.(list);
         setMode(data.mode || 'platform');
@@ -75,6 +97,7 @@ export function useAwsBuckets({
       selectedRegion,
       selectedBucket,
       onBucketChange,
+      onRegionChange,
       storageKeyPrefix,
       onBucketsLoaded,
     ]

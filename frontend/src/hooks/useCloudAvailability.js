@@ -12,7 +12,7 @@ const EMPTY_FEATURE = {
  */
 export const CSP_LABELS = {
   AWS: 'AWS',
-  GCP: 'GCP',
+  GCP: 'Google Cloud',
   Azure: 'Azure',
 };
 

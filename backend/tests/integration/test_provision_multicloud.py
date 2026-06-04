@@ -14,7 +14,27 @@ def test_templates_gcp(client, auth_headers):
     body = response.json()
     assert body["csp"] == "GCP"
     keys = {t["key"] for t in body["templates"]}
-    assert "static-gcs" in keys
+    assert "static-site" in keys
+    assert "backend-app" in keys
+    assert "serverless-db" in keys
+
+
+def test_templates_azure(client, auth_headers):
+    headers, _ = auth_headers(two_fa_enabled=False)
+    response = client.get("/api/provision/templates?csp=Azure", headers=headers)
+    assert response.status_code == 200, response.text
+    keys = {t["key"] for t in response.json()["templates"]}
+    assert "static-site" in keys
+    assert "backend-app" in keys
+    assert "serverless-db" in keys
+
+
+def test_modules_gcp(client, auth_headers):
+    headers, _ = auth_headers(two_fa_enabled=False)
+    response = client.get("/api/provision/modules?csp=GCP", headers=headers)
+    assert response.status_code == 200
+    keys = {m["key"] for m in response.json()["modules"]}
+    assert "gcs" in keys and "gce" in keys and "firestore" in keys
 
 
 @patch("app.provision.routes_provision.resolve_provision_engine", return_value="terraform")
@@ -39,7 +59,7 @@ def test_plan_gcp_requires_byoc(
         headers=headers,
         json={
             "csp": "GCP",
-            "template": "static-gcs",
+            "template": "static-site",
             "enable_gcs": True,
             "bucket_name": "zenith-test-gcs-bucket",
             "gcp_region": "us-central1",

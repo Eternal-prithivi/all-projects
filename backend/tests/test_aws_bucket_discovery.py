@@ -1,8 +1,12 @@
 """Tests for Storage vs Security bucket classification."""
 
+from unittest.mock import patch
+
 from app.byoc.aws_bucket_discovery import (
     classify_bucket_role,
     filter_buckets_for_surface,
+    filter_by_region,
+    get_buckets_for_user,
     infer_security_bucket_by_name,
 )
 
@@ -84,3 +88,28 @@ def test_shared_storage_secure_bucket_security_only():
     assert len(storage_list) == 0
     security_list = filter_buckets_for_surface(buckets, "security", layout=shared_layout)
     assert len(security_list) == 1
+
+
+def test_storage_surface_injects_layout_storage_when_list_only_vault():
+    buckets = [
+        _bucket("zenith-user-abc-secure", "secure"),
+        _bucket("zenith-user-abc-replica", "replica"),
+    ]
+    storage_list = filter_buckets_for_surface(buckets, "storage", layout=LAYOUT)
+    names = {b["name"] for b in storage_list}
+    assert "zenith-user-abc-storage" in names
+
+
+def test_filter_by_region_all_passes_through():
+    buckets = [_bucket("b1", region="ap-south-1")]
+    assert filter_by_region(buckets, "all") == buckets
+    assert filter_by_region(buckets, None) == buckets
+
+
+@patch("app.byoc.aws_bucket_discovery.resolve_aws_credentials")
+def test_platform_mode_returns_storage_bucket_despite_wrong_region(mock_resolve):
+    mock_resolve.return_value = {"is_byoc": False}
+    result = get_buckets_for_user("demo", "storage", region="us-east-1")
+    assert result["mode"] == "platform"
+    assert len(result["buckets"]) >= 1
+    assert result["buckets"][0]["role"] == "storage"

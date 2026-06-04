@@ -49,6 +49,7 @@ export default function BucketRegionSelector({
     selectedBucket,
     selectedRegion,
     onBucketChange,
+    onRegionChange,
     onBucketsLoaded,
   });
 
@@ -206,7 +207,33 @@ export default function BucketRegionSelector({
               Bucket
             </span>
             {buckets.length === 0 ? (
-              <p className="bucket-selector-empty">No buckets match this filter.</p>
+              <div className="bucket-selector-empty-block">
+                <p className="bucket-selector-empty">
+                  {discoveryError ||
+                    (surface === 'storage'
+                      ? 'No general storage buckets found. Connect AWS BYOC with a storage bucket, or use the Security page for vault buckets.'
+                      : 'No secure vault buckets found. Run BYOC setup or open the Security upload wizard.')}
+                </p>
+                {selectedRegion && selectedRegion !== 'all' && (
+                  <button
+                    type="button"
+                    className="bucket-selector-clear-region"
+                    onClick={() => handleRegionClick('all')}
+                  >
+                    Show all regions
+                  </button>
+                )}
+                {mode === 'byoc' && (
+                  <button
+                    type="button"
+                    className="bucket-selector-clear-region"
+                    onClick={refresh}
+                    disabled={refreshing}
+                  >
+                    Refresh from AWS
+                  </button>
+                )}
+              </div>
             ) : useChips ? (
               <div
                 className="bucket-selector-chips"

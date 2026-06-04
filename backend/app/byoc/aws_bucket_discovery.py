@@ -225,12 +225,25 @@ def filter_buckets_for_surface(
         return sorted(result, key=lambda x: (x.get("is_replica", False), x["name"]))
 
     storage_only = [b for b in buckets if b["name"] not in security_names]
-    return [
+    result = [
         b
         for b in storage_only
         if not is_security_bucket(b.get("role", ""))
         and not infer_security_bucket_by_name(b["name"])
     ]
+    if not result and layout and surface == "storage":
+        storage_name = (layout.get("storage_bucket_name") or "").strip()
+        if storage_name and storage_name not in security_names:
+            result.append(
+                {
+                    "name": storage_name,
+                    "region": (layout.get("primary_region") or "").strip(),
+                    "role": "storage",
+                    "is_default": True,
+                    "is_replica": False,
+                }
+            )
+    return result
 
 
 def filter_by_region(
@@ -342,9 +355,14 @@ def get_buckets_for_user(
 
     if not aws.get("is_byoc"):
         buckets = platform_bucket_entries(surface, username)
+        # Platform has fixed bucket(s) in PRIMARY_S3_REGION — ignore stale session
+        # region filters (no region pills in UI for platform mode).
+        filtered = filter_by_region(buckets, region)
+        if not filtered and buckets:
+            filtered = buckets
         return {
             "mode": "platform",
-            "buckets": filter_by_region(buckets, region),
+            "buckets": filtered,
             "supported_regions": [],
         }
 
@@ -374,7 +392,13 @@ def get_buckets_for_user(
     enriched = _enrich_buckets(raw, layout, default_storage)
     extra_secure = _get_secure_bucket_names_from_db(username)
     filtered = filter_buckets_for_surface(enriched, surface, extra_secure, layout)
-    filtered = filter_by_region(filtered, region)
+    region_filtered = filter_by_region(filtered, region)
+    if not region_filtered and filtered and region:
+        discovery_error = (
+            discovery_error
+            or f"No buckets in region {region}. Clear the region filter or choose All."
+        )
+    filtered = region_filtered if region_filtered or not region else filtered
 
     return {
         "mode": "byoc",

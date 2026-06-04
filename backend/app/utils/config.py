@@ -54,6 +54,7 @@ class Settings(BaseSettings):
     # --- GCP Credentials ---
     GCP_SERVICE_ACCOUNT_JSON_PATH: str = ""  # Leave empty if no GCP key file (DEMO_MODE bypasses real calls)
     GCP_BUCKET_NAME: str
+    GCP_REPLICA_BUCKET_NAME: str = ""  # Optional second bucket for secure vault replication
     GCP_PROJECT_ID: str
     GCP_ZONE: str = "us-central1-a" # Free tier zone + a specific sub-zone
 
