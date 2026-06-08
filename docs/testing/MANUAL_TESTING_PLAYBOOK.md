@@ -61,7 +61,7 @@ See chat guide or `docs/setup/CLOUD_CREDENTIAL_SETUP_GUIDE.md`.
 | 2.7 | Profile, settings, notifications | dashboard | ○ | ○ | ○ |
 | 2.8 | Support tickets | `/contact` → `/support/ticket` → `/admin/support` | ○ | ○ | ○ |
 
-**2.8 Support tickets:** Submit contact form → note `ZN-…` in toast/email → open `/support/ticket`, enter ref + email → OTP → view thread → reply. Logged-in: `/dashboard/support`. Admin: `/admin/support` → reply (customer email + optional WS notification).
+**2.8 Support tickets:** Submit contact form → note `ZN-…` in toast/email → open `/support/ticket`, enter ref + email → OTP → view thread → reply. Logged-in: `/dashboard/support`. Admin: `/admin/support` → reply (customer email + WS notification). **Chat UX:** keep both pages open — reply on one side; other side updates within ~10s or instantly via WebSocket (no manual refresh).
 
 ### Low — **Ask user before each cloud**
 

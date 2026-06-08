@@ -82,16 +82,9 @@ async def admin_reply(
         pass
 
     try:
-        user_id = ticket.get("user_id")
-        if user_id:
-            from app.websockets.connection_manager import manager
-            import json
+        from app.support.ws_notify import notify_ticket_agent_reply
 
-            ref = ticket.get("reference_code") or ""
-            await manager.send_personal_message(
-                json.dumps({"event": "support_reply", "reference_code": ref}),
-                user_id,
-            )
+        await notify_ticket_agent_reply(ticket)
     except Exception:
         pass
 

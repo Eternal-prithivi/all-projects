@@ -2,32 +2,26 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import MarketingPageLayout from '../components/layout/MarketingPageLayout.jsx';
+import SupportThreadPanel from '../components/support/SupportThreadPanel.jsx';
+import { useSupportThreadPoll } from '../hooks/useSupportThreadPoll.js';
 import { apiUrl } from '../config/apiBase.js';
 import '../styles/support-tickets.css';
 
 const GUEST_TOKEN_KEY = 'zenith_guest_ticket_token';
 
-function formatDate(value) {
-  if (!value) return '';
-  return new Date(value).toLocaleString();
-}
-
 function SupportTicketPage() {
   const [searchParams] = useSearchParams();
   const [step, setStep] = useState('lookup');
-  const [referenceCode, setReferenceCode] = useState(
-    searchParams.get('ref') || ''
-  );
+  const [referenceCode, setReferenceCode] = useState(searchParams.get('ref') || '');
   const [email, setEmail] = useState('');
   const [otp, setOtp] = useState('');
   const [guestToken, setGuestToken] = useState(
     () => sessionStorage.getItem(GUEST_TOKEN_KEY) || ''
   );
   const [thread, setThread] = useState(null);
-  const [reply, setReply] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const loadThread = useCallback(async (ref, token) => {
+  const loadThread = useCallback(async (ref, token, { silent = false } = {}) => {
     const res = await fetch(apiUrl(`/support/guest/tickets/${encodeURIComponent(ref)}`), {
       headers: { Authorization: `Bearer ${token}` },
     });
@@ -35,7 +29,10 @@ function SupportTicketPage() {
       const err = await res.json().catch(() => ({}));
       throw new Error(err.detail || 'Could not load ticket');
     }
-    return res.json();
+    const data = await res.json();
+    if (!silent) setThread(data);
+    else setThread(data);
+    return data;
   }, []);
 
   useEffect(() => {
@@ -62,6 +59,16 @@ function SupportTicketPage() {
       cancelled = true;
     };
   }, [guestToken, referenceCode, loadThread]);
+
+  const refreshThread = useCallback(() => {
+    if (guestToken && referenceCode) {
+      loadThread(referenceCode, guestToken, { silent: true }).catch(() => {});
+    }
+  }, [guestToken, referenceCode, loadThread]);
+
+  useSupportThreadPoll(refreshThread, {
+    enabled: step === 'thread' && Boolean(guestToken && referenceCode),
+  });
 
   const handleRequestOtp = async (e) => {
     e.preventDefault();
@@ -118,35 +125,24 @@ function SupportTicketPage() {
     }
   };
 
-  const handleReply = async (e) => {
-    e.preventDefault();
-    if (!reply.trim()) return;
-    setLoading(true);
-    try {
-      const res = await fetch(
-        apiUrl(`/support/guest/tickets/${encodeURIComponent(referenceCode)}/messages`),
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${guestToken}`,
-          },
-          body: JSON.stringify({ body: reply.trim() }),
-        }
-      );
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.detail || 'Reply failed');
+  const handleSend = async (body) => {
+    const res = await fetch(
+      apiUrl(`/support/guest/tickets/${encodeURIComponent(referenceCode)}/messages`),
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${guestToken}`,
+        },
+        body: JSON.stringify({ body }),
       }
-      const data = await res.json();
-      setThread(data);
-      setReply('');
-      toast.success('Reply sent');
-    } catch (err) {
-      toast.error(err.message || 'Could not send reply');
-    } finally {
-      setLoading(false);
+    );
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || 'Reply failed');
     }
+    const data = await res.json();
+    setThread(data);
   };
 
   const ticket = thread?.ticket;
@@ -229,52 +225,13 @@ function SupportTicketPage() {
         )}
 
         {step === 'thread' && ticket && (
-          <div className="support-card">
-            <div className="support-thread-header">
-              <div>
-                <span className="support-ref">{ticket.reference_code}</span>
-                <h2 style={{ margin: '0.35rem 0 0', fontSize: '1.1rem' }}>
-                  {ticket.subject || ticket.category}
-                </h2>
-              </div>
-              <span className={`support-status-pill support-status-pill--${ticket.status}`}>
-                {ticket.status?.replace(/_/g, ' ')}
-              </span>
-            </div>
-
-            <div className="support-messages" role="log" aria-live="polite">
-              {messages.map((msg) => (
-                <div
-                  key={msg.id}
-                  className={`support-bubble support-bubble--${msg.author_type}`}
-                >
-                  <div className="support-bubble-meta">
-                    {msg.author_name} · {formatDate(msg.created_at)}
-                  </div>
-                  <div style={{ whiteSpace: 'pre-wrap' }}>{msg.body}</div>
-                </div>
-              ))}
-            </div>
-
-            {ticket.status !== 'closed' && ticket.status !== 'resolved' && (
-              <form className="support-form" onSubmit={handleReply}>
-                <div className="form-group">
-                  <label htmlFor="reply">Your reply</label>
-                  <textarea
-                    id="reply"
-                    value={reply}
-                    onChange={(e) => setReply(e.target.value)}
-                    placeholder="Type your message…"
-                    required
-                  />
-                </div>
-                <button type="submit" className="support-btn" disabled={loading || !reply.trim()}>
-                  {loading ? 'Sending…' : 'Send reply'}
-                </button>
-              </form>
-            )}
-
-            <p style={{ marginTop: '1.25rem', fontSize: '0.85rem', opacity: 0.7 }}>
+          <div className="support-card support-card--chat">
+            <SupportThreadPanel
+              ticket={ticket}
+              messages={messages}
+              onSend={handleSend}
+            />
+            <p className="support-guest-footer-link">
               Need a new request? <Link to="/contact">Contact us</Link>
             </p>
           </div>

@@ -136,6 +136,92 @@ def test_admin_reply_requires_admin(client, auth_headers):
     assert len(reply.json()["messages"]) >= 2
 
 
+def test_customer_message_notifies_admins_ws(client, auth_headers):
+    _, admin = auth_headers(role="admin")
+    user_headers, user = auth_headers()
+    with patch("app.contact.routes_contact.email_service.send_contact_notification"), patch(
+        "app.contact.routes_contact.email_service.send_auto_reply"
+    ):
+        submit = client.post(
+            "/api/contact/submit",
+            json={
+                "name": user["username"],
+                "email": user["email"],
+                "subject": "support",
+                "message": "Initial",
+            },
+            headers=user_headers,
+        )
+    ref = submit.json()["reference_code"]
+    sent = []
+
+    async def capture_ws(message, user_id):
+        sent.append((user_id, message))
+
+    with patch(
+        "app.support.ws_notify.manager.send_personal_message",
+        side_effect=capture_ws,
+    ), patch("app.support.routes_support.email_service.send_admin_customer_reply_notification"):
+        reply = client.post(
+            f"/api/support/tickets/{ref}/messages",
+            headers=user_headers,
+            json={"body": "Follow-up from customer"},
+        )
+    assert reply.status_code == 200
+    assert len(sent) >= 1
+    admin_msgs = [m for u, m in sent if u == admin["username"]]
+    assert admin_msgs
+    import json
+
+    payload = json.loads(admin_msgs[0])
+    assert payload["event"] == "support_customer_reply"
+    assert payload["reference_code"] == ref
+    assert payload["ticket_id"]
+
+
+def test_admin_reply_emits_support_reply_ws(client, auth_headers):
+    user_headers, user = auth_headers()
+    with patch("app.contact.routes_contact.email_service.send_contact_notification"), patch(
+        "app.contact.routes_contact.email_service.send_auto_reply"
+    ):
+        submit = client.post(
+            "/api/contact/submit",
+            json={
+                "name": user["username"],
+                "email": user["email"],
+                "subject": "support",
+                "message": "Help",
+            },
+            headers=user_headers,
+        )
+    ticket_id = submit.json()["ticket_id"]
+    ref = submit.json()["reference_code"]
+    sent = []
+
+    async def capture_ws(message, user_id):
+        sent.append((user_id, message))
+
+    admin_headers, _ = auth_headers(role="admin")
+    with patch(
+        "app.support.ws_notify.manager.send_personal_message",
+        side_effect=capture_ws,
+    ), patch("app.support.routes_admin_support.email_service.send_agent_reply_email"):
+        reply = client.post(
+            f"/api/admin/support/tickets/{ticket_id}/messages",
+            headers=admin_headers,
+            json={"body": "Agent reply here"},
+        )
+    assert reply.status_code == 200
+    import json
+
+    user_msgs = [m for u, m in sent if u == user["username"]]
+    assert user_msgs
+    payload = json.loads(user_msgs[0])
+    assert payload["event"] == "support_reply"
+    assert payload["reference_code"] == ref
+    assert payload["ticket_id"]
+
+
 def test_legacy_admin_submissions_requires_admin(client, auth_headers):
     user_headers, _ = auth_headers()
     denied = client.get("/api/contact/admin/submissions", headers=user_headers)

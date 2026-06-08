@@ -7,6 +7,17 @@
 
 ---
 
+**Phase 18d — Support Chat UX** — COMPLETE 2026-06-05
+
+- Shared chat-style `SupportThreadPanel` across dashboard, guest, and admin support pages.
+- 10s polling (pauses when tab hidden); WebSocket `support_reply` / `support_customer_reply` via `SupportWsBridge` + event bus for instant refresh.
+- Backend `ws_notify.py` notifies admins on customer reply; agent reply payload includes `ticket_id`.
+- Optimistic send, auto-scroll, sticky composer. pytest 304 passed; build green.
+
+**How to test:** Open `/dashboard/support` and `/admin/support` side by side — reply on each side; thread updates without manual refresh.
+
+---
+
 **Phase 18c — Async Support Tickets** — COMPLETE 2026-06-05
 
 - Replaced one-shot contact flow with MongoDB ticket threads (`support_tickets`, `support_messages`, `support_ticket_otps`).

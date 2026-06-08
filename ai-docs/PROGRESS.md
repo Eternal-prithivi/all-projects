@@ -6,24 +6,27 @@
 
 ## 🔴 Active Task
 
-_None — Phase 18c complete._
+_None — Phase 18d complete._
+
+---
+
+## Phase 18d — Support Chat UX ✅
+
+Chat-style thread UI + 10s poll + WS refresh. No live chat.
+
+- [x] **18d.1** — `ws_notify.py` + wire customer/agent WS events
+- [x] **18d.2** — Integration tests for WS notify
+- [x] **18d.3** — Shared `SupportThreadPanel` + `SupportMessageBubble` + `supportFormat`
+- [x] **18d.4** — `useSupportThreadPoll` + `useSupportThreadWs` + event bus
+- [x] **18d.5** — Refactor SupportPage, SupportTicketPage, AdminSupportPage
+- [x] **18d.6** — CSS polish (sticky composer, pending state, mobile)
+- [x] **18d.7** — POST docs + pytest/build + push
 
 ---
 
 ## Phase 18c — Async Support Tickets ✅
 
-Zero-cost professional async support: MongoDB threads + Gmail SMTP + guest email OTP. No live chat.
-
-- [x] **18c.1** — `support_tickets` + `support_messages` + OTP store + indexes
-- [x] **18c.2** — `/api/support/*` + `/api/admin/support/*`; refactor `/api/contact/submit`
-- [x] **18c.3** — Email templates: OTP, agent reply, updated auto-reply
-- [x] **18c.4** — Migration script `contact_submissions` → tickets
-- [x] **18c.5** — Integration tests `test_support_api.py`
-- [x] **18c.6** — Frontend: `/support/ticket` (guest OTP)
-- [x] **18c.7** — Frontend: `/dashboard/support`
-- [x] **18c.8** — Frontend: `/admin/support`
-- [x] **18c.9** — Contact page polish + WS badge via `SupportReplyListener`
-- [x] **18c.10** — POST docs + pytest/build green
+- [x] All 18c items complete (see PROGRESS_HISTORY.md)
 
 ---
 

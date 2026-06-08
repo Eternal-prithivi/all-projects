@@ -281,6 +281,15 @@
 
 ---
 
+### [DEC-030] Phase 18d — Support chat UX without live chat
+- **Date**: 2026-06-05
+- **Status**: Accepted
+- **Context**: Phase 18c tickets work but feel like email threads (60s poll, duplicated UI, no in-page refresh for admin on customer reply).
+- **Decision**: Shared `SupportThreadPanel` (chat bubbles, sticky composer, optimistic send), 10s poll with visibility pause, single `SupportWsBridge` per layout dispatching `support_reply` / `support_customer_reply` via browser event bus. REST + MongoDB remain source of truth.
+- **Consequences**: Feels conversational on-page; still not live chat (no typing indicators, agent-online, per-ticket WS rooms). Guests poll only (no guest WS).
+
+---
+
 ### [DEC-029] Phase 18c — Async support tickets (no live chat)
 - **Date**: 2026-06-05
 - **Status**: Accepted

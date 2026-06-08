@@ -4,6 +4,7 @@ import { ToastContainer } from 'react-toastify';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import { NotificationProvider } from '../../context/NotificationContext.jsx';
+import SupportWsBridge from '../support/SupportWsBridge.jsx';
 import AdminSidebar from './AdminSidebar';
 import AdminMobileBottomNav from './AdminMobileBottomNav';
 import AdminHeader from './AdminHeader';
@@ -77,6 +78,7 @@ const AdminLayout = () => {
 
   return (
     <NotificationProvider>
+      <SupportWsBridge />
       <div className="admin-layout">
         <AdminSidebar user={user} />
         <AdminMobileBottomNav user={user} />

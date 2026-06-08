@@ -186,6 +186,13 @@ Auth: `POST /api/auth/verify-email?token=` — marks `email_verified` when `emai
 
 Collections: `support_tickets`, `support_messages`, `support_ticket_otps`. Migration: `scripts/migrate_contact_to_tickets.py`.
 
+**WebSocket events** (via `/ws/status`, `app/support/ws_notify.py`):
+
+| Event | Trigger | Recipient |
+|-------|---------|-----------|
+| `support_reply` | Admin posts message | Logged-in `user_id` on ticket |
+| `support_customer_reply` | Customer/guest posts message | All connected `role: admin` users |
+
 ---
 
 ## 🔧 How to Run Backend

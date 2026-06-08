@@ -75,7 +75,7 @@ For backend context → read `AI_CONTEXT_BACKEND.md`
 | `/dashboard/settings` | `SettingsPage.jsx` | Infrastructure provisioning engine (Boto3/Terraform); Preferences + Restart Tour |
 | `/dashboard/notifications` | `NotificationsPage.jsx` | Paginated history; All/Unread tabs; type filters |
 | `/dashboard/team` | `TeamPage.jsx` | Org create, invites, members |
-| `/dashboard/support` | `SupportPage.jsx` | Logged-in ticket list + thread (60s poll) |
+| `/dashboard/support` | `SupportPage.jsx` | Logged-in ticket list + chat thread (10s poll + WS) |
 | `/invite/:token` | `AcceptInvitePage.jsx` | Accept team invite |
 | `/auth/sso/callback` | `SsoCallbackPage.jsx` | OAuth redirect handler |
 
@@ -107,6 +107,8 @@ For backend context → read `AI_CONTEXT_BACKEND.md`
 | `dashboard/ProgressRing.jsx` | SVG ring — `percentage`, `color`, `size` props |
 | `OnboardingTour.jsx` | 7-step guided tour (react-joyride v3) — shows once per user |
 | `admin/AdminLayout.jsx` | Admin panel layout — AdminHeader + AdminSidebar + `<Outlet>` |
+| `support/SupportThreadPanel.jsx` | Shared chat-style ticket thread (bubbles, composer, optimistic send) |
+| `support/SupportWsBridge.jsx` | Single WS per layout; dispatches support events to event bus |
 | `ProtectedRoute.jsx` | Auth guard — redirects to `/login` if not authenticated |
 | `ErrorBoundary.jsx` | React error boundary |
 | `GlobalSearch.jsx` | Cmd+K search modal |

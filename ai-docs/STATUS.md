@@ -1,18 +1,18 @@
 # STATUS.md — Live Project Snapshot
 
-**Last Updated:** 2026-06-05 (Phase 18c complete)
+**Last Updated:** 2026-06-05 (Phase 18d complete)
 
 ---
 
 ## Identity
 
-| Phase | **18c** Async Support Tickets · **COMPLETE** |
+| Phase | **18d** Support Chat UX · **COMPLETE** |
 
 ---
 
 ## 🔴 Active Task
 
-_None — Phase 18c shipped 2026-06-05. Next task TBD._
+_None — Phase 18d shipped 2026-06-05. Next task TBD._
 
 ---
 
@@ -20,8 +20,6 @@ _None — Phase 18c shipped 2026-06-05. Next task TBD._
 
 | Check | Status |
 |-------|--------|
-| Backend pytest | ✅ 302 passed (2026-06-05) |
+| Backend pytest | ✅ 304 passed (2026-06-05) |
 | Frontend build | ✅ green (2026-06-05) |
-| Frontend lint | ⚠️ 1 pre-existing error in `SecurityPage.jsx` (`setShowEncryptPrompt`) — unrelated to 18c |
-| Multi-cloud matrix | `docs/cloud/MULTI_CLOUD_PARITY_MATRIX.md` |
-| E2E playbook | `docs/testing/MANUAL_TESTING_PLAYBOOK.md` — row 2.8 Support tickets |
+| E2E playbook | `docs/testing/MANUAL_TESTING_PLAYBOOK.md` — row 2.8 |

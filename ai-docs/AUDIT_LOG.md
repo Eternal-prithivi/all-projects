@@ -23,6 +23,18 @@ Notes: [one line optional]
 ## Session Log (recent only)
 
 ---
+SESSION_ID: 20260605-phase18d-chat-ux
+Date: 2026-06-05
+Agent: Cursor Composer
+Task: Phase 18d — Support chat UX (Phase B)
+Changes:
+- Shared SupportThreadPanel + 10s poll + WS event bus for instant thread refresh
+- ws_notify.py: support_customer_reply to admins, enriched support_reply payload
+- Refactored SupportPage, SupportTicketPage, AdminSupportPage; SupportWsBridge replaces SupportReplyListener
+- pytest 304 passed; build green
+Outcome: Done
+Notes: Not live chat — no typing indicators or agent-online
+---
 SESSION_ID: 20260605-phase18c-support
 Date: 2026-06-05
 Agent: Cursor Composer

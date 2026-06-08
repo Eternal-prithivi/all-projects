@@ -3,17 +3,12 @@ import { toast } from 'react-toastify';
 import { FaSearch } from 'react-icons/fa';
 import api from '../../api';
 import PageHeader from '../../components/ui/PageHeader.jsx';
+import SupportThreadPanel from '../../components/support/SupportThreadPanel.jsx';
+import { useSupportThreadPoll } from '../../hooks/useSupportThreadPoll.js';
+import { useSupportThreadWs } from '../../hooks/useSupportThreadWs.js';
+import { formatDateTime, statusLabel } from '../../utils/supportFormat.js';
 import '../../styles/admin-pages.css';
 import '../../styles/support-tickets.css';
-
-function formatDate(value) {
-  if (!value) return '—';
-  return new Date(value).toLocaleString();
-}
-
-function statusLabel(status) {
-  return (status || '').replace(/_/g, ' ');
-}
 
 const STATUS_OPTIONS = [
   { value: '', label: 'All statuses' },
@@ -31,8 +26,7 @@ function AdminSupportPage() {
   const [statusFilter, setStatusFilter] = useState('');
   const [selectedId, setSelectedId] = useState(null);
   const [detail, setDetail] = useState(null);
-  const [reply, setReply] = useState('');
-  const [sending, setSending] = useState(false);
+  const [loadingDetail, setLoadingDetail] = useState(false);
 
   const fetchTickets = useCallback(async () => {
     setLoading(true);
@@ -51,17 +45,22 @@ function AdminSupportPage() {
     }
   }, [search, statusFilter]);
 
-  const fetchDetail = useCallback(async (ticketId) => {
+  const fetchDetail = useCallback(async (ticketId, { silent = false } = {}) => {
     if (!ticketId) {
       setDetail(null);
       return;
     }
+    if (!silent) setLoadingDetail(true);
     try {
       const res = await api.get(`/admin/support/tickets/${ticketId}`);
       setDetail(res.data);
     } catch {
-      toast.error('Failed to load ticket');
-      setDetail(null);
+      if (!silent) {
+        toast.error('Failed to load ticket');
+        setDetail(null);
+      }
+    } finally {
+      if (!silent) setLoadingDetail(false);
     }
   }, []);
 
@@ -73,28 +72,36 @@ function AdminSupportPage() {
     fetchDetail(selectedId);
   }, [selectedId, fetchDetail]);
 
+  const refreshDetail = useCallback(() => {
+    if (selectedId) fetchDetail(selectedId, { silent: true });
+  }, [selectedId, fetchDetail]);
+
+  useSupportThreadPoll(
+    () => {
+      refreshDetail();
+      fetchTickets();
+    },
+    { enabled: Boolean(selectedId) }
+  );
+
+  useSupportThreadWs(refreshDetail, {
+    ticketId: selectedId,
+    events: ['support_customer_reply'],
+    enabled: Boolean(selectedId),
+  });
+
   const handleSearch = (e) => {
     e.preventDefault();
     fetchTickets();
   };
 
-  const handleReply = async (e) => {
-    e.preventDefault();
-    if (!reply.trim() || !selectedId) return;
-    setSending(true);
-    try {
-      const res = await api.post(`/admin/support/tickets/${selectedId}/messages`, {
-        body: reply.trim(),
-      });
-      setDetail(res.data);
-      setReply('');
-      toast.success('Reply sent to customer');
-      fetchTickets();
-    } catch (err) {
-      toast.error(err.response?.data?.detail || 'Failed to send reply');
-    } finally {
-      setSending(false);
-    }
+  const handleSend = async (body) => {
+    const res = await api.post(`/admin/support/tickets/${selectedId}/messages`, {
+      body,
+    });
+    setDetail(res.data);
+    toast.success('Reply sent to customer');
+    fetchTickets();
   };
 
   const handleStatusChange = async (newStatus) => {
@@ -102,7 +109,7 @@ function AdminSupportPage() {
     try {
       await api.patch(`/admin/support/tickets/${selectedId}`, { status: newStatus });
       toast.success(`Ticket marked ${statusLabel(newStatus)}`);
-      fetchDetail(selectedId);
+      fetchDetail(selectedId, { silent: true });
       fetchTickets();
     } catch (err) {
       toast.error(err.response?.data?.detail || 'Failed to update status');
@@ -111,6 +118,21 @@ function AdminSupportPage() {
 
   const ticket = detail?.ticket;
   const messages = detail?.messages || [];
+
+  const statusSelect = ticket ? (
+    <select
+      className="zenith-select support-status-select"
+      value={ticket.status}
+      onChange={(e) => handleStatusChange(e.target.value)}
+      aria-label="Ticket status"
+    >
+      {STATUS_OPTIONS.filter((o) => o.value).map((opt) => (
+        <option key={opt.value} value={opt.value}>
+          {opt.label}
+        </option>
+      ))}
+    </select>
+  ) : null;
 
   return (
     <div className="admin-support-page">
@@ -187,7 +209,7 @@ function AdminSupportPage() {
                           {statusLabel(t.status)}
                         </span>
                       </td>
-                      <td>{formatDate(t.last_message_at)}</td>
+                      <td>{formatDateTime(t.last_message_at)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -196,66 +218,18 @@ function AdminSupportPage() {
           )}
         </div>
 
-        <section className="support-card admin-support-detail">
-          {!selectedId ? (
-            <div className="support-empty">Select a ticket to view the thread</div>
-          ) : !ticket ? (
-            <div className="support-empty">Loading…</div>
-          ) : (
-            <>
-              <div className="support-thread-header">
-                <div>
-                  <span className="support-ref">{ticket.reference_code}</span>
-                  <h2 style={{ margin: '0.35rem 0 0', fontSize: '1.1rem' }}>
-                    {ticket.subject || ticket.category}
-                  </h2>
-                  <p style={{ margin: '0.25rem 0 0', fontSize: '0.85rem', opacity: 0.75 }}>
-                    {ticket.requester_name} · {ticket.requester_email}
-                  </p>
-                </div>
-                <div className="admin-support-actions">
-                  <select
-                    className="zenith-select"
-                    value={ticket.status}
-                    onChange={(e) => handleStatusChange(e.target.value)}
-                    aria-label="Ticket status"
-                  >
-                    {STATUS_OPTIONS.filter((o) => o.value).map((opt) => (
-                      <option key={opt.value} value={opt.value}>
-                        {opt.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <div className="support-messages" role="log" aria-live="polite">
-                {messages.map((msg) => (
-                  <div
-                    key={msg.id}
-                    className={`support-bubble support-bubble--${msg.author_type}`}
-                  >
-                    <div className="support-bubble-meta">
-                      {msg.author_name} ({msg.author_type}) · {formatDate(msg.created_at)}
-                    </div>
-                    <div style={{ whiteSpace: 'pre-wrap' }}>{msg.body}</div>
-                  </div>
-                ))}
-              </div>
-
-              <form className="admin-support-reply" onSubmit={handleReply}>
-                <textarea
-                  value={reply}
-                  onChange={(e) => setReply(e.target.value)}
-                  placeholder="Type your reply to the customer…"
-                  required
-                />
-                <button type="submit" className="support-btn" disabled={sending || !reply.trim()}>
-                  {sending ? 'Sending…' : 'Send reply'}
-                </button>
-              </form>
-            </>
-          )}
+        <section className="support-card support-card--chat admin-support-detail">
+          <SupportThreadPanel
+            ticket={ticket}
+            messages={messages}
+            loading={loadingDetail && !detail}
+            onSend={ticket ? handleSend : null}
+            headerExtra={statusSelect}
+            showFooterNote={false}
+            emptyMessage="Select a ticket to view the thread"
+            optimisticAuthorType="agent"
+            optimisticAuthorName="You"
+          />
         </section>
       </div>
     </div>

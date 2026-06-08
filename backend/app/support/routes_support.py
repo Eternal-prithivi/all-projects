@@ -49,7 +49,7 @@ def get_my_ticket(
 
 
 @router.post("/tickets/{reference_code}/messages")
-def post_my_ticket_message(
+async def post_my_ticket_message(
     reference_code: str,
     payload: MessageCreate,
     current_user: UserInDB = Depends(get_current_user),
@@ -72,6 +72,10 @@ def post_my_ticket_message(
             )
     except Exception:
         pass
+    if raw_ticket:
+        from app.support.ws_notify import notify_ticket_customer_reply
+
+        await notify_ticket_customer_reply(raw_ticket)
     return service.get_ticket_detail_for_user(reference_code, current_user)
 
 
@@ -119,7 +123,7 @@ def guest_get_ticket(
 
 
 @router.post("/guest/tickets/{reference_code}/messages")
-def guest_post_message(
+async def guest_post_message(
     reference_code: str,
     payload: MessageCreate,
     guest: dict = Depends(get_guest_ticket_access),
@@ -144,6 +148,9 @@ def guest_post_message(
         email_service.send_admin_customer_reply_notification(ticket, payload.body)
     except Exception:
         pass
+    from app.support.ws_notify import notify_ticket_customer_reply
+
+    await notify_ticket_customer_reply(ticket)
     return service.get_ticket_detail_guest(
         repo.find_ticket_by_reference(reference_code)  # type: ignore[arg-type]
     )
