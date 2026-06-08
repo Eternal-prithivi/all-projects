@@ -23,6 +23,18 @@ Notes: [one line optional]
 ## Session Log (recent only)
 
 ---
+SESSION_ID: 20260605-phase18c-support
+Date: 2026-06-05
+Agent: Cursor Composer
+Task: Phase 18c — Async support tickets (MongoDB + Gmail OTP)
+Changes:
+- Added `backend/app/support/` module (tickets, messages, guest OTP, admin inbox)
+- Refactored contact submit → ticket creation; secured legacy admin submissions endpoint
+- Frontend: `/support/ticket`, `/dashboard/support`, `/admin/support` + gold email templates
+- Migration script + `test_support_api.py`; pytest 302 passed; build green
+Outcome: Done
+Notes: No live chat; WS `support_reply` surfaces via NotificationCenter
+---
 SESSION_ID: 20260603-multicloud-phase7
 Date: 2026-06-03
 Agent: Cursor Composer

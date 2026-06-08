@@ -32,15 +32,17 @@ export default function TrustCenterPage() {
   return (
     <MarketingPageLayout>
       <div className="legal-page trust-center-page">
-        <div className="legal-header reveal-group">
-          <div className="legal-header-content reveal-item">
-            <FaShieldAlt className="legal-icon" />
+        <div className="legal-header">
+          <div className="legal-header-content">
+            <span className="legal-icon" aria-hidden="true">
+              <FaShieldAlt />
+            </span>
             <h1>Trust Center</h1>
             <p className="last-updated">Security & compliance overview for Zenith</p>
           </div>
         </div>
 
-        <div className="legal-content reveal-item">
+        <div className="legal-content">
           <div className="legal-intro">
             <p>
               Zenith is built for teams that need visibility into cloud spend, storage, and security

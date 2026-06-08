@@ -247,21 +247,43 @@ const HelpCenterPage = () => {
       </div>
 
       <div className="help-search-section reveal-item">
-        <div className="search-container">
-          <FaSearch className="search-icon" />
+        <form
+          role="search"
+          className="search-container"
+          onSubmit={(e) => e.preventDefault()}
+        >
+          <label htmlFor="help-search-input" className="sr-only">
+            Search help articles
+          </label>
+          <span className="search-icon" aria-hidden="true">
+            <FaSearch />
+          </span>
           <input
-            type="text"
+            id="help-search-input"
+            type="search"
             placeholder="Search for help articles..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="search-input"
+            autoComplete="off"
+            enterKeyHint="search"
           />
           {searchQuery && (
-            <button onClick={() => setSearchQuery('')} className="clear-search">
+            <button
+              type="button"
+              onClick={() => setSearchQuery('')}
+              className="clear-search"
+              aria-label="Clear search"
+            >
               ×
             </button>
           )}
-        </div>
+        </form>
+        {searchQuery.trim() && (
+          <p className="search-results-hint" aria-live="polite">
+            {filteredFaqs.length} {filteredFaqs.length === 1 ? 'result' : 'results'}
+          </p>
+        )}
       </div>
 
       {/* Category Filters */}

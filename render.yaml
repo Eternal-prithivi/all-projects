@@ -1,4 +1,4 @@
-services:
+aservices:
   - type: web
     name: zenith-backend
     env: docker

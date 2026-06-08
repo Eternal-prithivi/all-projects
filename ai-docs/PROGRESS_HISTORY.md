@@ -7,6 +7,18 @@
 
 ---
 
+**Phase 18c — Async Support Tickets** — COMPLETE 2026-06-05
+
+- Replaced one-shot contact flow with MongoDB ticket threads (`support_tickets`, `support_messages`, `support_ticket_otps`).
+- APIs: `/api/support/*` (JWT user + guest OTP), `/api/admin/support/*` (admin inbox). `POST /api/contact/submit` creates tickets; legacy admin submissions endpoint secured.
+- Emails: OTP, agent reply, resolved, updated auto-reply linking `/support/ticket`.
+- Frontend: `SupportTicketPage` (guest OTP), `SupportPage` (dashboard), `AdminSupportPage` (admin). Contact page track link; `SupportReplyListener` for WS `support_reply` notifications.
+- Migration script `migrate_contact_to_tickets.py`; integration tests `test_support_api.py` (5 cases). pytest 302 passed; frontend build green.
+
+**How to test:** Contact submit → email with `ZN-…` → `/support/ticket` OTP flow → `/admin/support` reply → customer email + dashboard notification.
+
+---
+
 **Boto3 / Terraform full parity** — COMPLETE 2026-05-30
 
 - Extracted `app/provision/boto3_modules/` (vpc, ec2, s3, iam, cloudwatch, dynamodb, billing) with Terraform-aligned behavior.

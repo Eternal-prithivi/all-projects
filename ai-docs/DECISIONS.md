@@ -281,6 +281,15 @@
 
 ---
 
+### [DEC-029] Phase 18c — Async support tickets (no live chat)
+- **Date**: 2026-06-05
+- **Status**: Accepted
+- **Context**: Contact form was one-shot (`contact_submissions`) with no self-service lookup; enterprise SaaS expects ticket threads without paid helpdesk vendors.
+- **Decision**: MongoDB `support_tickets` + `support_messages` + email OTP guest auth (`support_ticket_otps`). Public guest portal at `/support/ticket`; logged-in users at `/dashboard/support`; admin inbox at `/admin/support`. Gmail SMTP for OTP, agent reply, resolved emails. Optional WebSocket `support_reply` event for dashboard notification badge — not live chat.
+- **Consequences**: `POST /api/contact/submit` still works but creates tickets internally. Legacy `GET /api/contact/admin/submissions` requires admin. Inbound email parsing and Zendesk/Intercom deferred.
+
+---
+
 ### [DEC-021] BYOC Credential Routing Per User (Platform-Wide)
 - **Date**: 2026-05-29
 - **Status**: Accepted (implemented)

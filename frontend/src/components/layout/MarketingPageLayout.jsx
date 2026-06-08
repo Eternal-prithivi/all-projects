@@ -1,5 +1,5 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext.jsx';
 import Footer from './Footer.jsx';
 import AnimatedBackground from '../AnimatedBackground.jsx';
@@ -16,8 +16,9 @@ import { MARKETING_PAGE_LINKS } from '../../config/marketingNavLinks.js';
  */
 export default function MarketingPageLayout({ children, showFooter = true }) {
   const { user } = useAuth();
+  const { pathname } = useLocation();
   const navScrolled = useLandingNav(16);
-  useLandingReveal();
+  useLandingReveal(pathname);
 
   return (
     <div className="marketing-page">

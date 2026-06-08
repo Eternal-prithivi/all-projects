@@ -25,11 +25,10 @@ async def websocket_endpoint(
         manager.disconnect(user_id)
 
 @router.post("/notify/{user_id}")
-async def notify_user(user_id: str):
+async def notify_user(user_id: str, message: str = "job_complete"):
     """
-
-    An internal endpoint for the Celery worker to call.
-    It sends a message to a specific user over the WebSocket.
+    Internal endpoint for Celery workers and support replies.
+    Sends a text/JSON message to a connected user WebSocket.
     """
-    await manager.send_personal_message("job_complete", user_id)
+    await manager.send_personal_message(message, user_id)
     return {"status": "notification sent"}

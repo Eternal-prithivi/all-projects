@@ -1,23 +1,26 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 import { FaShieldAlt } from 'react-icons/fa';
 import MarketingPageLayout from '../components/layout/MarketingPageLayout.jsx';
 import '../styles/legal-pages.css';
 
 const PrivacyPolicyPage = () => {
-  const lastUpdated = "November 30, 2025";
+  const lastUpdated = 'June 5, 2026';
 
   return (
     <MarketingPageLayout>
     <div className="legal-page">
-      <div className="legal-header reveal-group">
-        <div className="legal-header-content reveal-item">
-          <FaShieldAlt className="legal-icon" />
+      <div className="legal-header">
+        <div className="legal-header-content">
+          <span className="legal-icon" aria-hidden="true">
+            <FaShieldAlt />
+          </span>
           <h1>Privacy Policy</h1>
           <p className="last-updated">Last Updated: {lastUpdated}</p>
         </div>
       </div>
 
-      <div className="legal-content reveal-item">
+      <div className="legal-content">
         <div className="legal-intro">
           <p>
             At Zenith, we take your privacy seriously. This Privacy Policy explains how we collect, use, disclose, 
@@ -307,8 +310,8 @@ const PrivacyPolicyPage = () => {
             please contact us:
           </p>
           <div className="contact-info">
-            <p><strong>Email:</strong> aangatla957@gmail.com</p>
-            <p><strong>Website:</strong> <a href="http://localhost:5173/contact">Contact Us</a></p>
+            <p><strong>Email:</strong> <a href="mailto:support@rajverse.me">support@rajverse.me</a></p>
+            <p><strong>Website:</strong> <Link to="/contact">Contact Us</Link></p>
             <p><strong>Data Protection Officer:</strong> Available upon request</p>
           </div>
         </section>

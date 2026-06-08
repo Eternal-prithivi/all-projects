@@ -1,5 +1,5 @@
 import React from 'react';
-import { FaChartLine, FaUsers, FaDollarSign, FaServer, FaHome, FaQuestionCircle } from 'react-icons/fa';
+import { FaChartLine, FaUsers, FaDollarSign, FaServer, FaHome, FaQuestionCircle, FaLifeRing } from 'react-icons/fa';
 
 export const ADMIN_NAV_ITEMS = [
   { to: '/admin', icon: <FaChartLine className="rail-icon" />, label: 'Overview', end: true },
@@ -7,6 +7,7 @@ export const ADMIN_NAV_ITEMS = [
   { to: '/admin/analytics', icon: <FaChartLine className="rail-icon" />, label: 'Analytics' },
   { to: '/admin/payments', icon: <FaDollarSign className="rail-icon" />, label: 'Payments' },
   { to: '/admin/system', icon: <FaServer className="rail-icon" />, label: 'System' },
+  { to: '/admin/support', icon: <FaLifeRing className="rail-icon" />, label: 'Support' },
 ];
 
 export const ADMIN_MOBILE_PRIMARY = [
@@ -20,6 +21,7 @@ export function getAdminMobileMoreItems(user) {
   return [
     ADMIN_NAV_ITEMS[2],
     ADMIN_NAV_ITEMS[4],
+    ADMIN_NAV_ITEMS[5],
     { to: '/dashboard', icon: <FaHome className="rail-icon" />, label: 'Dashboard' },
     { to: '/admin/settings', label: 'Admin Settings', isSettings: true, userInitial: initial },
     { to: '/help', icon: <FaQuestionCircle className="rail-icon" />, label: 'Help Center' },

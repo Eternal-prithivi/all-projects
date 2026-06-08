@@ -2,13 +2,31 @@
 Email service for contact form notifications using Gmail SMTP.
 """
 
-import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
-from datetime import datetime
-from typing import Dict, Optional
 import os
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from email.utils import formataddr
+from typing import Dict, Optional
+
 from dotenv import load_dotenv
+
+from app.contact.email_templates import (
+    admin_customer_reply_html,
+    admin_customer_reply_text,
+    agent_reply_html,
+    agent_reply_text,
+    contact_admin_html,
+    contact_admin_text,
+    contact_auto_reply_html,
+    contact_auto_reply_text,
+    reference_code,
+    subject_label,
+    ticket_otp_html,
+    ticket_otp_text,
+    ticket_resolved_html,
+    ticket_resolved_text,
+)
 from app.utils.logger import setup_logger
 
 load_dotenv()
@@ -27,7 +45,34 @@ class EmailService:
         
         if not self.sender_email or not self.sender_password:
             logger.warning("Gmail credentials not configured. Email notifications disabled.")
-    
+
+    def _from_header(self) -> str:
+        return formataddr(("Zenith Support", self.sender_email))
+
+    def _send_html_email(
+        self,
+        *,
+        to_email: str,
+        subject: str,
+        html_body: str,
+        text_body: str,
+        reply_to: Optional[str] = None,
+    ) -> bool:
+        msg = MIMEMultipart("alternative")
+        msg["Subject"] = subject
+        msg["From"] = self._from_header()
+        msg["To"] = to_email
+        if reply_to:
+            msg["Reply-To"] = reply_to
+        msg.attach(MIMEText(text_body, "plain", "utf-8"))
+        msg.attach(MIMEText(html_body, "html", "utf-8"))
+
+        with smtplib.SMTP(self.smtp_server, self.smtp_port) as server:
+            server.starttls()
+            server.login(self.sender_email, self.sender_password)
+            server.send_message(msg)
+        return True
+
     def send_contact_notification(self, submission: Dict) -> bool:
         """
         Send email notification to admin when contact form is submitted.
@@ -43,142 +88,20 @@ class EmailService:
             return False
         
         try:
-            # Create message
-            msg = MIMEMultipart('alternative')
-            msg['Subject'] = f"New Contact Form Submission: {submission['subject']}"
-            msg['From'] = self.sender_email
-            msg['To'] = self.admin_email
-            msg['Reply-To'] = submission['email']
-            
-            # Create HTML body
-            html_body = f"""
-            <html>
-                <head>
-                    <style>
-                        body {{
-                            font-family: Arial, sans-serif;
-                            line-height: 1.6;
-                            color: #333;
-                        }}
-                        .container {{
-                            max-width: 600px;
-                            margin: 0 auto;
-                            padding: 20px;
-                            background-color: #f9f9f9;
-                            border-radius: 8px;
-                        }}
-                        .header {{
-                            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                            color: white;
-                            padding: 20px;
-                            border-radius: 8px 8px 0 0;
-                            text-align: center;
-                        }}
-                        .content {{
-                            background: white;
-                            padding: 20px;
-                            border-radius: 0 0 8px 8px;
-                        }}
-                        .field {{
-                            margin-bottom: 15px;
-                        }}
-                        .label {{
-                            font-weight: bold;
-                            color: #667eea;
-                            display: block;
-                            margin-bottom: 5px;
-                        }}
-                        .value {{
-                            padding: 10px;
-                            background: #f5f5f5;
-                            border-radius: 4px;
-                            border-left: 3px solid #667eea;
-                        }}
-                        .message {{
-                            white-space: pre-wrap;
-                        }}
-                        .footer {{
-                            margin-top: 20px;
-                            padding-top: 20px;
-                            border-top: 1px solid #ddd;
-                            font-size: 12px;
-                            color: #666;
-                            text-align: center;
-                        }}
-                    </style>
-                </head>
-                <body>
-                    <div class="container">
-                        <div class="header">
-                            <h2>🔔 New Contact Form Submission</h2>
-                        </div>
-                        <div class="content">
-                            <div class="field">
-                                <span class="label">From:</span>
-                                <div class="value">{submission['name']}</div>
-                            </div>
-                            
-                            <div class="field">
-                                <span class="label">Email:</span>
-                                <div class="value">
-                                    <a href="mailto:{submission['email']}">{submission['email']}</a>
-                                </div>
-                            </div>
-                            
-                            <div class="field">
-                                <span class="label">Subject:</span>
-                                <div class="value">{submission['subject']}</div>
-                            </div>
-                            
-                            <div class="field">
-                                <span class="label">Message:</span>
-                                <div class="value message">{submission['message']}</div>
-                            </div>
-                            
-                            <div class="field">
-                                <span class="label">Submitted:</span>
-                                <div class="value">{submission.get('timestamp', datetime.now()).strftime('%B %d, %Y at %I:%M %p')}</div>
-                            </div>
-                        </div>
-                        <div class="footer">
-                            <p>This is an automated notification from Zenith Cloud Platform</p>
-                            <p>Reply directly to this email to respond to {submission['name']}</p>
-                        </div>
-                    </div>
-                </body>
-            </html>
-            """
-            
-            # Create plain text version
-            text_body = f"""
-New Contact Form Submission
+            category = subject_label(submission.get("subject", ""))
+            ref_code = reference_code(submission)
+            ref_suffix = f" [{ref_code}]" if ref_code else ""
+            subject = f"[Zenith Contact] {category} — {submission['name']}{ref_suffix}"
 
-From: {submission['name']}
-Email: {submission['email']}
-Subject: {submission['subject']}
+            self._send_html_email(
+                to_email=self.admin_email,
+                subject=subject,
+                html_body=contact_admin_html(submission),
+                text_body=contact_admin_text(submission),
+                reply_to=submission["email"],
+            )
 
-Message:
-{submission['message']}
-
-Submitted: {submission.get('timestamp', datetime.now()).strftime('%B %d, %Y at %I:%M %p')}
-
----
-Reply to this email to respond to {submission['name']}
-            """
-            
-            # Attach both versions
-            part1 = MIMEText(text_body, 'plain')
-            part2 = MIMEText(html_body, 'html')
-            msg.attach(part1)
-            msg.attach(part2)
-            
-            # Send email
-            with smtplib.SMTP(self.smtp_server, self.smtp_port) as server:
-                server.starttls()
-                server.login(self.sender_email, self.sender_password)
-                server.send_message(msg)
-            
-            logger.info(f"Contact notification email sent to {self.admin_email}")
+            logger.info("Contact notification email sent to %s", self.admin_email)
             return True
             
         except Exception as e:
@@ -339,130 +262,104 @@ Reply to this email to respond to {submission['name']}
             return False
         
         try:
-            msg = MIMEMultipart('alternative')
-            msg['Subject'] = "We received your message - Zenith Cloud Platform"
-            msg['From'] = self.sender_email
-            msg['To'] = submission['email']
-            
-            html_body = f"""
-            <html>
-                <head>
-                    <style>
-                        body {{
-                            font-family: Arial, sans-serif;
-                            line-height: 1.6;
-                            color: #333;
-                        }}
-                        .container {{
-                            max-width: 600px;
-                            margin: 0 auto;
-                            padding: 20px;
-                        }}
-                        .header {{
-                            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                            color: white;
-                            padding: 30px 20px;
-                            border-radius: 8px 8px 0 0;
-                            text-align: center;
-                        }}
-                        .content {{
-                            background: white;
-                            padding: 30px 20px;
-                            border: 1px solid #ddd;
-                            border-top: none;
-                            border-radius: 0 0 8px 8px;
-                        }}
-                        .button {{
-                            display: inline-block;
-                            padding: 12px 30px;
-                            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                            color: white;
-                            text-decoration: none;
-                            border-radius: 6px;
-                            margin-top: 20px;
-                        }}
-                        .footer {{
-                            margin-top: 30px;
-                            padding-top: 20px;
-                            border-top: 1px solid #ddd;
-                            font-size: 12px;
-                            color: #666;
-                        }}
-                    </style>
-                </head>
-                <body>
-                    <div class="container">
-                        <div class="header">
-                            <h1>✓ Message Received</h1>
-                        </div>
-                        <div class="content">
-                            <p>Hi {submission['name']},</p>
-                            
-                            <p>Thank you for contacting Zenith Cloud Platform! We've received your message and will respond within 24 hours.</p>
-                            
-                            <p><strong>Your message:</strong></p>
-                            <p style="background: #f5f5f5; padding: 15px; border-radius: 6px; border-left: 3px solid #667eea;">
-                                {submission['message'][:200]}{'...' if len(submission['message']) > 200 else ''}
-                            </p>
-                            
-                            <p>In the meantime, you can:</p>
-                            <ul>
-                                <li>Check our <a href="https://rajverse.me/dashboard">Dashboard</a></li>
-                                <li>Start a <a href="https://rajverse.me/contact">Live Chat</a> (9 AM - 6 PM IST)</li>
-                                <li>Browse our <a href="https://rajverse.me/docs">Documentation</a></li>
-                            </ul>
-                            
-                            <a href="https://rajverse.me/dashboard" class="button">Go to Dashboard</a>
-                            
-                            <div class="footer">
-                                <p>Best regards,<br><strong>Zenith Support Team</strong></p>
-                                <p style="margin-top: 20px;">
-                                    Zenith Cloud Resource Optimization Platform<br>
-                                    Email: support@rajverse.me
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-                </body>
-            </html>
-            """
-            
-            text_body = f"""
-Hi {submission['name']},
+            ref_code = reference_code(submission)
+            ref_suffix = f" ({ref_code})" if ref_code else ""
+            subject = f"We received your message — Zenith Support{ref_suffix}"
 
-Thank you for contacting Zenith Cloud Platform! We've received your message and will respond within 24 hours.
+            self._send_html_email(
+                to_email=submission["email"],
+                subject=subject,
+                html_body=contact_auto_reply_html(submission),
+                text_body=contact_auto_reply_text(submission),
+            )
 
-Your message:
-{submission['message'][:200]}{'...' if len(submission['message']) > 200 else ''}
-
-In the meantime, you can:
-- Check our Dashboard: https://rajverse.me/dashboard
-- Start a Live Chat (9 AM - 6 PM IST): https://rajverse.me/contact
-- Browse our Documentation: https://rajverse.me/docs
-
-Best regards,
-Zenith Support Team
-
----
-Zenith Cloud Resource Optimization Platform
-Email: support@rajverse.me
-            """
-            
-            part1 = MIMEText(text_body, 'plain')
-            part2 = MIMEText(html_body, 'html')
-            msg.attach(part1)
-            msg.attach(part2)
-            
-            with smtplib.SMTP(self.smtp_server, self.smtp_port) as server:
-                server.starttls()
-                server.login(self.sender_email, self.sender_password)
-                server.send_message(msg)
-            
-            logger.info(f"Auto-reply sent to {submission['email']}")
+            logger.info("Auto-reply sent to %s", submission["email"])
             return True
             
         except Exception as e:
             logger.error(f"Failed to send auto-reply: {str(e)}")
+            return False
+
+    def send_ticket_otp_email(self, to_email: str, ref_code: str, otp: str) -> bool:
+        if not self.sender_email or not self.sender_password:
+            return False
+        try:
+            self._send_html_email(
+                to_email=to_email,
+                subject=f"Your Zenith support code — {ref_code}",
+                html_body=ticket_otp_html(ref_code, otp),
+                text_body=ticket_otp_text(ref_code, otp),
+            )
+            return True
+        except Exception as e:
+            logger.error("Failed to send ticket OTP: %s", e)
+            return False
+
+    def send_agent_reply_email(self, ticket: Dict, message_body: str) -> bool:
+        if not self.sender_email or not self.sender_password:
+            return False
+        try:
+            ref = ticket.get("reference_code", "")
+            name = ticket.get("requester_name", "there")
+            email = ticket.get("requester_email", "")
+            logged_in = bool(ticket.get("user_id"))
+            self._send_html_email(
+                to_email=email,
+                subject=f"Re: {ref} — Zenith Support replied",
+                html_body=agent_reply_html(
+                    requester_name=name,
+                    ref_code=ref,
+                    message_preview=message_body,
+                    for_logged_in=logged_in,
+                ),
+                text_body=agent_reply_text(
+                    requester_name=name,
+                    ref_code=ref,
+                    message_preview=message_body,
+                    for_logged_in=logged_in,
+                ),
+            )
+            return True
+        except Exception as e:
+            logger.error("Failed to send agent reply email: %s", e)
+            return False
+
+    def send_ticket_resolved_email(self, ticket: Dict) -> bool:
+        if not self.sender_email or not self.sender_password:
+            return False
+        try:
+            ref = ticket.get("reference_code", "")
+            name = ticket.get("requester_name", "there")
+            email = ticket.get("requester_email", "")
+            self._send_html_email(
+                to_email=email,
+                subject=f"{ref} resolved — Zenith Support",
+                html_body=ticket_resolved_html(name, ref),
+                text_body=ticket_resolved_text(name, ref),
+            )
+            return True
+        except Exception as e:
+            logger.error("Failed to send resolved email: %s", e)
+            return False
+
+    def send_admin_customer_reply_notification(
+        self, ticket: Dict, message_body: str
+    ) -> bool:
+        if not self.sender_email or not self.sender_password:
+            return False
+        try:
+            ref = ticket.get("reference_code", "")
+            name = ticket.get("requester_name", "Customer")
+            self._send_html_email(
+                to_email=self.admin_email,
+                subject=f"[Zenith] Customer reply on {ref}",
+                html_body=admin_customer_reply_html(ref, name, message_body),
+                text_body=admin_customer_reply_text(ref, name, message_body),
+                reply_to=ticket.get("requester_email"),
+            )
+            return True
+        except Exception as e:
+            logger.error("Failed to send admin customer reply notice: %s", e)
             return False
 
 

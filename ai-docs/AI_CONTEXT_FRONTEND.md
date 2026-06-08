@@ -34,7 +34,8 @@ For backend context → read `AI_CONTEXT_BACKEND.md`
 | `/register` | `RegisterPage.jsx` |
 | `/forgot-password` | `ForgotPasswordPage.jsx` |
 | `/reset-password` | `ResetPasswordPage.jsx` |
-| `/contact` | `ContactPage.jsx` |
+| `/contact` | `ContactPage.jsx` — creates ticket; shows `ZN-…` + track link |
+| `/support/ticket` | `SupportTicketPage.jsx` — guest OTP lookup + thread |
 | `/about` | `AboutPage.jsx` |
 | `/features` | `FeaturesPage.jsx` |
 | `/help` | `HelpCenterPage.jsx` — 26 FAQs, search, 6 categories |
@@ -74,6 +75,7 @@ For backend context → read `AI_CONTEXT_BACKEND.md`
 | `/dashboard/settings` | `SettingsPage.jsx` | Infrastructure provisioning engine (Boto3/Terraform); Preferences + Restart Tour |
 | `/dashboard/notifications` | `NotificationsPage.jsx` | Paginated history; All/Unread tabs; type filters |
 | `/dashboard/team` | `TeamPage.jsx` | Org create, invites, members |
+| `/dashboard/support` | `SupportPage.jsx` | Logged-in ticket list + thread (60s poll) |
 | `/invite/:token` | `AcceptInvitePage.jsx` | Accept team invite |
 | `/auth/sso/callback` | `SsoCallbackPage.jsx` | OAuth redirect handler |
 
@@ -89,6 +91,7 @@ For backend context → read `AI_CONTEXT_BACKEND.md`
 | `/admin/system` | `AdminSystemPage.jsx` |
 | `/admin/settings` | `AdminSettingsPage.jsx` |
 | `/admin/test` | `AdminTestPage.jsx` |
+| `/admin/support` | `AdminSupportPage.jsx` | Support inbox — reply, status |
 
 ---
 
@@ -165,7 +168,7 @@ All routes defined in `frontend/src/main.jsx` via `createBrowserRouter`:
 ```
 Public routes → no wrapper
   /login, /register, /forgot-password, /reset-password
-  /, /contact, /about, /features, /help
+  /, /contact, /about, /features, /help, /support
   /legal/terms, /legal/privacy
   /access-denied, /500, /503, *
 

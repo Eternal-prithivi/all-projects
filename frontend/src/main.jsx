@@ -88,6 +88,9 @@ const NotificationsPage = lazyWithRetry(() => import("./pages/NotificationsPage.
 const TeamPage = lazyWithRetry(() => import("./pages/TeamPage.jsx"));
 const AcceptInvitePage = lazyWithRetry(() => import("./pages/AcceptInvitePage.jsx"));
 const SsoCallbackPage = lazyWithRetry(() => import("./pages/SsoCallbackPage.jsx"));
+const SupportTicketPage = lazyWithRetry(() => import("./pages/SupportTicketPage.jsx"));
+const SupportPage = lazyWithRetry(() => import("./pages/SupportPage.jsx"));
+const AdminSupportPage = lazyWithRetry(() => import("./pages/admin/AdminSupportPage.jsx"));
 
 const router = createBrowserRouter([
   {
@@ -103,6 +106,8 @@ const router = createBrowserRouter([
       
       // --- Public Routes (lazy loaded) ---
       { path: "/contact", element: <Suspense fallback={<LazyLoadFallback />}><ContactPage /></Suspense> },
+      { path: "/support/ticket", element: <Suspense fallback={<LazyLoadFallback />}><SupportTicketPage /></Suspense> },
+      { path: "/support/ticket/:referenceCode", element: <Suspense fallback={<LazyLoadFallback />}><SupportTicketPage /></Suspense> },
       { path: "/about", element: <Suspense fallback={<LazyLoadFallback />}><AboutPage /></Suspense> },
       { path: "/features", element: <Suspense fallback={<LazyLoadFallback />}><FeaturesPage /></Suspense> },
       { path: "/access-denied", element: <Suspense fallback={<LazyLoadFallback />}><AccessDeniedPage /></Suspense> },
@@ -145,6 +150,7 @@ const router = createBrowserRouter([
               { path: "provision", element: <Suspense fallback={<LazyLoadFallback />}><ProvisionPage /></Suspense> },
               { path: "notifications", element: <Suspense fallback={<LazyLoadFallback />}><NotificationsPage /></Suspense> },
               { path: "team", element: <Suspense fallback={<LazyLoadFallback />}><TeamPage /></Suspense> },
+              { path: "support", element: <Suspense fallback={<LazyLoadFallback />}><SupportPage /></Suspense> },
             ],
           },
           {
@@ -159,6 +165,7 @@ const router = createBrowserRouter([
               { path: "settings", element: <Suspense fallback={<LazyLoadFallback />}><AdminSettingsPage /></Suspense> },
               { path: "notifications", element: <Suspense fallback={<LazyLoadFallback />}><NotificationsPage /></Suspense> },
               { path: "test", element: <Suspense fallback={<LazyLoadFallback />}><AdminTestPage /></Suspense> },
+              { path: "support", element: <Suspense fallback={<LazyLoadFallback />}><AdminSupportPage /></Suspense> },
             ],
           },
         ],

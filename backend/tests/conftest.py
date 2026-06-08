@@ -89,6 +89,7 @@ def _rebind_route_databases(db: Database) -> None:
         ("app.users.routes_profile", ("DB",)),
         ("app.billing.routes_billing", ("DB",)),
         ("app.admin.routes_admin", ("DB",)),
+        ("app.contact.routes_contact", ("DB",)),
     ]
     for module_path, attrs in modules:
         try:

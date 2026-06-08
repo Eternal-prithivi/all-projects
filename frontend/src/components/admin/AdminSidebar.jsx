@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink, Link } from 'react-router-dom';
-import { FaChartLine, FaUsers, FaDollarSign, FaServer, FaHome, FaQuestionCircle } from 'react-icons/fa';
+import { FaChartLine, FaUsers, FaDollarSign, FaServer, FaHome, FaQuestionCircle, FaLifeRing } from 'react-icons/fa';
 import '../../styles/admin-layout.css';
 import ZenithLogo from '../brand/ZenithLogo.jsx';
 
@@ -43,6 +43,12 @@ const AdminSidebar = ({ user }) => {
             <NavLink to="/admin/system" role="menuitem" aria-label="System Health" className={({ isActive }) => `rail-link ${isActive ? 'active' : ''}`}>
               <span className="rail-link-icon"><FaServer className="rail-icon" /></span>
               <span className="rail-link-label">System</span>
+            </NavLink>
+          </li>
+          <li role="none">
+            <NavLink to="/admin/support" role="menuitem" aria-label="Support inbox" className={({ isActive }) => `rail-link ${isActive ? 'active' : ''}`}>
+              <span className="rail-link-icon"><FaLifeRing className="rail-icon" /></span>
+              <span className="rail-link-label">Support</span>
             </NavLink>
           </li>
         </ul>

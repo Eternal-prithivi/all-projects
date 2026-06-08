@@ -225,21 +225,70 @@
   padding-bottom: 4rem;
 }
 
-.marketing-page .legal-content {
-  background: rgba(14, 14, 18, 0.6);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 16px;
-  padding: 2rem;
-  max-width: 900px;
-  margin: 0 auto 2rem;
+.marketing-page .legal-header {
+  background: transparent !important;
+  border: none;
+  padding-top: 0;
+  overflow: visible;
 }
 
 .marketing-page .legal-header .back-button {
   display: none;
 }
 
-.marketing-page .legal-header-content h1 {
-  color: var(--text-primary);
+.marketing-page .legal-header-content h1,
+.marketing-page .legal-page h1 {
+  color: var(--text-primary) !important;
+  text-shadow: none;
+}
+
+.marketing-page .legal-content {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  margin: 0 auto !important;
+  padding: 0 1.5rem 4rem !important;
+}
+
+.marketing-page .legal-intro,
+.marketing-page .legal-section,
+.marketing-page .trust-pillar,
+.marketing-page .legal-footer {
+  background: rgba(14, 14, 18, 0.75) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+
+.marketing-page .legal-section:hover,
+.marketing-page .trust-pillar:hover {
+  border-color: rgba(212, 175, 55, 0.28) !important;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.3);
+}
+
+/* Legal/trust pages must render immediately (no scroll-reveal dependency) */
+.marketing-page .legal-page,
+.marketing-page .legal-page .legal-header,
+.marketing-page .legal-page .legal-content,
+.marketing-page .legal-page .legal-intro,
+.marketing-page .legal-page .legal-section,
+.marketing-page .legal-page .trust-pillar {
+  opacity: 1 !important;
+  transform: none !important;
+  filter: none !important;
+  animation: none !important;
+}
+
+.marketing-page .status-page {
+  background: transparent;
+  padding-top: 0;
+}
+
+.marketing-page .status-page,
+.marketing-page .status-page .status-banner,
+.marketing-page .status-page .status-section,
+.marketing-page .status-page .status-cloud-card {
+  opacity: 1 !important;
+  transform: none !important;
+  filter: none !important;
 }
 
 .marketing-page .section-heading::before,

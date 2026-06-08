@@ -10,15 +10,17 @@ export default function CookiePolicyPage() {
   return (
     <MarketingPageLayout>
       <div className="legal-page">
-        <div className="legal-header reveal-group">
-          <div className="legal-header-content reveal-item">
-            <FaCookieBite className="legal-icon" />
+        <div className="legal-header">
+          <div className="legal-header-content">
+            <span className="legal-icon" aria-hidden="true">
+              <FaCookieBite />
+            </span>
             <h1>Cookie Policy</h1>
             <p className="last-updated">Last Updated: {lastUpdated}</p>
           </div>
         </div>
 
-        <div className="legal-content reveal-item">
+        <div className="legal-content">
           <div className="legal-intro">
             <p>
               This Cookie Policy explains how Zenith uses cookies and similar technologies when you

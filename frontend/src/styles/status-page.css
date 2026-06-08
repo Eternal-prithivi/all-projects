@@ -1,74 +1,191 @@
+/* System status page — Zenith design tokens */
+
 .status-page {
-  max-width: 720px;
+  max-width: 900px;
   margin: 0 auto;
-  padding: 6rem 2rem 4rem;
+  padding: var(--space-xl) var(--space-md) var(--space-2xl);
+  color: var(--text-primary);
+}
+
+.status-page__header {
+  text-align: center;
+  margin-bottom: var(--space-xl);
+}
+
+.status-page__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  margin-bottom: var(--space-md);
+  color: var(--gold-primary);
+  background: rgba(212, 175, 55, 0.08);
+  border: 1px solid var(--gold-border);
+  border-radius: var(--radius-lg);
+}
+
+.status-page__icon svg {
+  width: 26px;
+  height: 26px;
 }
 
 .status-page__header h1 {
   font-family: 'Outfit', sans-serif;
-  font-size: 2rem;
-  margin: 0 0 0.35rem;
-  color: #f5f5f5;
+  font-size: clamp(1.75rem, 4vw, 2.25rem);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  margin: 0 0 var(--space-sm);
+  color: var(--text-primary);
 }
 
 .status-page__header p {
   margin: 0;
-  color: rgba(255, 255, 255, 0.55);
+  font-size: 1rem;
+  color: var(--text-secondary);
+  line-height: 1.6;
 }
 
+/* Overall banner */
 .status-banner {
   display: flex;
   align-items: flex-start;
-  gap: 1rem;
-  margin: 2rem 0;
-  padding: 1.25rem 1.35rem;
-  border-radius: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  gap: var(--space-md);
+  margin-bottom: var(--space-xl);
+  padding: var(--space-lg);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-default);
+  background: rgba(14, 14, 18, 0.75);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
 }
 
 .status-banner--ok {
-  background: rgba(39, 174, 96, 0.12);
   border-color: rgba(39, 174, 96, 0.35);
+  background: rgba(39, 174, 96, 0.08);
 }
 
 .status-banner--warn {
-  background: rgba(241, 196, 15, 0.1);
-  border-color: rgba(241, 196, 15, 0.3);
+  border-color: rgba(241, 196, 15, 0.35);
+  background: rgba(241, 196, 15, 0.08);
+}
+
+.status-banner--error {
+  border-color: rgba(231, 76, 60, 0.35);
+  background: rgba(231, 76, 60, 0.08);
+}
+
+.status-banner--loading {
+  border-color: var(--gold-border);
+  background: rgba(212, 175, 55, 0.06);
 }
 
 .status-banner__icon {
-  font-size: 1.5rem;
-  color: #d4af37;
-  margin-top: 0.15rem;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  color: var(--gold-primary);
+  background: rgba(212, 175, 55, 0.1);
+  border: 1px solid var(--gold-border);
+  border-radius: var(--radius-md);
+}
+
+.status-banner__icon svg {
+  width: 20px;
+  height: 20px;
+}
+
+.status-banner--ok .status-banner__icon {
+  color: #6ee7a0;
+  border-color: rgba(39, 174, 96, 0.35);
+  background: rgba(39, 174, 96, 0.12);
+}
+
+.status-banner--error .status-banner__icon {
+  color: #f87171;
+  border-color: rgba(231, 76, 60, 0.35);
+  background: rgba(231, 76, 60, 0.12);
+}
+
+.status-banner--loading .status-banner__icon svg {
+  animation: status-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes status-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.65; transform: scale(0.92); }
 }
 
 .status-banner strong {
   display: block;
-  color: #f5f5f5;
+  font-size: 1.1rem;
+  color: var(--text-primary);
   margin-bottom: 0.25rem;
 }
 
 .status-banner__meta {
-  margin: 0;
-  font-size: 0.85rem;
-  color: rgba(255, 255, 255, 0.5);
+  margin: 0.15rem 0 0;
+  font-size: 0.875rem;
+  color: var(--text-muted);
+  line-height: 1.5;
 }
 
+.status-banner__meta code {
+  font-size: 0.8rem;
+  padding: 0.1rem 0.35rem;
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--gold-light);
+}
+
+/* Sections */
+.status-section {
+  margin-bottom: var(--space-xl);
+}
+
+.status-section h2 {
+  font-family: 'Outfit', sans-serif;
+  font-size: 1.2rem;
+  font-weight: 700;
+  margin: 0 0 var(--space-sm);
+  color: var(--text-primary);
+}
+
+.status-section__hint {
+  margin: 0 0 var(--space-md);
+  font-size: 0.875rem;
+  line-height: 1.6;
+  color: var(--text-muted);
+}
+
+.status-section__hint code {
+  font-size: 0.8rem;
+  padding: 0.1rem 0.35rem;
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+/* Service list */
 .status-services {
   list-style: none;
   margin: 0;
   padding: 0;
-  border-radius: 14px;
+  border-radius: var(--radius-lg);
   overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--border-default);
 }
 
 .status-services li {
   display: flex;
   justify-content: space-between;
+  align-items: center;
+  gap: var(--space-md);
   padding: 0.85rem 1.1rem;
-  background: rgba(14, 14, 18, 0.6);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(14, 14, 18, 0.75);
+  border-bottom: 1px solid var(--border-default);
 }
 
 .status-services li:last-child {
@@ -76,34 +193,143 @@
 }
 
 .status-services__name {
-  text-transform: capitalize;
-  color: rgba(255, 255, 255, 0.85);
+  color: var(--text-primary);
+  font-weight: 500;
 }
 
-.status-services__state {
-  font-size: 0.8rem;
-  text-transform: capitalize;
+/* Cloud connectivity grid */
+.status-cloud-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: var(--space-md);
+}
+
+.status-cloud-card {
+  background: rgba(14, 14, 18, 0.75);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  padding: var(--space-md);
+  transition:
+    border-color var(--duration-normal) var(--ease-out),
+    box-shadow var(--duration-normal) var(--ease-out);
+}
+
+.status-cloud-card:hover {
+  border-color: var(--gold-border);
+  box-shadow: var(--shadow-card);
+}
+
+.status-cloud-card h3 {
+  font-family: 'Outfit', sans-serif;
+  font-size: 1rem;
+  font-weight: 700;
+  margin: 0 0 var(--space-md);
+  color: var(--gold-primary);
+  padding-bottom: var(--space-sm);
+  border-bottom: 1px solid var(--border-default);
+}
+
+.status-cloud-card ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.status-cloud-card li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: 0.45rem 0;
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+}
+
+/* Status pills */
+.status-pill {
+  flex-shrink: 0;
+  font-size: 0.75rem;
+  font-weight: 600;
   padding: 0.2rem 0.55rem;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
+  white-space: nowrap;
 }
 
-.status-services__state--operational {
-  background: rgba(39, 174, 96, 0.2);
+.status-pill--ok {
+  background: rgba(39, 174, 96, 0.18);
   color: #6ee7a0;
 }
 
-.status-services__state--degraded,
-.status-services__state--maintenance {
+.status-pill--warn {
   background: rgba(241, 196, 15, 0.15);
   color: #f1c40f;
 }
 
-.status-page__footer-note {
-  margin-top: 2rem;
+.status-pill--info {
+  background: rgba(212, 175, 55, 0.12);
+  color: var(--gold-light);
+}
+
+.status-pill--neutral {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-muted);
+}
+
+/* Loading */
+.status-loading {
+  text-align: center;
+  padding: var(--space-xl) var(--space-md);
+  color: var(--text-muted);
+}
+
+.status-loading__bar {
+  width: 120px;
+  height: 3px;
+  margin: 0 auto var(--space-md);
+  border-radius: 999px;
+  background: linear-gradient(90deg, transparent, var(--gold-primary), transparent);
+  animation: status-loading-slide 1.2s ease-in-out infinite;
+}
+
+@keyframes status-loading-slide {
+  0% { transform: translateX(-40%); opacity: 0.4; }
+  50% { opacity: 1; }
+  100% { transform: translateX(40%); opacity: 0.4; }
+}
+
+.status-loading p {
+  margin: 0;
   font-size: 0.9rem;
-  color: rgba(255, 255, 255, 0.55);
+}
+
+/* Footer */
+.status-page__footer-note {
+  margin-top: var(--space-xl);
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  text-align: center;
 }
 
 .status-page__footer-note a {
-  color: #ffe566;
+  color: var(--gold-primary);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.status-page__footer-note a:hover {
+  text-decoration: underline;
+}
+
+@media (max-width: 480px) {
+  .status-page {
+    padding-top: var(--space-lg);
+  }
+
+  .status-services li,
+  .status-cloud-card li {
+    flex-direction: column;
+    align-items: flex-start;
+  }
 }

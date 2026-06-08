@@ -21,6 +21,16 @@ export const teamIcon = (
   </svg>
 );
 
+export const supportIcon = (
+  <svg className="rail-icon" width="20" height="20" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+    <path
+      fillRule="evenodd"
+      d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z"
+      clipRule="evenodd"
+    />
+  </svg>
+);
+
 export const billingIcon = (
   <svg className="rail-icon" width="20" height="20" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
     <path d="M4 4a2 2 0 00-2 2v1h16V6a2 2 0 00-2-2H4z" />
@@ -42,6 +52,7 @@ export const DASHBOARD_NAV_ITEMS = [
   { to: '/dashboard/costs', icon: <IconBarChart className="rail-icon" />, label: 'Cost Analysis' },
   { to: '/dashboard/team', icon: teamIcon, label: 'Team' },
   { to: '/dashboard/billing', icon: billingIcon, label: 'Billing' },
+  { to: '/dashboard/support', icon: supportIcon, label: 'Support' },
 ];
 
 /** Primary bottom tabs on mobile (max 5). */
@@ -59,6 +70,7 @@ export function getDashboardMobileMoreItems(user) {
     DASHBOARD_NAV_ITEMS[3],
     DASHBOARD_NAV_ITEMS[6],
     DASHBOARD_NAV_ITEMS[7],
+    DASHBOARD_NAV_ITEMS[8],
     { to: '/help', label: 'Help Center', external: false, isHelp: true },
     { to: '/dashboard/settings', label: 'Settings', isSettings: true },
   ];

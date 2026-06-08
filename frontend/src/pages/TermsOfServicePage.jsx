@@ -9,15 +9,17 @@ const TermsOfServicePage = () => {
   return (
     <MarketingPageLayout>
     <div className="legal-page">
-      <div className="legal-header reveal-group">
-        <div className="legal-header-content reveal-item">
-          <FaFileContract className="legal-icon" />
+      <div className="legal-header">
+        <div className="legal-header-content">
+          <span className="legal-icon" aria-hidden="true">
+            <FaFileContract />
+          </span>
           <h1>Terms of Service</h1>
           <p className="last-updated">Last Updated: {lastUpdated}</p>
         </div>
       </div>
 
-      <div className="legal-content reveal-item">
+      <div className="legal-content">
         <div className="legal-intro">
           <p>
             Welcome to Zenith. These Terms of Service ("Terms") govern your access to and use of Zenith's 

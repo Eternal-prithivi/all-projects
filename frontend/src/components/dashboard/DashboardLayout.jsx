@@ -24,6 +24,7 @@ import QuickActions from "../QuickActions.jsx";
 import KeyboardShortcuts from "../KeyboardShortcuts.jsx";
 import GlobalSearch from "../GlobalSearch.jsx";
 import OnboardingTour from "../OnboardingTour.jsx";
+import SupportReplyListener from "../SupportReplyListener.jsx";
 import { useTheme } from "../../context/ThemeContext.jsx";
 import "../../styles/dashboard.css";
 import "../../styles/mobile-nav.css";
@@ -96,6 +97,7 @@ function DashboardLayout() {
 
   return (
     <NotificationProvider>
+      <SupportReplyListener />
       <div className="dashboard-page">
         {/* Skip to main content link for keyboard navigation */}
         <a href="#main-content" className="skip-to-main" tabIndex={0}>

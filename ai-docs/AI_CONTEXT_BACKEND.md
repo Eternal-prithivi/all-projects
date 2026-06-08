@@ -103,6 +103,8 @@ Database: `CloudResourceOptimizationDB`
 /api/byoc        → routes_byoc.py (connect, status, test, disconnect)
 (no prefix)      → routes_admin.py (admin/dashboard, admin/users CRUD, audit-logs)
 (no prefix)      → routes_contact.py
+/api/support     → routes_support.py (user tickets, guest OTP)
+/api/admin/support → routes_admin_support.py (admin inbox)
 /ws              → routes_ws.py (WebSocket + notify bridge)
 ```
 
@@ -169,6 +171,20 @@ Auth: `POST /api/auth/verify-email?token=` — marks `email_verified` when `emai
 **Organizations** (`/api/organizations`): create org, members, invites, accept invite — single org per user.
 
 **SSO** (`/api/auth/sso`): `GET providers`, `GET google/login`, `GET google/callback` — needs `GOOGLE_OAUTH_*` + `PUBLIC_API_URL` env.
+
+**Support tickets** (`/api/support`, `/api/admin/support`):
+
+| Method | Path | Auth | Purpose |
+|--------|------|------|---------|
+| POST | `/api/contact/submit` | Public (+ optional JWT) | Creates `support_tickets` + first message; legacy `contact_submissions` retained |
+| GET | `/api/support/tickets` | JWT | List own tickets |
+| GET/POST | `/api/support/tickets/{reference_code}[/messages]` | JWT | Thread read / customer reply |
+| POST | `/api/support/guest/request-otp` | Public (rate limited) | Send 6-digit OTP email |
+| POST | `/api/support/guest/verify-otp` | Public | Returns 1h guest JWT (`typ: guest_ticket`) |
+| GET/POST | `/api/support/guest/tickets/{reference_code}[/messages]` | Guest JWT | Guest thread read / reply |
+| GET/POST/PATCH | `/api/admin/support/tickets[/{id}[/messages]]` | Admin | Inbox, agent reply, status update |
+
+Collections: `support_tickets`, `support_messages`, `support_ticket_otps`. Migration: `scripts/migrate_contact_to_tickets.py`.
 
 ---
 

@@ -1,18 +1,18 @@
 # STATUS.md — Live Project Snapshot
 
-**Last Updated:** 2026-06-03 (Multi-cloud parity Phase 7 complete)
+**Last Updated:** 2026-06-05 (Phase 18c complete)
 
 ---
 
 ## Identity
 
-| Phase | **Parity 0–7** ✅ complete · **20.5.10** paused (branch protection) |
+| Phase | **18c** Async Support Tickets · **COMPLETE** |
 
 ---
 
 ## 🔴 Active Task
 
-**None** — Multi-cloud parity plan finished (Phases 0–7).
+_None — Phase 18c shipped 2026-06-05. Next task TBD._
 
 ---
 
@@ -20,6 +20,8 @@
 
 | Check | Status |
 |-------|--------|
-| Backend pytest | ✅ 261 passed (2026-06-03) |
+| Backend pytest | ✅ 302 passed (2026-06-05) |
+| Frontend build | ✅ green (2026-06-05) |
+| Frontend lint | ⚠️ 1 pre-existing error in `SecurityPage.jsx` (`setShowEncryptPrompt`) — unrelated to 18c |
 | Multi-cloud matrix | `docs/cloud/MULTI_CLOUD_PARITY_MATRIX.md` |
-| E2E playbook | `docs/testing/professional_standard.md` Tier I |
+| E2E playbook | `docs/testing/MANUAL_TESTING_PLAYBOOK.md` — row 2.8 Support tickets |

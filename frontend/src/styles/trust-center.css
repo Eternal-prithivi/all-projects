@@ -1,32 +1,70 @@
+/* Trust Center — extends legal-pages.css */
+
 .trust-center-page .trust-pillars {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 1.25rem;
-  margin: 2rem 0 2.5rem;
+  gap: var(--space-md);
+  margin: var(--space-lg) 0 var(--space-xl);
 }
 
 .trust-pillar {
-  padding: 1.25rem 1.35rem;
-  border-radius: 16px;
+  padding: var(--space-lg);
+  border-radius: var(--radius-lg);
   background: rgba(14, 14, 18, 0.75);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--border-default);
+  transition:
+    transform var(--duration-normal) var(--ease-out),
+    border-color var(--duration-normal) var(--ease-out),
+    box-shadow var(--duration-normal) var(--ease-out);
+}
+
+.trust-pillar:hover {
+  transform: translateY(-3px);
+  border-color: var(--gold-border);
+  box-shadow: var(--shadow-card);
 }
 
 .trust-pillar__icon {
-  font-size: 1.35rem;
-  color: #d4af37;
-  margin-bottom: 0.75rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  margin-bottom: var(--space-md);
+  color: var(--gold-primary);
+  background: rgba(212, 175, 55, 0.08);
+  border: 1px solid var(--gold-border);
+  border-radius: var(--radius-md);
+}
+
+.trust-pillar__icon svg {
+  width: 18px;
+  height: 18px;
 }
 
 .trust-pillar h2 {
+  font-family: 'Outfit', sans-serif;
   font-size: 1.05rem;
-  margin: 0 0 0.5rem;
-  color: #f5f5f5;
+  font-weight: 700;
+  margin: 0 0 var(--space-sm);
+  color: var(--text-primary);
+  border: none;
+  padding: 0;
+  background: none;
+  -webkit-text-fill-color: unset;
 }
 
 .trust-pillar p {
   margin: 0;
-  font-size: 0.9rem;
-  line-height: 1.55;
-  color: rgba(255, 255, 255, 0.65);
+  font-size: 0.9375rem;
+  line-height: 1.6;
+  color: var(--text-secondary);
+}
+
+@media (max-width: 480px) {
+  .trust-center-page .trust-pillars {
+    grid-template-columns: 1fr;
+  }
 }

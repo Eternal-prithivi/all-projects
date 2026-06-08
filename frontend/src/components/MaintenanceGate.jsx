@@ -10,6 +10,7 @@ const ALLOWED_PREFIXES = [
   '/legal/',
   '/trust',
   '/help',
+  '/support',
   '/about',
   '/features',
 ];

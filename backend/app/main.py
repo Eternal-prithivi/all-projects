@@ -27,6 +27,8 @@ from app.users import routes_profile
 from app.users import routes_settings
 from app.storage import routes_storage
 from app.contact import routes_contact
+from app.support import routes_support
+from app.support import routes_admin_support
 from app.security import routes_security
 from app.websockets import routes_ws
 from app.security import routes_2fa
@@ -197,6 +199,8 @@ app.include_router(routes_settings.router, prefix="/api")
 app.include_router(routes_dashboard.router, prefix="/api/dashboard")
 app.include_router(routes_storage.router, prefix="/api/storage")
 app.include_router(routes_contact.router)
+app.include_router(routes_support.router)
+app.include_router(routes_admin_support.router)
 app.include_router(routes_security.router, prefix="/api/security")
 app.include_router(routes_2fa.router, prefix="/api/2fa")
 app.include_router(routes_ws.router, prefix="/ws")
