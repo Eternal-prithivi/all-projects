@@ -37,7 +37,7 @@
       ]
     },
     {
-      "source": "/(favicon.*|icon-.*|zenith-icon\\.png|og-image\\.png)",
+      "source": "/(favicon.*|icon-.*|zenith-icon.*\\.png|og-image\\.png)",
       "headers": [
         {
           "key": "Cache-Control",

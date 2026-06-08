@@ -6,6 +6,8 @@ import path from 'path';
 import fs from 'fs';
 
 const BRAND_BG = '#050505';
+/** Flatten PNGs for Google Search / browser tabs — transparent favicons get a gray mat. */
+const flattenOnBrand = (pipeline) => pipeline.flatten({ background: BRAND_BG });
 
 const frontendRoot = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const publicRoot = path.join(frontendRoot, 'public');
@@ -58,7 +60,7 @@ const padIcon = async (size, bg = BRAND_BG) => {
   const padRatio = size <= 48 ? 0.06 : size <= 96 ? 0.07 : 0.08;
   const pad = Math.max(2, Math.round(size * padRatio));
   const inner = size - pad * 2;
-  return transparentPng
+  const pipeline = transparentPng
     .clone()
     .resize(inner, inner, {
       fit: 'contain',
@@ -70,9 +72,8 @@ const padIcon = async (size, bg = BRAND_BG) => {
       left: pad,
       right: pad,
       background: bg,
-    })
-    .png()
-    .toBuffer();
+    });
+  return flattenOnBrand(pipeline).png().toBuffer();
 };
 
 const sizes = [16, 32, 48, 96, 192, 512];
@@ -87,8 +88,14 @@ await sharp(icons[96]).toFile(path.join(publicRoot, 'favicon-96.png'));
 await sharp(icons[48]).toFile(path.join(publicRoot, 'favicon-48.png'));
 await sharp(icons[32]).toFile(path.join(publicRoot, 'favicon-32.png'));
 await sharp(icons[16]).toFile(path.join(publicRoot, 'favicon-16.png'));
-/** Root favicon — 48px PNG (widely used by Google Search + browsers). */
+/**
+ * Root favicon — 48px solid black (Google Search reads /favicon.ico).
+ * Real .ico multi-size is optional; PNG-in-ico is widely supported.
+ */
 await sharp(icons[48]).toFile(path.join(publicRoot, 'favicon.ico'));
+
+/** Solid black 512 — Organization logo in schema.org (not transparent). */
+await sharp(icons[512]).toFile(path.join(publicRoot, 'zenith-icon-solid.png'));
 
 const ogMarkSize = 300;
 const ogLogo = await transparentPng
@@ -111,7 +118,7 @@ await sharp(ogTextSvg)
   .png()
   .toFile(path.join(publicRoot, 'og-image.png'));
 
-const BRAND_VERSION = '3';
+const BRAND_VERSION = '4';
 fs.writeFileSync(
   path.join(publicRoot, 'brand-asset-version.txt'),
   BRAND_VERSION,
