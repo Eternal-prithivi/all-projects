@@ -1,7 +1,7 @@
 // =============================================================================
 // COMPONENT: GlobalSearch.jsx  (145 lines)
 // PURPOSE: ⌘K command-palette-style search modal — searches pages, commands, files
-//   - Triggered by: Header search button or keyboard shortcut ⌘K / Ctrl+K
+//   - Triggered by: Header search button or keyboard shortcut ⌘K / Ctrl+K (not while typing in fields)
 //   - Searches: page names (routes), quick actions, recent files
 //   - Results are navigated with arrow keys, Enter confirms, Escape closes
 //   - data-tour="global-search" on the trigger button in Header.jsx

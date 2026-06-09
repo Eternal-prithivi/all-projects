@@ -4,6 +4,7 @@ import {
   REGION_LABELS,
   useAwsBuckets,
 } from '../hooks/useAwsBuckets';
+import BucketSelectorLoading from './BucketSelectorLoading.jsx';
 import '../styles/bucket-selector.css';
 
 const CHIP_THRESHOLD = 4;
@@ -29,6 +30,8 @@ export default function BucketRegionSelector({
   onBucketChange,
   onRegionChange,
   onBucketsLoaded,
+  platformRegionSlug = null,
+  reloadToken = 0,
 }) {
   const [search, setSearch] = useState('');
 
@@ -41,8 +44,8 @@ export default function BucketRegionSelector({
     discoveryError,
     selectedMeta,
     selectBucket,
-    refresh,
     showRegionFilter,
+    platformMultiRegion,
   } = useAwsBuckets({
     surface,
     storageKeyPrefix,
@@ -51,7 +54,11 @@ export default function BucketRegionSelector({
     onBucketChange,
     onRegionChange,
     onBucketsLoaded,
+    platformRegionSlug,
+    reloadToken,
   });
+
+  const isBusy = loading || refreshing;
 
   const handleRegionClick = (value) => {
     try {
@@ -73,28 +80,27 @@ export default function BucketRegionSelector({
   }, [buckets, search]);
 
   const useChips = buckets.length > 0 && buckets.length <= CHIP_THRESHOLD;
-  const title = surface === 'security' ? 'Secure vault' : 'General storage';
+  const title = surface === 'security' ? 'AWS Secure vault' : 'AWS';
   const subtitle =
     mode === 'byoc'
       ? surface === 'security'
-        ? 'Secure and replica buckets only — not shown on the Storage page'
-        : 'Standard buckets only — secure vault buckets appear under Security'
+        ? 'Your secure and replica S3 buckets — not shown on the Storage page'
+        : 'Your S3 buckets — secure vault buckets appear under Security'
       : surface === 'security'
-        ? 'Zenith secure vault and replica'
-        : 'Zenith-managed object storage';
+        ? 'Zenith platform secure S3 and replica'
+        : platformMultiRegion
+          ? 'Zenith platform — configured regions'
+          : 'Zenith platform S3 buckets';
 
   return (
     <section
-      className={`bucket-selector bucket-selector--${surface}`}
-      aria-label="S3 bucket and region"
+      className={`bucket-selector bucket-selector--aws bucket-selector--${surface}`}
+      aria-label="AWS S3 bucket and region"
     >
       <div className="bucket-selector-top">
         <div className="bucket-selector-heading">
-          <span className="bucket-selector-icon" aria-hidden="true">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M4 7h16v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7z" />
-              <path d="M4 7l2-4h12l2 4" />
-            </svg>
+          <span className="bucket-selector-icon bucket-selector-icon--aws" aria-hidden="true">
+            <img src="/images/aws.png" alt="" width={20} height={20} />
           </span>
           <div>
             <h3 className="bucket-selector-title">{title}</h3>
@@ -102,34 +108,10 @@ export default function BucketRegionSelector({
           </div>
         </div>
         <div className="bucket-selector-top-actions">
-          {!loading && buckets.length > 0 && (
+          {!isBusy && buckets.length > 0 && (
             <span className="bucket-selector-stat">
               {buckets.length} bucket{buckets.length !== 1 ? 's' : ''}
             </span>
-          )}
-          {mode === 'byoc' && (
-            <button
-              type="button"
-              className="bucket-selector-refresh"
-              onClick={refresh}
-              disabled={refreshing || loading}
-              aria-label="Refresh buckets from AWS"
-            >
-              <svg
-                className={refreshing ? 'bucket-selector-spin' : ''}
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                aria-hidden="true"
-              >
-                <path d="M21 12a9 9 0 1 1-2.64-6.36" />
-                <path d="M21 3v6h-6" />
-              </svg>
-              Refresh
-            </button>
           )}
         </div>
       </div>
@@ -160,11 +142,8 @@ export default function BucketRegionSelector({
         </div>
       )}
 
-      {loading ? (
-        <div className="bucket-selector-loading" aria-busy="true">
-          <span className="bucket-selector-loading-bar" />
-          <span className="bucket-selector-loading-text">Discovering buckets…</span>
-        </div>
+      {isBusy ? (
+        <BucketSelectorLoading label="Discovering AWS buckets…" />
       ) : (
         <>
           {showRegionFilter && (
@@ -254,6 +233,9 @@ export default function BucketRegionSelector({
                     >
                       <span className="bucket-selector-chip-name">{b.name}</span>
                       <span className="bucket-selector-chip-meta">
+                        {b.platform_label && (
+                          <span className="bucket-selector-chip-region">{b.platform_label}</span>
+                        )}
                         {b.is_default && <span className="bucket-selector-tag bucket-selector-tag--gold">Default</span>}
                         {b.is_replica && <span className="bucket-selector-tag">Replica</span>}
                         {b.region && (

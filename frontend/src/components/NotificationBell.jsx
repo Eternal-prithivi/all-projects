@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useNotificationCenter } from '../context/NotificationContext';
+import IndeterminateProgressBar from './IndeterminateProgressBar.jsx';
 import '../styles/notification-bell.css';
 
 const formatTimestamp = (timestamp) => {
@@ -44,6 +45,12 @@ const getNotificationIcon = (type) => {
           <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
         </svg>
       );
+    case 'loading':
+      return (
+        <span className="notif-icon-loading" aria-hidden="true">
+          <IndeterminateProgressBar variant="gold" />
+        </span>
+      );
     default:
       return (
         <svg className="notif-icon info" width="20" height="20" viewBox="0 0 20 20" fill="currentColor" aria-hidden>
@@ -60,6 +67,7 @@ const NotificationBell = ({ viewAllPath = '/dashboard/notifications' }) => {
     markAsRead,
     markAllAsRead,
     deleteNotification,
+    clearAll,
     fetchRecent,
   } = useNotificationCenter();
   const [isOpen, setIsOpen] = useState(false);
@@ -95,6 +103,10 @@ const NotificationBell = ({ viewAllPath = '/dashboard/notifications' }) => {
   }, [isOpen, fetchRecent]);
 
   const toggleDropdown = () => setIsOpen((open) => !open);
+
+  const handleClearAll = async () => {
+    await clearAll();
+  };
 
   const handleItemClick = async (notification) => {
     if (!notification.read) {
@@ -136,6 +148,13 @@ const NotificationBell = ({ viewAllPath = '/dashboard/notifications' }) => {
                 <div className="notification-item-title">{notification.title}</div>
               )}
               <div className="notification-item-message">{notification.message}</div>
+              {notification.type === 'loading' && (
+                <IndeterminateProgressBar
+                  variant="gold"
+                  className="notification-item-progress"
+                  label={notification.message}
+                />
+              )}
               <div className="notification-item-timestamp">
                 {formatTimestamp(notification.timestamp)}
               </div>
@@ -188,7 +207,7 @@ const NotificationBell = ({ viewAllPath = '/dashboard/notifications' }) => {
             className={[
               'notification-badge',
               hasUrgentUnread ? 'notification-badge--urgent' : '',
-              unreadCount > 9 ? 'notification-badge--many' : '',
+              unreadCount > 9 ? 'notification-badge--many' : 'notification-badge--single',
             ]
               .filter(Boolean)
               .join(' ')}
@@ -219,14 +238,17 @@ const NotificationBell = ({ viewAllPath = '/dashboard/notifications' }) => {
 
           <div className="notification-list">
             {loading ? (
-              <div className="notification-empty">
-                <p>Loading…</p>
+              <div className="notification-loading-panel" aria-busy="true">
+                <p>Loading notifications…</p>
+                <IndeterminateProgressBar variant="gold" label="Loading notifications" />
               </div>
             ) : notifications.length === 0 ? (
               <div className="notification-empty">
-                <svg width="48" height="48" viewBox="0 0 48 48" fill="currentColor" opacity="0.3" aria-hidden>
-                  <path d="M24 4C22.895 4 22 4.895 22 6V8.19C17.923 9.062 15 12.701 15 17V26.586L12.707 28.879C11.526 30.06 12.379 32 14.086 32H33.914C35.621 32 36.474 30.06 35.293 28.879L33 26.586V17C33 12.701 30.077 9.062 26 8.19V6C26 4.895 25.105 4 24 4ZM24 38C21.791 38 20 39.791 20 42H28C28 39.791 26.209 38 24 38Z" />
-                </svg>
+                <span className="notification-empty-icon" aria-hidden="true">
+                  <svg viewBox="0 0 20 20" fill="currentColor">
+                    <path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z" />
+                  </svg>
+                </span>
                 <p>You're all caught up</p>
               </div>
             ) : (
@@ -237,9 +259,29 @@ const NotificationBell = ({ viewAllPath = '/dashboard/notifications' }) => {
             )}
           </div>
 
-          <div className="notification-dropdown-footer">
-            <Link to={viewAllPath} className="view-all-btn" onClick={() => setIsOpen(false)}>
-              View all notifications
+          <div
+            className={[
+              'notification-dropdown-footer',
+              notifications.length > 0 ? 'notification-dropdown-footer--split' : '',
+            ]
+              .filter(Boolean)
+              .join(' ')}
+          >
+            {notifications.length > 0 && (
+              <button
+                type="button"
+                className="notification-footer-btn notification-footer-btn--clear"
+                onClick={handleClearAll}
+              >
+                Clear all
+              </button>
+            )}
+            <Link
+              to={viewAllPath}
+              className="notification-footer-btn notification-footer-btn--view"
+              onClick={() => setIsOpen(false)}
+            >
+              View all
             </Link>
           </div>
         </div>

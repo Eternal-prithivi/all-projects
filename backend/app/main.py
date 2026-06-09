@@ -268,6 +268,12 @@ def on_startup():
         disable_rate_limits(app)
 
     def _warm_dependencies() -> None:
+        try:
+            from app.cloud.platform_storage_catalog import invalidate_platform_catalog_cache
+
+            invalidate_platform_catalog_cache()
+        except Exception:
+            pass
         mongodb_client.connect()
         try:
             from app.provision.routes_provision import recover_plans_interrupted_by_restart

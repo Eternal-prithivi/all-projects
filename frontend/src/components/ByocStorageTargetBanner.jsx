@@ -39,6 +39,8 @@ export default function ByocStorageTargetBanner({
   variant = 'storage',
   selectedBucket = null,
   selectedRegion = null,
+  selectedGcpBucket = null,
+  selectedAzureContainer = null,
   bucketCount = null,
   activeCsp = null,
 }) {
@@ -75,12 +77,31 @@ export default function ByocStorageTargetBanner({
     (csp) => !activeCsp || activeCsp === 'ALL' || activeCsp === csp
   );
 
-  const viewingLabel = selectedBucket ? (
-    <>
-      Viewing <code>{selectedBucket}</code>
-      {selectedRegion && selectedRegion !== 'all' ? ` (${selectedRegion})` : ''}
-    </>
-  ) : null;
+  const viewingLabel = (() => {
+    if (activeCsp === 'GCP' && selectedGcpBucket) {
+      return (
+        <>
+          Viewing GCS <code>{selectedGcpBucket}</code>
+        </>
+      );
+    }
+    if (activeCsp === 'Azure' && selectedAzureContainer) {
+      return (
+        <>
+          Viewing container <code>{selectedAzureContainer}</code>
+        </>
+      );
+    }
+    if ((activeCsp === 'AWS' || activeCsp === 'ALL') && selectedBucket) {
+      return (
+        <>
+          Viewing AWS <code>{selectedBucket}</code>
+          {selectedRegion && selectedRegion !== 'all' ? ` (${selectedRegion})` : ''}
+        </>
+      );
+    }
+    return null;
+  })();
 
   return (
     <div className="byoc-target-banner" role="status">
@@ -101,13 +122,18 @@ export default function ByocStorageTargetBanner({
           );
         })}
       </ul>
-      {targets.mode !== 'platform' &&
+      {(activeCsp === 'AWS' || activeCsp === 'ALL' || !activeCsp) &&
+        providers.includes('AWS') &&
         bucketCount != null &&
-        bucketCount > 1 &&
-        (activeCsp === 'AWS' || activeCsp === 'ALL' || !activeCsp) &&
-        providers.includes('AWS') && (
+        bucketCount > 1 && (
         <p className="byoc-target-hint">
-          {bucketCount} AWS bucket{bucketCount !== 1 ? 's' : ''} available — use the bucket selector above.
+          {bucketCount} AWS bucket{bucketCount !== 1 ? 's' : ''} — use the AWS selector above.
+        </p>
+      )}
+      {(activeCsp === 'ALL' || activeCsp === 'GCP' || activeCsp === 'Azure') &&
+        providers.length > 1 && (
+        <p className="byoc-target-hint">
+          Use the cloud filter on the file table to focus one provider&apos;s destination picker.
         </p>
       )}
     </div>

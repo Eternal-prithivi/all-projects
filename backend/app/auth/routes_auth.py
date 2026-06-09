@@ -79,6 +79,7 @@ def register_user_route(request: Request, user: UserCreate, db: Collection = Dep
             doc["email_verify_token"] = token
         else:
             doc["email_verified"] = True
+        doc["created_at"] = datetime.utcnow()
         db.insert_one(doc)
 
         if require_verify:
@@ -121,6 +122,10 @@ def login_for_access_token_route(
     user_dict = db.find_one({"username": username})
     if not user_dict or not verify_password(form_data.password, user_dict["hashed_password"]):
         logger.warning("Failed login attempt for username: %r", username)
+        raise ErrorResponses.unauthorized("Incorrect username or password")
+
+    if user_dict.get("deleted") or user_dict.get("status") == "deleted":
+        logger.warning("Login blocked for deleted account: %r", username)
         raise ErrorResponses.unauthorized("Incorrect username or password")
 
     if _email_verification_required(db) and not user_dict.get("email_verified", True):

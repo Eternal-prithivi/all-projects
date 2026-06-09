@@ -3,6 +3,7 @@ from jose import jwt, JWTError
 from fastapi.security import OAuth2PasswordBearer
 from pymongo.collection import Collection
 from pydantic import BaseModel, EmailStr
+from typing import Optional
 
 from app.users.user_model import User
 from app.database.mongo_client import get_users_collection
@@ -13,6 +14,7 @@ class UserResponse(BaseModel):
     username: str
     email: EmailStr
     role: str = "user"
+    profile_picture: Optional[str] = None
 
 # The prefix is now handled in main.py, so it's removed from here.
 router = APIRouter(tags=["Users"])
@@ -41,13 +43,18 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Collection = Depen
     return User(**user)
 
 @router.get("/me", response_model=UserResponse)
-async def read_users_me(current_user: User = Depends(get_current_user)):
+async def read_users_me(
+    current_user: User = Depends(get_current_user),
+    db: Collection = Depends(get_users_collection),
+):
     """
     An endpoint that returns the details for the currently logged-in user.
     It's protected by the get_current_user dependency.
     """
+    user_doc = db.find_one({"username": current_user.username}) or {}
     return UserResponse(
         username=current_user.username,
         email=current_user.email,
-        role=current_user.role
+        role=current_user.role,
+        profile_picture=user_doc.get("profile_picture"),
     )

@@ -3,11 +3,13 @@ import api from '../../api';
 import { useAuth } from '../../context/AuthContext';
 import '../../styles/admin-pages.css';
 import PageHeader from '../../components/ui/PageHeader.jsx';
+import { usePageRefresh } from '../../hooks/usePageRefresh.js';
 
 const AdminTestPage = () => {
   const { user } = useAuth();
   const [testResults, setTestResults] = useState({});
   const [loading, setLoading] = useState(false);
+  const { runPageRefresh, pageRefreshing } = usePageRefresh();
 
   const runTests = async () => {
     setLoading(true);
@@ -55,6 +57,14 @@ const AdminTestPage = () => {
         kicker="Admin"
         title="Portal Diagnostics"
         subtitle="Run quick checks against auth and admin API endpoints"
+        onRefresh={() =>
+          runPageRefresh(runTests, {
+            loadingMessage: 'Refreshing diagnostics…',
+            successMessage: 'Diagnostics refreshed.',
+            errorMessage: 'Failed to refresh diagnostics.',
+          })
+        }
+        refreshing={pageRefreshing || loading}
       />
       <button
         type="button"

@@ -29,6 +29,10 @@ export default function CloudProviderToolbar({
   actionLabel,
   actionDisabled = false,
   actionBusy = false,
+  onRefresh,
+  refreshBusy = false,
+  refreshDisabled = false,
+  refreshLabel = 'Refresh',
   actionClassName = 'action-btn',
   selectAriaLabel = 'Cloud provider',
   className = '',
@@ -55,14 +59,40 @@ export default function CloudProviderToolbar({
           </option>
         ))}
       </select>
-      <button
-        type="button"
-        className={`${actionClassName} cloud-provider-toolbar__action`.trim()}
-        onClick={onAction}
-        disabled={actionDisabled || actionBusy}
-      >
-        {actionBusy ? 'Syncing…' : actionLabel}
-      </button>
+      {typeof onRefresh === 'function' && (
+        <button
+          type="button"
+          className="cloud-provider-toolbar__refresh"
+          onClick={onRefresh}
+          disabled={refreshDisabled || refreshBusy}
+          aria-label={refreshLabel}
+        >
+          <svg
+            className={refreshBusy ? 'cloud-provider-toolbar__spin' : ''}
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            aria-hidden="true"
+          >
+            <path d="M21 12a9 9 0 1 1-2.64-6.36" />
+            <path d="M21 3v6h-6" />
+          </svg>
+          {refreshBusy ? 'Refreshing…' : refreshLabel}
+        </button>
+      )}
+      {typeof onAction === 'function' && (
+        <button
+          type="button"
+          className={`${actionClassName} cloud-provider-toolbar__action`.trim()}
+          onClick={onAction}
+          disabled={actionDisabled || actionBusy}
+        >
+          {actionBusy ? 'Syncing…' : actionLabel}
+        </button>
+      )}
     </div>
   );
 }

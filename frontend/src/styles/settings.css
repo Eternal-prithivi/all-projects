@@ -53,7 +53,6 @@
 }
 
 .settings-card:hover {
-  transform: translateY(-2px);
   box-shadow: var(--shadow-gold);
   border-color: var(--gold-border);
 }
@@ -61,9 +60,10 @@
 .settings-card h3 {
   color: var(--text-primary);
   font-size: 1.25rem;
-  margin-bottom: 1.5rem;
+  margin: 0 0 1.5rem;
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 0.75rem;
   font-weight: 600;
 }
@@ -76,6 +76,7 @@
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
+  width: 100%;
 }
 
 /* ============================================
@@ -84,13 +85,23 @@
 .setting-item {
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  padding: 1rem;
+  align-items: flex-start;
+  gap: 1.25rem;
+  padding: 1rem 1.25rem;
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
   transition: background var(--duration-fast) var(--ease-out),
               border-color var(--duration-fast) var(--ease-out);
+}
+
+.setting-item--action {
+  align-items: center;
+}
+
+.setting-info {
+  flex: 1;
+  min-width: 0;
 }
 
 .setting-item:hover {
@@ -110,17 +121,25 @@
 .setting-info h4 {
   color: var(--text-primary);
   font-size: 1rem;
-  margin: 0 0 0.25rem 0;
-  text-transform: capitalize;
+  margin: 0 0 0.35rem;
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 0.5rem;
+  line-height: 1.35;
 }
 
 .setting-info p {
   color: var(--text-secondary);
   font-size: 0.85rem;
   margin: 0;
+  line-height: 1.45;
+}
+
+.setting-item .toggle-switch {
+  margin-top: 0.15rem;
+  margin-left: auto;
+  flex-shrink: 0;
 }
 
 .toggle-switch {
@@ -469,8 +488,13 @@ input:disabled + .toggle-slider {
     gap: 1rem;
   }
 
-  .toggle-switch {
+  .setting-item .toggle-switch,
+  .settings-tour-row .btn-save {
     align-self: flex-end;
+  }
+
+  .setting-item--action {
+    align-items: flex-start;
   }
 
   .free-plan-header {
@@ -975,5 +999,32 @@ input:disabled + .toggle-slider {
   background: rgba(34, 197, 94, 0.05);
   border-radius: var(--radius-sm);
   margin-top: 0.25rem;
+}
+
+.settings-platform-region .settings-hint {
+  margin: 0.35rem 0 0.75rem;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  line-height: 1.45;
+}
+
+.settings-platform-region .platform-region-row {
+  margin: 0;
+}
+
+.settings-platform-region .bucket-selector-pills {
+  width: 100%;
+}
+
+.settings-tour-row {
+  margin-top: 1.25rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.settings-tour-row .btn-save {
+  margin-top: 0;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 

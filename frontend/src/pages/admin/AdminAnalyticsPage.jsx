@@ -5,10 +5,12 @@ import '../../styles/admin-pages.css';
 import { FaChartLine, FaUsers, FaServer, FaDollarSign, FaFileDownload, FaFilePdf } from 'react-icons/fa';
 import { exportToCSV, prepareAnalyticsForExport, exportAnalyticsToPDF } from '../../utils/exportUtils';
 import PageHeader from '../../components/ui/PageHeader.jsx';
+import { usePageRefresh } from '../../hooks/usePageRefresh.js';
 
 const AdminAnalyticsPage = () => {
   const [loading, setLoading] = useState(true);
   const [analytics, setAnalytics] = useState(null);
+  const { runPageRefresh, pageRefreshing } = usePageRefresh();
 
   useEffect(() => {
     fetchAnalytics();
@@ -61,20 +63,28 @@ const AdminAnalyticsPage = () => {
   return (
     <div className="admin-analytics">
       <PageHeader
-        className="zenith-page-header--row"
         kicker="Admin"
         title="Platform Analytics"
         subtitle="Detailed insights into platform performance"
-      >
-        <div className="zenith-page-header-actions" style={{ display: 'flex', gap: '10px' }}>
-          <button onClick={handleExportCSV} className="btn-export" aria-label="Export analytics data to CSV file">
-            <FaFileDownload /> Export CSV
-          </button>
-          <button onClick={handleExportPDF} className="btn-export-pdf" aria-label="Generate analytics report PDF">
-            <FaFilePdf /> Export PDF
-          </button>
-        </div>
-      </PageHeader>
+        actions={
+          <>
+            <button onClick={handleExportCSV} className="btn-export" aria-label="Export analytics data to CSV file">
+              <FaFileDownload /> Export CSV
+            </button>
+            <button onClick={handleExportPDF} className="btn-export-pdf" aria-label="Generate analytics report PDF">
+              <FaFilePdf /> Export PDF
+            </button>
+          </>
+        }
+        onRefresh={() =>
+          runPageRefresh(fetchAnalytics, {
+            loadingMessage: 'Refreshing analytics page…',
+            successMessage: 'Analytics page refreshed.',
+            errorMessage: 'Failed to refresh analytics page.',
+          })
+        }
+        refreshing={pageRefreshing || loading}
+      />
 
       {/* Revenue Trends */}
       <div className="analytics-section">

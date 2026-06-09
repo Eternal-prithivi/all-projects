@@ -45,6 +45,9 @@ def authenticate_user(username: str, password: str, users_collection: Collection
     if not user_dict:
         return None
 
+    if user_dict.get("deleted") or user_dict.get("status") == "deleted":
+        return None
+
     user_in_db = UserInDB(**user_dict)
 
     # Verify the password

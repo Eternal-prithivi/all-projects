@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import PageHeader from '../components/ui/PageHeader.jsx';
+import { usePageRefresh } from '../hooks/usePageRefresh.js';
 import { useNotificationCenter } from '../context/NotificationContext.jsx';
 import '../styles/notifications-page.css';
 
@@ -44,6 +45,7 @@ export default function NotificationsPage() {
   const [page, setPage] = useState(0);
   const [data, setData] = useState({ items: [], total: 0, unread_count: 0, has_more: false });
   const [loading, setLoading] = useState(true);
+  const { runPageRefresh, pageRefreshing } = usePageRefresh();
 
   const limit = 15;
 
@@ -96,6 +98,14 @@ export default function NotificationsPage() {
             )}
           </div>
         }
+        onRefresh={() =>
+          runPageRefresh(load, {
+            loadingMessage: 'Refreshing notifications…',
+            successMessage: 'Notifications refreshed.',
+            errorMessage: 'Failed to refresh notifications.',
+          })
+        }
+        refreshing={pageRefreshing || loading}
       />
 
       <div className="notifications-page__tabs" role="tablist">

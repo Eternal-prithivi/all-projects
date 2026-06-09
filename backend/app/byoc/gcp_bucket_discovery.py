@@ -8,6 +8,43 @@ from typing import Any, Dict, List, Optional
 from app.byoc.credential_resolver import resolve_gcp_credentials, get_user_cloud_credentials
 
 
+def _meter_gcp_list_buckets(username: str) -> None:
+    try:
+        from app.billing.storage_metering import record_storage_meter_event
+
+        record_storage_meter_event(username, "GCP", "list_buckets", count=1)
+    except Exception:
+        pass
+
+
+def _platform_gcp_response(username: str) -> Dict[str, Any]:
+    from app.cloud.platform_storage_catalog import (
+        catalog_is_multi_region,
+        default_platform_slug,
+        get_platform_buckets_for_csp,
+        supported_aws_region_codes,
+    )
+
+    gcp = resolve_gcp_credentials(username)
+    buckets = get_platform_buckets_for_csp("GCP", surface="storage")
+    default_bucket = default_platform_slug()
+    default_name = (gcp.get("bucket_name") or "").strip()
+    for b in buckets:
+        if b.get("is_default"):
+            default_name = b.get("name") or default_name
+            break
+    return {
+        "mode": "platform",
+        "project_id": gcp.get("project_id") or settings_gcp_project(),
+        "default_bucket": default_name or None,
+        "buckets": buckets,
+        "count": len(buckets),
+        "platform_multi_region": catalog_is_multi_region(),
+        "supported_regions": supported_aws_region_codes() if catalog_is_multi_region() else [],
+        "default_platform_slug": default_platform_slug(),
+    }
+
+
 def _client_from_sa_json(service_account_json: str):
     from google.cloud import storage as gcp_storage
     from google.oauth2 import service_account
@@ -44,8 +81,22 @@ def list_gcp_buckets_from_json(service_account_json: str, *, max_results: int = 
         return {"mode": "discover", "buckets": [], "error": str(exc)[:200]}
 
 
+def _mark_default_gcp_bucket(
+    buckets: List[Dict[str, Any]], default_name: str
+) -> List[Dict[str, Any]]:
+    default = (default_name or "").strip()
+    marked: List[Dict[str, Any]] = []
+    for entry in buckets:
+        item = dict(entry)
+        item["is_default"] = bool(default and item.get("name") == default)
+        marked.append(item)
+    return marked
+
+
 def list_gcp_buckets_for_user(username: str, *, max_results: int = 100) -> Dict[str, Any]:
-    """List buckets using active GCP BYOC or platform SA path."""
+    """List buckets using active GCP BYOC or platform catalog (no live list for platform)."""
+    gcp = resolve_gcp_credentials(username)
+    default_bucket = (gcp.get("bucket_name") or "").strip()
     byoc = get_user_cloud_credentials(username, "GCP")
     if byoc:
         creds = byoc.get("credentials") or {}
@@ -54,28 +105,18 @@ def list_gcp_buckets_for_user(username: str, *, max_results: int = 100) -> Dict[
             return {"mode": "byoc", "buckets": [], "error": "GCP BYOC missing service account JSON."}
         result = list_gcp_buckets_from_json(sa_json, max_results=max_results)
         result["mode"] = "byoc"
+        result["default_bucket"] = default_bucket or None
+        result["buckets"] = _mark_default_gcp_bucket(result.get("buckets") or [], default_bucket)
+        _meter_gcp_list_buckets(username)
         return result
 
-    gcp = resolve_gcp_credentials(username)
-    path = gcp.get("service_account_key_path") or ""
-    if not path:
-        return {
-            "mode": "platform",
-            "buckets": [],
-            "error": "GCP platform credentials not configured.",
-        }
-    from google.cloud import storage as gcp_storage
+    if not gcp.get("is_byoc"):
+        return _platform_gcp_response(username)
 
-    client = gcp_storage.Client.from_service_account_json(path)
-    buckets = [
-        {"name": b.name, "location": b.location or "", "storage_class": ""}
-        for b in client.list_buckets(max_results=max_results)
-    ]
     return {
         "mode": "platform",
-        "project_id": gcp.get("project_id") or settings_gcp_project(),
-        "buckets": buckets,
-        "count": len(buckets),
+        "buckets": [],
+        "error": "GCP platform credentials not configured.",
     }
 
 

@@ -111,4 +111,12 @@ class Settings(BaseSettings):
     AZURE_RESOURCE_GROUP: str = "zenith-rg"
     AZURE_LOCATION: str = "eastus"
 
+    # --- Platform multi-region storage catalog (optional) ---
+    # JSON file path (relative to backend/) or absolute path to region→bucket map.
+    PLATFORM_STORAGE_CATALOG_JSON: str = ""
+    # Inline JSON array alternative to file (overrides file when non-empty).
+    PLATFORM_STORAGE_CATALOG: str = ""
+    # Default region slug when catalog has multiple regions (e.g. asia).
+    PLATFORM_STORAGE_DEFAULT_SLUG: str = "asia"
+
 settings = Settings()

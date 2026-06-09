@@ -5,6 +5,8 @@ import { useNavigate } from 'react-router-dom';
 import { apiClient } from '../api';
 import { toast } from 'react-toastify';
 import { PageSkeleton } from '../components/Skeletons.jsx';
+import PageHeader from '../components/ui/PageHeader.jsx';
+import { usePageRefresh } from '../hooks/usePageRefresh.js';
 import '../styles/pricing.css';
 
 /** Compact capability blocks — avoids tall bullet lists on wide cards */
@@ -56,6 +58,7 @@ const PricingPage = () => {
   const [processingPlanId, setProcessingPlanId] = useState(null);
   const [billingCycle, setBillingCycle] = useState('monthly'); // monthly or yearly
   const navigate = useNavigate();
+  const { runPageRefresh, pageRefreshing } = usePageRefresh();
 
   useEffect(() => {
     loadData();
@@ -165,15 +168,26 @@ const PricingPage = () => {
   return (
     <div className="pricing-page">
       <div className="pricing-container">
-        <div className="pricing-header">
-          <h1>Choose Your Plan</h1>
-          <p>Select the perfect plan for your cloud resource needs</p>
-          {currentSubscription && (
-            <div className="current-plan-badge">
-              Current Plan: <strong>{currentSubscription.plan_name}</strong>
-            </div>
-          )}
-        </div>
+        <PageHeader
+          title="Choose Your Plan"
+          subtitle="Select the perfect plan for your cloud resource needs"
+          premium={false}
+          actions={
+            currentSubscription ? (
+              <div className="current-plan-badge">
+                Current Plan: <strong>{currentSubscription.plan_name}</strong>
+              </div>
+            ) : null
+          }
+          onRefresh={() =>
+            runPageRefresh(loadData, {
+              loadingMessage: 'Refreshing pricing page…',
+              successMessage: 'Pricing page refreshed.',
+              errorMessage: 'Failed to refresh pricing page.',
+            })
+          }
+          refreshing={pageRefreshing || loading}
+        />
 
         <div className="pricing-toggle">
           <button 

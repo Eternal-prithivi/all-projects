@@ -46,8 +46,54 @@
   gap: var(--space-md);
 }
 
+.zenith-page-header-main {
+  min-width: 0;
+  flex: 1;
+}
+
 .zenith-page-header--row .zenith-page-header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
   flex-shrink: 0;
+}
+
+.page-refresh-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 0.9rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+
+.page-refresh-btn:hover:not(:disabled) {
+  color: var(--gold-primary);
+  border-color: rgba(212, 168, 67, 0.55);
+  background: rgba(212, 168, 67, 0.08);
+}
+
+.page-refresh-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.page-refresh-btn__icon--spin {
+  animation: page-refresh-spin 0.75s linear infinite;
+}
+
+@keyframes page-refresh-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .zenith-glass-panel {

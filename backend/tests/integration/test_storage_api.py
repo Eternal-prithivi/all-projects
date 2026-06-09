@@ -78,9 +78,10 @@ def test_sync_aws_returns_structure(mock_resolve, _mock_list, client, auth_heade
     assert "bucket_name" in body
 
 
+@patch("app.storage.routes_storage.resolve_platform_storage_target", return_value=None)
 @patch("app.storage.routes_storage.list_objects_gcp", return_value=[])
 @patch("app.storage.routes_storage.resolve_gcp_credentials")
-def test_sync_gcp_returns_structure(mock_resolve, _mock_list, client, auth_headers):
+def test_sync_gcp_returns_structure(mock_resolve, _mock_list, _mock_platform, client, auth_headers):
     mock_resolve.return_value = {
         "bucket_name": "test-gcp-bucket",
         "service_account_key_path": "/tmp/fake-sa.json",
@@ -112,6 +113,27 @@ def test_upload_gcp_smoke(mock_resolve, mock_upload, client, auth_headers):
     assert response.status_code == 201, response.text
     assert response.json()["filename"] == "gcp-smoke.txt"
     assert response.json()["csp"] == "GCP"
+
+
+@patch("app.storage.routes_storage.upload_to_gcp", return_value="user/other-gcp.txt")
+@patch("app.storage.routes_storage.resolve_gcp_credentials")
+def test_upload_gcp_with_bucket_override(mock_resolve, mock_upload, client, auth_headers):
+    mock_resolve.return_value = {
+        "bucket_name": "default-gcp-bucket",
+        "service_account_key_path": "/tmp/fake-sa.json",
+        "is_byoc": False,
+    }
+    headers, _user = auth_headers()
+    response = client.post(
+        "/api/storage/upload",
+        headers=headers,
+        files={"file": ("other-gcp.txt", b"hello", "text/plain")},
+        data={"csp": "GCP", "storage_class": "STANDARD", "bucket": "other-gcp-bucket"},
+    )
+    assert response.status_code == 201, response.text
+    mock_upload.assert_called_once()
+    assert mock_upload.call_args.kwargs["bucket_name"] == "other-gcp-bucket"
+    assert response.json()["bucket"] == "other-gcp-bucket"
 
 
 @patch("app.storage.routes_storage.upload_to_azure", return_value="user/azure-smoke.txt")
@@ -244,9 +266,10 @@ def test_sync_gcp_missing_config(mock_resolve, client, auth_headers):
     assert detail["provider"] == "gcp"
 
 
+@patch("app.storage.routes_storage.resolve_platform_storage_target", return_value=None)
 @patch("app.storage.routes_storage.list_objects_azure", return_value=[])
 @patch("app.storage.routes_storage.resolve_azure_credentials")
-def test_sync_azure_returns_structure(mock_resolve, _mock_list, client, auth_headers):
+def test_sync_azure_returns_structure(mock_resolve, _mock_list, _mock_platform, client, auth_headers):
     mock_resolve.return_value = {
         "container_name": "test-container",
         "account_name": "acct",

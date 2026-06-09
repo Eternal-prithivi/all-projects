@@ -3,6 +3,7 @@ import { FaBuilding, FaUserPlus, FaUsers } from 'react-icons/fa';
 import { apiClient } from '../api';
 import LoadingSpinner from '../components/LoadingSpinner.jsx';
 import PageHeader from '../components/ui/PageHeader.jsx';
+import { usePageRefresh } from '../hooks/usePageRefresh.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import '../styles/settings.css';
 import '../styles/team-page.css';
@@ -11,6 +12,7 @@ export default function TeamPage() {
   const { user } = useAuth();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const { runPageRefresh, pageRefreshing } = usePageRefresh();
   const [orgName, setOrgName] = useState('');
   const [inviteEmail, setInviteEmail] = useState('');
   const [message, setMessage] = useState('');
@@ -100,6 +102,14 @@ export default function TeamPage() {
         kicker="Enterprise"
         title="Team & organization"
         subtitle="Manage members and invites for your workspace"
+        onRefresh={() =>
+          runPageRefresh(load, {
+            loadingMessage: 'Refreshing team page…',
+            successMessage: 'Team page refreshed.',
+            errorMessage: 'Failed to refresh team page.',
+          })
+        }
+        refreshing={pageRefreshing || loading}
       />
 
       {message && (

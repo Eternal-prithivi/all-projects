@@ -65,6 +65,8 @@ def get_current_user(token: str = Depends(oauth2_scheme)) -> UserInDB:
 
     if user_data is None:
         raise credentials_exception
+    if user_data.get("deleted") or user_data.get("status") == "deleted":
+        raise credentials_exception
     return UserInDB(**user_data)
 
 # --- 2FA specific functions ---

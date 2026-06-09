@@ -10,7 +10,7 @@
 //   - Use the simulator output as billing data — it's a read-only projection tool
 //   - Remove the provider comparison table — it's the main value prop of this page
 // =============================================================================
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { apiClient } from '../api.js';
 import { toast } from 'react-toastify';
 import { useNavigate } from 'react-router-dom';
@@ -23,6 +23,8 @@ import {
   IconTarget,
 } from '../components/dashboard/Icons.jsx';
 import '../styles/costsimulator.css';
+import PageRefreshButton from '../components/ui/PageRefreshButton.jsx';
+import { usePageRefresh } from '../hooks/usePageRefresh.js';
 
 const ProviderLogo = ({ provider }) => {
   const logoMap = {
@@ -56,32 +58,30 @@ const CostSimulatorPage = () => {
   const [pricing, setPricing] = useState(null);
   const [loading, setLoading] = useState(true);
   const [lastUpdated, setLastUpdated] = useState(null);
+  const { runPageRefresh, pageRefreshing } = usePageRefresh();
 
-  // Fetch pricing from backend on mount
-  useEffect(() => {
-    const fetchPricing = async () => {
-      try {
-        setLoading(true);
-        const response = await apiClient.get('/pricing');
-        
-        // Store pricing data
-        const { aws, gcp, azure, last_updated } = response.data;
-        setPricing({ aws, gcp, azure });
-        setLastUpdated(last_updated);
-        
+  const fetchPricing = useCallback(async ({ showLoadedToast = false } = {}) => {
+    try {
+      setLoading(true);
+      const response = await apiClient.get('/pricing');
+      const { aws, gcp, azure, last_updated } = response.data;
+      setPricing({ aws, gcp, azure });
+      setLastUpdated(last_updated);
+      if (showLoadedToast) {
         toast.success('Pricing data loaded successfully');
-      } catch (error) {
-        console.error('Error fetching pricing:', error);
-        toast.error('Failed to load pricing data');
-        // Set fallback pricing if API fails
-        setPricing(getFallbackPricing());
-      } finally {
-        setLoading(false);
       }
-    };
-
-    fetchPricing();
+    } catch (error) {
+      console.error('Error fetching pricing:', error);
+      toast.error('Failed to load pricing data');
+      setPricing(getFallbackPricing());
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    fetchPricing({ showLoadedToast: true });
+  }, [fetchPricing]);
 
   // Fallback pricing if backend fails
   const getFallbackPricing = () => ({
@@ -253,18 +253,30 @@ const CostSimulatorPage = () => {
           <IconChevronLeft aria-hidden="true" />
           Back to Cost Analysis
         </button>
-        <div>
-          <span className="page-kicker">Pricing Workbench</span>
-          <h1>
-            <span className="heading-icon"><IconDollarSign aria-hidden="true" /></span>
-            Cost Simulator
-          </h1>
-          <p>Compare cloud pricing across AWS, GCP, and Azure</p>
-          {lastUpdated && (
-            <small className="pricing-updated">
-              Pricing last updated: {new Date(lastUpdated).toLocaleDateString()}
-            </small>
-          )}
+        <div className="simulator-header-row">
+          <div>
+            <span className="page-kicker">Pricing Workbench</span>
+            <h1>
+              <span className="heading-icon"><IconDollarSign aria-hidden="true" /></span>
+              Cost Simulator
+            </h1>
+            <p>Compare cloud pricing across AWS, GCP, and Azure</p>
+            {lastUpdated && (
+              <small className="pricing-updated">
+                Pricing last updated: {new Date(lastUpdated).toLocaleDateString()}
+              </small>
+            )}
+          </div>
+          <PageRefreshButton
+            onClick={() =>
+              runPageRefresh(() => fetchPricing(), {
+                loadingMessage: 'Refreshing cost simulator…',
+                successMessage: 'Cost simulator refreshed.',
+                errorMessage: 'Failed to refresh cost simulator.',
+              })
+            }
+            busy={pageRefreshing || loading}
+          />
         </div>
       </div>
 

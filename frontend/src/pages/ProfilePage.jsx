@@ -29,10 +29,12 @@ import {
 } from '../utils/formValidation';
 import '../styles/profile.css';
 import PageHeader from '../components/ui/PageHeader.jsx';
+import { usePageRefresh } from '../hooks/usePageRefresh.js';
 
 const ProfilePage = () => {
-  const { token, logout } = useAuth();
+  const { token, logout, refreshUser } = useAuth();
   const notifications = useNotifications();
+  const { runPageRefresh, pageRefreshing } = usePageRefresh();
   const [isEditing, setIsEditing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [stats, setStats] = useState({
@@ -178,9 +180,17 @@ const ProfilePage = () => {
         },
       });
       notifications.success('Profile picture uploaded successfully!');
-      fetchProfileData();
-    } catch {
-      notifications.error('Failed to upload profile picture');
+      await fetchProfileData();
+      await refreshUser();
+    } catch (error) {
+      const detail = error.response?.data?.detail;
+      const message =
+        typeof detail === 'string'
+          ? detail
+          : detail?.message || 'Failed to upload profile picture';
+      notifications.error(message);
+    } finally {
+      event.target.value = '';
     }
   };
 
@@ -188,9 +198,13 @@ const ProfilePage = () => {
     try {
       await apiClient.delete('/profile/picture');
       notifications.success('Profile picture removed successfully!');
-      fetchProfileData();
-    } catch {
-      notifications.error('Failed to remove profile picture');
+      await fetchProfileData();
+      await refreshUser();
+    } catch (error) {
+      const detail = error.response?.data?.detail;
+      notifications.error(
+        typeof detail === 'string' ? detail : 'Failed to remove profile picture'
+      );
     }
   };
 
@@ -213,8 +227,11 @@ const ProfilePage = () => {
         logout();
         window.location.href = '/';
       }, 2000);
-    } catch {
-      notifications.error('Failed to delete account');
+    } catch (error) {
+      const detail = error.response?.data?.detail;
+      notifications.error(
+        typeof detail === 'string' ? detail : 'Failed to delete account',
+      );
       setIsDeletingAccount(false);
     }
   };
@@ -229,33 +246,62 @@ const ProfilePage = () => {
         kicker="Account"
         title="Profile"
         subtitle="Manage your account information and preferences"
+        onRefresh={() =>
+          runPageRefresh(fetchProfileData, {
+            loadingMessage: 'Refreshing profile…',
+            successMessage: 'Profile page refreshed.',
+            errorMessage: 'Failed to refresh profile.',
+          })
+        }
+        refreshing={pageRefreshing || isLoading}
       />
 
       <div className="profile-content">
         {/* Profile Picture Section */}
-        <div className="profile-card">
+        <div className="profile-card profile-card--avatar">
           <h3>Profile Picture</h3>
           <div className="profile-picture-section">
             <div className="picture-container">
               {formData.profile_picture ? (
-                <img src={formData.profile_picture} alt="Profile" className="profile-picture" />
+                <img
+                  src={formData.profile_picture}
+                  alt={`${formData.username || 'User'} profile`}
+                  className="profile-picture"
+                />
               ) : (
-                <div className="profile-picture-placeholder">
+                <div className="profile-picture-placeholder" aria-hidden="true">
                   {formData.username?.charAt(0).toUpperCase() || 'U'}
                 </div>
               )}
             </div>
             <div className="profile-picture-actions">
-              <label htmlFor="picture-upload" className="btn-upload">Upload Photo</label>
-              <input 
-                id="picture-upload" 
-                type="file" 
-                accept="image/*" 
-                onChange={handleUploadPicture}
-                style={{ display: 'none' }}
-              />
-              <button className="btn-remove" onClick={handleRemovePicture} type="button">Remove</button>
-              <p className="hint-text">JPG, GIF or PNG. Max size of 2MB</p>
+              <p className="profile-picture-lead">
+                Add a photo so your team can recognize you across Zenith.
+              </p>
+              <div className="profile-picture-buttons">
+                <label htmlFor="picture-upload" className="btn-upload">
+                  Upload photo
+                </label>
+                <input
+                  id="picture-upload"
+                  type="file"
+                  accept="image/jpeg,image/png,image/gif,image/webp"
+                  onChange={handleUploadPicture}
+                  className="profile-picture-input"
+                />
+                {formData.profile_picture && (
+                  <button
+                    className="btn-remove"
+                    onClick={handleRemovePicture}
+                    type="button"
+                  >
+                    Remove
+                  </button>
+                )}
+              </div>
+              <p className="hint-text profile-picture-hint">
+                JPG, PNG, GIF or WebP · max 2&nbsp;MB
+              </p>
             </div>
           </div>
         </div>
@@ -481,7 +527,11 @@ const ProfilePage = () => {
             <div className="stat-item">
               <div className="stat-icon"><IconHardDrive aria-hidden="true" /></div>
               <div className="stat-details">
-                <div className="stat-value">{stats.storage_used_tb.toFixed(2)} TB</div>
+                <div className="stat-value">
+                  {stats.storage_used_tb >= 0.01
+                    ? `${stats.storage_used_tb.toFixed(2)} TB`
+                    : `${(stats.storage_used_tb * 1024).toFixed(2)} GB`}
+                </div>
                 <div className="stat-label">Storage Used</div>
               </div>
             </div>
@@ -489,7 +539,7 @@ const ProfilePage = () => {
               <div className="stat-icon"><IconDollarSign aria-hidden="true" /></div>
               <div className="stat-details">
                 <div className="stat-value">${stats.total_spend.toFixed(2)}</div>
-                <div className="stat-label">Total Spend</div>
+                <div className="stat-label">Monthly Spend</div>
               </div>
             </div>
             <div className="stat-item">

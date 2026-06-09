@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useState, useEffect } from 'react';
 import { Outlet, useNavigate } from 'react-router-dom';
 import { ToastContainer } from 'react-toastify';
 import { useAuth } from '../../context/AuthContext';
@@ -11,6 +11,8 @@ import AdminHeader from './AdminHeader';
 import Breadcrumbs from '../Breadcrumbs.jsx';
 import GlobalSearch from '../GlobalSearch.jsx';
 import KeyboardShortcuts from '../KeyboardShortcuts.jsx';
+import { useAppKeyboardShortcuts } from '../../hooks/useAppKeyboardShortcuts.js';
+import { ADMIN_GO_ROUTES } from '../../utils/keyboardShortcuts.js';
 import '../../styles/header-toolbar.css';
 import '../../styles/admin-layout.css';
 import '../../styles/dashboard-polish.css';
@@ -38,30 +40,15 @@ const AdminLayout = () => {
     }
   }, [user, token, loading, navigate]);
 
-  useEffect(() => {
-    const handleKeyPress = (e) => {
-      if (e.key === '?' && !e.shiftKey) {
-        e.preventDefault();
-        setShowShortcuts(true);
-      }
-      if (e.key === '/' && !e.ctrlKey && !e.metaKey) {
-        e.preventDefault();
-        setShowSearch(true);
-      }
-      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
-        e.preventDefault();
-        setShowSearch(true);
-      }
-    };
-    const handleShowShortcuts = () => setShowShortcuts(true);
+  const openSearch = useCallback(() => setShowSearch(true), []);
+  const openShortcuts = useCallback(() => setShowShortcuts(true), []);
 
-    document.addEventListener('keydown', handleKeyPress);
-    window.addEventListener('show-shortcuts', handleShowShortcuts);
-    return () => {
-      document.removeEventListener('keydown', handleKeyPress);
-      window.removeEventListener('show-shortcuts', handleShowShortcuts);
-    };
-  }, []);
+  useAppKeyboardShortcuts({
+    goRoutes: ADMIN_GO_ROUTES,
+    onOpenSearch: openSearch,
+    onOpenShortcuts: openShortcuts,
+    overlaysOpen: showSearch || showShortcuts,
+  });
 
   if (loading) {
     return (
@@ -92,7 +79,11 @@ const AdminLayout = () => {
           </div>
         </div>
         <GlobalSearch isOpen={showSearch} onClose={() => setShowSearch(false)} />
-        <KeyboardShortcuts isOpen={showShortcuts} onClose={() => setShowShortcuts(false)} />
+        <KeyboardShortcuts
+          isOpen={showShortcuts}
+          onClose={() => setShowShortcuts(false)}
+          variant="admin"
+        />
         <ToastContainer
           position="top-right"
           autoClose={5000}

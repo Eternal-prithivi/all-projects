@@ -16,6 +16,8 @@ import {
   IconZap,
 } from '../components/dashboard/Icons.jsx';
 import '../styles/costoptimization.css';
+import PageRefreshButton from '../components/ui/PageRefreshButton.jsx';
+import { usePageRefresh } from '../hooks/usePageRefresh.js';
 
 const providerTips = [
   {
@@ -87,6 +89,7 @@ const monitoringCards = [
 
 const CostOptimizationPage = () => {
   const navigate = useNavigate();
+  const { runPageRefresh, pageRefreshing } = usePageRefresh();
 
   return (
     <div className="cost-optimization-container">
@@ -95,12 +98,25 @@ const CostOptimizationPage = () => {
           <IconChevronLeft aria-hidden="true" />
           Back to Cost Analysis
         </button>
-        <span className="page-kicker">Optimization Playbook</span>
-        <h1>
-          <span className="heading-icon"><IconLightbulb aria-hidden="true" /></span>
-          Cost Optimization Guide
-        </h1>
-        <p>Strategies to reduce cloud spending across AWS, GCP, and Azure.</p>
+        <div className="optimization-header-row">
+          <div>
+            <span className="page-kicker">Optimization Playbook</span>
+            <h1>
+              <span className="heading-icon"><IconLightbulb aria-hidden="true" /></span>
+              Cost Optimization Guide
+            </h1>
+            <p>Strategies to reduce cloud spending across AWS, GCP, and Azure.</p>
+          </div>
+          <PageRefreshButton
+            onClick={() =>
+              runPageRefresh(async () => {}, {
+                loadingMessage: 'Refreshing optimization guide…',
+                successMessage: 'Optimization guide refreshed.',
+              })
+            }
+            busy={pageRefreshing}
+          />
+        </div>
       </div>
 
       <section className="tips-section" aria-labelledby="provider-savings-heading">

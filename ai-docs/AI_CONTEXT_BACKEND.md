@@ -1,7 +1,7 @@
 # AI_CONTEXT_BACKEND.md — Backend Architecture & Source Map
 
 > Read this for any backend, API, database, Celery, or ML task.
-> **Last Updated: 2026-06-03** — Multi-cloud parity Phases 0–7; platform `cloud_connectivity` on status.
+> **Last Updated: 2026-06-09** — Phase 19 platform multi-region storage catalog + sync scoping.
 
 ---
 
@@ -23,7 +23,8 @@ For frontend context → read `AI_CONTEXT_FRONTEND.md`
 | **auth** | `routes_auth.py`, `routes_password_reset.py` | `auth_service.py`, `auth_utils.py`, `password_reset_service.py` | JWT login, register, forgot/reset password (email link + SMS OTP), recovery contacts |
 | **users** | `routes_users.py`, `routes_profile.py`, `routes_settings.py` | `user_model.py` | Profile edit, recovery contacts, settings preferences, BYOC, theme, currency, audit log |
 | **security** | `routes_security.py`, `routes_2fa.py` | `secure_vault.py`, `encryption_handler.py` | Tri-cloud secure vault (AWS/GCP/Azure); browser CSE AWS-only |
-| **storage** | `routes_storage.py` | `cloud_credentials.py`, `optimizer.py`, `uploader.py`, `manager.py`, `tasks.py`, `tiering_tasks.py`, `models_storage.py` | ML ensemble analysis, multi-cloud upload/download/delete, nightly lifecycle tiering; **BYOC** via `credential_resolver` |
+| **storage** | `routes_storage.py` | `cloud_credentials.py`, `optimizer.py`, `uploader.py`, `manager.py`, `tasks.py`, `tiering_tasks.py`, `models_storage.py`, `file_queries.py` | ML ensemble analysis, multi-cloud upload/download/delete/sync, nightly lifecycle tiering; **BYOC** via `credential_resolver`; platform catalog via `platform_storage_catalog.py` |
+| **cloud** | — | `platform_storage_catalog.py`, `storage_targets.py`, `providers.py` | Static multi-region bucket/container catalog; `resolve_platform_storage_target()` for upload/sync |
 | **vm** | `routes_vm.py`, `routes_admin_cleanup.py` | `manager.py`, `vm_provider.py`, `aws_manager.py`, `gcp_runtime.py`, `metrics_collector.py` | AWS EC2 + GCP GCE lifecycle; Azure 501 (`docs/cloud/VM_MULTI_CLOUD_SCOPE.md`) |
 | **cost** | `routes_cost.py`, `routes_forecast.py`, `routes_anomaly.py`, `routes_export.py` | `manager.py`, `forecasting.py`, `tasks_anomaly.py` | Decay-weighted linear regression forecast, Z-score anomaly detection, CSV export |
 | **ml** | `routes_feedback.py` | `storage_ensemble.py`, `feedback.py`, `retraining.py`, `repository.py`, `models.py`, `acceptance.py`, `sample_datasets.py`, `tasks_feedback.py` | RF+XGBoost ensemble, feedback outcome evaluation, guarded self-retraining |

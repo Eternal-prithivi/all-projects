@@ -5,6 +5,8 @@ import { toast } from 'react-toastify';
 import '../../styles/admin-pages.css';
 import '../../styles/dashboard-enhanced.css';
 import StatCard from '../../components/dashboard/StatCard.jsx';
+import PageRefreshButton from '../../components/ui/PageRefreshButton.jsx';
+import { usePageRefresh } from '../../hooks/usePageRefresh.js';
 import { 
   FaUsers, FaServer, FaDatabase, FaDollarSign,
   FaChartLine, FaHistory, FaCogs
@@ -14,6 +16,7 @@ const AdminOverviewPage = () => {
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState(null);
   const [activities, setActivities] = useState([]);
+  const { runPageRefresh, pageRefreshing } = usePageRefresh();
 
   const greeting = useMemo(() => {
     const hour = new Date().getHours();
@@ -100,6 +103,16 @@ const AdminOverviewPage = () => {
           <h2>{greeting}, admin</h2>
           <p className="greeting-date">{formattedDate} — platform operations at a glance</p>
         </div>
+        <PageRefreshButton
+          onClick={() =>
+            runPageRefresh(fetchData, {
+              loadingMessage: 'Refreshing admin overview…',
+              successMessage: 'Admin overview refreshed.',
+              errorMessage: 'Failed to refresh admin overview.',
+            })
+          }
+          busy={pageRefreshing || loading}
+        />
       </div>
 
       <div className="bento-grid">

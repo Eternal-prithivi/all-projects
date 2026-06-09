@@ -4,12 +4,45 @@ from __future__ import annotations
 
 from typing import Any, Dict, List
 
-from app.byoc.credential_resolver import get_aws_bucket_layout
-from app.byoc.credential_resolver import resolve_azure_credentials, resolve_gcp_credentials
+from app.byoc.credential_resolver import (
+    get_aws_bucket_layout,
+    resolve_aws_credentials,
+    resolve_azure_credentials,
+    resolve_gcp_credentials,
+)
+from app.cloud.platform_storage_catalog import (
+    catalog_is_multi_region,
+    get_platform_buckets_for_csp,
+)
 from app.cloud.availability import CloudFeature, available_providers, credential_source
 from app.cloud.providers import CloudProvider
 from app.storage.secure_vault import resolve_secure_storage
 from app.utils.config import settings
+
+
+def _platform_storage_regions(username: str, csp: str) -> List[Dict[str, Any]] | None:
+    """Multi-region catalog entries for platform mode (None when BYOC or single region)."""
+    resolvers = {
+        "AWS": resolve_aws_credentials,
+        "GCP": resolve_gcp_credentials,
+        "Azure": resolve_azure_credentials,
+    }
+    resolve = resolvers.get(csp)
+    if not resolve or resolve(username).get("is_byoc"):
+        return None
+    if not catalog_is_multi_region():
+        return None
+    regions: List[Dict[str, Any]] = []
+    for bucket in get_platform_buckets_for_csp(csp):
+        regions.append(
+            {
+                "slug": bucket.get("platform_slug"),
+                "label": bucket.get("platform_label"),
+                "bucket": bucket.get("name"),
+                "region": bucket.get("region") or bucket.get("location") or "—",
+            }
+        )
+    return regions or None
 
 
 def _aws_targets(username: str) -> Dict[str, Any]:
@@ -44,12 +77,16 @@ def _aws_targets(username: str) -> Dict[str, Any]:
         "replica_region": (layout or {}).get("replica_region") or settings.REPLICA_S3_REGION,
         "secure_dual_write": bool((layout or {}).get("secure_dual_write", True)),
     }
-    return {
+    payload = {
         "csp": "AWS",
         "credential_source": src,
         "storage": storage,
         "security": security,
     }
+    regions = _platform_storage_regions(username, "AWS")
+    if regions:
+        payload["storage_regions"] = regions
+    return payload
 
 
 def _gcp_targets(username: str) -> Dict[str, Any]:
@@ -62,7 +99,7 @@ def _gcp_targets(username: str) -> Dict[str, Any]:
     except Exception:
         secure_bucket = bucket
         secure_prefix = f"secure/{username}/"
-    return {
+    payload = {
         "csp": "GCP",
         "credential_source": credential_source(username, "GCP"),
         "storage": {
@@ -79,6 +116,10 @@ def _gcp_targets(username: str) -> Dict[str, Any]:
             "secure_dual_write": False,
         },
     }
+    regions = _platform_storage_regions(username, "GCP")
+    if regions:
+        payload["storage_regions"] = regions
+    return payload
 
 
 def _azure_targets(username: str) -> Dict[str, Any]:
@@ -92,7 +133,7 @@ def _azure_targets(username: str) -> Dict[str, Any]:
     except Exception:
         secure_container = container
         secure_prefix = f"secure/{username}/"
-    return {
+    payload = {
         "csp": "Azure",
         "credential_source": credential_source(username, "Azure"),
         "storage": {
@@ -111,6 +152,10 @@ def _azure_targets(username: str) -> Dict[str, Any]:
             "secure_dual_write": False,
         },
     }
+    regions = _platform_storage_regions(username, "Azure")
+    if regions:
+        payload["storage_regions"] = regions
+    return payload
 
 
 def build_storage_targets_payload(username: str) -> Dict[str, Any]:
@@ -119,7 +164,7 @@ def build_storage_targets_payload(username: str) -> Dict[str, Any]:
     by_csp: Dict[str, Any] = {}
     for p in providers:
         if p == "AWS":
-            by_csp[p] = _aws_targets(username, "storage")
+            by_csp[p] = _aws_targets(username)
         elif p == "GCP":
             by_csp[p] = _gcp_targets(username)
         else:

@@ -15,7 +15,7 @@ function Sidebar({ user }) {
   return (
     <aside className="nav-rail nav-rail--desktop" role="navigation" aria-label="Main navigation">
       <div className="rail-logo" data-tour="sidebar-logo">
-        <ZenithLogo size={32} linkTo="/" />
+        <ZenithLogo size={32} linkTo="/" animateOnMount />
       </div>
 
       <nav className="rail-nav" data-tour="sidebar-nav">

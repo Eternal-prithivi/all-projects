@@ -93,11 +93,24 @@ export const AuthProvider = ({ children }) => {
     sessionStorage.removeItem('cachedUser');
   };
 
+  const refreshUser = async () => {
+    if (!token) return null;
+    try {
+      const userData = await getCurrentUser(token);
+      setUser(userData);
+      sessionStorage.setItem('cachedUser', JSON.stringify(userData));
+      return userData;
+    } catch (error) {
+      console.error('AuthContext: failed to refresh user', error);
+      return null;
+    }
+  };
+
   const isAuthenticated = !!token;
 
   // Provide the user object and loading state to the rest of the app
   return (
-    <AuthContext.Provider value={{ isAuthenticated, token, user, loading, login, logout }}>
+    <AuthContext.Provider value={{ isAuthenticated, token, user, loading, login, logout, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );

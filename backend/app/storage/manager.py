@@ -82,7 +82,9 @@ def list_objects_gcp(
     max_results: int = 1000,
 ) -> list[dict]:
     """List GCS objects for sync (BYOC or platform credentials)."""
-    client, default_bucket, is_byoc = build_gcp_storage_client(username)
+    client, default_bucket, is_byoc = build_gcp_storage_client(
+        username, bucket_name=bucket_name
+    )
     target_bucket = bucket_name or default_bucket
     bucket = client.bucket(target_bucket)
     results: list[dict] = []
@@ -107,9 +109,16 @@ def list_objects_azure(
     container_name: str | None = None,
     prefix: str = "",
     max_results: int = 1000,
+    account_name: str | None = None,
+    account_key: str | None = None,
 ) -> list[dict]:
     """List Azure blob objects for sync (BYOC or platform credentials)."""
-    blob_service, default_container, is_byoc = build_azure_blob_service(username)
+    blob_service, default_container, is_byoc = build_azure_blob_service(
+        username,
+        account_name=account_name,
+        account_key=account_key,
+        container_name=container_name,
+    )
     target_container = container_name or default_container
     container_client = blob_service.get_container_client(target_container)
     results: list[dict] = []
@@ -257,18 +266,25 @@ def change_tier_on_aws(username: str, object_key: str, new_tier: str):
 
 # --- GCP Specialist Functions ---
 
-def delete_from_gcp(username: str, object_key: str):
+def delete_from_gcp(username: str, object_key: str, *, bucket_name: str | None = None):
     """Deletes an object from the user's resolved GCP bucket."""
-    storage_client, bucket_name, _ = build_gcp_storage_client(username)
-    bucket = storage_client.bucket(bucket_name)
+    storage_client, default_bucket, _ = build_gcp_storage_client(
+        username, bucket_name=bucket_name
+    )
+    target_bucket = bucket_name or default_bucket
+    bucket = storage_client.bucket(target_bucket)
     bucket.blob(object_key).delete()
-    logger.info(f"Deleted {object_key} from GCP bucket {bucket_name}")
+    logger.info(f"Deleted {object_key} from GCP bucket {target_bucket}")
 
 
-def get_download_url_from_gcp(username: str, object_key: str) -> str:
+def get_download_url_from_gcp(
+    username: str, object_key: str, *, bucket_name: str | None = None
+) -> str:
     """Generates a pre-signed download URL for an object in GCP Cloud Storage."""
-    storage_client, bucket_name, _ = build_gcp_storage_client(username)
-    blob = storage_client.bucket(bucket_name).blob(object_key)
+    storage_client, default_bucket, _ = build_gcp_storage_client(
+        username, bucket_name=bucket_name
+    )
+    blob = storage_client.bucket(bucket_name or default_bucket).blob(object_key)
     return blob.generate_signed_url(expiration=timedelta(hours=1))
 
 
@@ -282,21 +298,53 @@ def change_tier_on_gcp(username: str, object_key: str, new_tier: str):
 
 # --- Azure Specialist Functions ---
 
-def delete_from_azure(username: str, object_key: str):
+def delete_from_azure(
+    username: str,
+    object_key: str,
+    *,
+    container_name: str | None = None,
+    account_name: str | None = None,
+    account_key: str | None = None,
+):
     """Deletes an object from the user's resolved Azure container."""
-    blob_service_client, container_name, _ = build_azure_blob_service(username)
-    blob_service_client.get_blob_client(container=container_name, blob=object_key).delete_blob()
+    blob_service_client, default_container, _ = build_azure_blob_service(
+        username,
+        account_name=account_name,
+        account_key=account_key,
+        container_name=container_name,
+    )
+    container_name = container_name or default_container
+    blob_client = blob_service_client.get_blob_client(container=container_name, blob=object_key)
+    try:
+        blob_client.delete_blob()
+    except Exception as exc:
+        err_name = type(exc).__name__
+        if err_name not in ("ResourceNotFoundError",) and "BlobNotFound" not in str(exc):
+            raise
+        logger.warning(
+            "Azure blob already absent during delete: %s/%s (%s)",
+            container_name,
+            object_key,
+            exc,
+        )
     logger.info(f"Deleted {object_key} from Azure container {container_name}")
 
 
-def get_download_url_from_azure(username: str, object_key: str) -> str:
+def get_download_url_from_azure(
+    username: str,
+    object_key: str,
+    *,
+    container_name: str | None = None,
+    account_name: str | None = None,
+    account_key: str | None = None,
+) -> str:
     """Generates a pre-signed download URL for an object in Azure Blob Storage."""
     from azure.storage.blob import BlobSasPermissions, generate_blob_sas
 
     azure = resolve_azure_credentials(username)
-    container_name = azure["container_name"]
-    account_name = azure["account_name"]
-    account_key = azure["account_key"]
+    container_name = container_name or azure["container_name"]
+    account_name = account_name or azure["account_name"]
+    account_key = account_key or azure["account_key"]
 
     sas_token = generate_blob_sas(
         account_name=account_name,

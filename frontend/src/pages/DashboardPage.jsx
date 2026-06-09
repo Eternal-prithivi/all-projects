@@ -35,6 +35,8 @@ import {
 } from "../components/dashboard/Icons.jsx";
 import { useNavigate } from 'react-router-dom';
 import { useNotifications } from "../hooks/useNotifications.js";
+import PageRefreshButton from "../components/ui/PageRefreshButton.jsx";
+import { usePageRefresh } from "../hooks/usePageRefresh.js";
 import { useCountUp } from "../hooks/useCountUp.js";
 import { DashboardSkeleton } from "../components/Skeletons.jsx";
 import '../styles/dashboard-enhanced.css';
@@ -73,6 +75,7 @@ function DashboardPage() {
   const { formatCurrency, formatDateFriendly, currencySymbol } = usePreferences();
   const navigate = useNavigate();
   const notifications = useNotifications();
+  const { runPageRefresh, pageRefreshing } = usePageRefresh();
   const [stats, setStats] = useState(null);
   const [, setBudgets] = useState([]);
   const [recentActivity, setRecentActivity] = useState([]);
@@ -224,6 +227,16 @@ function DashboardPage() {
           </h2>
           <p className="greeting-date">{formattedDate} — Here's your cloud overview</p>
         </div>
+        <PageRefreshButton
+          onClick={() =>
+            runPageRefresh(fetchDashboardData, {
+              loadingMessage: 'Refreshing dashboard…',
+              successMessage: 'Dashboard refreshed.',
+              errorMessage: 'Failed to refresh dashboard.',
+            })
+          }
+          busy={pageRefreshing || isLoading}
+        />
       </div>
 
       {/* ============ BENTO GRID ============ */}

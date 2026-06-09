@@ -34,6 +34,19 @@ const ProfileDropdown = () => {
     return name.substring(0, 2).toUpperCase();
   };
 
+  const renderAvatar = () => {
+    if (user?.profile_picture) {
+      return (
+        <img
+          src={user.profile_picture}
+          alt=""
+          className="profile-avatar-img"
+        />
+      );
+    }
+    return getInitials(user?.username || 'User');
+  };
+
   return (
     <div className="profile-dropdown" ref={dropdownRef}>
       <button 
@@ -42,7 +55,7 @@ const ProfileDropdown = () => {
         aria-label="User menu"
       >
         <div className="profile-avatar">
-          {getInitials(user?.username || 'User')}
+          {renderAvatar()}
         </div>
         <span className="profile-name">{user?.username || 'User'}</span>
         <svg 
@@ -59,7 +72,7 @@ const ProfileDropdown = () => {
         <div className="profile-menu">
           <div className="profile-menu-header">
             <div className="profile-menu-avatar">
-              {getInitials(user?.username || 'User')}
+              {renderAvatar()}
             </div>
             <div className="profile-menu-info">
               <div className="profile-menu-name">{user?.username || 'User'}</div>

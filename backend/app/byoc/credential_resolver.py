@@ -265,6 +265,43 @@ def resolve_azure_credentials(username: str) -> Dict[str, str]:
     }
 
 
+def resolve_platform_storage_target(
+    username: str,
+    csp: str,
+    *,
+    region_slug: Optional[str] = None,
+    bucket: Optional[str] = None,
+    cloud_region: Optional[str] = None,
+    account_name: Optional[str] = None,
+) -> Optional[Dict[str, Any]]:
+    """
+    Platform-mode storage destination from catalog (None when BYOC or no catalog match).
+    """
+    csp_u = (csp or "").strip().upper()
+    if csp_u == "AWS" and resolve_aws_credentials(username).get("is_byoc"):
+        return None
+    if csp_u == "GCP" and resolve_gcp_credentials(username).get("is_byoc"):
+        return None
+    if csp_u == "Azure" and resolve_azure_credentials(username).get("is_byoc"):
+        return None
+
+    from app.cloud.platform_storage_catalog import (
+        resolve_platform_destination,
+        resolve_platform_destination_by_bucket,
+    )
+
+    if region_slug:
+        return resolve_platform_destination(csp_u, region_slug)
+    if bucket:
+        return resolve_platform_destination_by_bucket(
+            csp_u,
+            bucket,
+            cloud_region=cloud_region,
+            account_name=account_name,
+        )
+    return resolve_platform_destination(csp_u, region_slug)
+
+
 def resolve_credentials(username: str, provider: str = "aws") -> Optional[Dict[str, Any]]:
     """
     Resolve credentials for infrastructure provisioning (Terraform subprocess).

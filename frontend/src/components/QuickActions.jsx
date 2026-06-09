@@ -1,53 +1,49 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { commandKeyLabel } from '../utils/keyboardShortcuts';
 import '../styles/quick-actions.css';
 
 const QuickActions = () => {
   const [isOpen, setIsOpen] = useState(false);
   const navigate = useNavigate();
 
-  // Detect platform for display
-  const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0 || 
-                navigator.userAgent.toUpperCase().indexOf('MAC') >= 0;
-  const modifierKey = isMac ? '⌥' : 'Alt';
-
   const actions = [
     {
       id: 'vm',
       label: 'Request VM',
       icon: '🖥️',
-      shortcut: `${modifierKey} + Shift + N`,
+      shortcut: 'G → V',
       onClick: () => {
         navigate('/dashboard/vmcluster');
-      }
+      },
     },
     {
       id: 'upload',
       label: 'Upload File',
       icon: '📤',
-      shortcut: `${modifierKey} + Shift + U`,
+      shortcut: 'G → S',
       onClick: () => {
         navigate('/dashboard/storage');
-      }
+      },
     },
     {
       id: 'costs',
       label: 'View Costs',
       icon: '💰',
-      shortcut: `${modifierKey} + Shift + C`,
+      shortcut: 'G → C',
       onClick: () => {
         navigate('/dashboard/costs');
-      }
+      },
     },
     {
-      id: 'docs',
-      label: 'Documentation',
-      icon: '📚',
-      shortcut: '?',
+      id: 'search',
+      label: 'Command palette',
+      icon: '⌘',
+      shortcut: `${commandKeyLabel()}K`,
       onClick: () => {
-        navigate('/help');
-      }
-    }
+        window.dispatchEvent(new CustomEvent('open-global-search'));
+      },
+    },
   ];
 
   return (

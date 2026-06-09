@@ -3,6 +3,7 @@ import { toast } from 'react-toastify';
 import { FaSearch } from 'react-icons/fa';
 import api from '../../api';
 import PageHeader from '../../components/ui/PageHeader.jsx';
+import { usePageRefresh } from '../../hooks/usePageRefresh.js';
 import SupportThreadPanel from '../../components/support/SupportThreadPanel.jsx';
 import { useSupportThreadPoll } from '../../hooks/useSupportThreadPoll.js';
 import { useSupportThreadWs } from '../../hooks/useSupportThreadWs.js';
@@ -27,6 +28,7 @@ function AdminSupportPage() {
   const [selectedId, setSelectedId] = useState(null);
   const [detail, setDetail] = useState(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
+  const { runPageRefresh, pageRefreshing } = usePageRefresh();
 
   const fetchTickets = useCallback(async () => {
     setLoading(true);
@@ -137,10 +139,25 @@ function AdminSupportPage() {
   return (
     <div className="admin-support-page">
       <PageHeader
-        className="zenith-page-header--row"
         kicker="Admin"
         title="Support inbox"
         subtitle={`${total} ticket${total === 1 ? '' : 's'}`}
+        onRefresh={() =>
+          runPageRefresh(
+            async () => {
+              await fetchTickets();
+              if (selectedId) {
+                await fetchDetail(selectedId, { silent: true });
+              }
+            },
+            {
+              loadingMessage: 'Refreshing support inbox…',
+              successMessage: 'Support inbox refreshed.',
+              errorMessage: 'Failed to refresh support inbox.',
+            }
+          )
+        }
+        refreshing={pageRefreshing || loading}
       />
 
       <div className="admin-search-section">
@@ -179,7 +196,7 @@ function AdminSupportPage() {
           ) : tickets.length === 0 ? (
             <div className="support-empty">No tickets match your filters</div>
           ) : (
-            <div className="card-body no-padding">
+            <div className="card-body no-padding admin-support-table-wrap">
               <table className="admin-table">
                 <thead>
                   <tr>

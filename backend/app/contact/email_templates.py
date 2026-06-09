@@ -74,19 +74,67 @@ def zenith_email_html(
     """Table-based layout with inline styles for broad email client support."""
     base = frontend_base()
     return f"""<!DOCTYPE html>
-<html lang="en">
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml" xmlns:v="urn:schemas-microsoft-com:vml">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="color-scheme" content="dark" />
+  <meta name="x-apple-disable-message-reformatting" />
+  <meta name="color-scheme" content="dark light" />
+  <meta name="supported-color-schemes" content="dark light" />
   <title>{_esc(title)}</title>
+  <!--[if mso]>
+  <noscript>
+    <xml>
+      <o:OfficeDocumentSettings>
+        <o:PixelsPerInch>96</o:PixelsPerInch>
+      </o:OfficeDocumentSettings>
+    </xml>
+  </noscript>
+  <![endif]-->
+  <style type="text/css">
+    :root {{ color-scheme: dark light; supported-color-schemes: dark light; }}
+    html, body {{
+      margin: 0 !important;
+      padding: 0 !important;
+      width: 100% !important;
+      height: 100% !important;
+      background-color: {BG_PAGE} !important;
+    }}
+    .email-root, .email-root td {{
+      background-color: {BG_PAGE} !important;
+    }}
+    .email-card {{
+      background-color: {BG_CARD} !important;
+    }}
+    /* Gmail iOS/Android: reduce white letterboxing in light system theme */
+    u + .body .email-root {{
+      background-color: {BG_PAGE} !important;
+    }}
+    @media (prefers-color-scheme: dark) {{
+      .email-root, .email-root td, body {{
+        background-color: {BG_PAGE} !important;
+      }}
+      .email-card {{
+        background-color: {BG_CARD} !important;
+      }}
+    }}
+    @media (prefers-color-scheme: light) {{
+      /* Keep Zenith dark transactional shell; prevents harsh white gutters on mobile */
+      .email-root, .email-root td, body {{
+        background-color: {BG_PAGE} !important;
+      }}
+      .email-card {{
+        background-color: {BG_CARD} !important;
+      }}
+    }}
+  </style>
 </head>
-<body style="margin:0;padding:0;background-color:{BG_PAGE};font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
-  <div style="display:none;max-height:0;overflow:hidden;opacity:0;">{_esc(preheader)}</div>
-  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color:{BG_PAGE};padding:32px 16px;">
+<body class="body" bgcolor="{BG_PAGE}" style="margin:0;padding:0;width:100%;background-color:{BG_PAGE};font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%;">
+  <div style="display:none;max-height:0;overflow:hidden;opacity:0;mso-hide:all;">{_esc(preheader)}</div>
+  <table class="email-root" role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" bgcolor="{BG_PAGE}" style="width:100%;min-height:100vh;margin:0;padding:0;background-color:{BG_PAGE};">
     <tr>
-      <td align="center">
-        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:600px;">
+      <td align="center" bgcolor="{BG_PAGE}" style="padding:32px 16px;background-color:{BG_PAGE};">
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width:600px;margin:0 auto;">
           <tr>
             <td style="padding:0 0 20px;text-align:center;">
               <div style="font-size:11px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:{GOLD};">Zenith Cloud</div>
@@ -95,12 +143,12 @@ def zenith_email_html(
             </td>
           </tr>
           <tr>
-            <td style="background-color:{BG_CARD};border:1px solid {BORDER};border-top:3px solid {GOLD};border-radius:14px;padding:28px 24px;color:{TEXT_SECONDARY};font-size:15px;line-height:1.65;">
+            <td class="email-card" bgcolor="{BG_CARD}" style="background-color:{BG_CARD};border:1px solid {BORDER};border-top:3px solid {GOLD};border-radius:14px;padding:28px 24px;color:{TEXT_SECONDARY};font-size:15px;line-height:1.65;">
               {body_html}
             </td>
           </tr>
           <tr>
-            <td style="padding:22px 8px 0;text-align:center;font-size:12px;line-height:1.6;color:{TEXT_MUTED};">
+            <td bgcolor="{BG_PAGE}" style="padding:22px 8px 32px;text-align:center;font-size:12px;line-height:1.6;color:{TEXT_MUTED};background-color:{BG_PAGE};">
               <p style="margin:0 0 8px;">{_esc(footer_note)}</p>
               <p style="margin:0;">
                 <a href="{base}" style="color:{GOLD};text-decoration:none;">{base.replace('https://', '')}</a>
@@ -338,9 +386,13 @@ def ticket_otp_html(ref_code: str, otp: str) -> str:
       Use this verification code to access support ticket <strong style="color:{GOLD_LIGHT};">{_esc(ref_code)}</strong>.
       It expires in 15 minutes.
     </p>
-    <div style="display:inline-block;padding:14px 20px;background-color:#0f0f14;border:1px dashed {GOLD};border-radius:10px;font-size:28px;font-weight:800;letter-spacing:0.2em;color:{GOLD_LIGHT};">
-      {_esc(otp)}
-    </div>
+    <table role="presentation" cellspacing="0" cellpadding="0" style="margin:8px 0 0;">
+      <tr>
+        <td align="center" bgcolor="#0f0f14" style="padding:14px 24px;background-color:#0f0f14;border:2px dashed {GOLD};border-radius:10px;font-size:28px;font-weight:800;letter-spacing:0.2em;color:{GOLD_LIGHT};">
+          {_esc(otp)}
+        </td>
+      </tr>
+    </table>
     <p style="margin:16px 0 0;font-size:13px;color:{TEXT_MUTED};">
       If you did not request this code, you can ignore this email.
     </p>

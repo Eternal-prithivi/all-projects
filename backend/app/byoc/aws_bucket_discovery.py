@@ -294,46 +294,25 @@ def fetch_and_cache_buckets(username: str, force: bool = False) -> List[Dict[str
         aws["secret_access_key"],
         aws.get("session_token"),
     )
+    try:
+        from app.billing.storage_metering import record_storage_meter_event
+
+        record_storage_meter_event(username, "AWS", "list_buckets", count=1)
+        if raw:
+            record_storage_meter_event(
+                username, "AWS", "get_bucket_location", count=len(raw)
+            )
+    except Exception:
+        pass
     set_cached_raw_buckets(username, raw)
     return raw
 
 
 def platform_bucket_entries(surface: Surface, username: str) -> List[Dict[str, Any]]:
-    """Static buckets for non-BYOC users."""
-    regular = getattr(settings, "REGULAR_S3_BUCKET_NAME", settings.S3_BUCKET_NAME)
-    secure = settings.SECURE_S3_BUCKET_NAME
-    replica = settings.REPLICA_S3_BUCKET_NAME
-    primary_region = settings.PRIMARY_S3_REGION
-    replica_region = settings.REPLICA_S3_REGION
+    """Static buckets for non-BYOC users (from platform catalog or legacy .env)."""
+    from app.cloud.platform_storage_catalog import get_platform_buckets_for_csp
 
-    if surface == "security":
-        entries = [
-            {
-                "name": secure,
-                "region": primary_region,
-                "role": "secure",
-                "is_default": True,
-                "is_replica": False,
-            },
-            {
-                "name": replica,
-                "region": replica_region,
-                "role": "replica",
-                "is_default": False,
-                "is_replica": True,
-            },
-        ]
-        return entries
-
-    return [
-        {
-            "name": regular,
-            "region": primary_region,
-            "role": "storage",
-            "is_default": True,
-            "is_replica": False,
-        }
-    ]
+    return get_platform_buckets_for_csp("AWS", surface=surface)
 
 
 def get_buckets_for_user(
@@ -354,16 +333,27 @@ def get_buckets_for_user(
     )
 
     if not aws.get("is_byoc"):
+        from app.cloud.platform_storage_catalog import (
+            catalog_is_multi_region,
+            default_platform_slug,
+            supported_aws_region_codes,
+        )
+
         buckets = platform_bucket_entries(surface, username)
-        # Platform has fixed bucket(s) in PRIMARY_S3_REGION — ignore stale session
-        # region filters (no region pills in UI for platform mode).
-        filtered = filter_by_region(buckets, region)
-        if not filtered and buckets:
+        if catalog_is_multi_region():
+            # Full catalog — UI filters by platform region slug (not AWS region query param).
             filtered = buckets
+        else:
+            filtered = filter_by_region(buckets, region)
+            if not filtered and buckets:
+                filtered = buckets
+        supported = supported_aws_region_codes() if catalog_is_multi_region() else []
         return {
             "mode": "platform",
             "buckets": filtered,
-            "supported_regions": [],
+            "supported_regions": supported,
+            "platform_multi_region": catalog_is_multi_region(),
+            "default_platform_slug": default_platform_slug(),
         }
 
     discovery_error: Optional[str] = None

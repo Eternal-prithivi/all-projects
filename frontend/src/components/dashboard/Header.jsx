@@ -7,7 +7,7 @@ function Header() {
   return (
     <header className="dashboard-header">
       <div className="header-brand header-brand-zenith">
-        <ZenithLogo variant="full" size={32} badge="Cloud" textLayout="inline" />
+        <ZenithLogo variant="full" size={32} badge="Cloud" textLayout="inline" animateOnMount />
       </div>
 
       <HeaderGlobalSearchTrigger />

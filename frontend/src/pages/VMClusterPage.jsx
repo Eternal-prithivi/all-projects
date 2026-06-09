@@ -22,6 +22,7 @@ import { useAuth } from "../context/AuthContext.jsx";
 import LoadingSpinner from "../components/LoadingSpinner.jsx";
 import EmptyState from "../components/EmptyState.jsx";
 import PageHeader from "../components/ui/PageHeader.jsx";
+import { usePageRefresh } from "../hooks/usePageRefresh.js";
 import { VMClusterSkeleton } from "../components/Skeletons.jsx";
 import WorkloadGuidancePanel from "../components/vm/WorkloadGuidancePanel.jsx";
 import ZenithModal from "../components/ui/ZenithModal.jsx";
@@ -120,6 +121,8 @@ const getRecommendations = (token, minScore = 50) =>
 function VMClusterPage() {
   const { token } = useAuth();
   const notifications = useNotifications();
+  const { executeWithNotification, showLoading, updateSuccess, updateError } = notifications;
+  const { runPageRefresh, pageRefreshing } = usePageRefresh();
   const { loading: availLoading, getFeature, credentialMode } = useCloudAvailability();
   const vmProviders = getFeature("vm").providers || [];
   const vmToolbarOptions = useMemo(
@@ -157,8 +160,6 @@ function VMClusterPage() {
   const [clusterPreference, setClusterPreference] = useState("");
   const [priorityLevel, setPriorityLevel] = useState(1);
   const [isRequesting, setIsRequesting] = useState(false);
-  const [isRefreshingClusters, setIsRefreshingClusters] = useState(false);
-
   // Metrics mode toggle
   const [useRealMetrics, setUseRealMetrics] = useState(false);
 
@@ -401,21 +402,29 @@ function VMClusterPage() {
 
     setIsRequesting(true);
     try {
-      const data = {
-        csp: activeCsp,
-        workload_description: workloadDescription,
-        follow_up_answers: Object.keys(followUpAnswers).length ? followUpAnswers : null,
-        cluster_preference: clusterPreference || null,
-        priority_level: priorityLevel,
-      };
-      const result = await requestVMAssignment(data, token);
-      notifications.success(`VM Assigned: ${result.vm_name}`);
-      setShowRequestModal(false);
-      resetRequestModalState();
-      
-      await Promise.all([fetchAssignment(), fetchClusterHealth(), fetchVMMetrics()]);
-    } catch (error) {
-      notifications.error(error.message || "Failed to request VM");
+      const result = await executeWithNotification(
+        async () => {
+          const data = {
+            csp: activeCsp,
+            workload_description: workloadDescription,
+            follow_up_answers: Object.keys(followUpAnswers).length ? followUpAnswers : null,
+            cluster_preference: clusterPreference || null,
+            priority_level: priorityLevel,
+          };
+          const assignment = await requestVMAssignment(data, token);
+          setShowRequestModal(false);
+          resetRequestModalState();
+          await Promise.all([fetchAssignment(), fetchClusterHealth(), fetchVMMetrics()]);
+          return assignment;
+        },
+        {
+          loadingMessage: `Provisioning VM on ${activeCsp}…`,
+          getSuccessMessage: (res) => `VM assigned: ${res.vm_name}`,
+          getErrorMessage: (error) => error.message || "Failed to request VM",
+        }
+      );
+    } catch {
+      /* toast already shown */
     } finally {
       setIsRequesting(false);
     }
@@ -429,20 +438,25 @@ function VMClusterPage() {
     if (!window.confirm(confirmMsg)) return;
 
     try {
-      const url = assignmentId 
-        ? `${API_BASE_URL}/release/${assignmentId}`
-        : `${API_BASE_URL}/release`;
-      
-      await fetch(url, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
-      }).then(handleApiResponse);
-      
-      notifications.success("VM released successfully");
-      
-      await Promise.all([fetchAssignment(), fetchClusterHealth(), fetchVMMetrics()]);
-    } catch (error) {
-      notifications.error(error.message || "Failed to release VM");
+      await executeWithNotification(
+        async () => {
+          const url = assignmentId
+            ? `${API_BASE_URL}/release/${assignmentId}`
+            : `${API_BASE_URL}/release`;
+          await fetch(url, {
+            method: "POST",
+            headers: { Authorization: `Bearer ${token}` },
+          }).then(handleApiResponse);
+          await Promise.all([fetchAssignment(), fetchClusterHealth(), fetchVMMetrics()]);
+        },
+        {
+          loadingMessage: vmName ? `Releasing ${vmName}…` : "Releasing VM…",
+          successMessage: "VM released successfully.",
+          getErrorMessage: (error) => error.message || "Failed to release VM",
+        }
+      );
+    } catch {
+      /* toast already shown */
     }
   };
 
@@ -454,17 +468,27 @@ function VMClusterPage() {
 
     setIsTransferring(true);
     try {
-      const data = {
-        csp: activeCsp,
-        target_cluster: transferCluster,
-        reason: "User-initiated migration",
-      };
-      await transferVM(data, token);
-      notifications.success("VM migration initiated successfully");
-      setShowTransferModal(false);
-      await Promise.all([fetchAssignment(), fetchClusterHealth()]);
-    } catch (error) {
-      notifications.error(error.message || "Failed to migrate VM");
+      await executeWithNotification(
+        async () => {
+          await transferVM(
+            {
+              csp: activeCsp,
+              target_cluster: transferCluster,
+              reason: "User-initiated migration",
+            },
+            token
+          );
+          setShowTransferModal(false);
+          await Promise.all([fetchAssignment(), fetchClusterHealth()]);
+        },
+        {
+          loadingMessage: `Migrating VM to ${transferCluster}…`,
+          successMessage: "VM migration initiated successfully.",
+          getErrorMessage: (error) => error.message || "Failed to migrate VM",
+        }
+      );
+    } catch {
+      /* toast already shown */
     } finally {
       setIsTransferring(false);
     }
@@ -472,29 +496,33 @@ function VMClusterPage() {
 
   const handleDownloadSSHKey = async (assignmentId) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/ssh-key/${assignmentId}`, {
-        method: "GET",
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to download SSH key");
-      }
-
-      // Create blob and download
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `vm_${assignmentId}.pem`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-
-      notifications.success("SSH key downloaded! Remember to set permissions: chmod 400");
-    } catch (error) {
-      notifications.error(error.message || "Failed to download SSH key");
+      await executeWithNotification(
+        async () => {
+          const response = await fetch(`${API_BASE_URL}/ssh-key/${assignmentId}`, {
+            method: "GET",
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          if (!response.ok) {
+            throw new Error("Failed to download SSH key");
+          }
+          const blob = await response.blob();
+          const url = window.URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = `vm_${assignmentId}.pem`;
+          document.body.appendChild(a);
+          a.click();
+          window.URL.revokeObjectURL(url);
+          document.body.removeChild(a);
+        },
+        {
+          loadingMessage: "Preparing SSH key download…",
+          successMessage: "SSH key downloaded. Remember: chmod 400 your-key.pem",
+          getErrorMessage: (error) => error.message || "Failed to download SSH key",
+        }
+      );
+    } catch {
+      /* toast already shown */
     }
   };
 
@@ -582,13 +610,22 @@ ${instructions.troubleshooting.map((item) => `
     );
   }
 
-  const handleRefreshClusters = async () => {
-    setIsRefreshingClusters(true);
-    try {
-      await Promise.all([fetchClusterHealth(), fetchAssignment(), fetchVMMetrics()]);
-    } finally {
-      setIsRefreshingClusters(false);
-    }
+  const handlePageRefresh = async () => {
+    await runPageRefresh(
+      async () => {
+        await Promise.all([
+          fetchClusterHealth(),
+          fetchAssignment(),
+          fetchVMMetrics(),
+          fetchRecommendations(),
+        ]);
+      },
+      {
+        loadingMessage: 'Refreshing VM cluster page…',
+        successMessage: 'VM cluster page refreshed.',
+        getErrorMessage: (error) => error.message || 'Failed to refresh VM cluster page.',
+      }
+    );
   };
 
   return (
@@ -598,6 +635,8 @@ ${instructions.troubleshooting.map((item) => `
           kicker="Compute"
           title="VM Cluster Management"
           subtitle="Intelligent workload assignment with auto-scaling and migration"
+          onRefresh={handlePageRefresh}
+          refreshing={pageRefreshing}
         />
         <div className="vm-page-header-live live-indicator" aria-live="polite">
           <span className="live-dot" />
@@ -608,10 +647,6 @@ ${instructions.troubleshooting.map((item) => `
       <CloudProviderToolbar
         provider={cloudProvider}
         onProviderChange={setCloudProvider}
-        onAction={handleRefreshClusters}
-        actionLabel="Refresh clusters"
-        actionBusy={isRefreshingClusters}
-        actionClassName="btn btn-request vm-toolbar-refresh"
         selectAriaLabel="VM cloud provider"
         className="vm-cloud-toolbar"
         providerOptions={vmToolbarOptions}

@@ -48,6 +48,14 @@
   max-width: 760px;
 }
 
+.simulator-header-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-md);
+  max-width: none;
+}
+
 .page-kicker {
   display: block;
   margin-bottom: var(--space-xs);

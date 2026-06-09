@@ -31,7 +31,10 @@ import "../styles/storage.css";
 import PageHeader from "../components/ui/PageHeader.jsx";
 import ByocStorageTargetBanner from "../components/ByocStorageTargetBanner.jsx";
 import StorageUploadWizard from "../components/StorageUploadWizard.jsx";
-import BucketRegionSelector from "../components/BucketRegionSelector.jsx";
+import CloudDestinationPanel from "../components/CloudDestinationPanel.jsx";
+import StorageRegionScopeBar, {
+  platformLabelForSlug,
+} from "../components/StorageRegionScopeBar.jsx";
 import EmptyState from "../components/EmptyState.jsx";
 import CloudProviderToolbar, {
   filterFilesByCloudProvider,
@@ -43,6 +46,10 @@ import {
   coerceCloudProvider,
 } from "../hooks/useCloudAvailability.js";
 import { IconHardDrive } from "../components/dashboard/Icons.jsx";
+import { usePlatformStorageRegions } from "../hooks/usePlatformStorageRegions.js";
+import { usePageRefresh } from "../hooks/usePageRefresh.js";
+import { minLoadingDelay } from "../utils/minLoadingDelay.js";
+import { usePreferences } from "../context/PreferencesContext.jsx";
 
 // --- API FUNCTIONS (Missing from api.js) ---
 import { apiClient } from "../api";
@@ -92,6 +99,11 @@ function StoragePage() {
     error: notifyError,
     success: notifySuccess,
     info: notifyInfo,
+    showLoading,
+    updateSuccess,
+    updateError,
+    updateInfo,
+    executeWithNotification,
   } = useNotifications();
   const { loading: availLoading, getFeature, credentialMode } = useCloudAvailability();
   const storageProviders = getFeature("storage").providers || [];
@@ -103,6 +115,8 @@ function StoragePage() {
   const [files, setFiles] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [catalogReloadToken, setCatalogReloadToken] = useState(0);
+  const { runPageRefresh, pageRefreshing } = usePageRefresh();
   const [cloudProvider, setCloudProvider] = useState("ALL");
   const [isUploading, setIsUploading] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -138,19 +152,95 @@ function StoragePage() {
       return "all";
     }
   });
-  const handleBucketSelect = (name, region) => {
+  const [selectedGcpBucket, setSelectedGcpBucket] = useState(() => {
+    try {
+      return sessionStorage.getItem("zenith.storage.gcp.bucket") || null;
+    } catch {
+      return null;
+    }
+  });
+  const [selectedAzureContainer, setSelectedAzureContainer] = useState(() => {
+    try {
+      return sessionStorage.getItem("zenith.storage.azure.container") || null;
+    } catch {
+      return null;
+    }
+  });
+  const [awsBucketCount, setAwsBucketCount] = useState(null);
+  const { platformRegionSlug: accountPlatformRegion } = usePreferences();
+  const [sessionRegionOverride, setSessionRegionOverride] = useState(() => {
+    try {
+      return sessionStorage.getItem("zenith.storage.platform_region_override") || null;
+    } catch {
+      return null;
+    }
+  });
+  const {
+    platformMultiRegion,
+    platformRegions,
+    defaultPlatformSlug,
+  } = usePlatformStorageRegions({
+    enabled: Boolean(token),
+    reloadToken: catalogReloadToken,
+  });
+
+  const accountDefaultRegion =
+    accountPlatformRegion || defaultPlatformSlug || platformRegions[0]?.slug || null;
+  const platformRegionSlug = sessionRegionOverride || accountDefaultRegion;
+  const isRegionSessionOverride =
+    Boolean(sessionRegionOverride) && sessionRegionOverride !== accountDefaultRegion;
+  const handleBucketSelect = useCallback((name, region) => {
     setSelectedBucket(name);
     if (region) setSelectedRegion(region);
-  };
+  }, []);
+  const handleGcpBucketSelect = useCallback((name) => {
+    setSelectedGcpBucket(name);
+  }, []);
+  const handleAzureContainerSelect = useCallback((name) => {
+    setSelectedAzureContainer(name);
+  }, []);
+  const handleAwsBucketsLoaded = useCallback((list) => {
+    setAwsBucketCount(list?.length ?? null);
+  }, []);
 
-  const handleRegionSelect = (region) => {
+  const handlePlatformRegionSelect = useCallback(
+    (slug) => {
+      if (slug === accountDefaultRegion) {
+        setSessionRegionOverride(null);
+        try {
+          sessionStorage.removeItem("zenith.storage.platform_region_override");
+        } catch {
+          /* ignore */
+        }
+        return;
+      }
+      setSessionRegionOverride(slug);
+      try {
+        sessionStorage.setItem("zenith.storage.platform_region_override", slug);
+      } catch {
+        /* ignore */
+      }
+    },
+    [accountDefaultRegion]
+  );
+
+  const handleResetPlatformRegion = useCallback(() => {
+    setSessionRegionOverride(null);
+    try {
+      sessionStorage.removeItem("zenith.storage.platform_region_override");
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  const handleRegionSelect = useCallback((region) => {
     setSelectedRegion(region);
     try {
       sessionStorage.setItem("zenith.storage.region", region);
     } catch {
       /* ignore */
     }
-  };
+  }, []);
 
   // --- NEW STATE for Glacier Restore ---
   const [showRestoreModal, setShowRestoreModal] = useState(false);
@@ -164,9 +254,23 @@ function StoragePage() {
     if (!token) return;
     try {
       setIsLoading(true);
+      let bucketFilter;
+      let regionFilter;
+      let platformSlugFilter;
+      if (platformMultiRegion && platformRegionSlug) {
+        platformSlugFilter = platformRegionSlug;
+      } else if (cloudProvider === "AWS") {
+        bucketFilter = selectedBucket || undefined;
+        regionFilter = selectedRegion !== "all" ? selectedRegion : undefined;
+      } else if (cloudProvider === "GCP") {
+        bucketFilter = selectedGcpBucket || undefined;
+      } else if (cloudProvider === "Azure") {
+        bucketFilter = selectedAzureContainer || undefined;
+      }
       const fileList = await listFiles(token, {
-        bucket: selectedBucket || undefined,
-        region: selectedRegion !== "all" ? selectedRegion : undefined,
+        bucket: bucketFilter,
+        region: regionFilter,
+        platformSlug: platformSlugFilter,
       });
       setFiles(fileList);
     } catch (error) {
@@ -174,56 +278,96 @@ function StoragePage() {
     } finally {
       setIsLoading(false);
     }
-  }, [token, notifyError, selectedBucket, selectedRegion]);
+  }, [
+    token,
+    notifyError,
+    selectedBucket,
+    selectedRegion,
+    selectedGcpBucket,
+    selectedAzureContainer,
+    cloudProvider,
+    platformMultiRegion,
+    platformRegionSlug,
+  ]);
 
   const syncStorageProvider = useCallback(
-    async (csp) => {
+    async (csp, regionSlug) => {
+      const slug = regionSlug || (platformMultiRegion ? platformRegionSlug : undefined);
       if (csp === "GCP") {
-        return syncGcpBucket(token, { bucket: selectedBucket || undefined });
+        return syncGcpBucket(token, {
+          bucket: slug ? undefined : selectedGcpBucket || undefined,
+          regionSlug: slug || undefined,
+        });
       }
       if (csp === "Azure") {
-        return syncAzureContainer(token, { container: selectedBucket || undefined });
+        return syncAzureContainer(token, {
+          container: slug ? undefined : selectedAzureContainer || undefined,
+          regionSlug: slug || undefined,
+        });
       }
       return syncAwsBucket(token, {
-        bucket: selectedBucket || undefined,
-        region: selectedRegion !== "all" ? selectedRegion : undefined,
+        bucket: slug ? undefined : selectedBucket || undefined,
+        region: slug ? undefined : selectedRegion !== "all" ? selectedRegion : undefined,
+        regionSlug: slug || undefined,
       });
     },
-    [token, selectedBucket, selectedRegion]
+    [
+      token,
+      selectedBucket,
+      selectedRegion,
+      selectedGcpBucket,
+      selectedAzureContainer,
+      platformMultiRegion,
+      platformRegionSlug,
+    ]
   );
 
   const handleSyncWithBucket = async () => {
     if (!token) return;
     const targets =
       cloudProvider === "ALL" ? storageProviders : [cloudProvider];
+    const regionSlugs =
+      platformMultiRegion && platformRegions.length > 1
+        ? platformRegions.map((r) => r.slug)
+        : [platformRegionSlug].filter(Boolean);
     setIsSyncing(true);
+    const loadingToastId = showLoading(
+      platformMultiRegion && activeRegionLabel
+        ? `Syncing storage in ${activeRegionLabel}…`
+        : 'Syncing storage with cloud providers…'
+    );
     try {
       let totalInserted = 0;
       let totalRemoved = 0;
       const skipped = [];
 
       for (const csp of targets) {
-        try {
-          const result = await syncStorageProvider(csp);
-          totalInserted += result.inserted || 0;
-          totalRemoved += result.removed || 0;
-        } catch (error) {
-          const msg = getApiErrorMessage(error, "Sync failed.");
-          if (
-            cloudProvider === "ALL" &&
-            csp !== "AWS" &&
-            /not configured|credentials/i.test(String(msg))
-          ) {
-            skipped.push(csp);
-            continue;
+        const slugsToSync =
+          platformMultiRegion && regionSlugs.length > 0 ? regionSlugs : [undefined];
+        for (const slug of slugsToSync) {
+          try {
+            const result = await syncStorageProvider(csp, slug);
+            totalInserted += result.inserted || 0;
+            totalRemoved += result.removed || 0;
+          } catch (error) {
+            const msg = getApiErrorMessage(error, "Sync failed.");
+            if (
+              cloudProvider === "ALL" &&
+              csp !== "AWS" &&
+              /not configured|credentials/i.test(String(msg))
+            ) {
+              skipped.push(csp);
+              continue;
+            }
+            if (csp !== "AWS" && /not configured|credentials/i.test(String(msg))) {
+              updateInfo(
+                loadingToastId,
+                `${csp} sync needs BYOC or platform keys in Settings — connect your ${csp} account when ready.`
+              );
+              return;
+            }
+            throw error;
           }
-          if (csp !== "AWS" && /not configured|credentials/i.test(String(msg))) {
-            notifyInfo(
-              `${csp} sync needs BYOC or platform keys in Settings — connect your ${csp} account when ready.`
-            );
-            return;
-          }
-          throw error;
         }
       }
 
@@ -234,35 +378,81 @@ function StoragePage() {
           skipped.length > 0
             ? ` Skipped ${skipped.join(", ")} (not configured).`
             : "";
-        notifySuccess(
+        updateSuccess(
+          loadingToastId,
           `Sync complete (all providers). Added ${totalInserted} new file(s).${removedMsg}${skipMsg}`
         );
       } else {
-        notifySuccess(
+        updateSuccess(
+          loadingToastId,
           `Sync complete (${cloudProvider}). Added ${totalInserted} new file(s).${removedMsg}`
         );
       }
       await fetchFiles();
     } catch (error) {
-      notifyError(getApiErrorMessage(error, "Sync failed."));
+      updateError(loadingToastId, getApiErrorMessage(error, "Sync failed."));
     } finally {
       setIsSyncing(false);
     }
   };
+
+  const handlePageRefresh = useCallback(async () => {
+    if (!token) return;
+    await runPageRefresh(
+      async () => {
+        const startedAt = Date.now();
+        setCatalogReloadToken((t) => t + 1);
+        await Promise.all([fetchFiles(), minLoadingDelay(startedAt)]);
+      },
+      {
+        loadingMessage: 'Refreshing storage page…',
+        successMessage: 'Storage page refreshed — files and cloud destinations updated.',
+        getErrorMessage: (error) => getApiErrorMessage(error, 'Failed to refresh storage page.'),
+      }
+    );
+  }, [token, fetchFiles, runPageRefresh]);
 
   const displayedFiles = useMemo(
     () => filterFilesByCloudProvider(files, cloudProvider),
     [files, cloudProvider]
   );
 
-  const syncActionLabel = useMemo(() => {
-    if (selectedBucket) {
-      return cloudProvider === "ALL"
-        ? `Sync ${selectedBucket} (all)`
-        : `Sync ${selectedBucket}`;
+  const activeRegionLabel = useMemo(
+    () => platformRegions.find((r) => r.slug === platformRegionSlug)?.label,
+    [platformRegions, platformRegionSlug]
+  );
+
+  const listTitle = useMemo(() => {
+    if (platformMultiRegion && activeRegionLabel) {
+      return `Files in ${activeRegionLabel}`;
     }
-    return cloudProvider === "ALL" ? "Sync all providers" : `Sync (${cloudProvider})`;
-  }, [cloudProvider, selectedBucket]);
+    return "Your Files";
+  }, [platformMultiRegion, activeRegionLabel]);
+
+  const syncActionLabel = useMemo(() => {
+    const regionPrefix =
+      platformMultiRegion && activeRegionLabel ? `${activeRegionLabel} · ` : "";
+    if (cloudProvider === "GCP") {
+      return regionPrefix + (selectedGcpBucket ? `Sync ${selectedGcpBucket}` : "Sync GCP");
+    }
+    if (cloudProvider === "Azure") {
+      return (
+        regionPrefix +
+        (selectedAzureContainer ? `Sync ${selectedAzureContainer}` : "Sync Azure")
+      );
+    }
+    if (selectedBucket && cloudProvider === "AWS") {
+      return regionPrefix + `Sync ${selectedBucket}`;
+    }
+    return regionPrefix + (cloudProvider === "ALL" ? "Sync all providers" : `Sync ${cloudProvider}`);
+  }, [
+    cloudProvider,
+    selectedBucket,
+    selectedGcpBucket,
+    selectedAzureContainer,
+    platformMultiRegion,
+    activeRegionLabel,
+  ]);
 
   useEffect(() => {
     fetchFiles();
@@ -284,17 +474,27 @@ function StoragePage() {
     setManualCspSelection(null);
     setIsAnalyzing(true);
     try {
-      const analysisRequest = {
-        filename: selectedFile.name,
-        file_size_mb: selectedFile.size / (1024 * 1024),
-        user_priority: userPriority,
-        user_intent: userIntent,
-      };
-      const result = await analyzeFile(analysisRequest, token);
+      const result = await executeWithNotification(
+        () =>
+          analyzeFile(
+            {
+              filename: selectedFile.name,
+              file_size_mb: selectedFile.size / (1024 * 1024),
+              user_priority: userPriority,
+              user_intent: userIntent,
+            },
+            token
+          ),
+        {
+          loadingMessage: `Analyzing '${selectedFile.name}' for storage placement…`,
+          successMessage: `Analysis complete for '${selectedFile.name}'.`,
+          getErrorMessage: (error) => getApiErrorMessage(error, "Analysis failed."),
+        }
+      );
       setRecommendation(result);
       setShowRecommendationModal(true);
-    } catch (error) {
-      notifyError(getApiErrorMessage(error, "Analysis failed."));
+    } catch {
+      /* toast already shown */
     } finally {
       setIsAnalyzing(false);
     }
@@ -321,18 +521,32 @@ function StoragePage() {
 
     setShowRecommendationModal(false);
     setIsUploading(true);
+    const loadingToastId = showLoading(`Uploading '${selectedFile.name}' to ${finalCsp}…`);
 
     try {
+      const uploadBucket =
+        finalCsp === "AWS"
+          ? selectedBucket || undefined
+          : finalCsp === "GCP"
+            ? selectedGcpBucket || undefined
+            : finalCsp === "Azure"
+              ? selectedAzureContainer || undefined
+              : undefined;
       await uploadFileToCSP(selectedFile, finalCsp, storageClass, token, {
-        bucket: finalCsp === "AWS" && selectedBucket ? selectedBucket : undefined,
+        bucket: uploadBucket,
+        regionSlug:
+          platformMultiRegion && platformRegionSlug ? platformRegionSlug : undefined,
       });
-      notifySuccess(`'${selectedFile.name}' uploaded successfully to ${finalCsp}!`);
+      updateSuccess(
+        loadingToastId,
+        `'${selectedFile.name}' uploaded successfully to ${finalCsp}!`
+      );
       setSelectedFile(null);
       setManualCspSelection(null);
       if (fileInputRef.current) fileInputRef.current.value = "";
       await fetchFiles();
     } catch (error) {
-      notifyError(getApiErrorMessage(error, `Upload to ${finalCsp} failed.`));
+      updateError(loadingToastId, getApiErrorMessage(error, `Upload to ${finalCsp} failed.`));
     } finally {
       setIsUploading(false);
     }
@@ -345,14 +559,25 @@ function StoragePage() {
 
   const confirmDelete = async () => {
     if (!fileToDelete) return;
+    const { filename } = fileToDelete;
     try {
-      await deleteFile(fileToDelete.filename, token, {
-        bucket: fileToDelete.cloud_bucket || selectedBucket || undefined,
-      });
-      notifySuccess(`'${fileToDelete.filename}' deleted successfully.`);
-      await fetchFiles();
-    } catch (error) {
-      notifyError(getApiErrorMessage(error, "Failed to delete file."));
+      await executeWithNotification(
+        async () => {
+          await deleteFile(filename, token, {
+            bucket: fileToDelete.cloud_bucket || selectedBucket || undefined,
+            region: fileToDelete.region || undefined,
+            platformSlug: fileToDelete.platform_slug || undefined,
+          });
+          await fetchFiles();
+        },
+        {
+          loadingMessage: `Deleting '${filename}' from cloud storage…`,
+          successMessage: `'${filename}' deleted successfully.`,
+          getErrorMessage: (error) => getApiErrorMessage(error, "Failed to delete file."),
+        }
+      );
+    } catch {
+      /* toast already shown */
     } finally {
       setShowDeleteModal(false);
       setFileToDelete(null);
@@ -364,23 +589,28 @@ function StoragePage() {
     const filename = typeof file === "string" ? file : file.filename;
     const bucket =
       typeof file === "object" ? file.cloud_bucket || selectedBucket : selectedBucket;
+    const loadingToastId = showLoading(`Preparing download for '${filename}'…`);
     try {
       const { presigned_url } = await getDownloadUrl(filename, token, {
         bucket: bucket || undefined,
+        region: typeof file === "object" ? file.region || undefined : undefined,
+        platformSlug: typeof file === "object" ? file.platform_slug || undefined : undefined,
       });
       window.open(presigned_url, "_blank");
+      updateSuccess(loadingToastId, `Download started for '${filename}'.`);
     } catch (error) {
       const msg = error.message || error.detail || "";
-      // Check for the specific Glacier error message and status code from backend
       if (msg.includes("is in GLACIER storage") && msg.includes("412")) {
         setFileToRestore(filename);
-        setShowRestoreModal(true); // Open the restore modal
-        notifyInfo("This file is in Glacier. It needs to be restored before download.");
-      } else if (error.message.includes("is currently being restored") && error.message.includes("409")) {
-        notifyInfo(error.message); // Inform user it's already restoring
-      }
-      else {
-        notifyError(getApiErrorMessage(error, "Could not get download link."));
+        setShowRestoreModal(true);
+        updateInfo(
+          loadingToastId,
+          "This file is in Glacier. Restore it first, then download again."
+        );
+      } else if (error.message?.includes("is currently being restored") && error.message?.includes("409")) {
+        updateInfo(loadingToastId, error.message);
+      } else {
+        updateError(loadingToastId, getApiErrorMessage(error, "Could not get download link."));
       }
     }
   };
@@ -399,20 +629,30 @@ function StoragePage() {
     try {
       const record = files.find((f) => f.filename === fileToRestore);
       const restoreCsp = record?.csp || "AWS";
-      const result = await initiateArchiveRestore(
-        fileToRestore,
-        restoreCsp,
-        restoreTier,
-        restoreDays,
-        token
+      const result = await executeWithNotification(
+        async () => {
+          const res = await initiateArchiveRestore(
+            fileToRestore,
+            restoreCsp,
+            restoreTier,
+            restoreDays,
+            token
+          );
+          await fetchFiles();
+          return res;
+        },
+        {
+          loadingMessage: `Requesting ${restoreTier} restore for '${fileToRestore}'…`,
+          getSuccessMessage: (res) =>
+            res.message || `'${fileToRestore}' restore initiated.`,
+          getErrorMessage: (error) =>
+            getApiErrorMessage(error, `Failed to initiate restore for '${fileToRestore}'.`),
+        }
       );
-      notifySuccess(result.message || `'${fileToRestore}' restore initiated.`);
       setShowRestoreModal(false);
       setFileToRestore(null);
-      // Re-fetch files to potentially update their status in the UI
-      await fetchFiles();
-    } catch (error) {
-      notifyError(getApiErrorMessage(error, `Failed to initiate restore for '${fileToRestore}'.`));
+    } catch {
+      /* toast already shown */
     } finally {
       setIsRestoring(false);
     }
@@ -447,6 +687,9 @@ function StoragePage() {
         kicker="Object storage"
         title="Standard Storage"
         subtitle="Upload, analyze, and sync files across your connected cloud providers"
+        onRefresh={handlePageRefresh}
+        refreshing={pageRefreshing}
+        refreshDisabled={isLoading || isSyncing}
       />
 
       <div className="storage-process-info zenith-surface">
@@ -544,26 +787,59 @@ function StoragePage() {
         </div>
       </div>
 
+      {platformMultiRegion && platformRegions.length > 1 && (
+        <StorageRegionScopeBar
+          platformRegions={platformRegions}
+          selectedSlug={platformRegionSlug}
+          onSelect={handlePlatformRegionSelect}
+          onReset={handleResetPlatformRegion}
+          accountDefaultRegion={accountDefaultRegion}
+          isSessionOverride={isRegionSessionOverride}
+          fileCount={files.length}
+          filteredCount={displayedFiles.length}
+          cloudProvider={cloudProvider}
+        />
+      )}
+
       <div className="storage-destination-panel">
-        <BucketRegionSelector
+        <CloudDestinationPanel
           surface="storage"
           storageKeyPrefix="zenith.storage"
+          activeCsp={cloudProvider}
+          storageProviders={storageProviders}
           selectedBucket={selectedBucket}
           selectedRegion={selectedRegion}
           onBucketChange={handleBucketSelect}
           onRegionChange={handleRegionSelect}
+          onBucketsLoaded={handleAwsBucketsLoaded}
+          selectedGcpBucket={selectedGcpBucket}
+          onGcpBucketChange={handleGcpBucketSelect}
+          selectedAzureContainer={selectedAzureContainer}
+          onAzureContainerChange={handleAzureContainerSelect}
+          platformRegionSlug={platformRegionSlug}
+          onPlatformRegionChange={handlePlatformRegionSelect}
+          onResetPlatformRegion={handleResetPlatformRegion}
+          accountDefaultRegion={accountDefaultRegion}
+          isRegionSessionOverride={isRegionSessionOverride}
+          platformMultiRegion={platformMultiRegion}
+          platformRegions={platformRegions}
+          hidePlatformRegionSelector
+          reloadToken={catalogReloadToken}
         />
         <ByocStorageTargetBanner
           variant="storage"
           selectedBucket={selectedBucket}
           selectedRegion={selectedRegion}
+          selectedGcpBucket={selectedGcpBucket}
+          selectedAzureContainer={selectedAzureContainer}
+          bucketCount={awsBucketCount}
           activeCsp={cloudProvider}
         />
       </div>
 
       <div className="list-section zenith-surface">
         <div className="list-header">
-          <h3 className="list-title">Your Files</h3>
+          <h3 className="list-title">{listTitle}</h3>
           <CloudProviderToolbar
             provider={cloudProvider}
             onProviderChange={setCloudProvider}
@@ -579,13 +855,25 @@ function StoragePage() {
         ) : displayedFiles.length === 0 ? (
           <EmptyState
             icon={<IconHardDrive aria-hidden="true" />}
-            title={files.length === 0 ? "No files yet" : `No ${cloudProvider === "ALL" ? "" : `${cloudProvider} `}files`}
+            title={
+              files.length === 0
+                ? platformMultiRegion && activeRegionLabel
+                  ? `No files in ${activeRegionLabel}`
+                  : "No files yet"
+                : `No ${cloudProvider === "ALL" ? "" : `${cloudProvider} `}files${
+                    activeRegionLabel ? ` in ${activeRegionLabel}` : ""
+                  }`
+            }
             message={
               files.length === 0
-                ? "Upload a file above to see it listed here with storage class and actions."
+                ? platformMultiRegion && activeRegionLabel
+                  ? `Nothing stored in ${activeRegionLabel} yet. Upload above or switch region to view another location.`
+                  : "Upload a file above to see it listed here with storage class and actions."
                 : cloudProvider === "ALL"
-                  ? "No files match the current bucket or region filter."
-                  : `No files stored on ${cloudProvider}. Choose All or sync ${cloudProvider} when connected.`
+                  ? activeRegionLabel
+                    ? `No files in ${activeRegionLabel} for the current filter. Try another region or sync.`
+                    : "No files match the current bucket or region filter."
+                  : `No ${cloudProvider} files in ${activeRegionLabel || "this region"}. Choose All or sync ${cloudProvider}.`
             }
           />
         ) : (
@@ -602,7 +890,7 @@ function StoragePage() {
             </thead>
             <tbody>
               {displayedFiles.map((file) => (
-                  <tr key={`${file.cloud_bucket || ""}-${file.s3_key || file.filename}`}>
+                  <tr key={`${file.csp || ""}-${file.cloud_bucket || ""}-${file.region || ""}-${file.filename}`}>
                     <td>{file.filename}</td>
                     <td>{(file.size_bytes / 1024).toFixed(2)}</td>
                     <td className="date-col">
@@ -611,7 +899,19 @@ function StoragePage() {
                     <td>
                       <div className="csp-location-cell">
                         <CspIcon csp={file.csp} />
-                        <span>{file.storage_class}</span>
+                        <span>
+                          {(() => {
+                            const regionLabel = platformLabelForSlug(
+                              file.platform_slug,
+                              platformRegions
+                            );
+                            return regionLabel ? (
+                              <span className="platform-region-badge">{regionLabel}</span>
+                            ) : null;
+                          })()}
+                          {file.storage_class}
+                          {file.region ? ` · ${file.region}` : ""}
+                        </span>
                       </div>
                     </td>
                     <td>
@@ -675,6 +975,14 @@ function StoragePage() {
           selectedRegion={selectedRegion}
           onBucketChange={handleBucketSelect}
           onRegionChange={handleRegionSelect}
+          selectedGcpBucket={selectedGcpBucket}
+          onGcpBucketChange={handleGcpBucketSelect}
+          selectedAzureContainer={selectedAzureContainer}
+          onAzureContainerChange={handleAzureContainerSelect}
+          platformRegionSlug={platformRegionSlug}
+          onPlatformRegionChange={handlePlatformRegionSelect}
+          platformMultiRegion={platformMultiRegion}
+          platformRegions={platformRegions}
           manualCsp={manualCspSelection}
           onManualCspChange={setManualCspSelection}
           isUploading={isUploading}

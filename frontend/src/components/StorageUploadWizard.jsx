@@ -1,5 +1,8 @@
 import React, { useState } from "react";
 import BucketRegionSelector from "./BucketRegionSelector";
+import GcpBucketSelector from "./GcpBucketSelector";
+import AzureContainerSelector from "./AzureContainerSelector";
+import PlatformRegionPills from "./PlatformRegionPills";
 
 function CspIcon({ csp }) {
   const icons = {
@@ -10,6 +13,7 @@ function CspIcon({ csp }) {
   return <img src={icons[csp]} alt={`${csp} logo`} className="csp-icon" />;
 }
 import ZenithWizardFrame, { WizardNote } from "./wizard/ZenithWizardFrame";
+import StorageEnsembleBreakdown from "./wizard/StorageEnsembleBreakdown";
 import { CSP_LABELS } from "../hooks/useCloudAvailability";
 
 const STEP_LABELS = ["Analysis", "Cloud", "Folder", "Review"];
@@ -27,6 +31,14 @@ export default function StorageUploadWizard({
   selectedRegion,
   onBucketChange,
   onRegionChange,
+  selectedGcpBucket,
+  onGcpBucketChange,
+  selectedAzureContainer,
+  onAzureContainerChange,
+  platformRegionSlug = null,
+  onPlatformRegionChange,
+  platformMultiRegion = false,
+  platformRegions = [],
   manualCsp,
   onManualCspChange,
   onClose,
@@ -48,7 +60,13 @@ export default function StorageUploadWizard({
   const canNext = () => {
     if (step === 0) return Boolean(recommendation);
     if (step === 1) return Boolean(targetCsp);
-    if (step === 2) return targetCsp !== "AWS" || Boolean(selectedBucket);
+    if (step === 2) {
+      if (platformMultiRegion && !platformRegionSlug) return false;
+      if (targetCsp === "AWS") return Boolean(selectedBucket);
+      if (targetCsp === "GCP") return Boolean(selectedGcpBucket);
+      if (targetCsp === "Azure") return Boolean(selectedAzureContainer);
+      return true;
+    }
     return true;
   };
 
@@ -107,17 +125,24 @@ export default function StorageUploadWizard({
             Zenith classified this file and estimated the most cost-effective storage tier.
           </p>
           <div className="recommendation-box recommendation-box--compact">
-            <span className="recommendation-box__label">Recommended tier</span>
+            <span className="recommendation-box__label">Recommended placement</span>
             <p className="recommendation-csp">
               <CspIcon csp={recommended.csp} />
               {recommended.csp} — {recommended.service_name}
             </p>
-            <p className="zenith-wizard-section-desc" style={{ marginTop: "0.5rem" }}>
+            <p className="zenith-wizard-section-desc recommendation-box__tier-line">
               Workload tier: <strong>{recommendation.determined_tier}</strong>
-              {recommendation.ensemble_confidence != null &&
-                ` · ${formatPercent(recommendation.ensemble_confidence)} ensemble confidence`}
+              {recommendation.ensemble_confidence != null && (
+                <>
+                  {' '}
+                  · <strong>{formatPercent(recommendation.ensemble_confidence)}</strong> ensemble
+                  confidence
+                </>
+              )}
             </p>
           </div>
+
+          <StorageEnsembleBreakdown recommendation={recommendation} />
           <WizardNote title="What happens next">
             You can accept the recommendation or override the cloud on the next step. Then choose
             the bucket or folder prefix, and confirm upload. Billing uses your connected account
@@ -174,11 +199,21 @@ export default function StorageUploadWizard({
 
       {step === 2 && (
         <div className="zenith-wizard-destination">
-          <h3 className="zenith-wizard-section-title">Bucket & region</h3>
+          <h3 className="zenith-wizard-section-title">Region & destination</h3>
           <p className="zenith-wizard-section-desc">
-            Choose the destination folder for {CSP_LABELS[targetCsp] || targetCsp}.
+            {platformMultiRegion
+              ? "Pick a region, then confirm the bucket or container for this upload."
+              : `Choose the destination for ${CSP_LABELS[targetCsp] || targetCsp}.`}
           </p>
-          {targetCsp === "AWS" ? (
+          {platformMultiRegion && platformRegions.length > 0 && (
+            <PlatformRegionPills
+              regions={platformRegions}
+              selectedSlug={platformRegionSlug}
+              onSelect={onPlatformRegionChange}
+              id="wizard-platform-region"
+            />
+          )}
+          {targetCsp === "AWS" && (
             <>
               <WizardNote title="S3 destination">
                 Select the bucket (and optional region). Sync after upload refreshes the file table
@@ -191,13 +226,38 @@ export default function StorageUploadWizard({
                 selectedRegion={selectedRegion || "all"}
                 onBucketChange={onBucketChange}
                 onRegionChange={onRegionChange}
+                platformRegionSlug={platformRegionSlug}
               />
             </>
-          ) : (
-            <WizardNote title="Provider path">
-              Objects upload to your configured {CSP_LABELS[targetCsp] || targetCsp} bucket or
-              container from Settings (BYOC or platform). Use Sync to reconcile the file list.
-            </WizardNote>
+          )}
+          {targetCsp === "GCP" && (
+            <>
+              <WizardNote title="GCS destination">
+                Pick the GCS bucket. Location is fixed per bucket — use Sync after upload to refresh
+                the file table.
+              </WizardNote>
+              <GcpBucketSelector
+                storageKeyPrefix="zenith.storage.wizard"
+                selectedBucket={selectedGcpBucket}
+                onBucketChange={(name) => onGcpBucketChange?.(name)}
+                compact
+                platformRegionSlug={platformRegionSlug}
+              />
+            </>
+          )}
+          {targetCsp === "Azure" && (
+            <>
+              <WizardNote title="Blob destination">
+                Pick the Blob container for this upload. Region follows your storage account.
+              </WizardNote>
+              <AzureContainerSelector
+                storageKeyPrefix="zenith.storage.wizard"
+                selectedContainer={selectedAzureContainer}
+                onContainerChange={onAzureContainerChange}
+                compact
+                platformRegionSlug={platformRegionSlug}
+              />
+            </>
           )}
         </div>
       )}
@@ -212,6 +272,15 @@ export default function StorageUploadWizard({
             <dd>{recommendation?.determined_tier}</dd>
             <dt>Cloud</dt>
             <dd>{CSP_LABELS[finalCsp] || finalCsp}</dd>
+            {platformMultiRegion && platformRegionSlug && (
+              <>
+                <dt>Region</dt>
+                <dd>
+                  {platformRegions.find((r) => r.slug === platformRegionSlug)?.label ||
+                    platformRegionSlug}
+                </dd>
+              </>
+            )}
             <dt>Storage class</dt>
             <dd>
               {recommendation?.options_by_csp?.[finalCsp]?.service_name ||
@@ -223,6 +292,22 @@ export default function StorageUploadWizard({
                 <dt>Bucket</dt>
                 <dd>
                   <code>{selectedBucket}</code>
+                </dd>
+              </>
+            )}
+            {finalCsp === "GCP" && selectedGcpBucket && (
+              <>
+                <dt>GCS bucket</dt>
+                <dd>
+                  <code>{selectedGcpBucket}</code>
+                </dd>
+              </>
+            )}
+            {finalCsp === "Azure" && selectedAzureContainer && (
+              <>
+                <dt>Container</dt>
+                <dd>
+                  <code>{selectedAzureContainer}</code>
                 </dd>
               </>
             )}

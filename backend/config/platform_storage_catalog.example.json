@@ -1,0 +1,74 @@
+[
+  {
+    "slug": "asia",
+    "label": "Asia",
+    "aws": {
+      "bucket": "zeneith-storage-asia",
+      "region": "ap-south-1"
+    },
+    "gcp": {
+      "bucket": "zeneith-main-asia",
+      "location": "ASIA-SOUTH1"
+    },
+    "azure": {
+      "account_name": "zenithstorageasia",
+      "account_key": "REPLACE_WITH_ACCOUNT_KEY",
+      "container": "zenith-storage",
+      "region": "centralindia"
+    }
+  },
+  {
+    "slug": "us",
+    "label": "United States",
+    "aws": {
+      "bucket": "zeneith-storage-us",
+      "region": "us-east-1"
+    },
+    "gcp": {
+      "bucket": "zenith-main-bucket",
+      "location": "US-CENTRAL1"
+    },
+    "azure": {
+      "account_name": "zenithstorageus",
+      "account_key": "REPLACE_WITH_ACCOUNT_KEY",
+      "container": "zenith-storage",
+      "region": "eastus"
+    }
+  },
+  {
+    "slug": "europe",
+    "label": "Europe",
+    "aws": {
+      "bucket": "zeneith-storage-europe",
+      "region": "eu-west-1"
+    },
+    "gcp": {
+      "bucket": "zeneith-main-europe",
+      "location": "EUROPE-WEST1"
+    },
+    "azure": {
+      "account_name": "zenithstorageeurope",
+      "account_key": "REPLACE_WITH_ACCOUNT_KEY",
+      "container": "zenith-storage",
+      "region": "westeurope"
+    }
+  },
+  {
+    "slug": "africa",
+    "label": "Africa",
+    "aws": {
+      "bucket": "zeneith-storage-africa",
+      "region": "af-south-1"
+    },
+    "gcp": {
+      "bucket": "zeneith-main-africa",
+      "location": "AFRICA-SOUTH1"
+    },
+    "azure": {
+      "account_name": "zenithstorageafrica",
+      "account_key": "REPLACE_WITH_ACCOUNT_KEY",
+      "container": "zenith-storage",
+      "region": "southafricanorth"
+    }
+  }
+]

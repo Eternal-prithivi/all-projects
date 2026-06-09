@@ -13,7 +13,7 @@
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from typing import Literal, Optional, Dict, Any
+from typing import List, Literal, Optional, Dict, Any
 from datetime import datetime
 from ..users.routes_users import get_current_user
 from ..users.user_model import User
@@ -32,6 +32,11 @@ class NotificationSettings(BaseModel):
     maintenance_updates: bool = True
 
 
+class PlatformRegionOption(BaseModel):
+    slug: str
+    label: str
+
+
 class PreferencesSettings(BaseModel):
     theme: str = "dark"
     language: str = "en"
@@ -39,6 +44,7 @@ class PreferencesSettings(BaseModel):
     date_format: str = "MM/DD/YYYY"
     currency: str = "USD"
     provision_engine: Literal["boto3", "terraform"] = "boto3"
+    platform_region_slug: Optional[str] = None
 
 
 class BillingSettings(BaseModel):
@@ -50,6 +56,8 @@ class SettingsResponse(BaseModel):
     notifications: NotificationSettings
     preferences: PreferencesSettings
     billing: BillingSettings
+    platform_multi_region: bool = False
+    platform_regions: List[PlatformRegionOption] = []
 
 
 class APIKeyResponse(BaseModel):
@@ -57,6 +65,39 @@ class APIKeyResponse(BaseModel):
     key_preview: str
     created_at: datetime
     last_used: Optional[datetime] = None
+
+
+def _platform_region_options() -> tuple[bool, List[PlatformRegionOption]]:
+    try:
+        from app.cloud.platform_storage_catalog import (
+            catalog_is_multi_region,
+            get_platform_regions,
+        )
+
+        if not catalog_is_multi_region():
+            return False, []
+        return True, [
+            PlatformRegionOption(
+                slug=str(entry.get("slug", "")),
+                label=str(entry.get("label", entry.get("slug", ""))),
+            )
+            for entry in get_platform_regions()
+            if entry.get("slug")
+        ]
+    except Exception:
+        return False, []
+
+
+def _validate_platform_region_slug(slug: Optional[str]) -> None:
+    if slug is None or not str(slug).strip():
+        return
+    from app.cloud.platform_storage_catalog import get_region_by_slug
+
+    if not get_region_by_slug(str(slug).strip().lower()):
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid platform region. Choose a region from the platform catalog.",
+        )
 
 
 @router.get("/", response_model=SettingsResponse)
@@ -70,11 +111,19 @@ async def get_settings(current_user: User = Depends(get_current_user)):
             raise HTTPException(status_code=404, detail="User not found")
         
         settings = user.get("settings", {})
+        platform_multi_region, platform_regions = _platform_region_options()
+        prefs_raw = dict(settings.get("preferences", {}))
+        if platform_multi_region and not prefs_raw.get("platform_region_slug"):
+            from app.cloud.platform_storage_catalog import default_platform_slug
+
+            prefs_raw["platform_region_slug"] = default_platform_slug()
         
         return SettingsResponse(
             notifications=NotificationSettings(**settings.get("notifications", {})),
-            preferences=PreferencesSettings(**settings.get("preferences", {})),
-            billing=BillingSettings(**settings.get("billing", {}))
+            preferences=PreferencesSettings(**prefs_raw),
+            billing=BillingSettings(**settings.get("billing", {})),
+            platform_multi_region=platform_multi_region,
+            platform_regions=platform_regions,
         )
     except HTTPException:
         raise
@@ -134,6 +183,7 @@ async def update_preferences(
                 status_code=400,
                 detail=f"Invalid theme. Must be one of: {', '.join(sorted(VALID_THEMES))}",
             )
+        _validate_platform_region_slug(preferences.platform_region_slug)
 
         users_collection = DB["users"]
         

@@ -1509,3 +1509,42 @@
   color: var(--text-muted);
   font-weight: 500;
 }
+
+.storage-api-meter-row {
+  font-size: 0.9rem;
+}
+
+.storage-metering-detail {
+  margin-top: 1.25rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border-default);
+}
+
+.storage-metering-detail h3 {
+  margin: 0 0 0.35rem;
+  font-size: 1rem;
+}
+
+.storage-metering-note {
+  margin: 0 0 0.75rem;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+
+.storage-metering-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.storage-metering-table th,
+.storage-metering-table td {
+  padding: 0.45rem 0.6rem;
+  text-align: left;
+  border-bottom: 1px solid var(--border-default);
+}
+
+.storage-metering-table tfoot td {
+  border-bottom: none;
+  padding-top: 0.65rem;
+}

@@ -90,6 +90,13 @@
   font-size: 1rem;
 }
 
+.optimization-header-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-md);
+}
+
 .tips-section,
 .general-strategies,
 .quick-wins,

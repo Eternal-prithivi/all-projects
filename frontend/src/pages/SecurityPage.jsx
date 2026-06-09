@@ -43,6 +43,8 @@ import {
 import "../styles/security-page.css";
 import LoadingSpinner from "../components/LoadingSpinner.jsx";
 import PageHeader from "../components/ui/PageHeader.jsx";
+import { usePageRefresh } from "../hooks/usePageRefresh.js";
+import { minLoadingDelay } from "../utils/minLoadingDelay.js";
 import ByocStorageTargetBanner from "../components/ByocStorageTargetBanner.jsx";
 import BucketRegionSelector from "../components/BucketRegionSelector.jsx";
 import CloudProviderToolbar, {
@@ -64,6 +66,12 @@ import { IconLock } from "../components/dashboard/Icons.jsx";
 function SecurityPage() {
   const { token, user } = useAuth();
   const notifications = useNotifications();
+  const {
+    executeWithNotification,
+    showLoading,
+    updateSuccess,
+    updateError,
+  } = notifications;
   const { loading: availLoading, getFeature, credentialMode } = useCloudAvailability();
   const securityProviders = getFeature("security").providers || [];
   const securityToolbarOptions = useMemo(
@@ -74,6 +82,8 @@ function SecurityPage() {
   const [encrypt, setEncrypt] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [catalogReloadToken, setCatalogReloadToken] = useState(0);
+  const { runPageRefresh, pageRefreshing } = usePageRefresh();
   const [cloudProvider, setCloudProvider] = useState("ALL");
   const [secureFiles, setSecureFiles] = useState(() => {
     try { return JSON.parse(sessionStorage.getItem('cache_secureFiles')) || []; } catch { return []; }
@@ -91,7 +101,8 @@ function SecurityPage() {
   });
   const [qrCode, setQrCode] = useState(null);
   const [twoFACode, setTwoFACode] = useState("");
-  const [verifyPanelOpen, setVerifyPanelOpen] = useState(true);
+  const [verifyPanelOpen, setVerifyPanelOpen] = useState(false);
+  const [isEnabling2FA, setIsEnabling2FA] = useState(false);
   const [showDisablePanel, setShowDisablePanel] = useState(false);
   const fileInputRef = useRef(null);
   const [showModal, setShowModal] = useState(false);
@@ -168,6 +179,22 @@ function SecurityPage() {
     }
   }, [token, canAccessSecureArea, selectedBucket, selectedRegion, notifications]);
 
+  const handlePageRefresh = useCallback(async () => {
+    if (!token) return;
+    await runPageRefresh(
+      async () => {
+        const startedAt = Date.now();
+        setCatalogReloadToken((t) => t + 1);
+        await Promise.all([fetchSecureFiles(), minLoadingDelay(startedAt)]);
+      },
+      {
+        loadingMessage: 'Refreshing security page…',
+        successMessage: 'Security page refreshed — vault files and destinations updated.',
+        getErrorMessage: (err) => err?.detail || err?.message || 'Failed to refresh security page.',
+      }
+    );
+  }, [token, runPageRefresh, fetchSecureFiles]);
+
   useEffect(() => {
     const wsRef = { current: null };
     if (user && token && canAccessSecureArea && !loading) {
@@ -207,11 +234,16 @@ function SecurityPage() {
         const res = await status2FA(token);
         setTwoFAStatus(res);
         sessionStorage.setItem('cache_2faStatus', JSON.stringify(res));
+        if (res.enabled && !res.verified) {
+          setVerifyPanelOpen(true);
+        }
       } catch (err) {
-        if (err.detail?.includes("2FA token verification is required")) {
+        const detail = typeof err?.detail === 'string' ? err.detail : '';
+        if (detail.includes('2FA token verification is required')) {
           const status = { enabled: true, verified: false, secret_exists: true };
           setTwoFAStatus(status);
           sessionStorage.setItem('cache_2faStatus', JSON.stringify(status));
+          setVerifyPanelOpen(true);
         }
       } finally {
         setLoading(false);
@@ -221,7 +253,6 @@ function SecurityPage() {
   }, [token]);
 
   const clearModalState = () => {
-    setShowEncryptPrompt(false);
     setShowEncryptionModal(false);
     setShowDecryptionModal(false);
     setShowModal(false);
@@ -269,12 +300,16 @@ function SecurityPage() {
   };
 
   const handleEnable2FA = async () => {
-    clearModalState();
+    if (!token || isEnabling2FA) return;
     setShowDisablePanel(false);
+    setVerifyPanelOpen(false);
+    clearModalState();
+    setIsEnabling2FA(true);
     try {
       const res = await enable2FA(token);
-      if (res.qr_code) {
+      if (res?.qr_code) {
         setQrCode(res.qr_code);
+        setTwoFACode('');
         const next = {
           secret_exists: true,
           enabled: false,
@@ -282,9 +317,16 @@ function SecurityPage() {
         };
         setTwoFAStatus(next);
         persistTwoFAStatus(next);
+      } else {
+        notifications.error(res?.message || 'No QR code returned. Please try again.');
       }
     } catch (err) {
-      notifications.error(err.detail || "Failed to enable 2FA");
+      const detail = err?.detail;
+      notifications.error(
+        typeof detail === 'string' ? detail : detail?.message || 'Failed to enable 2FA',
+      );
+    } finally {
+      setIsEnabling2FA(false);
     }
   };
   const handleFinalize2FA = async () => {
@@ -335,6 +377,7 @@ function SecurityPage() {
     const targets =
       cloudProvider === "ALL" ? securityProviders : [cloudProvider];
     setIsSyncing(true);
+    const loadingToastId = showLoading("Syncing secure vault with cloud storage…");
     try {
       let totalInserted = 0;
       let totalRemoved = 0;
@@ -373,17 +416,22 @@ function SecurityPage() {
           skipped.length > 0
             ? ` Skipped ${skipped.join(", ")} (not configured).`
             : "";
-        notifications.success(
+        updateSuccess(
+          loadingToastId,
           `Secure sync complete (all providers). Added ${totalInserted} new file(s).${removedMsg}${skipMsg}`
         );
       } else {
-        notifications.success(
+        updateSuccess(
+          loadingToastId,
           `Secure sync complete (${cloudProvider}). Added ${totalInserted} new file(s).${removedMsg}`
         );
       }
       await fetchSecureFiles();
     } catch (err) {
-      notifications.error(err.detail || err.message || "Secure vault sync failed.");
+      updateError(
+        loadingToastId,
+        err.detail || err.message || "Secure vault sync failed."
+      );
     } finally {
       setIsSyncing(false);
     }
@@ -443,38 +491,42 @@ function SecurityPage() {
     if (!pendingLocalFile || !token) return;
     const filename = pendingLocalFile.name;
     setWizardSubmitting(true);
+    const encryptLabel =
+      encryptionMethod === "server-side" ? "cloud-managed" : "client-side";
     try {
-      if (encryptionMethod === "server-side") {
-        await uploadSecureFile(
-          pendingLocalFile,
-          true,
-          token,
-          true,
-          csp
-        );
-        await chooseEncryption(filename, "server-side", null, token, {
-          csp,
-          enableReplication,
-          replicaRegion,
-        });
-        notifications.success(
-          `'${filename}' stored with cloud-managed encryption on ${CSP_LABELS[csp] || csp}.`
-        );
-      } else {
-        const encryptedBlob = await encryptFileInBrowser(pendingLocalFile, password);
-        await uploadClientEncrypted(encryptedBlob, filename, Boolean(isSensitive), token, {
-          csp,
-          enableReplication,
-        });
-        notifications.success(
-          `'${filename}' encrypted in your browser and stored on ${CSP_LABELS[csp] || csp}.`
-        );
-      }
-      resetUploadState();
-      await fetchSecureFiles();
-    } catch (err) {
-      const msg = err.detail || err.message || "Secure upload failed";
-      notifications.error(typeof msg === "string" ? msg : "Secure upload failed");
+      await executeWithNotification(
+        async () => {
+          if (encryptionMethod === "server-side") {
+            await uploadSecureFile(pendingLocalFile, true, token, true, csp);
+            await chooseEncryption(filename, "server-side", null, token, {
+              csp,
+              enableReplication,
+              replicaRegion,
+            });
+          } else {
+            const encryptedBlob = await encryptFileInBrowser(pendingLocalFile, password);
+            await uploadClientEncrypted(encryptedBlob, filename, Boolean(isSensitive), token, {
+              csp,
+              enableReplication,
+            });
+          }
+          resetUploadState();
+          await fetchSecureFiles();
+        },
+        {
+          loadingMessage: `Securing '${filename}' with ${encryptLabel} encryption…`,
+          successMessage:
+            encryptionMethod === "server-side"
+              ? `'${filename}' stored with cloud-managed encryption on ${CSP_LABELS[csp] || csp}.`
+              : `'${filename}' encrypted in your browser and stored on ${CSP_LABELS[csp] || csp}.`,
+          getErrorMessage: (err) => {
+            const msg = err.detail || err.message || "Secure upload failed";
+            return typeof msg === "string" ? msg : "Secure upload failed";
+          },
+        }
+      );
+    } catch {
+      /* toast already shown */
     } finally {
       setWizardSubmitting(false);
     }
@@ -493,46 +545,49 @@ function SecurityPage() {
   const handleEncryptionChoice = async (encryptionMethod, password) => {
     if (!fileAwaitingEncryption) return;
 
+    const encFilename = fileAwaitingEncryption.filename;
     try {
-      if (encryptionMethod === "server-side") {
-        await chooseEncryption(
-          fileAwaitingEncryption.filename,
-          "server-side",
-          null,
-          token
-        );
-        notifications.success(
-          `'${fileAwaitingEncryption.filename}' encrypted with SSE-S3 and stored (primary + replica).`
-        );
-      } else if (encryptionMethod === "client-side") {
-        if (!pendingLocalFile) {
-          throw new Error(
-            "Original file is no longer in memory. Please re-upload and choose client-side encryption immediately."
-          );
-        }
-        const encryptedBlob = await encryptFileInBrowser(pendingLocalFile, password);
-        await uploadClientEncrypted(
-          encryptedBlob,
-          fileAwaitingEncryption.filename,
-          Boolean(fileAwaitingEncryption.is_sensitive ?? pendingFileMeta?.is_sensitive),
-          token
-        );
-        notifications.success(
-          `'${fileAwaitingEncryption.filename}' encrypted in your browser and stored. Your password was not sent to the server.`
-        );
-      }
+      await executeWithNotification(
+        async () => {
+          if (encryptionMethod === "server-side") {
+            await chooseEncryption(encFilename, "server-side", null, token);
+          } else if (encryptionMethod === "client-side") {
+            if (!pendingLocalFile) {
+              throw new Error(
+                "Original file is no longer in memory. Please re-upload and choose client-side encryption immediately."
+              );
+            }
+            const encryptedBlob = await encryptFileInBrowser(pendingLocalFile, password);
+            await uploadClientEncrypted(
+              encryptedBlob,
+              encFilename,
+              Boolean(fileAwaitingEncryption.is_sensitive ?? pendingFileMeta?.is_sensitive),
+              token
+            );
+          }
 
-      setShowEncryptionModal(false);
-      setFileAwaitingEncryption(null);
-      setPendingLocalFile(null);
-      setPendingFileMeta(null);
-      setShowSecureWizard(false);
-      setFile(null);
-      if (fileInputRef.current) fileInputRef.current.value = "";
-      await fetchSecureFiles();
+          setShowEncryptionModal(false);
+          setFileAwaitingEncryption(null);
+          setPendingLocalFile(null);
+          setPendingFileMeta(null);
+          setShowSecureWizard(false);
+          setFile(null);
+          if (fileInputRef.current) fileInputRef.current.value = "";
+          await fetchSecureFiles();
+        },
+        {
+          loadingMessage: `Applying encryption to '${encFilename}'…`,
+          successMessage:
+            encryptionMethod === "server-side"
+              ? `'${encFilename}' encrypted with SSE-S3 and stored (primary + replica).`
+              : `'${encFilename}' encrypted in your browser and stored. Your password was not sent to the server.`,
+          getErrorMessage: (err) => {
+            const msg = err.detail || err.message || "Failed to apply encryption";
+            return typeof msg === "string" ? msg : "Failed to apply encryption";
+          },
+        }
+      );
     } catch (err) {
-      const msg = err.detail || err.message || "Failed to apply encryption";
-      notifications.error(typeof msg === "string" ? msg : "Failed to apply encryption");
       throw err;
     }
   };
@@ -550,53 +605,65 @@ function SecurityPage() {
     setShowModal(false);
     setIsDeleting(filename);
     try {
-      await deleteSecureFile(filename, token, { bucket: bucket || undefined });
-      await fetchSecureFiles();
-      notifications.success(`File '${filename}' was deleted successfully.`);
-    } catch (err) {
-      notifications.error(err.detail || "Could not delete file.");
+      await executeWithNotification(
+        async () => {
+          await deleteSecureFile(filename, token, { bucket: bucket || undefined });
+          await fetchSecureFiles();
+        },
+        {
+          loadingMessage: `Deleting '${filename}' from secure vault…`,
+          successMessage: `File '${filename}' was deleted successfully.`,
+          getErrorMessage: (err) => err.detail || "Could not delete file.",
+        }
+      );
+    } catch {
+      /* toast already shown */
     } finally {
       setIsDeleting(null);
     }
   };
 
   const handleDownload = async (file) => {
+    const loadingToastId = showLoading(`Preparing secure download for '${file.filename}'…`);
     try {
       const response = await getSecureDownloadUrl(file.filename, token, {
         bucket: file.cloud_bucket || selectedBucket || undefined,
       });
-      
-      // Check if file is client-side encrypted
+
       if (response.client_side_encrypted) {
-        // Show password modal
         setFileToDecrypt(file);
         setShowDecryptionModal(true);
+        updateSuccess(
+          loadingToastId,
+          `'${file.filename}' is client-encrypted — enter your password to decrypt.`
+        );
       } else {
-        // Direct download for non-encrypted or server-side encrypted files
         window.open(response.presigned_url, "_blank");
+        updateSuccess(loadingToastId, `Download started for '${file.filename}'.`);
       }
     } catch (error) {
-      notifications.error(error.detail || "Could not get download link.");
+      updateError(loadingToastId, error.detail || "Could not get download link.");
     }
   };
 
   const handleDecryptDownload = async (password) => {
     if (!fileToDecrypt) return;
 
+    const filename = fileToDecrypt.filename;
+    const loadingToastId = showLoading(`Decrypting '${filename}' in your browser…`);
     try {
-      const ciphertextBlob = await downloadClientCiphertext(
-        fileToDecrypt.filename,
-        token,
-        { bucket: fileToDecrypt.cloud_bucket || selectedBucket || undefined }
-      );
+      const ciphertextBlob = await downloadClientCiphertext(filename, token, {
+        bucket: fileToDecrypt.cloud_bucket || selectedBucket || undefined,
+      });
       const plainBlob = await decryptBlobInBrowser(ciphertextBlob, password);
-      downloadBlob(plainBlob, fileToDecrypt.filename);
-      notifications.success("File decrypted in your browser and downloaded.");
+      downloadBlob(plainBlob, filename);
+      updateSuccess(loadingToastId, "File decrypted in your browser and downloaded.");
       setShowDecryptionModal(false);
       setFileToDecrypt(null);
     } catch (error) {
-      const detail = error.detail || error.message;
-      throw new Error(detail || "Decryption failed");
+      const detail = error.detail || error.message || "Decryption failed";
+      updateError(loadingToastId, detail);
+      throw new Error(detail);
     }
   };
 
@@ -722,6 +789,9 @@ function SecurityPage() {
           kicker="Secure vault"
           title="Security Center"
           subtitle="Scan, encrypt, and manage sensitive files with SSE-S3 or browser-side encryption."
+          onRefresh={handlePageRefresh}
+          refreshing={pageRefreshing}
+          refreshDisabled={isSyncing || wizardSubmitting}
         />
 
         <div className="security-2fa-bar" role="region" aria-label="Two-factor authentication">
@@ -771,8 +841,13 @@ function SecurityPage() {
                 </button>
               </>
             ) : (
-              <button type="button" onClick={handleEnable2FA} className="btn success-btn">
-                Enable 2FA
+              <button
+                type="button"
+                onClick={handleEnable2FA}
+                className="btn success-btn"
+                disabled={isEnabling2FA}
+              >
+                {isEnabling2FA ? 'Loading…' : 'Enable 2FA'}
               </button>
             )}
           </div>
@@ -874,6 +949,7 @@ function SecurityPage() {
               selectedRegion={selectedRegion}
               onBucketChange={handleBucketSelect}
               onRegionChange={handleRegionSelect}
+              reloadToken={catalogReloadToken}
             />
             <ByocStorageTargetBanner
               variant="security"

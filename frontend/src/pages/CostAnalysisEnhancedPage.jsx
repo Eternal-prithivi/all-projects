@@ -14,6 +14,7 @@ import React, { useState, useEffect } from 'react';
 import { apiClient, getApiErrorMessage } from '../api.js';
 import { useNotifications } from "../hooks/useNotifications";
 import PageHeader from '../components/ui/PageHeader.jsx';
+import { usePageRefresh } from '../hooks/usePageRefresh.js';
 import CostHubNav from '../components/dashboard/CostHubNav.jsx';
 import {
   IconAlert,
@@ -40,6 +41,7 @@ const ProviderLogo = ({ provider }) => {
 
 const CostAnalysisEnhancedPage = () => {
   const notifications = useNotifications();
+  const { runPageRefresh, pageRefreshing } = usePageRefresh();
   const { getFeature } = useCloudAvailability();
   const costProviderKeys = (getFeature('cost').providers || []).map((p) => CSP_TO_COST_KEY[p]).filter(Boolean);
 
@@ -74,6 +76,7 @@ const CostAnalysisEnhancedPage = () => {
   const [anomalySummary, setAnomalySummary] = useState(null);
   const [showAnomalies, setShowAnomalies] = useState(false);
   const [billingStatus, setBillingStatus] = useState(null);
+  const [storageMetering, setStorageMetering] = useState(null);
   const [providerSetup, setProviderSetup] = useState(null);
   const [setupForm, setSetupForm] = useState({
     billing_dataset_id: '',
@@ -94,6 +97,15 @@ const CostAnalysisEnhancedPage = () => {
     }
   };
 
+  const fetchStorageMetering = async () => {
+    try {
+      const res = await apiClient.get('/billing/storage-metering');
+      setStorageMetering(res.data);
+    } catch {
+      setStorageMetering(null);
+    }
+  };
+
   // Set default dates (last 30 days)
   useEffect(() => {
     const today = new Date();
@@ -108,6 +120,7 @@ const CostAnalysisEnhancedPage = () => {
     fetchAnomalies();
     fetchAnomalySummary();
     fetchBillingStatus();
+    fetchStorageMetering();
   }, []);
 
   const fetchProviderSetup = async (provider) => {
@@ -496,8 +509,44 @@ const CostAnalysisEnhancedPage = () => {
         kicker="Cost intelligence"
         title="Cost Analysis"
         subtitle="Monitor and optimize your multi-cloud spending"
+        onRefresh={() =>
+          runPageRefresh(
+            async () => {
+              await fetchBillingStatus();
+              await fetchStorageMetering();
+              await fetchBudgets();
+              if (startDate && endDate) {
+                await fetchCostData();
+              }
+              if (showForecast) {
+                await fetchForecast();
+              }
+              await fetchAnomalies();
+            },
+            {
+              loadingMessage: 'Refreshing cost analysis…',
+              successMessage: 'Cost analysis page refreshed.',
+              errorMessage: 'Failed to refresh cost analysis.',
+            }
+          )
+        }
+        refreshing={pageRefreshing || loading}
       />
       <CostHubNav />
+      {storageMetering?.estimated_usd && (
+        <div className="storage-metering-cost-banner zenith-surface" role="status">
+          <h3 className="storage-metering-cost-title">Storage API metering (this month)</h3>
+          <p className="storage-metering-cost-desc">
+            Pass-through estimate for list buckets, sync, upload, and download calls from the Storage page.
+          </p>
+          <div className="storage-metering-cost-pills">
+            <span>AWS: ${Number(storageMetering.estimated_usd.AWS || 0).toFixed(6)}</span>
+            <span>GCP: ${Number(storageMetering.estimated_usd.GCP || 0).toFixed(6)}</span>
+            <span>Azure: ${Number(storageMetering.estimated_usd.Azure || 0).toFixed(6)}</span>
+            <strong>Total: ${Number(storageMetering.estimated_usd.total || 0).toFixed(6)} USD</strong>
+          </div>
+        </div>
+      )}
       {billingStatus?.providers && (
         <div className="billing-connectivity-banner" role="status">
           {(costProviderKeys.length ? costProviderKeys : ['aws', 'gcp', 'azure']).map((key) => {

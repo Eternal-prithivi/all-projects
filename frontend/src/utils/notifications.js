@@ -1,4 +1,6 @@
+import React from 'react';
 import { toast } from 'react-toastify';
+import IndeterminateProgressBar from '../components/IndeterminateProgressBar.jsx';
 
 /**
  * Google Cloud-style notification system
@@ -27,16 +29,25 @@ export const showLoadingNotification = (message, options = {}) => {
     title = null,
   } = options;
   
-  const loadingToastId = toast.loading(message, {
-    toastId: existingToastId,
-    autoClose,
-    hideProgressBar,
-    position: 'top-right',
-    theme: 'dark',
-    className: 'toast-loading',
-    bodyClassName: 'toast-loading-body',
-    containerId: 'main-toast-container',
-  });
+  const loadingToastId = toast.loading(
+    React.createElement(
+      'div',
+      { className: 'toast-loading-content' },
+      React.createElement('span', { className: 'toast-loading-message' }, message),
+      React.createElement(IndeterminateProgressBar, { label: message })
+    ),
+    {
+      toastId: existingToastId,
+      autoClose,
+      hideProgressBar: true,
+      icon: false,
+      position: 'top-right',
+      theme: 'dark',
+      className: 'toast-loading',
+      bodyClassName: 'toast-loading-body',
+      containerId: 'main-toast-container',
+    }
+  );
   
   // Also add loading notification to the notification center
   if (notificationCenterRef) {

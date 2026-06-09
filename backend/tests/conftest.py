@@ -17,12 +17,22 @@ from fastapi.testclient import TestClient
 from pymongo import MongoClient
 from pymongo.database import Database
 
+# Never run integration test teardown against production DB names.
+_PROTECTED_MONGO_DB_NAMES = frozenset(
+    {
+        "CloudResourceOptimizationDB",
+        "zenith_production",
+        "zenith_prod",
+        "production",
+    }
+)
+
 # --- Environment before any app imports that load Settings / Mongo singleton ---
 _TEST_ENV: dict[str, str] = {
     "MONGO_CONNECTION_STRING": os.environ.get(
         "MONGO_CONNECTION_STRING", "mongodb://localhost:27017"
     ),
-    "MONGO_DB_NAME": os.environ.get("MONGO_DB_NAME", "zenith_test"),
+    "MONGO_DB_NAME": "zenith_test",
     "SECRET_KEY": "pytest-secret-key-do-not-use-in-production",
     "ALGORITHM": "HS256",
     "ACCESS_TOKEN_EXPIRE_MINUTES": "60",
@@ -59,7 +69,11 @@ _TEST_ENV: dict[str, str] = {
 
 def pytest_configure(config: pytest.Config) -> None:
     for key, value in _TEST_ENV.items():
-        os.environ.setdefault(key, value)
+        os.environ[key] = value
+    # Allow explicit override for CI only (never use production DB names).
+    override_db = os.environ.get("PYTEST_MONGO_DB_NAME", "").strip()
+    if override_db and override_db not in _PROTECTED_MONGO_DB_NAMES:
+        os.environ["MONGO_DB_NAME"] = override_db
 
 
 def _test_db_name() -> str:
@@ -166,6 +180,12 @@ def clean_database(request: pytest.FixtureRequest) -> Generator[None, None, None
         return
     test_database: Database = request.getfixturevalue("test_database")
     yield
+    db_name = test_database.name
+    if db_name in _PROTECTED_MONGO_DB_NAMES:
+        raise RuntimeError(
+            f"Refusing to wipe protected database {db_name!r} during tests. "
+            "Use MONGO_DB_NAME=zenith_test (default) or PYTEST_MONGO_DB_NAME for an isolated test DB."
+        )
     for name in test_database.list_collection_names():
         if name.startswith("system."):
             continue

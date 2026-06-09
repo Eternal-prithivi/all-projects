@@ -28,9 +28,13 @@ import {
 } from '../utils/formValidation';
 import '../styles/settings.css';
 import PageHeader from '../components/ui/PageHeader.jsx';
+import { usePageRefresh } from '../hooks/usePageRefresh.js';
+import PlatformRegionPills from '../components/PlatformRegionPills.jsx';
 
 const SettingsPage = () => {
   const notifications = useNotifications();
+  const { executeWithNotification, showLoading, updateSuccess, updateError } = notifications;
+  const { runPageRefresh, pageRefreshing } = usePageRefresh();
   const { theme, setTheme } = useTheme();
   const { updatePreferences } = usePreferences();
   
@@ -51,7 +55,10 @@ const SettingsPage = () => {
     dateFormat: 'MM/DD/YYYY',
     currency: 'USD',
     provisionEngine: 'boto3',
+    platformRegionSlug: '',
   });
+  const [platformMultiRegion, setPlatformMultiRegion] = useState(false);
+  const [platformRegions, setPlatformRegions] = useState([]);
 
   // BYOC State
   const [byocStatus, setByocStatus] = useState(null);
@@ -207,12 +214,19 @@ const SettingsPage = () => {
         setTheme(serverTheme);
       }
 
+      setPlatformMultiRegion(Boolean(data.platform_multi_region));
+      setPlatformRegions(data.platform_regions || []);
+
       setPreferences(prev => ({
         ...prev,
         ...data.preferences,
         dateFormat: data.preferences?.date_format || data.preferences?.dateFormat || prev.dateFormat,
         theme: serverTheme && ['dark', 'light', 'auto'].includes(serverTheme) ? serverTheme : theme,
         provisionEngine: data.preferences?.provision_engine || prev.provisionEngine,
+        platformRegionSlug:
+          data.preferences?.platform_region_slug ||
+          data.platform_regions?.[0]?.slug ||
+          prev.platformRegionSlug,
       }));
     } catch (error) {
       console.error('Failed to fetch settings:', error);
@@ -537,6 +551,7 @@ const SettingsPage = () => {
         date_format: nextPreferences.dateFormat,
         currency: nextPreferences.currency,
         provision_engine: nextPreferences.provisionEngine,
+        platform_region_slug: nextPreferences.platformRegionSlug || null,
       }).catch(() => {
         notifications.error('Theme updated locally but failed to save to account');
       });
@@ -549,6 +564,7 @@ const SettingsPage = () => {
         date_format: nextPreferences.dateFormat,
         currency: nextPreferences.currency,
         provision_engine: value,
+        platform_region_slug: nextPreferences.platformRegionSlug || null,
       }).catch(() => {
         notifications.error('Failed to save provisioning engine preference');
       });
@@ -557,31 +573,40 @@ const SettingsPage = () => {
 
   const handleSavePreferences = async () => {
     try {
-      await apiClient.put('/settings/preferences', {
-        theme: preferences.theme,
-        language: preferences.language,
-        timezone: preferences.timezone,
-        date_format: preferences.dateFormat,
-        currency: preferences.currency,
-        provision_engine: preferences.provisionEngine,
-      });
-      
-      // Update the app-wide PreferencesContext so formatting changes propagate immediately
-      updatePreferences({
-        currency: preferences.currency,
-        dateFormat: preferences.dateFormat,
-        timezone: preferences.timezone,
-      });
-      
-      notifications.success('Preferences saved successfully!');
+      await executeWithNotification(
+        async () => {
+          await apiClient.put('/settings/preferences', {
+            theme: preferences.theme,
+            language: preferences.language,
+            timezone: preferences.timezone,
+            date_format: preferences.dateFormat,
+            currency: preferences.currency,
+            provision_engine: preferences.provisionEngine,
+            platform_region_slug: preferences.platformRegionSlug || null,
+          });
+          updatePreferences({
+            currency: preferences.currency,
+            dateFormat: preferences.dateFormat,
+            timezone: preferences.timezone,
+            platformRegionSlug: preferences.platformRegionSlug || null,
+          });
+        },
+        {
+          loadingMessage: 'Saving preferences…',
+          successMessage: 'Preferences saved successfully!',
+          errorMessage: 'Failed to save preferences',
+        }
+      );
     } catch {
-      notifications.error('Failed to save preferences');
+      /* toast already shown */
     }
   };
 
   const handleGenerateApiKey = async () => {
+    const loadingToastId = showLoading('Generating API key…');
     try {
       const response = await apiClient.post('/settings/api-keys');
+      updateSuccess(loadingToastId, 'API key generated — copy it now; it will not be shown again.');
       notifications.success(
         <div>
           <strong>API Key Generated!</strong><br/>
@@ -592,17 +617,25 @@ const SettingsPage = () => {
       );
       fetchApiKeys();
     } catch {
-      notifications.error('Failed to generate API key');
+      updateError(loadingToastId, 'Failed to generate API key');
     }
   };
 
   const handleRevokeApiKey = async (keyId) => {
     try {
-      await apiClient.delete(`/settings/api-keys/${keyId}`);
-      notifications.success('API key revoked');
-      fetchApiKeys();
+      await executeWithNotification(
+        async () => {
+          await apiClient.delete(`/settings/api-keys/${keyId}`);
+          await fetchApiKeys();
+        },
+        {
+          loadingMessage: 'Revoking API key…',
+          successMessage: 'API key revoked.',
+          errorMessage: 'Failed to revoke API key',
+        }
+      );
     } catch {
-      notifications.error('Failed to revoke API key');
+      /* toast already shown */
     }
   };
 
@@ -663,7 +696,7 @@ const SettingsPage = () => {
   const renderByocSection = () => {
     if (!byocEligible) {
       return (
-        <div className="settings-card byoc-card animate-fade-in-up">
+        <div className="settings-card byoc-card">
           <h3>
             <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor">
               <path d="M4.406 3.342A5.53 5.53 0 0 1 8 2c2.69 0 4.923 2 5.166 4.579C14.758 6.804 16 8.137 16 9.773 16 11.569 14.502 13 12.687 13H3.781C1.708 13 0 11.366 0 9.318c0-1.763 1.266-3.223 2.942-3.593.143-.863.698-1.723 1.464-2.383z"/>
@@ -682,7 +715,7 @@ const SettingsPage = () => {
     }
 
     return (
-      <div className="settings-card byoc-card animate-fade-in-up">
+      <div className="settings-card byoc-card">
         <h3>
           <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor">
             <path d="M4.406 3.342A5.53 5.53 0 0 1 8 2c2.69 0 4.923 2 5.166 4.579C14.758 6.804 16 8.137 16 9.773 16 11.569 14.502 13 12.687 13H3.781C1.708 13 0 11.366 0 9.318c0-1.763 1.266-3.223 2.942-3.593.143-.863.698-1.723 1.464-2.383z"/>
@@ -1125,6 +1158,20 @@ const SettingsPage = () => {
         kicker="Workspace"
         title="Settings"
         subtitle="Manage your application preferences and configurations"
+        onRefresh={() =>
+          runPageRefresh(
+            async () => {
+              await fetchSettings();
+              await fetchApiKeys();
+            },
+            {
+              loadingMessage: 'Refreshing settings…',
+              successMessage: 'Settings page refreshed.',
+              errorMessage: 'Failed to refresh settings.',
+            }
+          )
+        }
+        refreshing={pageRefreshing}
       />
 
       <div className="settings-content stagger-children">
@@ -1132,7 +1179,7 @@ const SettingsPage = () => {
         {renderByocSection()}
 
         {/* Notifications Settings */}
-        <div className="settings-card animate-fade-in-up">
+        <div className="settings-card">
           <h3>
             <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor">
               <path d="M8 16a2 2 0 0 0 2-2H6a2 2 0 0 0 2 2zM8 1.918l-.797.161A4.002 4.002 0 0 0 4 6c0 .628-.134 2.197-.459 3.742-.16.767-.376 1.566-.663 2.258h10.244c-.287-.692-.502-1.49-.663-2.258C12.134 8.197 12 6.628 12 6a4.002 4.002 0 0 0-3.203-3.92L8 1.917zM14.22 12c.223.447.481.801.78 1H1c.299-.199.557-.553.78-1C2.68 10.2 3 6.88 3 6c0-2.42 1.72-4.44 4.005-4.901a1 1 0 1 1 1.99 0A5.002 5.002 0 0 1 13 6c0 .88.32 4.2 1.22 6z"/>
@@ -1167,7 +1214,7 @@ const SettingsPage = () => {
         </div>
 
         {/* Infrastructure provisioning engine */}
-        <div className="settings-card animate-fade-in-up">
+        <div className="settings-card">
           <h3>
             <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor">
               <path d="M1 2.5A1.5 1.5 0 0 1 2.5 1h3A1.5 1.5 0 0 1 7 2.5v3A1.5 1.5 0 0 1 5.5 7h-3A1.5 1.5 0 0 1 1 5.5v-3zM2.5 2a.5.5 0 0 0-.5.5v3a.5.5 0 0 0 .5.5h3a.5.5 0 0 0 .5-.5v-3a.5.5 0 0 0-.5-.5h-3zm6.5.5A1.5 1.5 0 0 1 10.5 1h3A1.5 1.5 0 0 1 15 2.5v3A1.5 1.5 0 0 1 13.5 7h-3A1.5 1.5 0 0 1 9 5.5v-3zm1.5-.5a.5.5 0 0 0-.5.5v3a.5.5 0 0 0 .5.5h3a.5.5 0 0 0 .5-.5v-3a.5.5 0 0 0-.5-.5h-3zM1 10.5A1.5 1.5 0 0 1 2.5 9h3A1.5 1.5 0 0 1 7 10.5v3A1.5 1.5 0 0 1 5.5 15h-3A1.5 1.5 0 0 1 1 13.5v-3zm1.5-.5a.5.5 0 0 0-.5.5v3a.5.5 0 0 0 .5.5h3a.5.5 0 0 0 .5-.5v-3a.5.5 0 0 0-.5-.5h-3zm6.5.5A1.5 1.5 0 0 1 10.5 9h3a1.5 1.5 0 0 1 1.5 1.5v3a1.5 1.5 0 0 1-1.5 1.5h-3A1.5 1.5 0 0 1 9 13.5v-3zm1.5-.5a.5.5 0 0 0-.5.5v3a.5.5 0 0 0 .5.5h3a.5.5 0 0 0 .5-.5v-3a.5.5 0 0 0-.5-.5h-3z"/>
@@ -1195,7 +1242,7 @@ const SettingsPage = () => {
         </div>
 
         {/* Preferences */}
-        <div className="settings-card animate-fade-in-up">
+        <div className="settings-card">
           <h3>
             <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor">
               <path d="M8 4.754a3.246 3.246 0 1 0 0 6.492 3.246 3.246 0 0 0 0-6.492zM5.754 8a2.246 2.246 0 1 1 4.492 0 2.246 2.246 0 0 1-4.492 0z"/>
@@ -1251,18 +1298,35 @@ const SettingsPage = () => {
                 <option value="GBP">GBP (£)</option>
               </select>
             </div>
+            {platformMultiRegion && platformRegions.length > 1 && (
+              <div className="setting-item-full settings-platform-region">
+                <label>Default platform region</label>
+                <p className="settings-hint">
+                  Used for Storage uploads, sync, and other platform services. You can override
+                  per session on the Storage page.
+                </p>
+                <PlatformRegionPills
+                  regions={platformRegions}
+                  selectedSlug={preferences.platformRegionSlug}
+                  onSelect={(slug) => {
+                    setPreferences((prev) => ({ ...prev, platformRegionSlug: slug }));
+                  }}
+                  id="settings-platform-region"
+                  hideLabel
+                />
+              </div>
+            )}
           </div>
           <button className="btn-save" onClick={handleSavePreferences}>
             Save Preferences
           </button>
-          <div className="setting-item-full" style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-            <div>
-              <label>Onboarding Tour</label>
-              <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: '4px 0 0' }}>
-                Restart the guided walkthrough of Zenith's key features
-              </p>
+          <div className="setting-item setting-item--action settings-tour-row">
+            <div className="setting-info">
+              <h4>Onboarding Tour</h4>
+              <p>Restart the guided walkthrough of Zenith&apos;s key features</p>
             </div>
             <button
+              type="button"
               className="btn-save"
               style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--text-secondary)', border: '1px solid rgba(255,255,255,0.08)' }}
               onClick={() => {
@@ -1277,7 +1341,7 @@ const SettingsPage = () => {
         </div>
 
         {/* Plan & Billing — loaded from /payments/my-subscription (same DB as Billing page) */}
-        <div className="settings-card animate-fade-in-up">
+        <div className="settings-card">
           <h3>
             <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor">
               <path d="M0 4a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V4zm2-1a1 1 0 0 0-1 1v1h14V4a1 1 0 0 0-1-1H2zm13 4H1v5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V7z"/>
@@ -1325,7 +1389,7 @@ const SettingsPage = () => {
         </div>
 
         {/* API Keys */}
-        <div className="settings-card animate-fade-in-up">
+        <div className="settings-card">
           <h3>
             <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor">
               <path d="M0 8a4 4 0 0 1 7.465-2H14a.5.5 0 0 1 .354.146l1.5 1.5a.5.5 0 0 1 0 .708l-1.5 1.5a.5.5 0 0 1-.708 0L13 9.207l-.646.647a.5.5 0 0 1-.708 0L11 9.207l-.646.647a.5.5 0 0 1-.708 0L9 9.207l-.646.647A.5.5 0 0 1 8 10h-.535A4 4 0 0 1 0 8zm4-3a3 3 0 1 0 2.712 4.285A.5.5 0 0 1 7.163 9h.63l.853-.854a.5.5 0 0 1 .708 0l.646.647.646-.647a.5.5 0 0 1 .708 0l.646.647.646-.647a.5.5 0 0 1 .708 0l.646.647.793-.793-1-1h-6.63a.5.5 0 0 1-.451-.285A3 3 0 0 0 4 5z"/>

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { LOGO_ICON_PATH } from '../../config/site.js';
 
@@ -14,17 +14,31 @@ export default function ZenithLogo({
   linkTo = null,
   badge = 'Cloud',
   textLayout = 'inline',
+  animateOnMount = false,
 }) {
+  const [bootAnim, setBootAnim] = useState(animateOnMount);
+
+  useEffect(() => {
+    if (!animateOnMount) return undefined;
+    const timer = window.setTimeout(() => setBootAnim(false), 1400);
+    return () => window.clearTimeout(timer);
+  }, [animateOnMount]);
+
   const icon = (
-    <img
-      src={LOGO_ICON_PATH}
-      alt=""
-      width={size}
-      height={size}
-      className={`zenith-logo-icon ${className}`.trim()}
-      aria-hidden
-      decoding="async"
-    />
+    <span
+      className={`zenith-logo-icon-wrap${bootAnim ? ' zenith-logo-icon-wrap--boot' : ''}`}
+      style={{ width: size, height: size }}
+    >
+      <img
+        src={LOGO_ICON_PATH}
+        alt=""
+        width={size}
+        height={size}
+        className={`zenith-logo-icon ${className}`.trim()}
+        aria-hidden
+        decoding="async"
+      />
+    </span>
   );
 
   let content = icon;

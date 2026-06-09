@@ -22,6 +22,7 @@ const DEFAULT_PREFERENCES = {
   currency: 'USD',
   dateFormat: 'MM/DD/YYYY',
   timezone: 'UTC+5:30',
+  platformRegionSlug: null,
 };
 
 /** Currency symbol map */
@@ -77,6 +78,8 @@ export const PreferencesProvider = ({ children }) => {
             currency: serverPrefs.currency || DEFAULT_PREFERENCES.currency,
             dateFormat: serverPrefs.date_format || serverPrefs.dateFormat || DEFAULT_PREFERENCES.dateFormat,
             timezone: serverPrefs.timezone || DEFAULT_PREFERENCES.timezone,
+            platformRegionSlug:
+              serverPrefs.platform_region_slug || DEFAULT_PREFERENCES.platformRegionSlug,
           };
           setPreferencesState(merged);
           try {

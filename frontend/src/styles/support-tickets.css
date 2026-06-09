@@ -239,10 +239,42 @@
 
 .admin-support-page .admin-card {
   margin-top: 1rem;
+  min-width: 0;
 }
 
-.admin-support-detail {
-  margin-top: 1.25rem;
+/* Admin inbox: equal columns + contain table overflow (avoids blur bleed into chat panel) */
+.admin-support-page .support-page-layout {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: start;
+}
+
+.admin-support-page .admin-support-table-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.admin-support-page .admin-table {
+  min-width: 32rem;
+}
+
+.admin-support-page .admin-support-detail {
+  margin-top: 0;
+  min-width: 0;
+  /* Opaque panel — backdrop-filter was blurring overflowing table cells behind it */
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  background: var(--bg-elevated, #111118);
+  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.1));
+}
+
+@media (max-width: 1100px) {
+  .admin-support-page .support-page-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-support-page .admin-support-detail {
+    min-height: 420px;
+  }
 }
 
 .admin-support-reply {
@@ -289,6 +321,7 @@
   padding: 0;
   overflow: hidden;
   min-height: 480px;
+  isolation: isolate;
 }
 
 .support-thread-panel {

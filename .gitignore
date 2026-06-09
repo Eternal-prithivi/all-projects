@@ -49,6 +49,10 @@ logs/
 celerybeat-schedule
 celerybeat-schedule.*
 
+# Platform storage catalog contains Azure keys
+backend/config/platform_storage_catalog.json
+backend/config/azure_platform_keys.json
+
 # Cloud credentials (NEVER commit these!)
 *-key.json
 *.pem

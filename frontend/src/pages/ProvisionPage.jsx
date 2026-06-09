@@ -9,6 +9,7 @@ import { Link } from 'react-router-dom';
 import api from '../api';
 import '../styles/provision.css';
 import PageHeader from '../components/ui/PageHeader.jsx';
+import { usePageRefresh } from '../hooks/usePageRefresh.js';
 import CloudAvailabilityBanner from '../components/CloudAvailabilityBanner.jsx';
 import { useCloudAvailability } from '../hooks/useCloudAvailability.js';
 import ProvisionManagePanel from '../components/provision/ProvisionManagePanel.jsx';
@@ -31,6 +32,16 @@ export default function ProvisionPage() {
   const [userProvisionEngine, setUserProvisionEngine] = useState('boto3');
   const [hostingHint, setHostingHint] = useState('');
   const [deploymentCount, setDeploymentCount] = useState(0);
+  const [panelReloadToken, setPanelReloadToken] = useState(0);
+  const { runPageRefresh, pageRefreshing } = usePageRefresh();
+
+  const reloadProvisionStatus = async () => {
+    const statusRes = await api.get('/provision/status').catch(() => ({ data: {} }));
+    setTerraformOk(statusRes.data?.terraform_installed ?? false);
+    setUserProvisionEngine(statusRes.data?.user_provision_engine || 'boto3');
+    setHostingHint(statusRes.data?.hosting_hint || '');
+    setPanelReloadToken((t) => t + 1);
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -85,6 +96,14 @@ export default function ProvisionPage() {
             ? 'Deploy on your connected cloud accounts (credentials from Settings).'
             : 'Deploy on Zenith platform clouds — connect BYOC in Settings to use your own accounts.'
         }
+        onRefresh={() =>
+          runPageRefresh(reloadProvisionStatus, {
+            loadingMessage: 'Refreshing provision page…',
+            successMessage: 'Provision page refreshed.',
+            errorMessage: 'Failed to refresh provision page.',
+          })
+        }
+        refreshing={pageRefreshing}
       />
 
       <div className="provision-status-bar">
@@ -127,10 +146,13 @@ export default function ProvisionPage() {
       </nav>
 
       {tab === 'manage' && (
-        <ProvisionManagePanel onDeploymentsChange={setDeploymentCount} />
+        <ProvisionManagePanel
+          key={`manage-${panelReloadToken}`}
+          onDeploymentsChange={setDeploymentCount}
+        />
       )}
-      {tab === 'activity' && <ProvisionActivityPanel />}
-      {tab === 'policies' && <ProvisionPoliciesPanel />}
+      {tab === 'activity' && <ProvisionActivityPanel key={`activity-${panelReloadToken}`} />}
+      {tab === 'policies' && <ProvisionPoliciesPanel key={`policies-${panelReloadToken}`} />}
       {tab === 'deploy' && (
         <>
           {userProvisionEngine === 'terraform' && !terraformOk && (

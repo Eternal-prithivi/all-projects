@@ -18,6 +18,10 @@ aservices:
         value: production
       - key: FRONTEND_URL
         value: https://rajverse.me
+      # Multi-region platform storage: mount catalog JSON in the image or set via Render secret.
+      # See docs/cloud/PLATFORM_STORAGE_REGIONS.md
+      # - key: PLATFORM_STORAGE_CATALOG_JSON
+      #   value: config/platform_storage_catalog.json
 
   # Background jobs: storage tiering, cost anomalies, ML retrain, VM agent, drift checks.
   # Copy the same env vars as zenith-backend in the Render dashboard (CELERY_BROKER_URL, Mongo, etc.).

@@ -11,6 +11,7 @@ import {
 import '../styles/security-settings.css';
 import TwoFADialog from '../components/TwoFADialog.jsx';
 import PageHeader from '../components/ui/PageHeader.jsx';
+import { usePageRefresh } from '../hooks/usePageRefresh.js';
 
 const formatRelativeTime = (timestamp) => {
   const date = new Date(timestamp);
@@ -48,11 +49,25 @@ const SecuritySettingsPage = () => {
     newPassword: '',
     confirmPassword: '',
   });
+  const [passwordTouched, setPasswordTouched] = useState({
+    currentPassword: false,
+    newPassword: false,
+    confirmPassword: false,
+  });
+  const [passwordSubmitAttempted, setPasswordSubmitAttempted] = useState(false);
+  const { runPageRefresh, pageRefreshing } = usePageRefresh();
 
   const passwordValidation = React.useMemo(
     () => validatePasswordChangeForm(passwordData),
     [passwordData]
   );
+
+  const showPasswordFieldError = (field) =>
+    (passwordSubmitAttempted || passwordTouched[field]) && passwordValidation.errors[field];
+
+  const markPasswordFieldTouched = (field) => {
+    setPasswordTouched((prev) => ({ ...prev, [field]: true }));
+  };
 
   useEffect(() => {
     fetchSecuritySettings();
@@ -67,7 +82,20 @@ const SecuritySettingsPage = () => {
         apiClient.get('/profile/activity/summary', { params: { period_days: 30 } }),
       ]);
 
-      setTwoFactorEnabled(twoFAResponse.data.enabled || false);
+      const enabled = twoFAResponse.data.enabled || false;
+      setTwoFactorEnabled(enabled);
+      try {
+        sessionStorage.setItem(
+          'cache_2faStatus',
+          JSON.stringify({
+            enabled,
+            verified: twoFAResponse.data.verified || false,
+            secret_exists: twoFAResponse.data.secret_exists || false,
+          }),
+        );
+      } catch {
+        /* ignore */
+      }
       setSessions(sessionsResponse.data || []);
       setActivitySummary(summaryResponse.data);
     } catch (error) {
@@ -91,6 +119,7 @@ const SecuritySettingsPage = () => {
 
   const handlePasswordChange = async (e) => {
     e.preventDefault();
+    setPasswordSubmitAttempted(true);
 
     if (!passwordValidation.isValid) {
       toast.error(getValidationErrorMessage(passwordValidation.errors));
@@ -106,6 +135,12 @@ const SecuritySettingsPage = () => {
 
       toast.success('Password changed successfully');
       setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
+      setPasswordTouched({
+        currentPassword: false,
+        newPassword: false,
+        confirmPassword: false,
+      });
+      setPasswordSubmitAttempted(false);
       await refreshActivitySummary();
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Failed to change password');
@@ -210,6 +245,14 @@ const SecuritySettingsPage = () => {
         kicker="Account security"
         title="Security Settings"
         subtitle="Password, two-factor authentication, and sign-in overview"
+        onRefresh={() =>
+          runPageRefresh(fetchSecuritySettings, {
+            loadingMessage: 'Refreshing security settings…',
+            successMessage: 'Security settings page refreshed.',
+            errorMessage: 'Failed to refresh security settings.',
+          })
+        }
+        refreshing={pageRefreshing || isLoading}
       />
 
       <div className="security-bento">
@@ -229,12 +272,13 @@ const SecuritySettingsPage = () => {
                 autoComplete="current-password"
                 value={passwordData.currentPassword}
                 onChange={(e) => setPasswordData({ ...passwordData, currentPassword: e.target.value })}
+                onBlur={() => markPasswordFieldTouched('currentPassword')}
                 required
                 className="form-input"
-                aria-invalid={!!passwordValidation.errors.currentPassword}
-                aria-describedby={passwordValidation.errors.currentPassword ? 'current-password-error' : undefined}
+                aria-invalid={!!showPasswordFieldError('currentPassword')}
+                aria-describedby={showPasswordFieldError('currentPassword') ? 'current-password-error' : undefined}
               />
-              {passwordValidation.errors.currentPassword && (
+              {showPasswordFieldError('currentPassword') && (
                 <p id="current-password-error" className="form-field-error">{passwordValidation.errors.currentPassword}</p>
               )}
             </div>
@@ -246,14 +290,17 @@ const SecuritySettingsPage = () => {
                 autoComplete="new-password"
                 value={passwordData.newPassword}
                 onChange={(e) => setPasswordData({ ...passwordData, newPassword: e.target.value })}
+                onBlur={() => markPasswordFieldTouched('newPassword')}
                 required
                 minLength={8}
                 className="form-input"
-                aria-invalid={!!passwordValidation.errors.newPassword}
-                aria-describedby={passwordValidation.errors.newPassword ? 'new-password-error' : undefined}
+                aria-invalid={!!showPasswordFieldError('newPassword')}
+                aria-describedby={
+                  showPasswordFieldError('newPassword') ? 'new-password-error' : 'new-password-hint'
+                }
               />
-              <small className="hint-text">At least 8 characters</small>
-              {passwordValidation.errors.newPassword && (
+              <small id="new-password-hint" className="hint-text">At least 8 characters</small>
+              {showPasswordFieldError('newPassword') && (
                 <p id="new-password-error" className="form-field-error">{passwordValidation.errors.newPassword}</p>
               )}
             </div>
@@ -265,12 +312,13 @@ const SecuritySettingsPage = () => {
                 autoComplete="new-password"
                 value={passwordData.confirmPassword}
                 onChange={(e) => setPasswordData({ ...passwordData, confirmPassword: e.target.value })}
+                onBlur={() => markPasswordFieldTouched('confirmPassword')}
                 required
                 className="form-input"
-                aria-invalid={!!passwordValidation.errors.confirmPassword}
-                aria-describedby={passwordValidation.errors.confirmPassword ? 'confirm-password-error' : undefined}
+                aria-invalid={!!showPasswordFieldError('confirmPassword')}
+                aria-describedby={showPasswordFieldError('confirmPassword') ? 'confirm-password-error' : undefined}
               />
-              {passwordValidation.errors.confirmPassword && (
+              {showPasswordFieldError('confirmPassword') && (
                 <p id="confirm-password-error" className="form-field-error">{passwordValidation.errors.confirmPassword}</p>
               )}
             </div>

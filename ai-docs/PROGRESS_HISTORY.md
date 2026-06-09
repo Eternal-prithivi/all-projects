@@ -7,6 +7,17 @@
 
 ---
 
+**Phase 19 — Platform multi-region storage + page refresh UX** — COMPLETE 2026-06-09
+
+- **Backend:** `platform_storage_catalog.py` serves static bucket/container lists per region slug (`asia`, `us`, `europe`, `africa`). Upload and sync resolve destinations via `resolve_platform_storage_target` with `region_slug`. Sync stale-object removal and file list queries scoped by `cloud_bucket` + `cloud_account` (Azure). New tests: `test_platform_storage_catalog.py`, `test_storage_sync_filters.py`, `test_storage_metering.py`.
+- **Frontend:** `CloudDestinationPanel` stacks AWS/GCP/Azure selectors; platform region pills filter catalog entries. Removed per-CSP refresh buttons; **page header Refresh** reloads that page only (`usePageRefresh` + loading toasts). `BucketSelectorLoading` + `minLoadingDelay` show gold bar on all three CSPs during reload. `StorageRegionScopeBar` places region context near upload/files.
+- **Render:** Set `PLATFORM_STORAGE_CATALOG_JSON` + upload catalog secret; see `docs/cloud/PLATFORM_STORAGE_REGIONS.md`.
+- pytest 320 passed; `npm run build` green.
+
+**How to test:** `/dashboard/storage` → header Refresh → gold bars on AWS/GCP/Azure → buckets listed; upload with region pill → sync → correct file counts per bucket.
+
+---
+
 **Phase 18d — Support Chat UX** — COMPLETE 2026-06-05
 
 - Shared chat-style `SupportThreadPanel` across dashboard, guest, and admin support pages.

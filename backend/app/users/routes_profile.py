@@ -13,6 +13,7 @@
 #   - Return hashed_password in any profile response
 # =============================================================================
 
+import base64
 import csv
 import io
 
@@ -30,6 +31,39 @@ from app.utils.audit_log import categorize_audit_action
 
 router = APIRouter(prefix="/profile", tags=["Profile"])
 DB = get_database()
+
+
+def _sum_user_storage_bytes(username: str) -> int:
+    """Sum file sizes across regular and secure vault collections."""
+    total = 0
+    projection = {"size_bytes": 1, "size": 1}
+    owner_filter = {"$or": [{"owner_username": username}, {"username": username}]}
+    for collection_name in ("files", "secure_files"):
+        for doc in DB[collection_name].find(owner_filter, projection):
+            total += int(doc.get("size_bytes") or doc.get("size") or 0)
+    return total
+
+
+def _resolve_member_since(user: dict, username: str) -> str:
+    created_at = user.get("created_at")
+    if not created_at:
+        first_session = DB["sessions"].find_one(
+            {"username": username},
+            sort=[("created_at", 1)],
+            projection={"created_at": 1},
+        )
+        created_at = first_session.get("created_at") if first_session else None
+    if created_at:
+        return created_at.strftime("%B %Y")
+    return "Recent"
+
+ALLOWED_AVATAR_TYPES = frozenset({
+    "image/jpeg",
+    "image/png",
+    "image/gif",
+    "image/webp",
+})
+MAX_AVATAR_BYTES = 2 * 1024 * 1024
 
 
 class ProfileUpdate(BaseModel):
@@ -257,22 +291,50 @@ async def update_profile(
 @router.post("/picture")
 async def upload_profile_picture(
     file: UploadFile = File(...),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
-    """
-    Profile avatars are not yet stored in object storage (tri-cloud).
-    Use Settings → display name until S3/GCS/Blob upload ships (Phase 27 backlog).
-    """
-    raise HTTPException(
-        status_code=501,
-        detail={
-            "code": "not_implemented",
-            "message": (
-                "Profile picture upload is not available yet. "
-                "Tri-cloud object storage for avatars is planned; use display name for now."
-            ),
-        },
-    )
+    """Store profile avatar as a data URL on the user document (max 2 MB)."""
+    content_type = (file.content_type or "").lower().split(";")[0].strip()
+    if content_type not in ALLOWED_AVATAR_TYPES:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid file type. Use JPG, PNG, GIF, or WebP.",
+        )
+
+    try:
+        raw = await file.read()
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Failed to read upload: {e}") from e
+
+    if not raw:
+        raise HTTPException(status_code=400, detail="Empty file.")
+    if len(raw) > MAX_AVATAR_BYTES:
+        raise HTTPException(status_code=400, detail="File size must be less than 2MB.")
+
+    data_url = f"data:{content_type};base64,{base64.b64encode(raw).decode('ascii')}"
+
+    try:
+        users_collection = DB["users"]
+        users_collection.update_one(
+            {"username": current_user.username},
+            {"$set": {"profile_picture": data_url, "updated_at": datetime.utcnow()}},
+        )
+
+        activity_collection = DB["activity_log"]
+        activity_collection.insert_one({
+            "username": current_user.username,
+            "action": "Profile Picture Updated",
+            "description": "User uploaded a new profile picture",
+            "timestamp": datetime.utcnow(),
+        })
+
+        return {
+            "success": True,
+            "message": "Profile picture uploaded successfully",
+            "profile_picture": data_url,
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to upload picture: {str(e)}") from e
 
 
 @router.delete("/picture")
@@ -295,37 +357,31 @@ async def get_account_stats(current_user: User = Depends(get_current_user)):
     """Get user's account statistics"""
     try:
         users_collection = DB["users"]
-        vm_assignments_collection = DB["vm_assignments"]
-        files_collection = DB["files"]
-        
-        user = users_collection.find_one({"username": current_user.username})
-        
-        # Count total VMs created (including released ones)
-        total_vms = vm_assignments_collection.count_documents({
-            "username": current_user.username
-        })
-        
-        # Calculate storage used
-        user_files = list(files_collection.find({"username": current_user.username}))
-        total_storage_bytes = sum(f.get("size", 0) for f in user_files)
-        storage_tb = round(total_storage_bytes / (1024 ** 4), 2)  # Convert to TB
-        
-        # Calculate total spend (mock data for now)
-        # TODO: Integrate with actual billing data
-        total_spend = round(total_vms * 45.50 + storage_tb * 23.5, 2)
-        
-        # Member since
-        created_at = user.get("created_at")
-        if created_at:
-            member_since = created_at.strftime("%B %Y")
-        else:
-            member_since = "Recent"
-        
+        username = current_user.username
+
+        user = users_collection.find_one({"username": username}) or {}
+
+        cluster_vms = DB["vm_assignments"].count_documents({"user_id": username})
+        provisioned_vms = DB["provision_deployments"].count_documents({"user_id": username})
+        total_vms = cluster_vms + provisioned_vms
+
+        storage_tb = round(_sum_user_storage_bytes(username) / (1024 ** 4), 4)
+
+        from app.dashboard.cost_aggregation import get_cached_user_costs, refresh_user_costs
+
+        cost_snapshot = get_cached_user_costs(username)
+        if not cost_snapshot.get("providers_included"):
+            try:
+                cost_snapshot = refresh_user_costs(username)
+            except Exception:
+                pass
+        total_spend = round(float(cost_snapshot.get("monthly_costs", 0.0) or 0.0), 2)
+
         return AccountStats(
             total_vms_created=total_vms,
             storage_used_tb=storage_tb,
             total_spend=total_spend,
-            member_since=member_since
+            member_since=_resolve_member_since(user, username),
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch stats: {str(e)}")
@@ -333,23 +389,37 @@ async def get_account_stats(current_user: User = Depends(get_current_user)):
 
 @router.delete("/account")
 async def delete_account(current_user: User = Depends(get_current_user)):
-    """Delete user account (soft delete)"""
+    """Soft-delete the user account, revoke sessions, and block future sign-in."""
     try:
+        username = current_user.username
         users_collection = DB["users"]
-        
-        # Mark account as deleted instead of actually deleting
+
+        existing = users_collection.find_one({"username": username}) or {}
+        if existing.get("deleted") or existing.get("status") == "deleted":
+            raise HTTPException(status_code=400, detail="Account is already deleted.")
+
         users_collection.update_one(
-            {"username": current_user.username},
+            {"username": username},
             {"$set": {
                 "deleted": True,
                 "deleted_at": datetime.utcnow(),
-                "status": "deleted"
-            }}
+                "status": "deleted",
+            }},
         )
-        
-        # TODO: Release all VMs, delete files, clean up resources
-        
+
+        DB["sessions"].delete_many({"username": username})
+
+        activity_collection = DB["activity_log"]
+        activity_collection.insert_one({
+            "username": username,
+            "action": "Account Deleted",
+            "description": "User deleted their account",
+            "timestamp": datetime.utcnow(),
+        })
+
         return {"success": True, "message": "Account deleted successfully"}
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to delete account: {str(e)}")
 

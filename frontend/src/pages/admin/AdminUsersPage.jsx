@@ -7,12 +7,14 @@ import {
 } from 'react-icons/fa';
 import { exportToCSV, prepareUsersForExport, exportUsersToPDF } from '../../utils/exportUtils';
 import PageHeader from '../../components/ui/PageHeader.jsx';
+import { usePageRefresh } from '../../hooks/usePageRefresh.js';
 
 const AdminUsersPage = () => {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [pagination, setPagination] = useState({ skip: 0, limit: 20, total: 0 });
+  const { runPageRefresh, pageRefreshing } = usePageRefresh();
 
   const fetchUsers = useCallback(async () => {
     setLoading(true);
@@ -83,20 +85,28 @@ const AdminUsersPage = () => {
   return (
     <div className="admin-users-page">
       <PageHeader
-        className="zenith-page-header--row"
         kicker="Admin"
         title="User Management"
         subtitle="Manage platform users and their accounts"
-      >
-        <div className="zenith-page-header-actions" style={{ display: 'flex', gap: '10px' }}>
-          <button onClick={handleExportCSV} className="btn-export" aria-label="Export users data to CSV file">
-            <FaFileDownload /> Export CSV
-          </button>
-          <button onClick={handleExportPDF} className="btn-export-pdf" aria-label="Generate users report PDF">
-            <FaFilePdf /> Export PDF
-          </button>
-        </div>
-      </PageHeader>
+        actions={
+          <>
+            <button onClick={handleExportCSV} className="btn-export" aria-label="Export users data to CSV file">
+              <FaFileDownload /> Export CSV
+            </button>
+            <button onClick={handleExportPDF} className="btn-export-pdf" aria-label="Generate users report PDF">
+              <FaFilePdf /> Export PDF
+            </button>
+          </>
+        }
+        onRefresh={() =>
+          runPageRefresh(fetchUsers, {
+            loadingMessage: 'Refreshing users page…',
+            successMessage: 'Users page refreshed.',
+            errorMessage: 'Failed to refresh users page.',
+          })
+        }
+        refreshing={pageRefreshing || loading}
+      />
 
       {/* Search Bar */}
       <div className="admin-search-section">

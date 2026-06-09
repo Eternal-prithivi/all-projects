@@ -5,6 +5,7 @@ import '../../styles/admin-pages.css';
 import { FaDollarSign, FaFilter, FaCheckCircle, FaTimesCircle, FaClock, FaFileDownload, FaFilePdf } from 'react-icons/fa';
 import { exportToCSV, preparePaymentsForExport, exportPaymentsToPDF } from '../../utils/exportUtils';
 import PageHeader from '../../components/ui/PageHeader.jsx';
+import { usePageRefresh } from '../../hooks/usePageRefresh.js';
 
 const AdminPaymentsPage = () => {
   const [loading, setLoading] = useState(true);
@@ -13,6 +14,7 @@ const AdminPaymentsPage = () => {
   const [filter, setFilter] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
   const paymentsPerPage = 20;
+  const { runPageRefresh, pageRefreshing } = usePageRefresh();
 
   const fetchPayments = useCallback(async () => {
     setLoading(true);
@@ -78,20 +80,28 @@ const AdminPaymentsPage = () => {
   return (
     <div className="admin-payments">
       <PageHeader
-        className="zenith-page-header--row"
         kicker="Admin"
         title="Payment Transactions"
         subtitle="Monitor all platform payments and revenue"
-      >
-        <div className="zenith-page-header-actions" style={{ display: 'flex', gap: '10px' }}>
-          <button onClick={handleExportCSV} className="btn-export" aria-label="Export payment transactions to CSV file">
-            <FaFileDownload /> Export CSV
-          </button>
-          <button onClick={handleExportPDF} className="btn-export-pdf" aria-label="Generate payments report PDF">
-            <FaFilePdf /> Export PDF
-          </button>
-        </div>
-      </PageHeader>
+        actions={
+          <>
+            <button onClick={handleExportCSV} className="btn-export" aria-label="Export payment transactions to CSV file">
+              <FaFileDownload /> Export CSV
+            </button>
+            <button onClick={handleExportPDF} className="btn-export-pdf" aria-label="Generate payments report PDF">
+              <FaFilePdf /> Export PDF
+            </button>
+          </>
+        }
+        onRefresh={() =>
+          runPageRefresh(fetchPayments, {
+            loadingMessage: 'Refreshing payments page…',
+            successMessage: 'Payments page refreshed.',
+            errorMessage: 'Failed to refresh payments page.',
+          })
+        }
+        refreshing={pageRefreshing || loading}
+      />
 
       {/* Stats Cards */}
       <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', marginBottom: '20px' }}>

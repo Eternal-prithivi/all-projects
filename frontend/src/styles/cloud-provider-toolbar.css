@@ -19,6 +19,43 @@
   white-space: nowrap;
 }
 
+.cloud-provider-toolbar__refresh {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.55rem 0.85rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  background: transparent;
+  border: 1px solid var(--border-default);
+  border-radius: 8px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+
+.cloud-provider-toolbar__refresh:hover:not(:disabled) {
+  color: var(--gold-primary);
+  border-color: rgba(212, 168, 67, 0.55);
+  background: rgba(212, 168, 67, 0.08);
+}
+
+.cloud-provider-toolbar__refresh:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.cloud-provider-toolbar__spin {
+  animation: cloud-provider-toolbar-spin 0.75s linear infinite;
+}
+
+@keyframes cloud-provider-toolbar-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 @media (max-width: 480px) {
   .cloud-provider-toolbar {
     width: 100%;

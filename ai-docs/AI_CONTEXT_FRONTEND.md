@@ -1,7 +1,7 @@
 # AI_CONTEXT_FRONTEND.md — Frontend Architecture & Source Map
 
 > Read this for any frontend, UI, CSS, component, or routing task.
-> **Last Updated: 2026-05-29** — Phase 18 enterprise public pages.
+> **Last Updated: 2026-06-09** — Phase 19 platform storage regions + page refresh UX.
 
 ---
 
@@ -118,6 +118,28 @@ For backend context → read `AI_CONTEXT_BACKEND.md`
 | `LoadingSpinner.jsx`, `Skeletons.jsx`, `LazyLoadFallback.jsx` | Loading states |
 | `NotificationBell.jsx` | Header bell — recent 8, Today/Earlier groups, glass dropdown |
 | `EmptyState.jsx` | Reusable empty state with icon + message |
+| `ui/PageHeader.jsx` | Kicker + title + subtitle; optional `actions` + `onRefresh` |
+| `ui/PageRefreshButton.jsx` | Console-style page refresh control (used via PageHeader) |
+| `CloudDestinationPanel.jsx` | Multi-CSP storage destination stack (AWS + GCP + Azure) |
+| `BucketRegionSelector.jsx` | AWS S3 bucket + region picker |
+| `GcpBucketSelector.jsx` | GCS bucket picker (platform catalog or BYOC) |
+| `AzureContainerSelector.jsx` | Azure Blob container picker |
+| `BucketSelectorLoading.jsx` | Gold indeterminate bar while bucket lists load/reload |
+| `PlatformRegionPills.jsx` | Platform region slug pills (`asia`, `us`, …) |
+| `StorageRegionScopeBar.jsx` | Region context bar between upload and file list |
+| `IndeterminateProgressBar.jsx` | Sliding gold progress bar (toasts, bucket selectors) |
+
+### Hooks (storage & refresh)
+
+| File | Purpose |
+|------|---------|
+| `usePageRefresh.js` | `runPageRefresh()` — loading toast + success/error for page-level refresh |
+| `useAwsBuckets.js` | AWS bucket discovery; `reloadToken` triggers reload with gold bar |
+| `useGcpBuckets.js` | GCS bucket discovery (static catalog in platform mode) |
+| `useAzureContainers.js` | Azure container discovery (static catalog in platform mode) |
+| `usePlatformStorageRegions.js` | Platform multi-region metadata from AWS catalog endpoint |
+
+**Page refresh pattern:** Every dashboard and admin page uses `PageHeader` `onRefresh` + `usePageRefresh`. Refresh reloads **that page only** — not a global app reload. Storage/Security also bump `catalogReloadToken` to reload all CSP destination panels.
 
 ---
 

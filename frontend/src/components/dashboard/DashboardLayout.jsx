@@ -10,8 +10,8 @@
 //   - Add page-specific logic here — keep this as a pure layout shell
 //   - Remove ToastContainer — it's the global toast host for react-toastify
 // =============================================================================
-import React, { useState, useEffect } from "react";
-import { Outlet, useNavigate } from "react-router-dom";
+import React, { useCallback, useState } from "react";
+import { Outlet } from "react-router-dom";
 import { ToastContainer } from "react-toastify";
 import { useAuth } from "../../context/AuthContext.jsx";
 import { NotificationProvider } from "../../context/NotificationContext.jsx";
@@ -26,6 +26,8 @@ import GlobalSearch from "../GlobalSearch.jsx";
 import OnboardingTour from "../OnboardingTour.jsx";
 import SupportWsBridge from "../support/SupportWsBridge.jsx";
 import { useTheme } from "../../context/ThemeContext.jsx";
+import { useAppKeyboardShortcuts } from "../../hooks/useAppKeyboardShortcuts.js";
+import { DASHBOARD_GO_ROUTES } from "../../utils/keyboardShortcuts.js";
 import "../../styles/dashboard.css";
 import "../../styles/mobile-nav.css";
 import "../../styles/cards.css";
@@ -36,64 +38,18 @@ import "../../styles/toast-custom.css";
 function DashboardLayout() {
   const { user } = useAuth();
   const { effectiveTheme } = useTheme();
-  const navigate = useNavigate();
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
 
-  useEffect(() => {
-    const handleKeyPress = (e) => {
-      // Show keyboard shortcuts
-      if (e.key === '?' && !e.shiftKey) {
-        e.preventDefault();
-        setShowShortcuts(true);
-      }
-      
-      // Show search
-      if (e.key === '/' && !e.ctrlKey && !e.metaKey) {
-        e.preventDefault();
-        setShowSearch(true);
-      }
+  const openSearch = useCallback(() => setShowSearch(true), []);
+  const openShortcuts = useCallback(() => setShowShortcuts(true), []);
 
-      // Command palette (Cmd/Ctrl + K)
-      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
-        e.preventDefault();
-        setShowSearch(true);
-      }
-      
-      // Quick actions - Alt/Option + Shift + key
-      // altKey works for both Mac (Option) and Windows (Alt)
-      if (e.altKey && e.shiftKey && (e.key === 'n' || e.key === 'N')) {
-        if (!showSearch && !showShortcuts) {
-          e.preventDefault();
-          navigate('/dashboard/vmcluster');
-        }
-      }
-      if (e.altKey && e.shiftKey && (e.key === 'u' || e.key === 'U')) {
-        if (!showSearch && !showShortcuts) {
-          e.preventDefault();
-          navigate('/dashboard/storage');
-        }
-      }
-      if (e.altKey && e.shiftKey && (e.key === 'c' || e.key === 'C')) {
-        if (!showSearch && !showShortcuts) {
-          e.preventDefault();
-          navigate('/dashboard/costs');
-        }
-      }
-    };
-
-    const handleShowShortcuts = () => {
-      setShowShortcuts(true);
-    };
-
-    document.addEventListener('keydown', handleKeyPress);
-    window.addEventListener('show-shortcuts', handleShowShortcuts);
-    
-    return () => {
-      document.removeEventListener('keydown', handleKeyPress);
-      window.removeEventListener('show-shortcuts', handleShowShortcuts);
-    };
-  }, [navigate, showSearch, showShortcuts]);
+  useAppKeyboardShortcuts({
+    goRoutes: DASHBOARD_GO_ROUTES,
+    onOpenSearch: openSearch,
+    onOpenShortcuts: openShortcuts,
+    overlaysOpen: showSearch || showShortcuts,
+  });
 
   return (
     <NotificationProvider>
@@ -120,9 +76,10 @@ function DashboardLayout() {
           </main>
         </div>
         <QuickActions />
-        <KeyboardShortcuts 
-          isOpen={showShortcuts} 
-          onClose={() => setShowShortcuts(false)} 
+        <KeyboardShortcuts
+          isOpen={showShortcuts}
+          onClose={() => setShowShortcuts(false)}
+          variant="dashboard"
         />
         <GlobalSearch 
           isOpen={showSearch} 

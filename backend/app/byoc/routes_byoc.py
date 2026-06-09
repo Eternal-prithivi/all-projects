@@ -582,7 +582,6 @@ def _verify_azure_cost_management(
 
 @router.get("/gcp-buckets", summary="List GCS buckets (BYOC or platform)")
 async def list_gcp_buckets(user: User = Depends(get_current_user)):
-    check_byoc_eligibility(user.username)
     result = list_gcp_buckets_for_user(user.username)
     if result.get("error") and not result.get("buckets"):
         raise HTTPException(status_code=400, detail=result["error"])
@@ -603,7 +602,6 @@ async def discover_gcp_buckets(
 
 @router.get("/azure-containers", summary="List Azure Blob containers (BYOC or platform)")
 async def list_azure_containers(user: User = Depends(get_current_user)):
-    check_byoc_eligibility(user.username)
     result = list_azure_containers_for_user(user.username)
     if result.get("error") and not result.get("containers"):
         raise HTTPException(status_code=400, detail=result["error"])

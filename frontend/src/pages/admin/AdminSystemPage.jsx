@@ -4,10 +4,12 @@ import { toast } from 'react-toastify';
 import '../../styles/admin-pages.css';
 import { FaServer, FaDatabase, FaCheckCircle, FaExclamationTriangle } from 'react-icons/fa';
 import PageHeader from '../../components/ui/PageHeader.jsx';
+import { usePageRefresh } from '../../hooks/usePageRefresh.js';
 
 const AdminSystemPage = () => {
   const [systemHealth, setSystemHealth] = useState(null);
   const [loading, setLoading] = useState(true);
+  const { runPageRefresh, pageRefreshing } = usePageRefresh();
 
   const fetchSystemHealth = useCallback(async () => {
     setLoading(true);
@@ -77,6 +79,14 @@ const AdminSystemPage = () => {
             Export audit CSV
           </button>
         }
+        onRefresh={() =>
+          runPageRefresh(fetchSystemHealth, {
+            loadingMessage: 'Refreshing system health…',
+            successMessage: 'System health page refreshed.',
+            errorMessage: 'Failed to refresh system health.',
+          })
+        }
+        refreshing={pageRefreshing || loading}
       />
 
       <div className="health-grid">

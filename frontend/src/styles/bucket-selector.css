@@ -187,9 +187,14 @@
 
 .bucket-selector-loading {
   display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 0.5rem 0;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.55rem;
+  padding: 0.65rem 0 0.5rem;
+}
+
+.bucket-selector-loading__bar {
+  width: 100%;
 }
 
 .bucket-selector-loading-bar {
@@ -243,6 +248,38 @@
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--text-muted);
+}
+
+.platform-region-panel {
+  margin-bottom: 1rem;
+  padding-bottom: 0.85rem;
+  border-bottom: 1px solid var(--border-default);
+}
+
+.platform-region-active {
+  margin: 0.65rem 0 0;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.platform-region-active strong {
+  color: var(--gold-primary);
+}
+
+.platform-region-reset {
+  margin-left: 0.65rem;
+  padding: 0.2rem 0.55rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--gold-primary);
+  background: transparent;
+  border: 1px solid rgba(212, 168, 67, 0.45);
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.platform-region-reset:hover {
+  background: rgba(212, 168, 67, 0.12);
 }
 
 .bucket-selector-pills {
@@ -435,4 +472,50 @@ html.theme-light .bucket-selector {
 
 html.theme-light .bucket-selector-chip:hover {
   background: rgba(0, 0, 0, 0.03);
+}
+
+/* Multi-cloud destination stack */
+.cloud-destination-panel--stacked .bucket-selector {
+  margin-bottom: 1rem;
+}
+
+.cloud-destination-panel--stacked .bucket-selector:last-child {
+  margin-bottom: 1.5rem;
+}
+
+.bucket-selector--compact {
+  padding: 0.95rem 1.1rem;
+}
+
+.bucket-selector--aws {
+  border-color: rgba(255, 153, 0, 0.22);
+}
+
+.bucket-selector--gcp {
+  border-color: rgba(66, 133, 244, 0.22);
+}
+
+.bucket-selector--azure {
+  border-color: rgba(0, 120, 212, 0.22);
+}
+
+.bucket-selector-icon--aws,
+.bucket-selector-icon--gcp,
+.bucket-selector-icon--azure {
+  background: rgba(255, 255, 255, 0.06);
+  padding: 0.2rem;
+}
+
+.bucket-selector-icon--aws img,
+.bucket-selector-icon--gcp img,
+.bucket-selector-icon--azure img {
+  display: block;
+  object-fit: contain;
+}
+
+.bucket-selector-hint {
+  margin: 0.65rem 0 0;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  line-height: 1.45;
 }

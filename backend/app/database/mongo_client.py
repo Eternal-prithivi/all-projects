@@ -67,7 +67,7 @@ class MongoDB:
             return
 
         try:
-            self._create_index_if_missing("files", [("owner_username", 1), ("filename", 1)], unique=True)
+            self._ensure_files_unique_index()
             self._create_index_if_missing("files", [("owner_username", 1), ("last_accessed_at", -1)])
             self._create_index_if_missing("files", [("storage_class", 1), ("last_accessed_at", -1)])
             self._create_index_if_missing("files", [("last_tier_change", -1)])
@@ -110,6 +110,38 @@ class MongoDB:
             self._create_index_if_missing("provision_deployments", [("deployment_name", 1)], unique=True)
         except Exception as e:
             logger.warning("Failed to ensure MongoDB indexes: %s", e)
+
+    def _ensure_files_unique_index(self) -> None:
+        """
+        Allow the same filename in different regions/buckets (multi-region platform storage).
+        Replaces legacy unique index on (owner_username, filename) only.
+        """
+        collection = self.db["files"]
+        legacy_keys = [("owner_username", 1), ("filename", 1)]
+        new_keys = [
+            ("owner_username", 1),
+            ("filename", 1),
+            ("csp", 1),
+            ("cloud_bucket", 1),
+            ("region", 1),
+        ]
+
+        indexes = collection.index_information()
+        has_new = any(
+            info.get("key") == new_keys and info.get("unique")
+            for info in indexes.values()
+        )
+        if has_new:
+            return
+
+        for name, info in indexes.items():
+            if info.get("key") == legacy_keys and info.get("unique"):
+                logger.info("Dropping legacy files unique index %s", name)
+                collection.drop_index(name)
+                break
+
+        logger.info("Creating multi-region files unique index on %s", new_keys)
+        collection.create_index(new_keys, unique=True, name="files_owner_filename_csp_bucket_region")
 
     def _create_index_if_missing(self, collection_name: str, keys, **kwargs) -> None:
         collection = self.db[collection_name]

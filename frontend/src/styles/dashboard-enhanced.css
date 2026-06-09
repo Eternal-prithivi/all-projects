@@ -27,6 +27,10 @@
    GREETING SECTION
    ======================================== */
 .mc-greeting {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-md);
   margin-bottom: var(--space-xl);
   padding: var(--space-xl);
   background: linear-gradient(135deg, var(--gold-glow) 0%, var(--bg-card) 55%, var(--bg-base) 100%);

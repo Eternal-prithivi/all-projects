@@ -1,12 +1,24 @@
 # PROGRESS.md — Task Tracker
 
-> **Last Updated:** 2026-06-05
+> **Last Updated:** 2026-06-09
 
 ---
 
 ## 🔴 Active Task
 
-_None — Phase 18d complete._
+_None — Phase 19 complete._
+
+---
+
+## Phase 19 — Platform storage regions + page refresh UX ✅
+
+- [x] **19.1** — `platform_storage_catalog.py` + example JSON + unit tests
+- [x] **19.2** — Static AWS/GCP/Azure discovery from catalog (no live list on platform page load)
+- [x] **19.3** — Upload/sync `region_slug` + scoped stale removal in sync/list
+- [x] **19.4** — `CloudDestinationPanel`, region pills, `StorageRegionScopeBar`
+- [x] **19.5** — Page-level `PageRefreshButton` on all dashboard + admin pages
+- [x] **19.6** — Gold `BucketSelectorLoading` for AWS/GCP/Azure on reload
+- [x] **19.7** — Docs + pytest 320 + build + push `stage`
 
 ---
 

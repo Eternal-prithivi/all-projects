@@ -95,7 +95,7 @@ const AuditLogPanel = ({ onClose }) => {
           </p>
         </div>
         <div className="audit-panel-actions">
-          <button type="button" className="audit-export-btn" onClick={handleExportCsv}>
+          <button type="button" className="btn-secondary-outline" onClick={handleExportCsv}>
             Export CSV
           </button>
           <button type="button" className="audit-panel-close" onClick={onClose} aria-label="Close">

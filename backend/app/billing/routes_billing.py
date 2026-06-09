@@ -20,6 +20,11 @@ from ..users.routes_users import get_current_user
 from ..users.user_model import User
 from ..database.mongo_client import get_database
 from ..cost.manager import get_aws_cost_and_usage, get_gcp_billing_data, get_azure_billing_data
+from app.billing.storage_metering import (
+    get_platform_storage_metering_summary,
+    get_storage_metering_summary,
+)
+from app.payments.subscription_service import _owner_usernames
 import secrets
 import time
 import logging
@@ -35,6 +40,11 @@ class CostBreakdown(BaseModel):
     gcp: float = 0.0
     azure: float = 0.0
     platform_fee: float = 29.00  # Fixed platform fee
+    # Pass-through estimates for storage page list/sync/upload/download API calls
+    storage_api_aws: float = 0.0
+    storage_api_gcp: float = 0.0
+    storage_api_azure: float = 0.0
+    storage_api_total: float = 0.0
 
 class BudgetSettings(BaseModel):
     monthly_budget: float = 0.0
@@ -138,7 +148,63 @@ def fetch_real_cloud_costs(
         billing_cache["timestamp"] = time.time()
         logger.info(f"Billing cost data cached")
     
+    _apply_storage_api_metering(username, costs, start_date, end_date)
     return costs
+
+
+def _apply_storage_api_metering(
+    username: str, costs: CostBreakdown, start_date: str, end_date: str
+) -> None:
+    """Merge metered storage API estimates into CostBreakdown (current month periods)."""
+    try:
+        start_period = (start_date or "")[:7]
+        end_period = (end_date or "")[:7]
+        if not start_period or not end_period:
+            return
+        summary = get_storage_metering_summary(
+            username, start_period=start_period, end_period=end_period
+        )
+        est = summary.get("estimated_usd") or {}
+        costs.storage_api_aws = round(float(est.get("AWS", 0.0)), 6)
+        costs.storage_api_gcp = round(float(est.get("GCP", 0.0)), 6)
+        costs.storage_api_azure = round(float(est.get("Azure", 0.0)), 6)
+        costs.storage_api_total = round(float(est.get("total", 0.0)), 6)
+    except Exception as exc:
+        logger.warning("storage_api_metering merge failed for %s: %s", username, exc)
+
+
+@router.get("/storage-metering")
+async def get_storage_metering(
+    current_user: User = Depends(get_current_user),
+    start_period: Optional[str] = None,
+    end_period: Optional[str] = None,
+):
+    """Metered storage API usage (list buckets, sync, upload, download) for pass-through billing."""
+    now = datetime.utcnow()
+    period = start_period or now.strftime("%Y-%m")
+    end = end_period or period
+    summary = get_storage_metering_summary(
+        current_user.username, start_period=period, end_period=end
+    )
+    return {"success": True, **summary}
+
+
+@router.get("/storage-metering/platform")
+async def get_platform_storage_metering(
+    current_user: User = Depends(get_current_user),
+    start_period: Optional[str] = None,
+    end_period: Optional[str] = None,
+):
+    """Aggregate metered storage API usage across all users (platform operator only)."""
+    if current_user.username not in _owner_usernames():
+        raise HTTPException(status_code=403, detail="Platform operator access required.")
+    now = datetime.utcnow()
+    period = start_period or now.strftime("%Y-%m")
+    end = end_period or period
+    summary = get_platform_storage_metering_summary(
+        start_period=period, end_period=end
+    )
+    return {"success": True, **summary}
 
 
 @router.get("/invoices", response_model=InvoicesListResponse)
@@ -239,7 +305,13 @@ async def generate_invoice(current_user: User = Depends(get_current_user)):
         
         costs = fetch_real_cloud_costs(current_user.username, start_of_month, end_date)
         
-        total = costs.aws + costs.gcp + costs.azure + costs.platform_fee
+        total = (
+            costs.aws
+            + costs.gcp
+            + costs.azure
+            + costs.storage_api_total
+            + costs.platform_fee
+        )
         
         # Due date is 7 days from creation
         due_date = now + timedelta(days=7)
@@ -331,19 +403,30 @@ async def get_current_month_summary(current_user: User = Depends(get_current_use
         
         current_costs = fetch_real_cloud_costs(current_user.username, start_of_month, end_date)
         
-        total = current_costs.aws + current_costs.gcp + current_costs.azure + current_costs.platform_fee
+        total = (
+            current_costs.aws
+            + current_costs.gcp
+            + current_costs.azure
+            + current_costs.storage_api_total
+            + current_costs.platform_fee
+        )
         
         # Get days remaining in month
         next_month = now.replace(day=1) + relativedelta(months=1)
         days_remaining = (next_month - now).days
         
+        period = now.strftime("%Y-%m")
+        storage_detail = get_storage_metering_summary(
+            current_user.username, start_period=period, end_period=period
+        )
         return {
             "success": True,
-            "billing_period": now.strftime("%Y-%m"),
+            "billing_period": period,
             "costs": current_costs.model_dump(),
-            "total": round(total, 2),
+            "storage_metering": storage_detail,
+            "total": round(total, 6),
             "days_remaining": days_remaining,
-            "invoice_date": next_month.strftime("%Y-%m-%d")
+            "invoice_date": next_month.strftime("%Y-%m-%d"),
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch current month summary: {str(e)}")

@@ -18,6 +18,7 @@ import { useNavigate } from 'react-router-dom';
 import { PageSkeleton } from '../components/Skeletons.jsx';
 import '../styles/billing.css';
 import PageHeader from '../components/ui/PageHeader.jsx';
+import { usePageRefresh } from '../hooks/usePageRefresh.js';
 
 function BillingPage() {
   const [subscription, setSubscription] = useState(() => {
@@ -33,6 +34,7 @@ function BillingPage() {
   const [loading, setLoading] = useState(() => !sessionStorage.getItem('cache_billing_sub'));
   const [processingPayment, setProcessingPayment] = useState(false);
   const navigate = useNavigate();
+  const { runPageRefresh, pageRefreshing } = usePageRefresh();
 
   useEffect(() => {
     loadBillingData();
@@ -105,6 +107,7 @@ function BillingPage() {
       cloudCostsUSD += currentMonthCosts.costs.aws || 0;
       cloudCostsUSD += currentMonthCosts.costs.gcp || 0;
       cloudCostsUSD += currentMonthCosts.costs.azure || 0;
+      cloudCostsUSD += currentMonthCosts.costs.storage_api_total || 0;
       // Platform fee only for free tier
       if (subscription?.plan_id === 'free') {
         cloudCostsUSD += currentMonthCosts.costs.platform_fee || 0;
@@ -257,21 +260,36 @@ function BillingPage() {
   return (
     <div className="billing-page">
       <PageHeader
-        className="zenith-page-header--row billing-page-header"
+        className="billing-page-header"
         kicker="Finance center"
         title="Billing & Payments"
         subtitle="Manage your subscription, cloud spend, and renewal timing in one place."
-      >
-        {subscription?.plan_id !== 'free' && (
-          <button
-            type="button"
-            className="zenith-page-header-actions btn-upgrade-plan-header"
-            onClick={() => navigate('/dashboard/pricing')}
-          >
-            View All Plans
-          </button>
-        )}
-      </PageHeader>
+        actions={
+          subscription?.plan_id !== 'free' ? (
+            <button
+              type="button"
+              className="btn-upgrade-plan-header"
+              onClick={() => navigate('/dashboard/pricing')}
+            >
+              View All Plans
+            </button>
+          ) : null
+        }
+        onRefresh={() =>
+          runPageRefresh(
+            async () => {
+              await loadBillingData();
+              await loadCloudCosts();
+            },
+            {
+              loadingMessage: 'Refreshing billing page…',
+              successMessage: 'Billing page refreshed.',
+              errorMessage: 'Failed to refresh billing page.',
+            }
+          )
+        }
+        refreshing={pageRefreshing || loading}
+      />
 
       <div className="billing-overview-grid">
         {billingOverview.map((item) => (
@@ -454,6 +472,15 @@ function BillingPage() {
                 ${(currentMonthCosts.costs.aws + currentMonthCosts.costs.gcp + currentMonthCosts.costs.azure).toFixed(2)} USD
               </span>
             </div>
+            {(currentMonthCosts.costs.storage_api_total > 0 ||
+              currentMonthCosts.storage_metering?.operations?.length > 0) && (
+              <div className="summary-row storage-api-meter-row">
+                <span>Storage API metering (list / sync / upload / download)</span>
+                <span className="summary-amount">
+                  ${(currentMonthCosts.costs.storage_api_total || 0).toFixed(4)} USD
+                </span>
+              </div>
+            )}
             <div className="summary-row conversion-row">
               <span>  └─ Converted to INR (@ ₹83/USD)</span>
               <span className="summary-amount">{formatCurrency(Math.round(billBreakdown.cloudINR))}</span>
@@ -507,6 +534,46 @@ function BillingPage() {
           <div className="cost-note">
             💡 Pay now to cover cloud usage + subscription for the next month
           </div>
+          {currentMonthCosts.storage_metering?.operations?.length > 0 && (
+            <div className="storage-metering-detail">
+              <h3>Storage API breakdown (pass-through)</h3>
+              <p className="storage-metering-note">
+                Estimated cloud API charges from Storage page actions — billed at published list/sync/upload/download rates.
+              </p>
+              <div className="table-responsive-scroll">
+                <table className="storage-metering-table">
+                  <thead>
+                    <tr>
+                      <th>Cloud</th>
+                      <th>Operation</th>
+                      <th>Count</th>
+                      <th>Est. USD</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {currentMonthCosts.storage_metering.operations.map((row) => (
+                      <tr key={`${row.csp}-${row.operation}`}>
+                        <td>{row.csp}</td>
+                        <td>{row.label}</td>
+                        <td>{row.count}</td>
+                        <td>${Number(row.estimated_usd).toFixed(6)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr>
+                      <td colSpan={3}><strong>Storage API subtotal</strong></td>
+                      <td>
+                        <strong>
+                          ${(currentMonthCosts.costs.storage_api_total || 0).toFixed(6)}
+                        </strong>
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

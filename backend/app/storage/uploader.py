@@ -60,13 +60,23 @@ def upload_to_aws(
     return object_key
 
 
-def upload_to_gcp(file: UploadFile, username: str, filename: str, storage_class: str):
+def upload_to_gcp(
+    file: UploadFile,
+    username: str,
+    filename: str,
+    storage_class: str,
+    *,
+    bucket_name: str | None = None,
+):
     """Uploads a file to the user's resolved GCP bucket (BYOC or platform)."""
-    storage_client, bucket_name, is_byoc = build_gcp_storage_client(username)
-    bucket = storage_client.bucket(bucket_name)
+    storage_client, default_bucket, is_byoc = build_gcp_storage_client(
+        username, bucket_name=bucket_name
+    )
+    target_bucket = (bucket_name or default_bucket).strip()
+    bucket = storage_client.bucket(target_bucket)
     if not bucket.exists():
         raise ValueError(
-            f"GCP bucket '{bucket_name}' does not exist or is not accessible with the configured credentials."
+            f"GCP bucket '{target_bucket}' does not exist or is not accessible with the configured credentials."
         )
 
     object_key = f"{username}/{filename}"
@@ -88,19 +98,34 @@ def upload_to_gcp(file: UploadFile, username: str, filename: str, storage_class:
     logger.info(
         "Uploaded %s to gs://%s/%s (byoc=%s)",
         filename,
-        bucket_name,
+        target_bucket,
         object_key,
         is_byoc,
     )
     return object_key
 
 
-def upload_to_azure(file: UploadFile, username: str, filename: str, storage_class: str):
+def upload_to_azure(
+    file: UploadFile,
+    username: str,
+    filename: str,
+    storage_class: str,
+    *,
+    container_name: str | None = None,
+    account_name: str | None = None,
+    account_key: str | None = None,
+):
     """Uploads a file to the user's resolved Azure container (BYOC or platform)."""
-    blob_service_client, container_name, is_byoc = build_azure_blob_service(username)
+    blob_service_client, default_container, is_byoc = build_azure_blob_service(
+        username,
+        account_name=account_name,
+        account_key=account_key,
+        container_name=container_name,
+    )
+    target_container = (container_name or default_container).strip()
     object_key = f"{username}/{filename}"
     blob_client = blob_service_client.get_blob_client(
-        container=container_name, blob=object_key
+        container=target_container, blob=object_key
     )
 
     azure_storage_class_map = {
@@ -118,7 +143,7 @@ def upload_to_azure(file: UploadFile, username: str, filename: str, storage_clas
     logger.info(
         "Uploaded %s to azure://%s/%s (byoc=%s)",
         filename,
-        container_name,
+        target_container,
         object_key,
         is_byoc,
     )

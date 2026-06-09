@@ -1,13 +1,7 @@
 import React from 'react';
 
 function openGlobalSearch() {
-  document.dispatchEvent(
-    new KeyboardEvent('keydown', {
-      key: 'k',
-      metaKey: true,
-      bubbles: true,
-    })
-  );
+  window.dispatchEvent(new CustomEvent('open-global-search'));
 }
 
 /**

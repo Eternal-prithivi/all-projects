@@ -23,3 +23,13 @@ def test_billing_invoices_authenticated(mock_costs, client, auth_headers):
     body = response.json()
     assert body["success"] is True
     assert "invoices" in body
+
+
+def test_storage_metering_endpoint(client, auth_headers):
+    headers, _user = auth_headers()
+    response = client.get("/api/billing/storage-metering", headers=headers)
+    assert response.status_code == 200
+    body = response.json()
+    assert body["success"] is True
+    assert "estimated_usd" in body
+    assert "operations" in body

@@ -29,7 +29,10 @@ class FileMetadata(BaseModel):
     awaiting_encryption_choice: bool = False
     client_side_encrypted: bool = False  # True if encrypted with user's password
 
-    # Multi-bucket BYOC: which S3 bucket/region holds this object
+    # Multi-bucket BYOC / platform: which bucket or container holds this object
     cloud_bucket: Optional[str] = None
     region: Optional[str] = None
+    # Platform multi-region: catalog slug (asia, us, europe, africa) and Azure account name
+    platform_slug: Optional[str] = None
+    cloud_account: Optional[str] = None
 

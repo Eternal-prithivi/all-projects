@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import api from '../api';
 import PageHeader from '../components/ui/PageHeader.jsx';
+import { usePageRefresh } from '../hooks/usePageRefresh.js';
 import SupportThreadPanel from '../components/support/SupportThreadPanel.jsx';
 import { useSupportThreadPoll } from '../hooks/useSupportThreadPoll.js';
 import { useSupportThreadWs } from '../hooks/useSupportThreadWs.js';
@@ -16,6 +17,7 @@ function SupportPage() {
   const [thread, setThread] = useState(null);
   const [loadingList, setLoadingList] = useState(true);
   const [loadingThread, setLoadingThread] = useState(false);
+  const { runPageRefresh, pageRefreshing } = usePageRefresh();
 
   const fetchTickets = useCallback(async () => {
     setLoadingList(true);
@@ -101,6 +103,22 @@ function SupportPage() {
         kicker="Support"
         title="My support tickets"
         subtitle="View and reply to your conversations with Zenith Support"
+        onRefresh={() =>
+          runPageRefresh(
+            async () => {
+              await fetchTickets();
+              if (selectedRef) {
+                await fetchThread(selectedRef, { silent: true });
+              }
+            },
+            {
+              loadingMessage: 'Refreshing support tickets…',
+              successMessage: 'Support page refreshed.',
+              errorMessage: 'Failed to refresh support page.',
+            }
+          )
+        }
+        refreshing={pageRefreshing || loadingList}
       />
 
       {loadingList ? (

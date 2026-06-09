@@ -236,7 +236,11 @@ def resolve_secure_aws_storage(username: str) -> SecureAwsStorage:
     )
 
 
-def build_gcp_storage_client(username: str) -> Tuple[gcp_storage.Client, str, bool]:
+def build_gcp_storage_client(
+    username: str,
+    *,
+    bucket_name: str | None = None,
+) -> Tuple[gcp_storage.Client, str, bool]:
     """Return (GCS client, bucket_name, is_byoc)."""
     gcp = resolve_gcp_credentials(username)
     if gcp.get("is_byoc"):
@@ -250,7 +254,8 @@ def build_gcp_storage_client(username: str) -> Tuple[gcp_storage.Client, str, bo
             credentials=credentials,
             project=sa_info.get("project_id"),
         )
-        return client, gcp["bucket_name"], True
+        target = (bucket_name or gcp["bucket_name"]).strip()
+        return client, target, True
 
     from app.utils.gcp_credentials import gcp_credentials_file_present
 
@@ -262,17 +267,27 @@ def build_gcp_storage_client(username: str) -> Tuple[gcp_storage.Client, str, bo
             "Add your service account JSON path in server .env (same idea as Azure storage keys)."
         )
     client = gcp_storage.Client.from_service_account_json(path)
-    return client, gcp["bucket_name"], False
+    target = (bucket_name or gcp["bucket_name"]).strip()
+    return client, target, False
 
 
-def build_azure_blob_service(username: str) -> Tuple[BlobServiceClient, str, bool]:
+def build_azure_blob_service(
+    username: str,
+    *,
+    account_name: str | None = None,
+    account_key: str | None = None,
+    container_name: str | None = None,
+) -> Tuple[BlobServiceClient, str, bool]:
     """Return (BlobServiceClient, container_name, is_byoc)."""
     azure = resolve_azure_credentials(username)
+    acct = (account_name or azure["account_name"]).strip()
+    key = (account_key or azure["account_key"]).strip()
+    container = (container_name or azure["container_name"]).strip()
     connection_string = (
         "DefaultEndpointsProtocol=https;"
-        f"AccountName={azure['account_name']};"
-        f"AccountKey={azure['account_key']};"
+        f"AccountName={acct};"
+        f"AccountKey={key};"
         "EndpointSuffix=core.windows.net"
     )
     client = BlobServiceClient.from_connection_string(connection_string)
-    return client, azure["container_name"], bool(azure.get("is_byoc"))
+    return client, container, bool(azure.get("is_byoc"))

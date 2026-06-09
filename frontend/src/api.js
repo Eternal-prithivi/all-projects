@@ -145,12 +145,13 @@ export const getCurrentUser = async (token) => {
 
 // ---------------- STORAGE ----------------
 
-export const uploadFile = async (file, csp, storageClass, token, { bucket } = {}) => {
+export const uploadFile = async (file, csp, storageClass, token, { bucket, regionSlug } = {}) => {
   const formData = new FormData();
   formData.append("file", file);
   formData.append("csp", csp);
   formData.append("storage_class", storageClass);
   if (bucket) formData.append("bucket", bucket);
+  if (regionSlug) formData.append("region_slug", regionSlug);
 
   try {
     const response = await apiClient.post("/storage/upload", formData, {
@@ -187,11 +188,32 @@ export const refreshAwsBuckets = async (surface = "storage", { region } = {}) =>
   }
 };
 
-export const listFiles = async (token, { bucket, region } = {}) => {
+export const getGcpBuckets = async () => {
+  try {
+    const response = await apiClient.get("/byoc/gcp-buckets");
+    return response.data;
+  } catch (error) {
+    throw error.response?.data || error;
+  }
+};
+
+export const getAzureContainers = async () => {
+  try {
+    const response = await apiClient.get("/byoc/azure-containers");
+    return response.data;
+  } catch (error) {
+    throw error.response?.data || error;
+  }
+};
+
+export const listFiles = async (token, { bucket, region, platformSlug } = {}) => {
   try {
     const params = {};
-    if (bucket) params.bucket = bucket;
-    if (region && region !== "all") params.region = region;
+    if (platformSlug) params.platform_slug = platformSlug;
+    else {
+      if (bucket) params.bucket = bucket;
+      if (region && region !== "all") params.region = region;
+    }
     const response = await apiClient.get("/storage/files", {
       params,
       headers: { Authorization: `Bearer ${token}` },
@@ -202,10 +224,12 @@ export const listFiles = async (token, { bucket, region } = {}) => {
   }
 };
 
-export const getDownloadUrl = async (filename, token, { bucket } = {}) => {
+export const getDownloadUrl = async (filename, token, { bucket, region, platformSlug } = {}) => {
   try {
     const params = {};
     if (bucket) params.bucket = bucket;
+    if (region) params.region = region;
+    if (platformSlug) params.platform_slug = platformSlug;
     const response = await apiClient.get(
       `/storage/download/${encodeURIComponent(filename)}`,
       {
@@ -219,10 +243,12 @@ export const getDownloadUrl = async (filename, token, { bucket } = {}) => {
   }
 };
 
-export const deleteFile = async (filename, token, { bucket } = {}) => {
+export const deleteFile = async (filename, token, { bucket, region, platformSlug } = {}) => {
   try {
     const params = {};
     if (bucket) params.bucket = bucket;
+    if (region) params.region = region;
+    if (platformSlug) params.platform_slug = platformSlug;
     await apiClient.delete(`/storage/delete/${encodeURIComponent(filename)}`, {
       params,
       headers: { Authorization: `Bearer ${token}` },
@@ -232,11 +258,14 @@ export const deleteFile = async (filename, token, { bucket } = {}) => {
   }
 };
 
-export const syncAwsBucket = async (token, { bucket, region } = {}) => {
+export const syncAwsBucket = async (token, { bucket, region, regionSlug } = {}) => {
   try {
     const params = {};
-    if (bucket) params.bucket = bucket;
-    if (region && region !== "all") params.region = region;
+    if (regionSlug) params.region_slug = regionSlug;
+    else {
+      if (bucket) params.bucket = bucket;
+      if (region && region !== "all") params.region = region;
+    }
     const response = await apiClient.post("/storage/sync/aws", {}, {
       params,
       headers: { Authorization: `Bearer ${token}` },
@@ -247,10 +276,11 @@ export const syncAwsBucket = async (token, { bucket, region } = {}) => {
   }
 };
 
-export const syncGcpBucket = async (token, { bucket } = {}) => {
+export const syncGcpBucket = async (token, { bucket, regionSlug } = {}) => {
   try {
     const params = {};
-    if (bucket) params.bucket = bucket;
+    if (regionSlug) params.region_slug = regionSlug;
+    else if (bucket) params.bucket = bucket;
     const response = await apiClient.post("/storage/sync/gcp", {}, {
       params,
       headers: { Authorization: `Bearer ${token}` },
@@ -261,10 +291,11 @@ export const syncGcpBucket = async (token, { bucket } = {}) => {
   }
 };
 
-export const syncAzureContainer = async (token, { container } = {}) => {
+export const syncAzureContainer = async (token, { container, regionSlug } = {}) => {
   try {
     const params = {};
-    if (container) params.container = container;
+    if (regionSlug) params.region_slug = regionSlug;
+    else if (container) params.container = container;
     const response = await apiClient.post("/storage/sync/azure", {}, {
       params,
       headers: { Authorization: `Bearer ${token}` },

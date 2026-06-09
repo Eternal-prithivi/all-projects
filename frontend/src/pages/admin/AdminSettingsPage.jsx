@@ -7,12 +7,14 @@ import {
   FaDatabase, FaEnvelope, FaClock, FaShieldAlt 
 } from 'react-icons/fa';
 import PageHeader from '../../components/ui/PageHeader.jsx';
+import { usePageRefresh } from '../../hooks/usePageRefresh.js';
 
 const AdminSettingsPage = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [settings, setSettings] = useState(null);
   const [statistics, setStatistics] = useState(null);
+  const { runPageRefresh, pageRefreshing } = usePageRefresh();
 
   const fetchSettings = useCallback(async () => {
     setLoading(true);
@@ -76,6 +78,14 @@ const AdminSettingsPage = () => {
         kicker="Admin"
         title="Platform Settings"
         subtitle="Configure platform-wide settings and preferences"
+        onRefresh={() =>
+          runPageRefresh(fetchSettings, {
+            loadingMessage: 'Refreshing admin settings…',
+            successMessage: 'Admin settings page refreshed.',
+            errorMessage: 'Failed to refresh admin settings.',
+          })
+        }
+        refreshing={pageRefreshing || loading}
       />
 
       {/* Statistics */}

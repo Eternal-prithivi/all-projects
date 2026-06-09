@@ -1,0 +1,146 @@
+/* Region scope bar — sits above the file list on Storage page */
+
+.storage-region-scope {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+  margin-top: 0.25rem;
+  padding: 1.15rem 1.25rem;
+  border-radius: var(--radius-lg, 12px);
+  border: 1px solid rgba(212, 168, 67, 0.35);
+  background: linear-gradient(
+    135deg,
+    rgba(212, 168, 67, 0.1) 0%,
+    rgba(18, 18, 22, 0.92) 45%
+  );
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.18);
+}
+
+.storage-region-scope__main {
+  display: flex;
+  gap: 0.85rem;
+  align-items: flex-start;
+}
+
+.storage-region-scope__icon {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: var(--radius-md, 8px);
+  color: var(--gold-primary);
+  background: rgba(212, 168, 67, 0.14);
+  border: 1px solid rgba(212, 168, 67, 0.25);
+}
+
+.storage-region-scope__copy {
+  min-width: 0;
+  flex: 1;
+}
+
+.storage-region-scope__eyebrow {
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--text-muted);
+}
+
+.storage-region-scope__title-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.5rem 0.85rem;
+  margin-top: 0.2rem;
+}
+
+.storage-region-scope__title {
+  margin: 0;
+  font-family: "Outfit", "Inter", sans-serif;
+  font-size: 1.35rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--gold-primary);
+}
+
+.storage-region-scope__count {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--border-default);
+}
+
+.storage-region-scope__hint {
+  margin: 0.45rem 0 0;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  color: var(--text-muted);
+  max-width: 52rem;
+}
+
+.storage-region-scope__controls {
+  padding-top: 0.15rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.storage-region-scope__controls .platform-region-row {
+  margin: 0;
+}
+
+.storage-region-scope__controls .bucket-selector-row-label {
+  min-width: 5.5rem;
+}
+
+.storage-region-scope__override {
+  margin: 0.55rem 0 0;
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+}
+
+.storage-region-scope__override strong {
+  color: var(--text-primary);
+}
+
+.storage-region-scope__reset {
+  margin-left: 0.5rem;
+  padding: 0.15rem 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--gold-primary);
+  background: transparent;
+  border: 1px solid rgba(212, 168, 67, 0.45);
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.storage-region-scope__reset:hover {
+  background: rgba(212, 168, 67, 0.12);
+}
+
+.storage-container .platform-region-badge {
+  display: inline-block;
+  margin-right: 0.35rem;
+  padding: 0.12rem 0.45rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--gold-primary);
+  background: rgba(212, 168, 67, 0.12);
+  border: 1px solid rgba(212, 168, 67, 0.3);
+  border-radius: 4px;
+  vertical-align: middle;
+}
+
+@media (max-width: 640px) {
+  .storage-region-scope__title {
+    font-size: 1.15rem;
+  }
+}
