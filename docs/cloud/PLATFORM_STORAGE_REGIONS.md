@@ -46,3 +46,5 @@ PLATFORM_STORAGE_DEFAULT_SLUG=asia
 5. **BYOC:** Connect BYOC for a CSP. Confirm live discovery and existing region filters still work.
 6. **Page refresh:** Use header **Refresh** on Storage. Confirm gold loading bar on AWS, GCP, and Azure panels, then buckets/containers listed.
 7. **Sync after delete:** Delete a file in the cloud console, sync the bucket — file count in Zenith should match (region-scoped stale removal).
+8. **Lifecycle tier change:** Upload the same file type to `asia` and `us` buckets. Backdate `last_accessed_at` in MongoDB (or wait for nightly `run_storage_optimization`). Confirm S3/GCS/Blob API calls target the **file record's** `cloud_bucket` and `region` / `cloud_account`, not the default `.env` bucket.
+9. **Archive restore:** Demote a test file to cold/archive on each CSP. Use Storage **Restore**, then download when ready. GCP `ARCHIVE` and Azure `Archive` should return 412 on direct download until restored.

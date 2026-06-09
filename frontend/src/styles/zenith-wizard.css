@@ -245,6 +245,23 @@
   border-color: rgba(212, 175, 55, 0.35);
 }
 
+.lifecycle-policy-grid {
+  margin-top: 0.75rem;
+}
+
+.lifecycle-policy-card.is-suggested {
+  border-color: rgba(212, 175, 55, 0.45);
+}
+
+.lifecycle-suggested-badge {
+  display: inline-block;
+  margin-top: 0.35rem;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--zenith-gold, #d4af37);
+}
+
 .zenith-wizard-option-card.is-selected {
   border-color: var(--gold-primary);
   background: rgba(212, 175, 55, 0.08);

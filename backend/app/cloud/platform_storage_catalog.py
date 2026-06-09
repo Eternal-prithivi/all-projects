@@ -331,19 +331,65 @@ def _legacy_security_buckets_for_csp(csp: str) -> List[Dict[str, Any]]:
                 "is_replica": True,
             },
         ]
-    dest = resolve_platform_destination(csp_u, default_platform_slug())
-    if not dest:
-        return []
-    return [
-        {
-            "name": dest.get("bucket") or dest.get("container") or "",
-            "region": dest.get("region") or "",
-            "role": "storage",
-            "is_default": True,
-            "is_replica": False,
-            "platform_slug": dest.get("platform_slug"),
-        }
-    ]
+    if csp_u == "GCP":
+        secure = (settings.GCP_SECURE_BUCKET_NAME or "").strip()
+        if not secure:
+            return []
+        out = [
+            {
+                "name": secure,
+                "region": settings.GCP_ZONE or "",
+                "role": "secure",
+                "is_default": True,
+                "is_replica": False,
+            },
+        ]
+        replica = (
+            (settings.GCP_SECURE_REPLICA_BUCKET_NAME or "").strip()
+            or (settings.GCP_REPLICA_BUCKET_NAME or "").strip()
+        )
+        if replica:
+            out.append(
+                {
+                    "name": replica,
+                    "region": "",
+                    "role": "replica",
+                    "is_default": False,
+                    "is_replica": True,
+                }
+            )
+        return out
+    if csp_u == "AZURE":
+        secure = (settings.AZURE_SECURE_CONTAINER_NAME or "").strip()
+        if not secure:
+            return []
+        acct = (
+            settings.AZURE_SECURE_STORAGE_ACCOUNT_NAME.strip()
+            or settings.AZURE_STORAGE_ACCOUNT_NAME
+        )
+        out = [
+            {
+                "name": secure,
+                "account_name": acct,
+                "region": settings.AZURE_LOCATION or "",
+                "role": "secure",
+                "is_default": True,
+                "is_replica": False,
+            },
+        ]
+        replica = (settings.AZURE_SECURE_REPLICA_CONTAINER_NAME or "").strip()
+        if replica:
+            out.append(
+                {
+                    "name": replica,
+                    "account_name": acct,
+                    "role": "replica",
+                    "is_default": False,
+                    "is_replica": True,
+                }
+            )
+        return out
+    return []
 
 
 def invalidate_platform_catalog_cache() -> None:

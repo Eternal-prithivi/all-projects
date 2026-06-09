@@ -17,6 +17,10 @@ or the user's own BYOC credentials for each operation.
 from typing import Optional, Dict, Any
 from app.database.mongo_client import get_database
 from app.byoc.aws_bucket_helpers import REPLICA_REGION_DEFAULT
+from app.byoc.gcp_bucket_helpers import (
+    GCP_PRIMARY_LOCATION_DEFAULT,
+    GCP_REPLICA_LOCATION_DEFAULT,
+)
 from app.byoc.encryption import decrypt_credentials_dict
 from app.utils.config import settings
 from app.utils.logger import setup_logger
@@ -77,6 +81,89 @@ def get_aws_bucket_layout(username: str) -> Optional[Dict[str, Any]]:
     return normalize_aws_byoc_layout(record)
 
 
+def get_gcp_byoc_record(username: str) -> Optional[Dict[str, Any]]:
+    return byoc_collection.find_one(
+        {"username": username, "csp": "GCP", "is_active": True}
+    )
+
+
+def get_azure_byoc_record(username: str) -> Optional[Dict[str, Any]]:
+    return byoc_collection.find_one(
+        {"username": username, "csp": "Azure", "is_active": True}
+    )
+
+
+def normalize_gcp_byoc_layout(record: Dict[str, Any]) -> Dict[str, Any]:
+    storage = (
+        record.get("storage_bucket_name")
+        or record.get("bucket_name")
+        or record.get("gcp_bucket_name")
+        or ""
+    ).strip()
+    secure = (record.get("secure_bucket_name") or storage).strip()
+    replica = (record.get("replica_bucket_name") or "").strip()
+    primary_location = (
+        record.get("gcp_primary_location")
+        or record.get("primary_location")
+        or GCP_PRIMARY_LOCATION_DEFAULT
+    )
+    replica_location = (
+        record.get("gcp_replica_location")
+        or record.get("replica_location")
+        or GCP_REPLICA_LOCATION_DEFAULT
+    )
+    dual_write = record.get("secure_dual_write")
+    if dual_write is None:
+        dual_write = bool(replica)
+    if not replica:
+        dual_write = False
+    return {
+        "storage_bucket_name": storage,
+        "secure_bucket_name": secure,
+        "replica_bucket_name": replica,
+        "primary_location": primary_location,
+        "replica_location": replica_location,
+        "secure_dual_write": bool(dual_write),
+        "uses_dedicated_secure_bucket": bool(secure and secure != storage),
+    }
+
+
+def normalize_azure_byoc_layout(record: Dict[str, Any]) -> Dict[str, Any]:
+    storage = (
+        record.get("storage_container_name")
+        or record.get("container_name")
+        or ""
+    ).strip()
+    secure = (record.get("secure_container_name") or storage).strip()
+    replica = (record.get("replica_container_name") or "").strip()
+    dual_write = record.get("secure_dual_write")
+    if dual_write is None:
+        dual_write = bool(replica)
+    if not replica:
+        dual_write = False
+    return {
+        "storage_container_name": storage,
+        "secure_container_name": secure,
+        "replica_container_name": replica,
+        "secure_dual_write": bool(dual_write),
+        "uses_dedicated_secure_container": bool(secure and secure != storage),
+    }
+
+
+def get_gcp_bucket_layout(username: str) -> Optional[Dict[str, Any]]:
+    record = get_gcp_byoc_record(username)
+    if not record:
+        return None
+    return normalize_gcp_byoc_layout(record)
+
+
+def get_azure_container_layout(username: str) -> Optional[Dict[str, Any]]:
+    record = get_azure_byoc_record(username)
+    if not record:
+        return None
+    return normalize_azure_byoc_layout(record)
+
+
 def get_user_cloud_credentials(username: str, csp: str) -> Optional[Dict[str, Any]]:
     """
     Get cloud credentials for a user + CSP.
@@ -103,25 +190,54 @@ def get_user_cloud_credentials(username: str, csp: str) -> Optional[Dict[str, An
     decrypted = decrypt_credentials_dict(encrypted_creds)
     
     layout = None
-    if record["csp"] == "AWS":
-        storage = record.get("storage_bucket_name") or record.get("bucket_name") or ""
-        layout = {
-            "storage_bucket_name": storage,
-            "secure_bucket_name": record.get("secure_bucket_name") or storage,
-            "replica_bucket_name": record.get("replica_bucket_name") or "",
-        }
+    csp = record["csp"]
+    if csp == "AWS":
+        layout = normalize_aws_byoc_layout(record)
+    elif csp == "GCP":
+        layout = normalize_gcp_byoc_layout(record)
+    elif csp == "Azure":
+        layout = normalize_azure_byoc_layout(record)
+
+    gcp_layout = layout if csp == "GCP" else {}
+    az_layout = layout if csp == "Azure" else {}
 
     return {
-        "csp": record["csp"],
+        "csp": csp,
         "connection_method": record.get("connection_method", "access_keys"),
         "bucket_name": record.get("bucket_name", ""),
-        "storage_bucket_name": record.get("storage_bucket_name", record.get("bucket_name", "")),
-        "secure_bucket_name": record.get("secure_bucket_name", ""),
-        "replica_bucket_name": record.get("replica_bucket_name", ""),
+        "storage_bucket_name": (
+            record.get("storage_bucket_name")
+            or record.get("bucket_name")
+            or gcp_layout.get("storage_bucket_name", "")
+        ),
+        "secure_bucket_name": (
+            record.get("secure_bucket_name")
+            or gcp_layout.get("secure_bucket_name", "")
+        ),
+        "replica_bucket_name": (
+            record.get("replica_bucket_name")
+            or gcp_layout.get("replica_bucket_name", "")
+        ),
+        "gcp_primary_location": record.get("gcp_primary_location", ""),
+        "gcp_replica_location": record.get("gcp_replica_location", ""),
         "primary_region": record.get("primary_region", ""),
         "replica_region": record.get("replica_region", ""),
         "secure_dual_write": record.get("secure_dual_write", True),
         "container_name": record.get("container_name", ""),
+        "storage_container_name": (
+            record.get("storage_container_name")
+            or record.get("container_name")
+            or az_layout.get("storage_container_name", "")
+        ),
+        "secure_container_name": (
+            record.get("secure_container_name")
+            or az_layout.get("secure_container_name", "")
+        ),
+        "replica_container_name": (
+            record.get("replica_container_name")
+            or az_layout.get("replica_container_name", "")
+        ),
+        "account_name": record.get("account_name", ""),
         "credentials": decrypted,
         "is_active": record.get("is_active", True),
         "layout": layout,
@@ -211,10 +327,17 @@ def resolve_gcp_credentials(username: str) -> Dict[str, str]:
     
     if byoc:
         creds = byoc["credentials"]
+        layout = get_gcp_bucket_layout(username) or {}
+        storage_bucket = (
+            layout.get("storage_bucket_name")
+            or byoc.get("storage_bucket_name")
+            or byoc.get("bucket_name")
+            or settings.GCP_BUCKET_NAME
+        )
         logger.info(f"BYOC: Using {username}'s own GCP credentials")
         return {
             "service_account_json": creds.get("service_account_json", ""),
-            "bucket_name": byoc.get("bucket_name", settings.GCP_BUCKET_NAME),
+            "bucket_name": storage_bucket,
             "billing_dataset_id": creds.get("billing_dataset_id", ""),
             "billing_table_id": creds.get("billing_table_id", ""),
             "is_byoc": True,
@@ -237,11 +360,18 @@ def resolve_azure_credentials(username: str) -> Dict[str, str]:
     
     if byoc:
         creds = byoc["credentials"]
+        layout = get_azure_container_layout(username) or {}
+        storage_container = (
+            layout.get("storage_container_name")
+            or byoc.get("storage_container_name")
+            or byoc.get("container_name")
+            or settings.AZURE_CONTAINER_NAME
+        )
         logger.info(f"BYOC: Using {username}'s own Azure credentials")
         return {
             "account_name": creds.get("account_name", ""),
             "account_key": creds.get("account_key", ""),
-            "container_name": byoc.get("container_name", settings.AZURE_CONTAINER_NAME),
+            "container_name": storage_container,
             "subscription_id": (creds.get("subscription_id") or "").strip(),
             "tenant_id": (creds.get("tenant_id") or "").strip(),
             "client_id": (creds.get("client_id") or "").strip(),

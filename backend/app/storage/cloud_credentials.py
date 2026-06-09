@@ -149,6 +149,27 @@ def copy_secure_object_to_replica(
     storage.replica_client.copy_object(**kwargs)
 
 
+def copy_secure_object_from_replica(
+    storage: SecureAwsStorage,
+    object_key: str,
+    *,
+    server_side_encryption: bool = False,
+) -> None:
+    """Copy an object from replica secure bucket back to primary."""
+    if not storage.dual_write_enabled:
+        raise ValueError("Replica vault is not configured")
+    copy_source = f"{storage.replica_bucket}/{object_key}"
+    kwargs: dict = {
+        "Bucket": storage.primary_bucket,
+        "Key": object_key,
+        "CopySource": copy_source,
+    }
+    if server_side_encryption:
+        kwargs["ServerSideEncryption"] = "AES256"
+        kwargs["MetadataDirective"] = "REPLACE"
+    storage.primary_client.copy_object(**kwargs)
+
+
 def delete_secure_object_dual(storage: SecureAwsStorage, object_key: str) -> None:
     """Delete from primary and replica secure buckets."""
     storage.primary_client.delete_object(
@@ -269,6 +290,80 @@ def build_gcp_storage_client(
     client = gcp_storage.Client.from_service_account_json(path)
     target = (bucket_name or gcp["bucket_name"]).strip()
     return client, target, False
+
+
+def _gcp_secure_replica_bucket_name() -> str:
+    primary = (getattr(settings, "GCP_SECURE_REPLICA_BUCKET_NAME", None) or "").strip()
+    if primary:
+        return primary
+    return (getattr(settings, "GCP_REPLICA_BUCKET_NAME", None) or "").strip()
+
+
+def build_gcp_secure_storage_client(
+    username: str,
+) -> Tuple[gcp_storage.Client, str, bool]:
+    """Return (GCS client, secure_vault_bucket_name, is_byoc)."""
+    gcp = resolve_gcp_credentials(username)
+    if gcp.get("is_byoc"):
+        from app.byoc.credential_resolver import get_user_cloud_credentials
+
+        byoc = get_user_cloud_credentials(username, "GCP") or {}
+        secure_bucket = (byoc.get("secure_bucket_name") or gcp["bucket_name"]).strip()
+        client, _, is_byoc = build_gcp_storage_client(username, bucket_name=secure_bucket)
+        return client, secure_bucket, is_byoc
+
+    from app.utils.gcp_credentials import gcp_credentials_file_present
+
+    path = (gcp.get("service_account_key_path") or "").strip()
+    if not path or not gcp_credentials_file_present():
+        raise ValueError(
+            "Google Cloud secure vault is configured but "
+            "GCP_SERVICE_ACCOUNT_JSON_PATH is missing or points to a file that does not exist."
+        )
+    client = gcp_storage.Client.from_service_account_json(path)
+    return client, settings.GCP_SECURE_BUCKET_NAME.strip(), False
+
+
+def build_azure_secure_blob_service(
+    username: str,
+) -> Tuple[BlobServiceClient, str, bool, str, str]:
+    """Return (BlobServiceClient, secure_container, is_byoc, account_name, account_key)."""
+    azure = resolve_azure_credentials(username)
+    if azure.get("is_byoc"):
+        from app.byoc.credential_resolver import get_user_cloud_credentials
+
+        byoc = get_user_cloud_credentials(username, "Azure") or {}
+        container = (
+            byoc.get("secure_container_name")
+            or byoc.get("container_name")
+            or azure["container_name"]
+        ).strip()
+        acct = (byoc.get("account_name") or azure["account_name"]).strip()
+        key = (byoc.get("account_key") or azure["account_key"]).strip()
+        client, _, is_byoc = build_azure_blob_service(
+            username,
+            account_name=acct,
+            account_key=key,
+            container_name=container,
+        )
+        return client, container, is_byoc, acct, key
+
+    acct = (
+        settings.AZURE_SECURE_STORAGE_ACCOUNT_NAME.strip()
+        or settings.AZURE_STORAGE_ACCOUNT_NAME
+    ).strip()
+    key = (
+        settings.AZURE_SECURE_STORAGE_ACCOUNT_KEY.strip()
+        or settings.AZURE_STORAGE_ACCOUNT_KEY
+    ).strip()
+    container = settings.AZURE_SECURE_CONTAINER_NAME.strip()
+    client, _, is_byoc = build_azure_blob_service(
+        username,
+        account_name=acct,
+        account_key=key,
+        container_name=container,
+    )
+    return client, container, is_byoc, acct, key
 
 
 def build_azure_blob_service(

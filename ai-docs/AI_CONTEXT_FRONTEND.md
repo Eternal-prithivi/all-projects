@@ -69,7 +69,7 @@ For backend context → read `AI_CONTEXT_BACKEND.md`
 | `/dashboard/pricing` | `PricingPage.jsx` | |
 | `/dashboard/storage` | `StoragePage.jsx` | Uses `AuthContext` — tanjiro mock removed ✅ |
 | `/dashboard/vmcluster` | `VMClusterPage.jsx` | |
-| `/dashboard/security` | `SecurityPage.jsx` | 2FA vault + `syncAwsSecureBucket()` via `api.js` named exports |
+| `/dashboard/security` | `SecurityPage.jsx` | 2FA vault; tri-cloud sync; BYOC secure pickers (AWS/GCP/Azure via `SecurityVaultDestinationSummary`); trust docs: `docs/security/TRUST_AND_ENCRYPTION.md` |
 | `/dashboard/security-settings` | `SecuritySettingsPage.jsx` | |
 | `/dashboard/profile` | `ProfilePage.jsx` | |
 | `/dashboard/settings` | `SettingsPage.jsx` | Infrastructure provisioning engine (Boto3/Terraform); Preferences + Restart Tour |

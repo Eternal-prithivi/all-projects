@@ -6,7 +6,7 @@
 
 **Cost gate:** **ASK** rows need approval before running (VM, Provision Apply, live billing).
 
-**Last updated:** 2026-06-09
+**Last updated:** 2026-06-10
 
 ---
 
@@ -76,6 +76,16 @@
 | - [ ] | 3.8 | Platform region pills (if catalog) | `/dashboard/storage` | - [ ] | - [ ] | - [ ] | One bucket/container per CSP per pill |
 | - [ ] | 3.9 | Page header Refresh | `/dashboard/storage` | - [ ] | - [ ] | - [ ] | Gold bar on all three CSP panels; files + destinations reload |
 | - [ ] | 3.10 | Sync after manual cloud delete | `/dashboard/storage` | - [ ] | - [ ] | - [ ] | Stale file removed from Zenith list |
+| - [ ] | 3.11 | ML analyze → tier + CSP + expert votes | `/dashboard/storage` | - [ ] | - [ ] | - [ ] | Recommendation modal shows ensemble breakdown (+ RL note when applied) |
+| - [ ] | 3.12 | Multi-region lifecycle (backdate `last_accessed_at`) | `/dashboard/storage` | - [ ] | - [ ] | - [ ] | Nightly job or manual trigger moves file using **recorded** `cloud_bucket` + region (not default env bucket) |
+| - [ ] | 3.13 | Archive restore → download | `/dashboard/storage` | - [ ] | - [ ] | - [ ] | Cold/archive file: Restore button → 202 → download succeeds after rehydration |
+| - [ ] | 3.14 | Sensitive file skips auto-tier | DB + lifecycle job | - [ ] | - [ ] | - [ ] | `is_sensitive=true` file unchanged after demotion window |
+| - [ ] | 3.15 | Lifecycle policy at upload | upload wizard step 4 | - [ ] | - [ ] | - [ ] | Review step shows policy cards; suggested badge matches priority/intent |
+| - [ ] | 3.16 | Pending demotion notification | bell + Storage | - [ ] | - [ ] | - [ ] | After lifecycle job: warning with Keep hot / Snooze / Move now |
+| - [ ] | 3.17 | Settings lifecycle defaults | `/dashboard/settings` | - [ ] | - [ ] | - [ ] | Default policy + notice days save and apply to new uploads |
+| - [ ] | 3.18 | Storage health bar | `/dashboard/storage` | - [ ] | - [ ] | - [ ] | Grade A–D, lifetime savings, pending moves visible |
+| - [ ] | 3.19 | Upload cost forecast | upload wizard step 4 | - [ ] | - [ ] | - [ ] | 12-month keep-hot vs policy + tri-cloud $/month table |
+| - [ ] | 3.20 | Per-file Zenith insight | file table column | - [ ] | - [ ] | - [ ] | Click insight — policy, blockers, savings, inactive days |
 
 ---
 
@@ -91,6 +101,20 @@
 | - [ ] | 4.6 | Download secure file | `/dashboard/security` | - [ ] | - [ ] | - [ ] | File downloads |
 | - [ ] | 4.7 | Delete secure file | `/dashboard/security` | - [ ] | - [ ] | - [ ] | Removed |
 | - [ ] | 4.8 | Browser CSE upload | `/dashboard/security` | n/a | n/a | - [ ] | AWS only; others 501 OK |
+| - [ ] | 4.9 | Vault health bar | `/dashboard/security` | - [ ] | - [ ] | - [ ] | Grade A–D + metrics load |
+| - [ ] | 4.10 | Per-file insight panel | `/dashboard/security` | - [ ] | - [ ] | - [ ] | Expand row shows reasons/steps |
+| - [ ] | 4.11 | Upload cost preview | Secure upload wizard | - [ ] | - [ ] | - [ ] | Tri-cloud $/month updates |
+| - [ ] | 4.12 | Encryption pending notification | Notification bell | - [ ] | - [ ] | - [ ] | Encrypt now / Dismiss |
+| - [ ] | 4.13 | Stale file notification | Notification bell | - [ ] | - [ ] | - [ ] | Archive / Snooze / Delete |
+| - [ ] | 4.14 | Secure vault defaults | `/dashboard/settings` | - [ ] | - [ ] | - [ ] | Encryption/CSP/replication prefs save |
+| - [ ] | 4.15 | Archive / restore vault | `/dashboard/security` | - [ ] | - [ ] | - [ ] | **Archive** moves file primary→replica; **Restore** copies back; filter **Archived** lists replica-only files |
+| - [ ] | 4.16 | ML-assisted scan | Secure upload wizard | - [ ] | - [ ] | - [ ] | ML risk score on scan step |
+| - [ ] | 4.17 | Skip encryption after scan | Secure upload wizard | - [ ] | - [ ] | - [ ] | Third option + ack checkbox; file listed as unencrypted |
+| - [ ] | 4.18 | Vault destination disclosure | `/dashboard/security` | - [ ] | - [ ] | - [ ] | Platform: collapsed “Vault storage locations”; BYOC: per-CSP secure picker (AWS/GCP/Azure) + disclosure |
+| - [ ] | 4.21 | BYOC connect 2-step wizard | `/dashboard/settings` | - [ ] | - [ ] | - [ ] | Verify credentials → storage + secure + replica names; auto-create; dual-write toggle |
+| - [ ] | 4.22 | Trust docs accuracy | `docs/security/TRUST_AND_ENCRYPTION.md` | - [ ] | - [ ] | - [ ] | Matches live SSE/CSE/BYOC behavior |
+| - [ ] | 4.19 | GCP/Azure dedicated secure buckets | `/dashboard/security` | - [ ] | - [ ] | - [ ] | Vault cards show `zenith-secure-gcp` / `zenith-secure` not storage buckets |
+| - [ ] | 4.20 | Fixed replica (no region picker) | Secure upload wizard | - [ ] | - [ ] | - [ ] | Replication toggle only; no replica region dropdown |
 
 ---
 

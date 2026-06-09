@@ -13,6 +13,7 @@ export function useAzureContainers({
   enabled = true,
   platformRegionSlug = null,
   reloadToken = 0,
+  surface = 'storage',
 }) {
   const [containers, setContainers] = useState([]);
   const [mode, setMode] = useState('platform');
@@ -37,7 +38,7 @@ export function useAzureContainers({
     const startedAt = Date.now();
     setLoading(true);
     try {
-      const data = await getAzureContainers();
+      const data = await getAzureContainers({ surface });
       const list = data.containers || [];
       setContainers(list);
       setMode(data.mode || 'platform');
@@ -68,7 +69,7 @@ export function useAzureContainers({
       setLoading(false);
       setRefreshing(false);
     }
-  }, [enabled, storageKeyPrefix, reloadToken]);
+  }, [enabled, storageKeyPrefix, reloadToken, surface]);
 
   useEffect(() => {
     if (!enabled) return;

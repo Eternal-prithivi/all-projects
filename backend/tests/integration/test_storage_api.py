@@ -14,6 +14,40 @@ def test_list_files_empty(client, auth_headers):
     assert response.json() == []
 
 
+def test_cost_preview_endpoint(client, auth_headers):
+    headers, _user = auth_headers()
+    response = client.post(
+        "/api/storage/intelligence/cost-preview",
+        headers=headers,
+        json={
+            "file_size_mb": 512,
+            "determined_tier": "warm",
+            "user_priority": "cost",
+            "user_intent": "archival",
+            "lifecycle_policy": "auto",
+        },
+    )
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert "cross_cloud" in body
+    assert len(body["scenarios"]) == 2
+
+
+@patch("app.storage.routes_storage.resolve_aws_credentials")
+def test_intelligence_summary_endpoint(mock_resolve, client, auth_headers):
+    mock_resolve.return_value = {
+        "bucket_name": "test-bucket",
+        "region": "us-east-1",
+    }
+    headers, _user = auth_headers()
+    response = client.get("/api/storage/intelligence/summary", headers=headers)
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert "health" in body
+    assert "savings" in body
+    assert body["health"]["grade"] == "A"
+
+
 @patch("app.storage.routes_storage.resolve_aws_credentials")
 @patch("app.storage.routes_storage.upload_to_aws")
 def test_upload_smoke(mock_upload, mock_resolve, client, auth_headers):
@@ -233,7 +267,8 @@ def test_restore_aws_route(mock_resolve, mock_restore, client, auth_headers, db)
     mock_restore.assert_called_once()
 
 
-def test_restore_gcp_returns_501(client, auth_headers, db):
+@patch("app.storage.routes_storage.initiate_archive_restore_gcp", return_value={"message": "GCP restore started"})
+def test_restore_gcp_route(mock_restore, client, auth_headers, db):
     headers, user = auth_headers()
     db["files"].insert_one(
         {
@@ -242,13 +277,37 @@ def test_restore_gcp_returns_501(client, auth_headers, db):
             "owner_username": user["username"],
             "csp": "GCP",
             "storage_class": "ARCHIVE",
+            "cloud_bucket": "zeneith-main-asia",
         }
     )
     response = client.post("/api/storage/restore/GCP/archived.gcs", headers=headers)
-    assert response.status_code == 501, response.text
-    body = response.json()["detail"]
-    assert body["status"] == "not_supported"
-    assert body["provider"] == "gcp"
+    assert response.status_code == 202, response.text
+    assert response.json()["provider"] == "gcp"
+    mock_restore.assert_called_once()
+
+
+@patch("app.storage.routes_storage.initiate_archive_restore_azure", return_value={"message": "Azure restore started"})
+def test_restore_azure_route(mock_restore, client, auth_headers, db):
+    headers, user = auth_headers()
+    db["files"].insert_one(
+        {
+            "filename": "archived.blob",
+            "s3_key": f"{user['username']}/archived.blob",
+            "owner_username": user["username"],
+            "csp": "Azure",
+            "storage_class": "Archive",
+            "cloud_bucket": "zenith-storage",
+            "cloud_account": "zenithstorageasia",
+        }
+    )
+    response = client.post(
+        "/api/storage/restore/Azure/archived.blob",
+        headers=headers,
+        data={"tier": "High", "days": "1"},
+    )
+    assert response.status_code == 202, response.text
+    assert response.json()["provider"] == "azure"
+    mock_restore.assert_called_once()
 
 
 @patch("app.storage.routes_storage.resolve_gcp_credentials")

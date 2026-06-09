@@ -1,6 +1,21 @@
 # ML Training and Datasets
 
-Last updated: 2026-05-24
+Last updated: 2026-06-09
+
+## Report-5 traceability (Major Project latest22- Report-5.pdf)
+
+| Report section | Capability | Code module |
+|----------------|------------|-------------|
+| §3.4 Step 1 | Task arrival / preprocessing (filename, size, priority, intent) | `workflow_orchestrator.py`, `optimizer.py` |
+| §3.4 Step 2 | Ensemble tier prediction (Rule 30% + RF 35% + XGB 35%) | `storage_ensemble.py`, `acceptance.py` |
+| §3.4 Step 3 | CSP + service selection; RL bandit blend | `optimizer.py`, `rl_policy.py` |
+| §3.4 Step 4 | Post-upload monitoring (access frequency, lifecycle) | `routes_storage.py` (download), `tiering_tasks.py` |
+| §3.4 Step 5 | Feedback eval, retrain, RL update | `feedback.py`, `retraining.py`, `tasks_feedback.py` |
+| §4.2 | Initial placement ML (hot/warm/cold) | `POST /api/storage/analyze` |
+| §4.3 | Nightly lifecycle demotion/promotion (rules, not ensemble) | `tiering_tasks.py`, `storage_tiers.py`, `manager.py` |
+| §4.5 | Feedback-driven retraining with quality filter | `feedback.py`, `retraining.py` |
+
+**Two-system model:** The ensemble predicts **initial tier at upload**. Celery lifecycle jobs **move existing objects** between tiers using rule-based scoring — not the RF/XGBoost models.
 
 ## Current Truth
 
@@ -20,7 +35,7 @@ It generates:
 
 | File | Purpose | Rows |
 |---|---:|---:|
-| `app/ml/datasets/storage_tier_training.csv` | Storage tier training data for hot/warm/cold prediction | 13,824 |
+| `app/ml/datasets/storage_tier_training.csv` | Storage tier training data for hot/warm/cold prediction | 13,827 |
 | `app/ml/datasets/workload_classification_training.csv` | Workload text samples for general/storage/memory/performance/AI-ML routing | 600 |
 
 The datasets are synthetic and report-aligned. They are useful for demos, repeatable validation, and local training. They are not a substitute for real production cloud telemetry.
@@ -64,7 +79,7 @@ If the guard fails, the candidate is kept for inspection but the active model is
 ## Last Local Training Result
 
 ```text
-storage_tier_training.csv: 13,824 rows
+storage_tier_training.csv: 13,827 rows (includes 3 Report §4.2.2 edge-case rows from `generate_storage_edge_case_rows()`)
 workload_classification_training.csv: 600 rows
 storage random_forest test accuracy: 0.9996
 storage xgboost/fallback test accuracy: 0.9993

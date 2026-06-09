@@ -44,7 +44,7 @@ async def get_dashboard_stats(user: dict = Depends(get_current_user)):
 
         secure_files = DB["secure_files"]
         security_alerts = secure_files.count_documents(
-            {"has_sensitive_data": True, "is_encrypted": False}
+            {"is_sensitive": True, "is_encrypted": False}
         )
 
         vm_metrics = DB["vm_metrics"]

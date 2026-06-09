@@ -145,13 +145,23 @@ export const getCurrentUser = async (token) => {
 
 // ---------------- STORAGE ----------------
 
-export const uploadFile = async (file, csp, storageClass, token, { bucket, regionSlug } = {}) => {
+export const uploadFile = async (
+  file,
+  csp,
+  storageClass,
+  token,
+  { bucket, regionSlug, lifecyclePolicy, userPriority, userIntent, initialPlannedTier } = {}
+) => {
   const formData = new FormData();
   formData.append("file", file);
   formData.append("csp", csp);
   formData.append("storage_class", storageClass);
   if (bucket) formData.append("bucket", bucket);
   if (regionSlug) formData.append("region_slug", regionSlug);
+  if (lifecyclePolicy) formData.append("lifecycle_policy", lifecyclePolicy);
+  if (userPriority) formData.append("user_priority", userPriority);
+  if (userIntent) formData.append("user_intent", userIntent);
+  if (initialPlannedTier) formData.append("initial_planned_tier", initialPlannedTier);
 
   try {
     const response = await apiClient.post("/storage/upload", formData, {
@@ -164,6 +174,49 @@ export const uploadFile = async (file, csp, storageClass, token, { bucket, regio
   } catch (error) {
     throw error.response?.data || error;
   }
+};
+
+export const storageLifecycleAction = async (filename, action, { snoozeDays = 30 } = {}) => {
+  const response = await apiClient.post("/storage/lifecycle/action", {
+    filename,
+    action,
+    snooze_days: snoozeDays,
+  });
+  return response.data;
+};
+
+export const fetchStorageIntelligenceSummary = async (params = {}) => {
+  const response = await apiClient.get("/storage/intelligence/summary", { params });
+  return response.data;
+};
+
+export const fetchStorageCostPreview = async (payload) => {
+  const response = await apiClient.post("/storage/intelligence/cost-preview", payload);
+  return response.data;
+};
+
+export const fetchSecurityIntelligenceSummary = async (token, params = {}) => {
+  const response = await apiClient.get("/security/intelligence/summary", {
+    params,
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  return response.data;
+};
+
+export const fetchSecurityCostPreview = async (token, payload) => {
+  const response = await apiClient.post("/security/intelligence/cost-preview", payload, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  return response.data;
+};
+
+export const securityVaultAction = async (token, filename, action, { snoozeDays = 30 } = {}) => {
+  const response = await apiClient.post(
+    "/security/vault/action",
+    { filename, action, snooze_days: snoozeDays },
+    { headers: { Authorization: `Bearer ${token}` } },
+  );
+  return response.data;
 };
 
 export const getAwsBuckets = async (surface = "storage", { region } = {}) => {
@@ -188,18 +241,18 @@ export const refreshAwsBuckets = async (surface = "storage", { region } = {}) =>
   }
 };
 
-export const getGcpBuckets = async () => {
+export const getGcpBuckets = async ({ surface = "storage" } = {}) => {
   try {
-    const response = await apiClient.get("/byoc/gcp-buckets");
+    const response = await apiClient.get("/byoc/gcp-buckets", { params: { surface } });
     return response.data;
   } catch (error) {
     throw error.response?.data || error;
   }
 };
 
-export const getAzureContainers = async () => {
+export const getAzureContainers = async ({ surface = "storage" } = {}) => {
   try {
-    const response = await apiClient.get("/byoc/azure-containers");
+    const response = await apiClient.get("/byoc/azure-containers", { params: { surface } });
     return response.data;
   } catch (error) {
     throw error.response?.data || error;
@@ -342,12 +395,20 @@ export const uploadSecureFile = async (
   encrypt,
   token,
   alwaysAskEncryption = false,
-  csp = "AWS"
+  csp = "AWS",
+  {
+    skipEncryption = false,
+    enableReplication = false,
+    replicaRegion = null,
+  } = {}
 ) => {
   const formData = new FormData();
   formData.append("file", file);
   formData.append("encrypt_manual", encrypt);
   formData.append("always_ask_encryption", alwaysAskEncryption);
+  formData.append("skip_encryption", skipEncryption);
+  formData.append("enable_replication", enableReplication);
+  if (replicaRegion) formData.append("replica_region", replicaRegion);
   formData.append("csp", csp);
 
   try {

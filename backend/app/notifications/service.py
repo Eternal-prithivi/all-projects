@@ -35,6 +35,7 @@ def create_notification(
     message: str,
     type: str = "info",
     link: Optional[str] = None,
+    metadata: Optional[Dict[str, Any]] = None,
 ) -> str:
     doc = {
         "username": username,
@@ -45,21 +46,24 @@ def create_notification(
         "read": False,
         "created_at": datetime.utcnow(),
     }
+    if metadata:
+        doc["metadata"] = metadata
     result = _col().insert_one(doc)
     return str(result.inserted_id)
 
 
 def _serialize(doc: dict) -> Dict[str, Any]:
+    created = doc.get("created_at")
     return {
         "id": str(doc["_id"]),
         "title": doc.get("title"),
         "message": doc.get("message"),
         "type": doc.get("type", "info"),
         "link": doc.get("link"),
+        "metadata": doc.get("metadata"),
         "read": bool(doc.get("read")),
-        "created_at": doc.get("created_at").isoformat() + "Z"
-        if doc.get("created_at")
-        else None,
+        "created_at": created.isoformat() + "Z" if created else None,
+        "timestamp": created.isoformat() + "Z" if created else None,
     }
 
 
@@ -121,6 +125,38 @@ def list_notifications(username: str, limit: int = 100) -> List[Dict[str, Any]]:
     """Backward-compatible full list (capped)."""
     items, _, _ = list_notifications_paginated(username, limit=limit, skip=0)
     return items
+
+
+def update_notification(
+    username: str,
+    notification_id: str,
+    *,
+    title: Optional[str] = None,
+    message: Optional[str] = None,
+    type: Optional[str] = None,
+    link: Optional[str] = None,
+) -> bool:
+    try:
+        oid = ObjectId(notification_id)
+    except Exception:
+        return False
+    updates: Dict[str, Any] = {}
+    if title is not None:
+        updates["title"] = title
+    if message is not None:
+        updates["message"] = message
+    if type is not None:
+        updates["type"] = type
+    if link is not None:
+        updates["link"] = link
+    if not updates:
+        return False
+    updates["updated_at"] = datetime.utcnow()
+    result = _col().update_one(
+        {"_id": oid, "username": username},
+        {"$set": updates},
+    )
+    return result.modified_count > 0
 
 
 def mark_read(username: str, notification_id: str) -> bool:

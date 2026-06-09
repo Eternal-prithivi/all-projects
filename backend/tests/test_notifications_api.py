@@ -39,3 +39,20 @@ def test_paginated_list_and_unread_filter(username):
     recent, unread_recent = notification_service.list_recent_notifications(username, limit=8)
     assert len(recent) == 2
     assert unread_recent == 1
+
+
+def test_update_notification(username):
+    nid = notification_service.create_notification(
+        username, title="Upload", message="Uploading file…", type="loading"
+    )
+    ok = notification_service.update_notification(
+        username,
+        nid,
+        message="Upload complete.",
+        type="success",
+    )
+    assert ok is True
+    items, _, _ = notification_service.list_notifications_paginated(username, limit=10)
+    updated = next(i for i in items if i["id"] == nid)
+    assert updated["type"] == "success"
+    assert updated["message"] == "Upload complete."

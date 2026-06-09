@@ -68,6 +68,20 @@ CATALOG_SPEC = [
     },
 ]
 
+# Dedicated secure vault (separate from multi-region storage catalog).
+SECURE_VAULT_SPEC = {
+    "gcp": {
+        "secure_bucket": "zenith-secure-gcp",
+        "secure_location": "ASIA-SOUTH1",
+        "replica_bucket": "zenith-secure-gcp-replica",
+        "replica_location": "US-EAST1",
+    },
+    "azure": {
+        "secure_container": "zenith-secure",
+        "replica_container": "zenith-secure-replica",
+    },
+}
+
 
 def ensure_aws_bucket(s3, name: str, region: str, dry_run: bool) -> str:
     from botocore.exceptions import ClientError
@@ -151,8 +165,11 @@ def ensure_azure_account(
         print(f"  Azure CREATED account: {account_name} [{region}]")
         status = "created"
 
-    keys = storage_client.storage_accounts.list_keys(resource_group, account_name)
-    key = keys.keys[0].value
+    key_result = storage_client.storage_accounts.list_keys(resource_group, account_name)
+    key_list = getattr(key_result, "keys_property", None) or key_result.keys
+    if callable(key_list):
+        key_list = key_list()
+    key = key_list[0].value
 
     conn = (
         f"DefaultEndpointsProtocol=https;AccountName={account_name};"
@@ -170,6 +187,82 @@ def ensure_azure_account(
         print(f"  Azure OK (container exists): {account_name}/{container}")
 
     return status, key
+
+
+def ensure_azure_container_on_account(
+    account_name: str,
+    account_key: str,
+    container: str,
+    dry_run: bool,
+) -> str:
+    from azure.storage.blob import BlobServiceClient
+
+    if not account_name or not account_key:
+        print(f"  Azure SKIP container {container}: missing account credentials", file=sys.stderr)
+        return "skip"
+
+    conn = (
+        f"DefaultEndpointsProtocol=https;AccountName={account_name};"
+        f"AccountKey={account_key};EndpointSuffix=core.windows.net"
+    )
+    blob_service = BlobServiceClient.from_connection_string(conn)
+    cc = blob_service.get_container_client(container)
+    if cc.exists():
+        print(f"  Azure OK (container exists): {account_name}/{container}")
+        return "exists"
+    if dry_run:
+        print(f"  Azure WOULD CREATE container: {account_name}/{container}")
+        return "would_create"
+    cc.create_container()
+    print(f"  Azure CREATED container: {account_name}/{container}")
+    return "created"
+
+
+def provision_secure_vault(
+    *,
+    gcp_client,
+    azure_account: str,
+    azure_key: str,
+    dry_run: bool,
+) -> None:
+    print("\n=== Secure vault (GCP + Azure) ===")
+    gcp = SECURE_VAULT_SPEC["gcp"]
+    try:
+        ensure_gcp_bucket(gcp_client, gcp["secure_bucket"], gcp["secure_location"], dry_run)
+        ensure_gcp_bucket(gcp_client, gcp["replica_bucket"], gcp["replica_location"], dry_run)
+    except Exception as exc:
+        print(f"  GCP secure vault ERROR: {exc}", file=sys.stderr)
+
+    az = SECURE_VAULT_SPEC["azure"]
+    for container in (az["secure_container"], az["replica_container"]):
+        try:
+            ensure_azure_container_on_account(azure_account, azure_key, container, dry_run)
+        except Exception as exc:
+            print(f"  Azure secure vault ERROR ({container}): {exc}", file=sys.stderr)
+
+
+def _append_env_secure_vault_keys(env_path: Path) -> None:
+    """Ensure .env has dedicated secure vault keys (does not overwrite existing values)."""
+    gcp = SECURE_VAULT_SPEC["gcp"]
+    az = SECURE_VAULT_SPEC["azure"]
+    desired = {
+        "GCP_SECURE_BUCKET_NAME": gcp["secure_bucket"],
+        "GCP_SECURE_REPLICA_BUCKET_NAME": gcp["replica_bucket"],
+        "AZURE_SECURE_CONTAINER_NAME": az["secure_container"],
+        "AZURE_SECURE_REPLICA_CONTAINER_NAME": az["replica_container"],
+    }
+    if not env_path.is_file():
+        return
+    lines = env_path.read_text(encoding="utf-8").splitlines()
+    present = {line.split("=", 1)[0] for line in lines if "=" in line and not line.strip().startswith("#")}
+    appended = []
+    for key, value in desired.items():
+        if key not in present:
+            lines.append(f"{key}={value}")
+            appended.append(key)
+    if appended:
+        env_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        print(f"Added to {env_path}: {', '.join(appended)}")
 
 
 def main() -> int:
@@ -291,8 +384,16 @@ def main() -> int:
             }
         )
 
+    provision_secure_vault(
+        gcp_client=gcp_client,
+        azure_account=existing_az_account,
+        azure_key=existing_az_key,
+        dry_run=args.dry_run,
+    )
+
     if args.dry_run:
         print("\nDry run complete — no catalog written.")
+        _append_env_secure_vault_keys(BACKEND_ROOT / ".env")
         return 1 if errors else 0
 
     out_path = Path(args.catalog_out)
@@ -322,6 +423,7 @@ def main() -> int:
         lines.append("PLATFORM_STORAGE_DEFAULT_SLUG=asia")
     env_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
     print("Updated backend/.env with PLATFORM_STORAGE_CATALOG_JSON")
+    _append_env_secure_vault_keys(env_path)
 
     if errors:
         print("\nCompleted with errors:", file=sys.stderr)

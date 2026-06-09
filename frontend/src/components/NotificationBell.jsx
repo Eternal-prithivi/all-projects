@@ -1,6 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useNotificationCenter } from '../context/NotificationContext';
+import { storageLifecycleAction, securityVaultAction } from '../api';
+import { useAuth } from '../context/AuthContext';
 import IndeterminateProgressBar from './IndeterminateProgressBar.jsx';
 import '../styles/notification-bell.css';
 
@@ -72,8 +74,22 @@ const NotificationBell = ({ viewAllPath = '/dashboard/notifications' }) => {
   } = useNotificationCenter();
   const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [actionLoading, setActionLoading] = useState(null);
   const dropdownRef = useRef(null);
   const navigate = useNavigate();
+  const { token } = useAuth();
+
+  const lifecycleActionLabels = {
+    keep_hot: 'Keep hot',
+    snooze: 'Snooze 30d',
+    approve: 'Move now',
+    encrypt_now: 'Encrypt now',
+    dismiss_encryption: 'Dismiss',
+    archive: 'Archive',
+    restore: 'Restore',
+    snooze_stale: 'Snooze 30d',
+    approve_delete: 'Delete',
+  };
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -109,12 +125,55 @@ const NotificationBell = ({ viewAllPath = '/dashboard/notifications' }) => {
   };
 
   const handleItemClick = async (notification) => {
+    const cat = notification.metadata?.category;
+    if (cat === 'lifecycle_pending' || cat === 'security_encryption_pending' || cat === 'security_stale_pending') {
+      return;
+    }
     if (!notification.read) {
       await markAsRead(notification.id);
     }
     if (notification.link) {
       setIsOpen(false);
       navigate(notification.link);
+    }
+  };
+
+  const handleLifecycleAction = async (notification, action) => {
+    const filename = notification.metadata?.filename;
+    if (!filename) return;
+    setActionLoading(`${notification.id}-${action}`);
+    try {
+      await storageLifecycleAction(filename, action);
+      await markAsRead(notification.id);
+      await fetchRecent();
+    } catch (err) {
+      console.error('Lifecycle action failed', err);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleSecurityAction = async (notification, action) => {
+    const filename = notification.metadata?.filename;
+    if (!filename || !token) return;
+    setActionLoading(`${notification.id}-${action}`);
+    try {
+      if (action === 'dismiss_encryption') {
+        await markAsRead(notification.id);
+        await fetchRecent();
+        return;
+      }
+      const result = await securityVaultAction(token, filename, action);
+      await markAsRead(notification.id);
+      await fetchRecent();
+      if (action === 'encrypt_now' || result?.open_encryption) {
+        setIsOpen(false);
+        navigate('/dashboard/security');
+      }
+    } catch (err) {
+      console.error('Security vault action failed', err);
+    } finally {
+      setActionLoading(null);
     }
   };
 
@@ -158,6 +217,45 @@ const NotificationBell = ({ viewAllPath = '/dashboard/notifications' }) => {
               <div className="notification-item-timestamp">
                 {formatTimestamp(notification.timestamp)}
               </div>
+              {notification.metadata?.category === 'lifecycle_pending' &&
+                Array.isArray(notification.metadata.actions) && (
+                  <div className="notification-lifecycle-actions">
+                    {notification.metadata.actions.map((action) => (
+                      <button
+                        key={action}
+                        type="button"
+                        className="notification-lifecycle-btn"
+                        disabled={actionLoading === `${notification.id}-${action}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleLifecycleAction(notification, action);
+                        }}
+                      >
+                        {lifecycleActionLabels[action] || action}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              {(notification.metadata?.category === 'security_encryption_pending' ||
+                notification.metadata?.category === 'security_stale_pending') &&
+                Array.isArray(notification.metadata.actions) && (
+                  <div className="notification-lifecycle-actions">
+                    {notification.metadata.actions.map((action) => (
+                      <button
+                        key={action}
+                        type="button"
+                        className="notification-lifecycle-btn"
+                        disabled={actionLoading === `${notification.id}-${action}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleSecurityAction(notification, action);
+                        }}
+                      >
+                        {lifecycleActionLabels[action] || action}
+                      </button>
+                    ))}
+                  </div>
+                )}
             </div>
             <button
               type="button"

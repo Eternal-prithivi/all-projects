@@ -77,6 +77,9 @@ class MongoDB:
                 "secure_files",
                 [("owner_username", 1), ("is_sensitive", 1), ("is_encrypted", 1)],
             )
+            self._create_index_if_missing(
+                "secure_files", [("owner_username", 1), ("last_accessed_at", -1)]
+            )
 
             self._create_index_if_missing("sessions", [("username", 1), ("last_active", -1)])
             self._create_index_if_missing("activity_log", [("username", 1), ("timestamp", -1)])

@@ -21,6 +21,7 @@ export function useGcpBuckets({
   enabled = true,
   platformRegionSlug = null,
   reloadToken = 0,
+  surface = 'storage',
 }) {
   const [buckets, setBuckets] = useState([]);
   const [mode, setMode] = useState('platform');
@@ -45,7 +46,7 @@ export function useGcpBuckets({
     const startedAt = Date.now();
     setLoading(true);
     try {
-      const data = await getGcpBuckets();
+      const data = await getGcpBuckets({ surface });
       const list = data.buckets || [];
       setBuckets(list);
       setMode(data.mode || 'platform');
@@ -76,7 +77,7 @@ export function useGcpBuckets({
       setLoading(false);
       setRefreshing(false);
     }
-  }, [enabled, storageKeyPrefix, reloadToken]);
+  }, [enabled, storageKeyPrefix, reloadToken, surface]);
 
   useEffect(() => {
     if (!enabled) return;

@@ -23,6 +23,18 @@ Notes: [one line optional]
 ## Session Log (recent only)
 
 ---
+SESSION_ID: 20260610-phase20-trust-byoc-encrypt
+Date: 2026-06-10
+Agent: Cursor Composer
+Task: Phase 20 — Trust docs + BYOC credential encryption hardening
+Changes:
+- docs/security/TRUST_AND_ENCRYPTION.md + BYOC_CREDENTIAL_ENCRYPTION.md
+- encryption.py v1 prefix, idempotent encrypt, merge_and_encrypt_credentials
+- routes_byoc incremental credential merge; test_byoc_encryption.py
+- parity matrix, CREDENTIAL_CONTRACT, ai-docs STATUS/SCRATCHPAD/PROGRESS
+Outcome: Done
+Notes: CSE AWS-only; KMS envelope deferred Tier F
+---
 SESSION_ID: 20260609-phase19-storage-refresh
 Date: 2026-06-09
 Agent: Cursor Composer

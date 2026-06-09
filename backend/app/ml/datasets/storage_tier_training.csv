@@ -13823,3 +13823,6 @@ proposal_r3.pdf,12390.4,document,balanced,frequent,5,False,5.0,hot,hot,12390.4,3
 proposal_2026-05-24_r3.pdf,12390.4,document,balanced,frequent,5,True,8.0,warm,hot,12390.4,3.0,0.0,0.0,1.0,0.0,0.0,1.0,8.0,1.0
 report_r3.pdf,12390.4,document,balanced,frequent,8,False,8.0,warm,hot,12390.4,3.0,0.0,0.0,1.0,0.0,0.0,1.0,8.0,1.0
 report_2026-05-24_r3.pdf,12390.4,document,balanced,frequent,8,True,11.0,warm,hot,12390.4,3.0,0.0,0.0,1.0,0.0,0.0,1.0,11.0,1.0
+quarterly_report_Q4_2024.pdf,10.0,document,cost,archival,3,True,13.0,cold,warm,10.0,3.0,1.0,0.0,0.0,1.0,0.0,0.0,13.0,2.0
+backup_archive_export_2026-01-01.zip,5120.0,archive,cost,archival,8,True,22.0,cold,cold,5120.0,0.0,1.0,0.0,0.0,1.0,0.0,0.0,22.0,2.0
+active-dashboard-api.json,2.5,data,performance,frequent,0,False,-2.0,hot,hot,2.5,1.0,0.0,1.0,0.0,0.0,0.0,1.0,-2.0,0.0

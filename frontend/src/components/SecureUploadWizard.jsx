@@ -1,21 +1,15 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { REGION_LABELS } from "../hooks/useAwsBuckets";
 import { CSP_LABELS } from "../hooks/useCloudAvailability";
 import { scanSecureFile } from "../api";
 import { isClientPasswordValid } from "../utils/passwordPolicy";
 import BucketRegionSelector from "./BucketRegionSelector";
+import SecurityCostPreview from "./security/SecurityCostPreview";
+import SecurityVaultDestinationSummary from "./security/SecurityVaultDestinationSummary";
 import ZenithWizardFrame, { WizardNote } from "./wizard/ZenithWizardFrame";
 import WizardPasswordFields from "./wizard/WizardPasswordFields";
 import "../styles/encryption-modal.css";
 
 const STEP_LABELS = ["Scan", "Encrypt", "Folder", "Replicate", "Review"];
-
-const REPLICATION_REGIONS = [
-  { value: "us-east-1", label: "US East (N. Virginia)" },
-  { value: "us-west-2", label: "US West (Oregon)" },
-  { value: "ap-south-1", label: "Asia Pacific (Mumbai)" },
-  { value: "eu-west-1", label: "Europe (Ireland)" },
-];
 
 const ENCRYPTION_NOTES = {
   "server-side": (
@@ -31,6 +25,13 @@ const ENCRYPTION_NOTES = {
       sent to Zenith. If you lose the password, the file cannot be recovered.
     </>
   ),
+  none: (
+    <>
+      The file is stored in your 2FA-protected vault without Zenith-managed encryption. Anyone
+      with vault or cloud access could read plaintext. Not recommended when sensitive data was
+      detected.
+    </>
+  ),
 };
 
 export default function SecureUploadWizard({
@@ -44,6 +45,8 @@ export default function SecureUploadWizard({
   onClose,
   onComplete,
   isSubmitting = false,
+  securityPrefs = null,
+  awsBucketPickerEnabled = false,
 }) {
   const [step, setStep] = useState(0);
   const [scanning, setScanning] = useState(true);
@@ -53,21 +56,39 @@ export default function SecureUploadWizard({
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [enableReplication, setEnableReplication] = useState(false);
-  const [replicaRegion, setReplicaRegion] = useState("us-east-1");
-  const [targetCsp, setTargetCsp] = useState(providers[0] || "AWS");
+  const [targetCsp, setTargetCsp] = useState(
+    securityPrefs?.default_security_csp || providers[0] || "AWS",
+  );
+  const [skipEncryptionAcknowledged, setSkipEncryptionAcknowledged] = useState(false);
+
+  const fileSizeMb = useMemo(() => {
+    const bytes = scan?.size_bytes || file?.size || 0;
+    return Math.max(bytes / (1024 * 1024), 0.001);
+  }, [scan, file]);
 
   const isSensitive = scan?.is_sensitive ?? true;
-  const replicationSupported = targetCsp === "AWS" || targetCsp === "GCP";
+  const replicationSupported = targetCsp === "AWS" || targetCsp === "GCP" || targetCsp === "Azure";
+
+  useEffect(() => {
+    if (!securityPrefs) return;
+    const prefCsp = securityPrefs.default_security_csp;
+    if (prefCsp && providers.includes(prefCsp)) {
+      setTargetCsp(prefCsp);
+    }
+    if (securityPrefs.default_security_replication) {
+      setEnableReplication(true);
+    }
+    const enc = securityPrefs.default_security_encryption;
+    if (enc === "server-side" || enc === "client-side") {
+      setEncryptionMethod(enc);
+    }
+  }, [securityPrefs, providers]);
 
   useEffect(() => {
     if (providers.length && !providers.includes(targetCsp)) {
       setTargetCsp(providers[0]);
     }
   }, [providers, targetCsp]);
-
-  useEffect(() => {
-    if (targetCsp === "Azure") setEnableReplication(false);
-  }, [targetCsp]);
 
   useEffect(() => {
     let cancelled = false;
@@ -100,13 +121,17 @@ export default function SecureUploadWizard({
     if (step === 0) return !scanning && !scanError;
     if (step === 1) {
       if (!encryptionMethod) return false;
+      if (encryptionMethod === "none") {
+        return !isSensitive || skipEncryptionAcknowledged;
+      }
       if (encryptionMethod === "client-side") {
         return isClientPasswordValid(password, confirmPassword);
       }
       return true;
     }
     if (step === 2) {
-      return Boolean(targetCsp) && (targetCsp !== "AWS" || selectedBucket);
+      const needsAwsBucket = targetCsp === "AWS" && awsBucketPickerEnabled;
+      return Boolean(targetCsp) && (!needsAwsBucket || selectedBucket);
     }
     if (step === 3) return true;
     return true;
@@ -119,11 +144,17 @@ export default function SecureUploadWizard({
     confirmPassword,
     targetCsp,
     selectedBucket,
+    awsBucketPickerEnabled,
+    isSensitive,
+    skipEncryptionAcknowledged,
   ]);
 
   const nextBlockedHint = useMemo(() => {
     if (step !== 1 || stepCanAdvance) return null;
     if (!encryptionMethod) return "Select an encryption option to continue.";
+    if (encryptionMethod === "none" && isSensitive && !skipEncryptionAcknowledged) {
+      return "Confirm you accept storing sensitive content without encryption.";
+    }
     if (encryptionMethod === "client-side") {
       if (!password || !confirmPassword) {
         return "Enter and confirm your encryption password.";
@@ -136,7 +167,7 @@ export default function SecureUploadWizard({
       }
     }
     return null;
-  }, [step, stepCanAdvance, encryptionMethod, password, confirmPassword]);
+  }, [step, stepCanAdvance, encryptionMethod, password, confirmPassword, isSensitive, skipEncryptionAcknowledged]);
 
   const nextStep = () => {
     if (step < STEP_LABELS.length - 1 && stepCanAdvance) setStep((s) => s + 1);
@@ -182,7 +213,6 @@ export default function SecureUploadWizard({
               password: encryptionMethod === "client-side" ? password : null,
               csp: targetCsp,
               enableReplication: replicationSupported && enableReplication,
-              replicaRegion: replicationSupported && enableReplication ? replicaRegion : null,
               bucket: selectedBucket,
               isSensitive,
             })
@@ -224,13 +254,13 @@ export default function SecureUploadWizard({
               >
                 {isSensitive ? (
                   <p>
-                    Found: <strong>{reasonText}</strong>. You must choose encryption, optional
-                    replication, and a destination folder before upload.
+                    Found: <strong>{reasonText}</strong>. Choose encryption (recommended), or
+                    explicitly skip encryption if you accept the risk.
                   </p>
                 ) : (
                   <p>
-                    No mandatory encryption wizard is required, but you can still enable
-                    encryption in the next steps if you prefer.
+                    No sensitive patterns found. You may skip encryption or enable it in the next
+                    step.
                   </p>
                 )}
               </WizardNote>
@@ -239,7 +269,19 @@ export default function SecureUploadWizard({
                 <dd>{file?.name}</dd>
                 <dt>Size</dt>
                 <dd>{((scan.size_bytes || file?.size || 0) / 1024).toFixed(2)} KB</dd>
+                {scan.ml_scan_score != null && (
+                  <>
+                    <dt>ML risk score</dt>
+                    <dd>{Math.round(scan.ml_scan_score * 100)}%</dd>
+                  </>
+                )}
               </div>
+              {scan.ml_scan_score != null && scan.ml_scan_score >= 0.65 && !isSensitive && (
+                <WizardNote title="ML-assisted scan" variant="warn">
+                  The ML risk model also flagged this file. Consider encryption even if rules were
+                  quiet.
+                </WizardNote>
+              )}
             </>
           )}
           <WizardNote title="What happens next">
@@ -286,7 +328,38 @@ export default function SecureUploadWizard({
               </h4>
               <p>Zero-knowledge — encrypted locally, then uploaded as ciphertext.</p>
             </div>
+            <div
+              className={`zenith-wizard-option-card${
+                encryptionMethod === "none" ? " is-selected" : ""
+              }${isSensitive ? " zenith-wizard-option-card--warn" : ""}`}
+              onClick={() => setEncryptionMethod("none")}
+              onKeyDown={(e) => e.key === "Enter" && setEncryptionMethod("none")}
+              role="button"
+              tabIndex={0}
+            >
+              <h4>
+                <input type="radio" readOnly checked={encryptionMethod === "none"} />
+                Store without encryption
+              </h4>
+              <p>
+                Upload to the secure vault with 2FA only — no Zenith encryption layer.
+                {isSensitive ? " Not recommended for sensitive files." : ""}
+              </p>
+            </div>
           </div>
+          {encryptionMethod === "none" && isSensitive && (
+            <label className="security-skip-encrypt-ack">
+              <input
+                type="checkbox"
+                checked={skipEncryptionAcknowledged}
+                onChange={(e) => setSkipEncryptionAcknowledged(e.target.checked)}
+              />
+              <span>
+                I understand this file contains sensitive data and I accept storing it without
+                Zenith encryption.
+              </span>
+            </label>
+          )}
           {encryptionMethod && (
             <WizardNote title="If you continue with this option">
               {ENCRYPTION_NOTES[encryptionMethod]}
@@ -298,6 +371,16 @@ export default function SecureUploadWizard({
               confirmPassword={confirmPassword}
               onPasswordChange={setPassword}
               onConfirmChange={setConfirmPassword}
+            />
+          )}
+          {encryptionMethod && token && (
+            <SecurityCostPreview
+              token={token}
+              fileSizeMb={fileSizeMb}
+              encryptionMethod={encryptionMethod}
+              selectedCsp={targetCsp}
+              enableReplication={false}
+              compact
             />
           )}
         </div>
@@ -332,11 +415,10 @@ export default function SecureUploadWizard({
                   </div>
                 ))}
               </div>
-              {targetCsp === "AWS" && (
+              {targetCsp === "AWS" && awsBucketPickerEnabled ? (
                 <>
                   <WizardNote title="Choose vault folder (S3 bucket)">
-                    Select the secure bucket (and optional region filter) where this file will
-                    live. Replica buckets appear here when configured.
+                    Select the secure bucket where this file will live.
                   </WizardNote>
                   <BucketRegionSelector
                     surface="security"
@@ -347,20 +429,20 @@ export default function SecureUploadWizard({
                     onRegionChange={onRegionChange}
                   />
                 </>
+              ) : (
+                <SecurityVaultDestinationSummary
+                  providers={[targetCsp]}
+                  activeCsp={targetCsp}
+                />
               )}
-              {targetCsp === "GCP" && (
-                <WizardNote title="Google Cloud vault">
-                  Uploads use your configured GCS secure bucket. Set{" "}
-                  <code>GCP_SERVICE_ACCOUNT_JSON_PATH</code> in server .env (like Azure storage
-                  keys). Optional <code>GCP_REPLICA_BUCKET_NAME</code> enables replication on the
-                  next step.
-                </WizardNote>
-              )}
-              {targetCsp === "Azure" && (
-                <WizardNote title="Azure vault">
-                  Files upload to your configured secure container using platform or BYOC
-                  credentials from Settings.
-                </WizardNote>
+              {token && (
+                <SecurityCostPreview
+                  token={token}
+                  fileSizeMb={fileSizeMb}
+                  encryptionMethod={encryptionMethod || "server-side"}
+                  selectedCsp={targetCsp}
+                  enableReplication={false}
+                />
               )}
             </>
           )}
@@ -369,19 +451,20 @@ export default function SecureUploadWizard({
 
       {step === 3 && (
         <div>
-          <h3 className="zenith-wizard-section-title">Regional replication</h3>
+          <h3 className="zenith-wizard-section-title">Vault replication</h3>
           <p className="zenith-wizard-section-desc">
-            Optional second copy for AWS (cross-region) or Google Cloud (replica bucket).
+            Optional second copy to your platform&apos;s fixed replica bucket or container
+            (configured in server .env — no region picker).
           </p>
           <div className="zenith-wizard-replication-row">
             <div className="zenith-wizard-replication-row__text">
               <strong>Replicate secure copy</strong>
               <span>
-                {replicationSupported
-                  ? targetCsp === "GCP"
-                    ? "Writes to primary GCS bucket and a configured replica bucket."
-                    : "Writes to primary S3 bucket and your replica region."
-                  : "Azure stores a single copy in your secure container."}
+                {targetCsp === "GCP"
+                  ? "Primary GCS secure bucket → fixed replica GCS bucket."
+                  : targetCsp === "Azure"
+                    ? "Primary secure container → fixed replica container."
+                    : "Primary S3 secure bucket → fixed replica S3 bucket."}
               </span>
             </div>
             <label className="zenith-wizard-toggle" aria-label="Enable replication">
@@ -389,54 +472,29 @@ export default function SecureUploadWizard({
                 type="checkbox"
                 checked={enableReplication}
                 onChange={(e) => setEnableReplication(e.target.checked)}
-                disabled={!replicationSupported}
               />
               <span className="zenith-wizard-toggle__slider" />
             </label>
           </div>
-          {!replicationSupported && (
-            <WizardNote title="Note" variant="warn">
-              {CSP_LABELS[targetCsp] || targetCsp} does not support vault replication in Zenith yet.
-              Choose AWS or Google Cloud on the previous step to enable a replica copy.
-            </WizardNote>
-          )}
-          {enableReplication && replicationSupported && targetCsp === "AWS" && (
-            <div className="config-field" style={{ marginTop: "1rem" }}>
-              <label htmlFor="secure-replica-region">Replica region (AWS)</label>
-              <select
-                id="secure-replica-region"
-                className="zenith-select"
-                value={replicaRegion}
-                onChange={(e) => setReplicaRegion(e.target.value)}
-              >
-                {REPLICATION_REGIONS.map((r) => (
-                  <option key={r.value} value={r.value}>
-                    {r.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-          {enableReplication && replicationSupported && targetCsp === "GCP" && (
-            <WizardNote title="Google Cloud replication">
-              Zenith copies the object to <code>GCP_REPLICA_BUCKET_NAME</code> when set in server
-              configuration. Both buckets must be writable by the same service account.
-            </WizardNote>
-          )}
           <WizardNote title="If you enable replication">
-            {targetCsp === "GCP"
-              ? "Zenith stores in your primary GCS secure bucket, then uploads the same object to the replica bucket."
-              : `Zenith writes to your primary secure bucket, then copies to the replica bucket in ${
-                  REGION_LABELS[replicaRegion] || replicaRegion
-                }.`}{" "}
-            This increases durability; your cloud bill may include transfer and storage in both
-            locations.
+            Zenith writes to your primary secure vault, then copies to the fixed replica destination
+            for {CSP_LABELS[targetCsp] || targetCsp}. Replica location is set by your operator in
+            server configuration — not chosen per upload.
           </WizardNote>
           {!enableReplication && (
             <WizardNote title="If you skip replication">
               Only the primary secure vault location receives the file. You can enable replication
               later only by re-uploading with replication turned on.
             </WizardNote>
+          )}
+          {token && (
+            <SecurityCostPreview
+              token={token}
+              fileSizeMb={fileSizeMb}
+              encryptionMethod={encryptionMethod || "server-side"}
+              selectedCsp={targetCsp}
+              enableReplication={enableReplication && replicationSupported}
+            />
           )}
         </div>
       )}
@@ -454,14 +512,14 @@ export default function SecureUploadWizard({
             <dd>
               {encryptionMethod === "client-side"
                 ? "Browser (zero-knowledge)"
-                : "Cloud-managed"}
+                : encryptionMethod === "none"
+                  ? "None (vault + 2FA only)"
+                  : "Cloud-managed"}
             </dd>
             <dt>Replication</dt>
             <dd>
               {enableReplication && replicationSupported
-                ? targetCsp === "GCP"
-                  ? "GCS replica bucket"
-                  : REGION_LABELS[replicaRegion] || replicaRegion
+                ? `Fixed replica (${CSP_LABELS[targetCsp] || targetCsp})`
                 : "None"}
             </dd>
             <dt>Cloud</dt>
@@ -476,11 +534,25 @@ export default function SecureUploadWizard({
             )}
           </dl>
           <WizardNote title="On upload">
-            Zenith will {encryptionMethod === "client-side" ? "store ciphertext" : "encrypt at rest"}{" "}
+            Zenith will{" "}
+            {encryptionMethod === "client-side"
+              ? "store ciphertext"
+              : encryptionMethod === "none"
+                ? "store the file without Zenith encryption"
+                : "encrypt at rest"}{" "}
             in your {CSP_LABELS[targetCsp] || targetCsp} vault
             {enableReplication && replicationSupported ? " with a replica copy" : ""}. This action
             cannot be undone without deleting the file from the vault.
           </WizardNote>
+          {token && (
+            <SecurityCostPreview
+              token={token}
+              fileSizeMb={fileSizeMb}
+              encryptionMethod={encryptionMethod || "server-side"}
+              selectedCsp={targetCsp}
+              enableReplication={enableReplication && replicationSupported}
+            />
+          )}
         </div>
       )}
     </ZenithWizardFrame>

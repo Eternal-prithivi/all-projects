@@ -569,6 +569,33 @@
   }
 }
 
+.notification-lifecycle-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.notification-lifecycle-btn {
+  font-size: 11px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.15));
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-primary, #f5f5f5);
+  cursor: pointer;
+}
+
+.notification-lifecycle-btn:hover:not(:disabled) {
+  background: rgba(212, 175, 55, 0.15);
+  border-color: var(--zenith-gold, #d4af37);
+}
+
+.notification-lifecycle-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 @media (max-width: 480px) {
   .notification-dropdown {
     position: fixed;

@@ -245,18 +245,29 @@ def initiate_glacier_restore_aws(
         )
 
 
-def change_tier_on_aws(username: str, object_key: str, new_tier: str):
+def change_tier_on_aws(
+    username: str,
+    object_key: str,
+    new_tier: str,
+    *,
+    bucket_name: str | None = None,
+    region_name: str | None = None,
+):
     """Changes the storage class of an object in AWS S3."""
     try:
-        s3_client, bucket_name, _ = build_aws_s3_client(username)
+        if bucket_name and region_name:
+            s3_client, _ = build_aws_s3_client_for_bucket(username, region_name)
+            target_bucket = bucket_name
+        else:
+            s3_client, target_bucket, _ = build_aws_s3_client(username)
         s3_client.copy_object(
-            Bucket=bucket_name,
+            Bucket=target_bucket,
             Key=object_key,
-            CopySource={"Bucket": bucket_name, "Key": object_key},
+            CopySource={"Bucket": target_bucket, "Key": object_key},
             StorageClass=new_tier,
             MetadataDirective="COPY",
         )
-        logger.info(f"Tiered {object_key} to {new_tier} on AWS S3 bucket {bucket_name}")
+        logger.info(f"Tiered {object_key} to {new_tier} on AWS S3 bucket {target_bucket}")
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -284,16 +295,63 @@ def get_download_url_from_gcp(
     storage_client, default_bucket, _ = build_gcp_storage_client(
         username, bucket_name=bucket_name
     )
-    blob = storage_client.bucket(bucket_name or default_bucket).blob(object_key)
+    target_bucket = bucket_name or default_bucket
+    blob = storage_client.bucket(target_bucket).blob(object_key)
+    blob.reload()
+    storage_class = (blob.storage_class or "STANDARD").upper()
+    if storage_class == "ARCHIVE":
+        raise HTTPException(
+            status_code=status.HTTP_412_PRECONDITION_FAILED,
+            detail=(
+                f"File '{object_key}' is in ARCHIVE storage and must be restored "
+                "before downloading. Initiate a restore operation first."
+            ),
+        )
     return blob.generate_signed_url(expiration=timedelta(hours=1))
 
 
-def change_tier_on_gcp(username: str, object_key: str, new_tier: str):
+def initiate_archive_restore_gcp(
+    username: str,
+    object_key: str,
+    target_class: str = "STANDARD",
+    *,
+    bucket_name: str | None = None,
+):
+    """Reclassify an ARCHIVE object to STANDARD/NEARLINE for access (async on GCP side)."""
+    storage_client, default_bucket, _ = build_gcp_storage_client(
+        username, bucket_name=bucket_name
+    )
+    target_bucket = bucket_name or default_bucket
+    blob = storage_client.bucket(target_bucket).blob(object_key)
+    blob.reload()
+    if (blob.storage_class or "").upper() != "ARCHIVE":
+        return {
+            "message": f"'{object_key}' is not in ARCHIVE (current: {blob.storage_class}). No restore needed."
+        }
+    blob.update_storage_class(target_class.upper())
+    return {
+        "message": (
+            f"Restore initiated for '{object_key}': reclassifying ARCHIVE → {target_class.upper()}. "
+            "Download may take several minutes to hours depending on object size."
+        )
+    }
+
+
+def change_tier_on_gcp(
+    username: str,
+    object_key: str,
+    new_tier: str,
+    *,
+    bucket_name: str | None = None,
+):
     """Changes the storage class of an object in GCP Cloud Storage."""
-    storage_client, bucket_name, _ = build_gcp_storage_client(username)
-    blob = storage_client.bucket(bucket_name).blob(object_key)
+    storage_client, default_bucket, _ = build_gcp_storage_client(
+        username, bucket_name=bucket_name
+    )
+    target_bucket = bucket_name or default_bucket
+    blob = storage_client.bucket(target_bucket).blob(object_key)
     blob.update_storage_class(new_tier)
-    logger.info(f"Tiered {object_key} to {new_tier} on GCP bucket {bucket_name}")
+    logger.info(f"Tiered {object_key} to {new_tier} on GCP bucket {target_bucket}")
 
 
 # --- Azure Specialist Functions ---
@@ -346,6 +404,26 @@ def get_download_url_from_azure(
     account_name = account_name or azure["account_name"]
     account_key = account_key or azure["account_key"]
 
+    blob_service_client, _, _ = build_azure_blob_service(
+        username,
+        account_name=account_name,
+        account_key=account_key,
+        container_name=container_name,
+    )
+    blob_client = blob_service_client.get_blob_client(container=container_name, blob=object_key)
+    props = blob_client.get_blob_properties()
+    tier = props.blob_tier
+    if tier and str(tier).lower() == "archive":
+        rehydration = getattr(props, "blob_tier_change_time", None)
+        if not rehydration:
+            raise HTTPException(
+                status_code=status.HTTP_412_PRECONDITION_FAILED,
+                detail=(
+                    f"File '{object_key}' is in Archive tier and must be rehydrated "
+                    "before downloading. Initiate a restore operation first."
+                ),
+            )
+
     sas_token = generate_blob_sas(
         account_name=account_name,
         container_name=container_name,
@@ -360,9 +438,62 @@ def get_download_url_from_azure(
     )
 
 
-def change_tier_on_azure(username: str, object_key: str, new_tier: str):
+def initiate_archive_restore_azure(
+    username: str,
+    object_key: str,
+    target_tier: str = "Hot",
+    *,
+    container_name: str | None = None,
+    account_name: str | None = None,
+    account_key: str | None = None,
+    rehydrate_priority: str = "Standard",
+):
+    """Rehydrate an Archive blob to Hot/Cool for download."""
+    from azure.storage.blob import RehydratePriority, StandardBlobTier
+
+    blob_service_client, default_container, _ = build_azure_blob_service(
+        username,
+        account_name=account_name,
+        account_key=account_key,
+        container_name=container_name,
+    )
+    container_name = container_name or default_container
+    blob_client = blob_service_client.get_blob_client(container=container_name, blob=object_key)
+    props = blob_client.get_blob_properties()
+    if props.blob_tier and str(props.blob_tier).lower() != "archive":
+        return {
+            "message": f"'{object_key}' is not in Archive (current: {props.blob_tier}). No restore needed."
+        }
+    tier_enum = StandardBlobTier.Hot if target_tier.lower() == "hot" else StandardBlobTier.Cool
+    priority = (
+        RehydratePriority.High if rehydrate_priority.lower() == "high" else RehydratePriority.Standard
+    )
+    blob_client.set_standard_blob_tier(tier_enum, rehydrate_priority=priority)
+    return {
+        "message": (
+            f"Rehydration initiated for '{object_key}' to {target_tier} tier "
+            f"({rehydrate_priority} priority). Download when rehydration completes."
+        )
+    }
+
+
+def change_tier_on_azure(
+    username: str,
+    object_key: str,
+    new_tier: str,
+    *,
+    container_name: str | None = None,
+    account_name: str | None = None,
+    account_key: str | None = None,
+):
     """Changes the access tier of an object in Azure Blob Storage."""
-    blob_service_client, container_name, _ = build_azure_blob_service(username)
+    blob_service_client, default_container, _ = build_azure_blob_service(
+        username,
+        account_name=account_name,
+        account_key=account_key,
+        container_name=container_name,
+    )
+    container_name = container_name or default_container
     blob_client = blob_service_client.get_blob_client(container=container_name, blob=object_key)
     blob_client.set_standard_blob_tier(new_tier)
     logger.info(f"Tiered {object_key} to {new_tier} on Azure container {container_name}")

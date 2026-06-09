@@ -27,10 +27,13 @@ def test_list_secure_ok_without_2fa(client, auth_headers):
     assert isinstance(response.json(), list)
 
 
-@patch("app.security.routes_security.scan_file_content")
+@patch("app.security.routes_security._scan_for_user")
 def test_scan_secure_file(mock_scan, client, auth_headers):
     mock_scan.return_value = SimpleNamespace(
-        is_sensitive=True, reasons=["credit_card_pattern"]
+        is_sensitive=True,
+        reasons=["credit_card_pattern"],
+        ml_scan_score=None,
+        ml_scan_signals=None,
     )
     headers, _user = auth_headers(two_fa_enabled=False)
     response = client.post(
@@ -89,11 +92,14 @@ def test_sync_secure_gcp_route(mock_sync, client, auth_headers):
 
 @patch("app.security.routes_security.resolve_secure_storage")
 @patch("app.security.routes_security.put_secure_vault_object")
-@patch("app.security.routes_security.scan_file_content")
+@patch("app.security.routes_security._scan_for_user")
+@patch("app.security.routes_security.notify_encryption_pending")
 def test_upload_secure_with_gcp_csp(
-    mock_scan, mock_put, mock_resolve, client, auth_headers
+    mock_notify, mock_scan, mock_put, mock_resolve, client, auth_headers
 ):
-    mock_scan.return_value = SimpleNamespace(is_sensitive=False, reasons=[])
+    mock_scan.return_value = SimpleNamespace(
+        is_sensitive=False, reasons=[], ml_scan_score=None, ml_scan_signals=None
+    )
     storage = SimpleNamespace(
         primary_bucket="gcp-vault",
         is_byoc=False,
@@ -111,3 +117,70 @@ def test_upload_secure_with_gcp_csp(
     assert response.status_code == 200, response.text
     mock_resolve.assert_called()
     mock_put.assert_called_once()
+
+
+@patch("app.security.routes_security.put_secure_vault_object")
+@patch("app.security.routes_security.resolve_secure_storage")
+@patch("app.security.routes_security._scan_for_user")
+def test_upload_secure_skip_encryption(
+    mock_scan, mock_resolve, mock_put, client, auth_headers
+):
+    mock_scan.return_value = SimpleNamespace(
+        is_sensitive=True,
+        reasons=["credit_card_pattern"],
+        ml_scan_score=None,
+        ml_scan_signals=None,
+    )
+    storage = SimpleNamespace(
+        primary_bucket="secure-primary",
+        is_byoc=False,
+        region="ap-south-1",
+        object_key=lambda username, filename: f"{username}/{filename}",
+    )
+    mock_resolve.return_value = storage
+    headers, _user = auth_headers(two_fa_enabled=False)
+    response = client.post(
+        "/api/security/upload-secure",
+        headers=headers,
+        files={"file": ("card.txt", b"4111111111111111", "text/plain")},
+        data={
+            "skip_encryption": "true",
+            "encrypt_manual": "false",
+            "always_ask_encryption": "false",
+            "csp": "AWS",
+        },
+    )
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["encryption_method"] == "none"
+    assert body["is_sensitive"] is True
+    mock_put.assert_called_once()
+
+
+@patch("app.security.routes_security.compute_vault_health")
+def test_security_intelligence_summary(mock_health, client, auth_headers):
+    mock_health.return_value = {"score": 90, "grade": "A", "summary": "ok", "factors": {}}
+    headers, _user = auth_headers(two_fa_enabled=False)
+    response = client.get("/api/security/intelligence/summary", headers=headers)
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert "health" in body
+    assert "savings" in body
+
+
+def test_security_cost_preview(client, auth_headers):
+    headers, _user = auth_headers(two_fa_enabled=False)
+    response = client.post(
+        "/api/security/intelligence/cost-preview",
+        headers=headers,
+        json={
+            "file_size_mb": 100,
+            "encryption_method": "server-side",
+            "selected_csp": "AWS",
+            "enable_replication": True,
+        },
+    )
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["total_monthly_usd"] > 0
+    assert len(body["cross_cloud"]) == 3

@@ -59,6 +59,25 @@ def test_resolve_platform_destination_from_inline_catalog(monkeypatch):
     assert catalog.catalog_is_multi_region() is True
 
 
+def test_security_surface_gcp_azure_dedicated_buckets(monkeypatch):
+    monkeypatch.setattr(catalog.settings, "GCP_SECURE_BUCKET_NAME", "gcp-vault")
+    monkeypatch.setattr(catalog.settings, "GCP_SECURE_REPLICA_BUCKET_NAME", "gcp-vault-replica")
+    monkeypatch.setattr(catalog.settings, "AZURE_SECURE_CONTAINER_NAME", "secure-cont")
+    monkeypatch.setattr(catalog.settings, "AZURE_SECURE_REPLICA_CONTAINER_NAME", "secure-replica")
+    monkeypatch.setattr(catalog.settings, "AZURE_SECURE_STORAGE_ACCOUNT_NAME", "")
+    monkeypatch.setattr(catalog.settings, "AZURE_STORAGE_ACCOUNT_NAME", "acctmain")
+
+    gcp_buckets = catalog.get_platform_buckets_for_csp("GCP", surface="security")
+    assert len(gcp_buckets) == 2
+    assert gcp_buckets[0]["name"] == "gcp-vault"
+    assert gcp_buckets[1]["is_replica"] is True
+
+    az_buckets = catalog.get_platform_buckets_for_csp("Azure", surface="security")
+    assert len(az_buckets) == 2
+    assert az_buckets[0]["name"] == "secure-cont"
+    assert az_buckets[0]["account_name"] == "acctmain"
+
+
 def test_legacy_fallback_single_region(monkeypatch):
     monkeypatch.setattr(catalog.settings, "PLATFORM_STORAGE_CATALOG", "")
     monkeypatch.setattr(catalog.settings, "PLATFORM_STORAGE_CATALOG_JSON", "")

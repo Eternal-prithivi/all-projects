@@ -2,8 +2,9 @@
 # MODULE: ml/storage_ensemble.py  (441 lines)
 # PURPOSE: Phase 7 ML ensemble for storage tier prediction — Random Forest + XGBoost
 #          vote together (weighted) to classify files into HOT/WARM/COLD/ARCHIVE
-# FEATURES (10-dim): file_size_mb, access_frequency, age_days, is_sensitive,
-#                    user_priority_enc, user_intent_enc, hour_of_day, day_of_week, etc.
+# FEATURES (10-dim upload-time): file_size_mb, file_type_code, priority one-hot (3),
+#                               intent one-hot (3), rule_score, rule_tier_numeric.
+#                               (access_frequency / age_days / is_sensitive are lifecycle-only — tiering_tasks.py)
 # OUTPUT: tier prediction + confidence + expert_votes breakdown
 # CALLED BY: optimizer.py → get_initial_placement_recommendation()
 #            ml/retraining.py → model evaluation + guarded retrain

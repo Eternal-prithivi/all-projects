@@ -1,5 +1,8 @@
 # Client-Side Encryption Feature Implementation
 
+> **Trust overview:** See [TRUST_AND_ENCRYPTION.md](./TRUST_AND_ENCRYPTION.md) for the full custody and BYOC narrative.  
+> **Current CSE upload path:** Browser encrypts via `frontend/src/utils/clientEncryption.js` → `POST /api/security/upload-client-encrypted` (password never sent). AWS secure vault today; GCP/Azure browser CSE returns 501.
+
 ## 🎯 Overview
 
 This implementation adds **user-controlled client-side encryption** to the Security Page, giving users maximum privacy and control over their encrypted files. Even platform administrators cannot access client-side encrypted files without the user's password.

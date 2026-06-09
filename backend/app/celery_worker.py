@@ -15,6 +15,7 @@ celery_app = Celery(
         "app.cost.tasks_anomaly",  # Cost anomaly detection
         "app.budgets.tasks",  # Budget monitoring and alerts
         "app.security.tasks_alerts",  # Security alert pipeline (email + SMS)
+        "app.security.security_stale_tasks",  # Stale secure-file awareness
         "app.ml.tasks_feedback",  # Phase 8 feedback evaluation/retraining readiness
         "app.provision.tasks",  # Phase 11 Terraform drift detection
     ] 
@@ -69,6 +70,12 @@ celery_app.conf.beat_schedule = {
     'check-security-alerts-daily': {
         'task': 'check_security_alerts',
         'schedule': crontab(hour=8, minute=0),  # Every day at 8 AM UTC
+    },
+
+    # Secure vault stale-file awareness
+    'run-security-stale-check-daily': {
+        'task': 'run_security_stale_check',
+        'schedule': crontab(hour=3, minute=0),  # Every day at 3 AM UTC
     },
 
     # Phase 8 ML feedback/retraining readiness

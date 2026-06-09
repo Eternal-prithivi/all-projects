@@ -9,6 +9,7 @@ const CHIP_THRESHOLD = 4;
  * Azure Blob container picker — region is fixed at the storage account level.
  */
 export default function AzureContainerSelector({
+  surface = 'storage',
   storageKeyPrefix = 'zenith.storage',
   selectedContainer,
   onContainerChange,
@@ -28,6 +29,7 @@ export default function AzureContainerSelector({
     selectedMeta,
     selectContainer,
   } = useAzureContainers({
+    surface,
     storageKeyPrefix,
     selectedContainer,
     onContainerChange,

@@ -3,32 +3,32 @@ import { toast } from 'react-toastify';
 import IndeterminateProgressBar from '../components/IndeterminateProgressBar.jsx';
 
 /**
- * Google Cloud-style notification system
- * Shows loading notifications that update to success/error
- * Also stores notifications in the notification center (bell icon)
+ * Notification system: loading toast (top-right) + notification center (bell).
+ * Success/error/info appear only in the bell — loading toast is dismissed when done.
  */
 
-// Global reference to notification center (will be set by useNotifications hook)
 let notificationCenterRef = null;
 
 export const setNotificationCenter = (centerRef) => {
   notificationCenterRef = centerRef;
 };
 
+const dismissLoadingToast = (toastId) => {
+  if (toastId != null) {
+    toast.dismiss(toastId);
+  }
+};
+
 /**
  * Show a loading notification and return an ID that can be used to update it
- * @param {string} message - Loading message
- * @param {object} options - Additional options
- * @returns {string|number} - Toast ID
  */
 export const showLoadingNotification = (message, options = {}) => {
   const {
     toastId: existingToastId = null,
     autoClose = false,
-    hideProgressBar = false,
     title = null,
   } = options;
-  
+
   const loadingToastId = toast.loading(
     React.createElement(
       'div',
@@ -48,44 +48,27 @@ export const showLoadingNotification = (message, options = {}) => {
       containerId: 'main-toast-container',
     }
   );
-  
-  // Also add loading notification to the notification center
+
   if (notificationCenterRef) {
     notificationCenterRef.addNotification({
-      id: loadingToastId, // Use same ID so we can update it later
+      id: loadingToastId,
       type: 'loading',
       title: title,
       message: message,
     });
   }
-  
+
   return loadingToastId;
 };
 
 /**
- * Update a loading notification to success
- * @param {string|number} toastId - Toast ID from showLoadingNotification
- * @param {string} message - Success message
- * @param {object} options - Additional options
+ * Finalize a loading notification as success (bell only — dismiss loading toast)
  */
 export const updateToSuccess = (toastId, message, options = {}) => {
-  const {
-    autoClose = 5000,
-    onClose = null,
-    title = null,
-  } = options;
+  const { onClose = null, title = null } = options;
 
-  toast.update(toastId, {
-    render: message,
-    type: 'success',
-    isLoading: false,
-    autoClose,
-    hideProgressBar: false,
-    containerId: 'main-toast-container',
-    onClose,
-  });
+  dismissLoadingToast(toastId);
 
-  // Update the notification in the bell (don't create new one)
   if (notificationCenterRef) {
     notificationCenterRef.updateNotification(toastId, {
       type: 'success',
@@ -93,32 +76,18 @@ export const updateToSuccess = (toastId, message, options = {}) => {
       message: message,
     });
   }
+
+  if (onClose) onClose();
 };
 
 /**
- * Update a loading notification to error
- * @param {string|number} toastId - Toast ID from showLoadingNotification
- * @param {string} message - Error message
- * @param {object} options - Additional options
+ * Finalize a loading notification as error (bell only — dismiss loading toast)
  */
 export const updateToError = (toastId, message, options = {}) => {
-  const {
-    autoClose = 7000, // Errors stay longer
-    onClose = null,
-    title = null,
-  } = options;
+  const { onClose = null, title = null } = options;
 
-  toast.update(toastId, {
-    render: message,
-    type: 'error',
-    isLoading: false,
-    autoClose,
-    hideProgressBar: false,
-    containerId: 'main-toast-container',
-    onClose,
-  });
+  dismissLoadingToast(toastId);
 
-  // Update the notification in the bell (don't create new one)
   if (notificationCenterRef) {
     notificationCenterRef.updateNotification(toastId, {
       type: 'error',
@@ -126,60 +95,55 @@ export const updateToError = (toastId, message, options = {}) => {
       message: message,
     });
   }
+
+  if (onClose) onClose();
 };
 
 /**
- * Update a loading notification to info
- * @param {string|number} toastId - Toast ID from showLoadingNotification
- * @param {string} message - Info message
- * @param {object} options - Additional options
+ * Finalize a loading notification as info (bell only — dismiss loading toast)
  */
 export const updateToInfo = (toastId, message, options = {}) => {
-  const {
-    autoClose = 5000,
-    onClose = null,
-  } = options;
+  const { onClose = null, title = null } = options;
 
-  toast.update(toastId, {
-    render: message,
-    type: 'info',
-    isLoading: false,
-    autoClose,
-    hideProgressBar: false,
-    onClose,
-  });
+  dismissLoadingToast(toastId);
+
+  if (notificationCenterRef) {
+    notificationCenterRef.updateNotification(toastId, {
+      type: 'info',
+      title: title,
+      message: message,
+    });
+  }
+
+  if (onClose) onClose();
 };
 
 /**
- * Wrapper function to execute an async operation with automatic loading notifications
- * @param {Function} asyncFn - Async function to execute
- * @param {object} options - Notification options
- * @returns {Promise} - Result of asyncFn
+ * Execute an async operation with loading toast + bell notification
  */
-export const withLoadingNotification = async (
-  asyncFn,
-  options = {}
-) => {
+export const withLoadingNotification = async (asyncFn, options = {}) => {
   const {
     loadingMessage = 'Loading...',
     successMessage = 'Operation completed successfully',
     errorMessage = 'Operation failed',
     onSuccess = null,
     onError = null,
-    getSuccessMessage = null, // Function to generate success message from result
-    getErrorMessage = null, // Function to generate error message from error
+    getSuccessMessage = null,
+    getErrorMessage = null,
+    title = null,
   } = options;
 
-  const toastId = showLoadingNotification(loadingMessage);
+  const toastId = showLoadingNotification(loadingMessage, { title });
 
   try {
     const result = await asyncFn();
-    
-    const finalSuccessMessage = getSuccessMessage 
-      ? getSuccessMessage(result) 
+
+    const finalSuccessMessage = getSuccessMessage
+      ? getSuccessMessage(result)
       : successMessage;
 
     updateToSuccess(toastId, finalSuccessMessage, {
+      title,
       onClose: onSuccess ? () => onSuccess(result) : null,
     });
 
@@ -190,6 +154,7 @@ export const withLoadingNotification = async (
       : error?.response?.data?.detail || error?.message || errorMessage;
 
     updateToError(toastId, finalErrorMessage, {
+      title,
       onClose: onError ? () => onError(error) : null,
     });
 
@@ -198,10 +163,9 @@ export const withLoadingNotification = async (
 };
 
 /**
- * Quick notification helpers (without loading states)
+ * Quick notification helpers — notification center only (no toast banners)
  */
 export const notifySuccess = (message, options = {}) => {
-  // Add to notification center
   if (notificationCenterRef) {
     notificationCenterRef.addNotification({
       type: 'success',
@@ -209,18 +173,10 @@ export const notifySuccess = (message, options = {}) => {
       message: message,
     });
   }
-  
-  return toast.success(message, {
-    position: 'top-right',
-    theme: 'dark',
-    autoClose: options.autoClose || 5000,
-    containerId: 'main-toast-container',
-    ...options,
-  });
+  return null;
 };
 
 export const notifyError = (message, options = {}) => {
-  // Add to notification center
   if (notificationCenterRef) {
     notificationCenterRef.addNotification({
       type: 'error',
@@ -228,18 +184,10 @@ export const notifyError = (message, options = {}) => {
       message: message,
     });
   }
-  
-  return toast.error(message, {
-    position: 'top-right',
-    theme: 'dark',
-    autoClose: options.autoClose || 7000,
-    containerId: 'main-toast-container',
-    ...options,
-  });
+  return null;
 };
 
 export const notifyInfo = (message, options = {}) => {
-  // Add to notification center
   if (notificationCenterRef) {
     notificationCenterRef.addNotification({
       type: 'info',
@@ -247,18 +195,10 @@ export const notifyInfo = (message, options = {}) => {
       message: message,
     });
   }
-  
-  return toast.info(message, {
-    position: 'top-right',
-    theme: 'dark',
-    autoClose: options.autoClose || 5000,
-    containerId: 'main-toast-container',
-    ...options,
-  });
+  return null;
 };
 
 export const notifyWarning = (message, options = {}) => {
-  // Add to notification center
   if (notificationCenterRef) {
     notificationCenterRef.addNotification({
       type: 'warning',
@@ -266,13 +206,5 @@ export const notifyWarning = (message, options = {}) => {
       message: message,
     });
   }
-  
-  return toast.warning(message, {
-    position: 'top-right',
-    theme: 'dark',
-    autoClose: options.autoClose || 6000,
-    containerId: 'main-toast-container',
-    ...options,
-  });
+  return null;
 };
-

@@ -3,9 +3,62 @@
 from __future__ import annotations
 
 import json
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional  # noqa: F401 used in helpers
 
-from app.byoc.credential_resolver import resolve_gcp_credentials, get_user_cloud_credentials
+from app.byoc.aws_bucket_discovery import filter_buckets_for_surface
+from app.byoc.credential_resolver import (
+    get_gcp_bucket_layout,
+    get_user_cloud_credentials,
+    resolve_gcp_credentials,
+)
+
+
+def _gcp_layout_for_surface_filter(layout: Optional[dict]) -> Optional[dict]:
+    if not layout:
+        return None
+    return {
+        "storage_bucket_name": layout.get("storage_bucket_name"),
+        "secure_bucket_name": layout.get("secure_bucket_name"),
+        "replica_bucket_name": layout.get("replica_bucket_name"),
+        "primary_region": layout.get("primary_location"),
+        "replica_region": layout.get("replica_location"),
+    }
+
+
+def _filter_gcp_buckets_for_surface(
+    buckets: List[Dict[str, Any]],
+    surface: str,
+    layout: Optional[dict],
+) -> List[Dict[str, Any]]:
+    aws_style = [
+        {
+            "name": b["name"],
+            "region": b.get("location") or b.get("region") or "",
+            "role": b.get("role", "storage"),
+            "is_default": b.get("is_default", False),
+            "is_replica": b.get("is_replica", False),
+        }
+        for b in buckets
+    ]
+    filtered = filter_buckets_for_surface(
+        aws_style,
+        "security" if surface == "security" else "storage",
+        layout=_gcp_layout_for_surface_filter(layout),
+    )
+    out: List[Dict[str, Any]] = []
+    for item in filtered:
+        original = next((b for b in buckets if b["name"] == item["name"]), {})
+        out.append(
+            {
+                "name": item["name"],
+                "location": original.get("location") or item.get("region") or "",
+                "storage_class": original.get("storage_class", ""),
+                "is_default": item.get("is_default", False),
+                "is_replica": item.get("is_replica", False),
+                "role": item.get("role", "storage"),
+            }
+        )
+    return out
 
 
 def _meter_gcp_list_buckets(username: str) -> None:
@@ -93,7 +146,12 @@ def _mark_default_gcp_bucket(
     return marked
 
 
-def list_gcp_buckets_for_user(username: str, *, max_results: int = 100) -> Dict[str, Any]:
+def list_gcp_buckets_for_user(
+    username: str,
+    *,
+    surface: str = "storage",
+    max_results: int = 100,
+) -> Dict[str, Any]:
     """List buckets using active GCP BYOC or platform catalog (no live list for platform)."""
     gcp = resolve_gcp_credentials(username)
     default_bucket = (gcp.get("bucket_name") or "").strip()
@@ -105,8 +163,13 @@ def list_gcp_buckets_for_user(username: str, *, max_results: int = 100) -> Dict[
             return {"mode": "byoc", "buckets": [], "error": "GCP BYOC missing service account JSON."}
         result = list_gcp_buckets_from_json(sa_json, max_results=max_results)
         result["mode"] = "byoc"
+        layout = get_gcp_bucket_layout(username)
+        if surface == "security" and layout:
+            default_bucket = layout.get("secure_bucket_name") or default_bucket
+        marked = _mark_default_gcp_bucket(result.get("buckets") or [], default_bucket)
         result["default_bucket"] = default_bucket or None
-        result["buckets"] = _mark_default_gcp_bucket(result.get("buckets") or [], default_bucket)
+        result["buckets"] = _filter_gcp_buckets_for_surface(marked, surface, layout)
+        result["surface"] = surface
         _meter_gcp_list_buckets(username)
         return result
 

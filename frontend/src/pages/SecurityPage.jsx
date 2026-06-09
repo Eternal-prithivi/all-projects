@@ -39,14 +39,18 @@ import {
   chooseEncryption,
   uploadClientEncrypted,
   downloadClientCiphertext,
+  fetchSecurityIntelligenceSummary,
+  securityVaultAction,
+  apiClient,
 } from "../api";
+import SecurityIntelligenceBar from "../components/security/SecurityIntelligenceBar.jsx";
+import SecurityFileInsight from "../components/security/SecurityFileInsight.jsx";
 import "../styles/security-page.css";
 import LoadingSpinner from "../components/LoadingSpinner.jsx";
 import PageHeader from "../components/ui/PageHeader.jsx";
 import { usePageRefresh } from "../hooks/usePageRefresh.js";
 import { minLoadingDelay } from "../utils/minLoadingDelay.js";
-import ByocStorageTargetBanner from "../components/ByocStorageTargetBanner.jsx";
-import BucketRegionSelector from "../components/BucketRegionSelector.jsx";
+import SecurityVaultDestinationSummary from "../components/security/SecurityVaultDestinationSummary.jsx";
 import CloudProviderToolbar, {
   filterFilesByCloudProvider,
 } from "../components/CloudProviderSelect.jsx";
@@ -106,8 +110,11 @@ function SecurityPage() {
   const [showDisablePanel, setShowDisablePanel] = useState(false);
   const fileInputRef = useRef(null);
   const [showModal, setShowModal] = useState(false);
+  const [showArchiveModal, setShowArchiveModal] = useState(false);
   const [fileToDelete, setFileToDelete] = useState(null);
+  const [fileToArchive, setFileToArchive] = useState(null);
   const [isDeleting, setIsDeleting] = useState(null);
+  const [vaultActionBusy, setVaultActionBusy] = useState(null);
   const pollIntervalRef = useRef(null);
   const [showEncryptionModal, setShowEncryptionModal] = useState(false);
   const [fileAwaitingEncryption, setFileAwaitingEncryption] = useState(null);
@@ -117,13 +124,10 @@ function SecurityPage() {
   const [wizardSubmitting, setWizardSubmitting] = useState(false);
   const [pendingLocalFile, setPendingLocalFile] = useState(null);
   const [pendingFileMeta, setPendingFileMeta] = useState(null);
-  const [alwaysAskEncryption, setAlwaysAskEncryption] = useState(() => {
-    try {
-      return localStorage.getItem("zenith-always-ask-encryption") === "true";
-    } catch {
-      return false;
-    }
-  });
+  const [intelSummary, setIntelSummary] = useState(null);
+  const [intelLoading, setIntelLoading] = useState(false);
+  const [vaultStatusFilter, setVaultStatusFilter] = useState("active");
+  const [securityPrefs, setSecurityPrefs] = useState(null);
   const [selectedBucket, setSelectedBucket] = useState(() => {
     try {
       return sessionStorage.getItem("zenith.security.bucket") || null;
@@ -154,30 +158,46 @@ function SecurityPage() {
 
   const canAccessSecureArea = !twoFAStatus.enabled || twoFAStatus.verified;
 
-  const handleAlwaysAskChange = (checked) => {
-    setAlwaysAskEncryption(checked);
-    try {
-      localStorage.setItem("zenith-always-ask-encryption", checked ? "true" : "false");
-    } catch {
-      /* ignore */
+  const secureListQueryParams = useCallback(() => {
+    if (credentialMode === "platform" || !selectedBucket) return {};
+    if (cloudProvider === "AWS") {
+      return {
+        bucket: selectedBucket,
+        region: selectedRegion !== "all" ? selectedRegion : undefined,
+      };
     }
-  };
+    if (cloudProvider === "GCP" || cloudProvider === "Azure") {
+      return { bucket: selectedBucket };
+    }
+    return {};
+  }, [credentialMode, selectedBucket, selectedRegion, cloudProvider]);
+
+  const fetchIntelSummary = useCallback(async () => {
+    if (!token || !canAccessSecureArea) return;
+    setIntelLoading(true);
+    try {
+      const data = await fetchSecurityIntelligenceSummary(token, secureListQueryParams());
+      setIntelSummary(data);
+    } catch {
+      setIntelSummary(null);
+    } finally {
+      setIntelLoading(false);
+    }
+  }, [token, canAccessSecureArea, secureListQueryParams]);
 
   const fetchSecureFiles = useCallback(async () => {
     if (!token || !canAccessSecureArea) return [];
     try {
-      const files = await listSecureFiles(token, {
-        bucket: selectedBucket || undefined,
-        region: selectedRegion !== "all" ? selectedRegion : undefined,
-      });
+      const files = await listSecureFiles(token, secureListQueryParams());
       setSecureFiles(files);
       sessionStorage.setItem('cache_secureFiles', JSON.stringify(files));
+      await fetchIntelSummary();
       return files;
     } catch {
       notifications.error("Could not fetch secure file list.");
       return [];
     }
-  }, [token, canAccessSecureArea, selectedBucket, selectedRegion, notifications]);
+  }, [token, canAccessSecureArea, secureListQueryParams, notifications, fetchIntelSummary]);
 
   const handlePageRefresh = useCallback(async () => {
     if (!token) return;
@@ -223,6 +243,14 @@ function SecurityPage() {
       setCloudProvider(next);
     }
   }, [securityProviders, cloudProvider]);
+
+  useEffect(() => {
+    if (!token) return;
+    apiClient
+      .get("/settings")
+      .then((res) => setSecurityPrefs(res.data?.preferences || null))
+      .catch(() => setSecurityPrefs(null));
+  }, [token]);
 
   useEffect(() => {
     const check2FA = async () => {
@@ -372,6 +400,20 @@ function SecurityPage() {
   };
   const handleFileChange = (e) => setFile(e.target.files[0]);
 
+  const vaultBucketForCsp = useCallback((csp) => {
+    if (credentialMode === "platform") return null;
+    if (cloudProvider !== "ALL" && cloudProvider !== csp) return null;
+    if (cloudProvider !== "ALL") return selectedBucket;
+    try {
+      if (csp === "AWS") return sessionStorage.getItem("zenith.security.bucket");
+      if (csp === "GCP") return sessionStorage.getItem("zenith.security.gcp.bucket");
+      if (csp === "Azure") return sessionStorage.getItem("zenith.security.azure.container");
+    } catch {
+      /* ignore */
+    }
+    return null;
+  }, [credentialMode, cloudProvider, selectedBucket]);
+
   const handleSyncWithSecureBucket = async () => {
     if (!token || !canAccessSecureArea) return;
     const targets =
@@ -385,12 +427,17 @@ function SecurityPage() {
 
       for (const csp of targets) {
         try {
-          const syncOpts = {
-            bucket: selectedBucket || undefined,
-            region: selectedRegion !== "all" ? selectedRegion : undefined,
-          };
-          if (csp === "Azure" && selectedBucket) {
-            syncOpts.container = selectedBucket;
+          const syncOpts = {};
+          const vaultBucket = vaultBucketForCsp(csp);
+          if (vaultBucket) {
+            syncOpts.bucket = vaultBucket;
+            if (csp === "AWS") {
+              const region =
+                cloudProvider === "ALL"
+                  ? sessionStorage.getItem("zenith.security.region")
+                  : selectedRegion;
+              if (region && region !== "all") syncOpts.region = region;
+            }
           }
           const result = await syncSecureVault(token, csp, syncOpts);
           totalInserted += result.inserted || 0;
@@ -438,9 +485,15 @@ function SecurityPage() {
   };
 
   const displayedSecureFiles = useMemo(() => {
-    const withCsp = (secureFiles || []).map((f) => ({ ...f, csp: f.csp || "AWS" }));
-    return filterFilesByCloudProvider(withCsp, cloudProvider);
-  }, [secureFiles, cloudProvider]);
+    const withCsp = (secureFiles || []).map((f) => ({
+      ...f,
+      csp: f.csp || "AWS",
+      vault_status: f.vault_status || "active",
+    }));
+    const byCloud = filterFilesByCloudProvider(withCsp, cloudProvider);
+    if (vaultStatusFilter === "all") return byCloud;
+    return byCloud.filter((f) => (f.vault_status || "active") === vaultStatusFilter);
+  }, [secureFiles, cloudProvider, vaultStatusFilter]);
 
   const secureSyncActionLabel = useMemo(() => {
     if (selectedBucket) {
@@ -480,28 +533,74 @@ function SecurityPage() {
     setShowSecureWizard(true);
   };
 
+  const handlePrimaryVaultResolved = useCallback((bucket, region, csp = "AWS") => {
+    if (!bucket) return;
+    if (cloudProvider !== "ALL" && cloudProvider !== csp) return;
+    setSelectedBucket(bucket);
+    if (region) setSelectedRegion(region);
+    try {
+      if (csp === "GCP") {
+        sessionStorage.setItem("zenith.security.gcp.bucket", bucket);
+      } else if (csp === "Azure") {
+        sessionStorage.setItem("zenith.security.azure.container", bucket);
+      } else {
+        sessionStorage.setItem("zenith.security.bucket", bucket);
+        if (region) sessionStorage.setItem("zenith.security.region", region);
+      }
+    } catch {
+      /* ignore */
+    }
+  }, [cloudProvider]);
+
+  useEffect(() => {
+    if (credentialMode === "platform") return;
+    try {
+      if (cloudProvider === "AWS") {
+        setSelectedBucket(sessionStorage.getItem("zenith.security.bucket") || null);
+        setSelectedRegion(sessionStorage.getItem("zenith.security.region") || "all");
+      } else if (cloudProvider === "GCP") {
+        setSelectedBucket(sessionStorage.getItem("zenith.security.gcp.bucket") || null);
+        setSelectedRegion("all");
+      } else if (cloudProvider === "Azure") {
+        setSelectedBucket(sessionStorage.getItem("zenith.security.azure.container") || null);
+        setSelectedRegion("all");
+      } else {
+        setSelectedBucket(null);
+      }
+    } catch {
+      /* ignore */
+    }
+  }, [cloudProvider, credentialMode]);
+
   const handleWizardComplete = async ({
     encryptionMethod,
     password,
     csp,
     enableReplication,
-    replicaRegion,
     isSensitive,
   }) => {
     if (!pendingLocalFile || !token) return;
     const filename = pendingLocalFile.name;
     setWizardSubmitting(true);
     const encryptLabel =
-      encryptionMethod === "server-side" ? "cloud-managed" : "client-side";
+      encryptionMethod === "server-side"
+        ? "cloud-managed"
+        : encryptionMethod === "none"
+          ? "unencrypted"
+          : "client-side";
     try {
       await executeWithNotification(
         async () => {
-          if (encryptionMethod === "server-side") {
+          if (encryptionMethod === "none") {
+            await uploadSecureFile(pendingLocalFile, false, token, false, csp, {
+              skipEncryption: true,
+              enableReplication,
+            });
+          } else if (encryptionMethod === "server-side") {
             await uploadSecureFile(pendingLocalFile, true, token, true, csp);
             await chooseEncryption(filename, "server-side", null, token, {
               csp,
               enableReplication,
-              replicaRegion,
             });
           } else {
             const encryptedBlob = await encryptFileInBrowser(pendingLocalFile, password);
@@ -511,14 +610,17 @@ function SecurityPage() {
             });
           }
           resetUploadState();
+          setCloudProvider(csp);
           await fetchSecureFiles();
         },
         {
           loadingMessage: `Securing '${filename}' with ${encryptLabel} encryption…`,
           successMessage:
-            encryptionMethod === "server-side"
-              ? `'${filename}' stored with cloud-managed encryption on ${CSP_LABELS[csp] || csp}.`
-              : `'${filename}' encrypted in your browser and stored on ${CSP_LABELS[csp] || csp}.`,
+            encryptionMethod === "none"
+              ? `'${filename}' stored in the vault without Zenith encryption on ${CSP_LABELS[csp] || csp}.`
+              : encryptionMethod === "server-side"
+                ? `'${filename}' stored with cloud-managed encryption on ${CSP_LABELS[csp] || csp}.`
+                : `'${filename}' encrypted in your browser and stored on ${CSP_LABELS[csp] || csp}.`,
           getErrorMessage: (err) => {
             const msg = err.detail || err.message || "Secure upload failed";
             return typeof msg === "string" ? msg : "Secure upload failed";
@@ -551,6 +653,8 @@ function SecurityPage() {
         async () => {
           if (encryptionMethod === "server-side") {
             await chooseEncryption(encFilename, "server-side", null, token);
+          } else if (encryptionMethod === "none") {
+            await chooseEncryption(encFilename, "none", null, token);
           } else if (encryptionMethod === "client-side") {
             if (!pendingLocalFile) {
               throw new Error(
@@ -576,11 +680,16 @@ function SecurityPage() {
           await fetchSecureFiles();
         },
         {
-          loadingMessage: `Applying encryption to '${encFilename}'…`,
+          loadingMessage:
+            encryptionMethod === "none"
+              ? `Storing '${encFilename}' without Zenith encryption…`
+              : `Applying encryption to '${encFilename}'…`,
           successMessage:
-            encryptionMethod === "server-side"
-              ? `'${encFilename}' encrypted with SSE-S3 and stored (primary + replica).`
-              : `'${encFilename}' encrypted in your browser and stored. Your password was not sent to the server.`,
+            encryptionMethod === "none"
+              ? `'${encFilename}' stored in the vault without Zenith encryption.`
+              : encryptionMethod === "server-side"
+                ? `'${encFilename}' encrypted with SSE-S3 and stored (primary + replica).`
+                : `'${encFilename}' encrypted in your browser and stored. Your password was not sent to the server.`,
           getErrorMessage: (err) => {
             const msg = err.detail || err.message || "Failed to apply encryption";
             return typeof msg === "string" ? msg : "Failed to apply encryption";
@@ -596,6 +705,44 @@ function SecurityPage() {
     handleStartEncryptFlow(file);
   };
 
+  const secureFileRowKey = (file, action = "") =>
+    `${action}:${file.csp || "AWS"}:${file.filename}`;
+
+  const handleVaultAction = async (file, action) => {
+    const busyKey = secureFileRowKey(file, action);
+    setVaultActionBusy(busyKey);
+    const labels = {
+      archive: {
+        loading: `Moving '${file.filename}' to replica vault…`,
+        success: `'${file.filename}' moved to your replica vault. It is off primary storage until you restore.`,
+        error: "Could not archive file.",
+      },
+      restore: {
+        loading: `Restoring '${file.filename}' to primary vault…`,
+        success: `'${file.filename}' is back on primary storage. The replica copy was removed.`,
+        error: "Could not restore file.",
+      },
+    };
+    const copy = labels[action] || { loading: "Updating vault…", success: "Done.", error: "Action failed." };
+    try {
+      await executeWithNotification(
+        async () => {
+          await securityVaultAction(token, file.filename, action);
+          await fetchSecureFiles();
+        },
+        {
+          loadingMessage: copy.loading,
+          successMessage: copy.success,
+          getErrorMessage: (err) => err.detail || copy.error,
+        }
+      );
+    } catch {
+      /* toast already shown */
+    } finally {
+      setVaultActionBusy(null);
+    }
+  };
+
   const handleDelete = async (fileRef) => {
     const filename = typeof fileRef === "string" ? fileRef : fileRef.filename;
     const bucket =
@@ -603,7 +750,11 @@ function SecurityPage() {
         ? fileRef.cloud_bucket || selectedBucket
         : selectedBucket;
     setShowModal(false);
-    setIsDeleting(filename);
+    const deleteKey =
+      typeof fileRef === "object"
+        ? secureFileRowKey(fileRef)
+        : secureFileRowKey({ filename, csp: cloudProvider === "ALL" ? "AWS" : cloudProvider });
+    setIsDeleting(deleteKey);
     try {
       await executeWithNotification(
         async () => {
@@ -856,9 +1007,9 @@ function SecurityPage() {
         <div className="page-card zenith-surface zenith-surface--accent-security">
           <h3 className="page-title">Secure File Upload</h3>
           <p className="page-description">
-            Files are scanned for sensitive data. When sensitive content is found, you
-            choose encryption (cloud-managed or browser), optional regional replication,
-            and the target cloud (AWS, Google Cloud, or Azure).
+            Files are scanned for sensitive data. You choose encryption (cloud-managed,
+            browser, or skip), optional regional replication, and the target cloud
+            (AWS, Google Cloud, or Azure).
           </p>
           {!availLoading && securityProviders.length === 0 && (
             <CloudAvailabilityBanner
@@ -941,41 +1092,72 @@ function SecurityPage() {
         </div>
 
         {canAccessSecureArea && (
-          <div className="security-destination-panel">
-            <BucketRegionSelector
-              surface="security"
-              storageKeyPrefix="zenith.security"
-              selectedBucket={selectedBucket}
-              selectedRegion={selectedRegion}
-              onBucketChange={handleBucketSelect}
-              onRegionChange={handleRegionSelect}
-              reloadToken={catalogReloadToken}
-            />
-            <ByocStorageTargetBanner
-              variant="security"
-              selectedBucket={selectedBucket}
-              selectedRegion={selectedRegion}
-              activeCsp={cloudProvider}
-            />
-          </div>
+          <SecurityIntelligenceBar summary={intelSummary} loading={intelLoading} />
+        )}
+
+        {canAccessSecureArea && (
+          <SecurityVaultDestinationSummary
+            providers={securityProviders}
+            activeCsp={cloudProvider}
+            credentialMode={credentialMode}
+            reloadToken={catalogReloadToken}
+            selectedBucket={selectedBucket}
+            selectedRegion={selectedRegion}
+            onBucketChange={handleBucketSelect}
+            onRegionChange={handleRegionSelect}
+            onPrimaryVaultResolved={handlePrimaryVaultResolved}
+          />
         )}
 
         {/* Secure Files Table */}
         <div className="files-section zenith-surface zenith-surface--accent-security">
           <div className="list-header">
             <h3 className="section-title">Your Secure Files</h3>
-            <CloudProviderToolbar
-              className="security-cloud-toolbar"
-              provider={cloudProvider}
-              onProviderChange={setCloudProvider}
-              onAction={handleSyncWithSecureBucket}
-              actionLabel={secureSyncActionLabel}
-              actionBusy={isSyncing}
-              actionDisabled={!canAccessSecureArea}
-              actionClassName="btn sync-btn"
-              selectAriaLabel="Filter secure files by cloud provider"
-              providerOptions={securityToolbarOptions}
-            />
+            <div className="list-header__controls">
+              <div className="security-vault-filter">
+                <label htmlFor="vault-status-filter">Show</label>
+                <select
+                  id="vault-status-filter"
+                  className="zenith-select"
+                  value={vaultStatusFilter}
+                  onChange={(e) => setVaultStatusFilter(e.target.value)}
+                >
+                  <option value="active">Active files</option>
+                  <option value="archived">Archived</option>
+                  <option value="all">All</option>
+                </select>
+              </div>
+              <CloudProviderToolbar
+                className="security-cloud-toolbar"
+                provider={cloudProvider}
+                onProviderChange={setCloudProvider}
+                onAction={handleSyncWithSecureBucket}
+                actionLabel={secureSyncActionLabel}
+                actionBusy={isSyncing}
+                actionDisabled={!canAccessSecureArea}
+                actionClassName="btn sync-btn"
+                selectAriaLabel="Filter secure files by cloud provider"
+                providerOptions={securityToolbarOptions}
+              />
+            </div>
+          </div>
+          <div className="security-vault-lifecycle-note" role="note">
+            <p className="security-vault-lifecycle-note__title">Archive vs delete</p>
+            <ul className="security-vault-lifecycle-note__list">
+              <li>
+                <strong>Archive</strong> moves the file from primary to the replica vault
+                {credentialMode === "platform" ? " (second region)" : ""}
+                . While archived, download and delete are disabled — only <strong>Restore</strong> is
+                available. Restore moves the file back to primary and removes the replica copy so you
+                are not charged twice.
+              </li>
+              <li>
+                <strong>Delete</strong> permanently removes the file from cloud storage
+                {credentialMode === "platform" ? " (primary and replica)" : ""}
+                {" "}
+                and cannot be undone. Only available for active files.
+              </li>
+            </ul>
           </div>
           {!secureFiles || secureFiles.length === 0 ? (
             <EmptyState
@@ -1001,37 +1183,87 @@ function SecurityPage() {
                 <th>Filename</th>
                 <th>Size (KB)</th>
                 <th>Upload Date</th>
-                <th>Status</th>
+                <th>Insight</th>
                 <th>Actions</th>
               </tr>
             </thead>
             <tbody>
               {displayedSecureFiles.map((f) => {
                   const showEncryptionChoice = f.awaiting_encryption_choice && f.encryption_status === 'awaiting_choice';
+                  const isArchived = (f.vault_status || "active") === "archived";
+                  const rowBusy = vaultActionBusy === secureFileRowKey(f, "archive")
+                    || vaultActionBusy === secureFileRowKey(f, "restore");
                   return (
-                    <tr key={`${f.cloud_bucket || ""}-${f.s3_key || f.filename}`}>
-                      <td>{f.filename}</td>
+                    <tr key={`${f.csp || "AWS"}-${f.filename}`} className={isArchived ? "security-file-row--archived" : ""}>
+                      <td>
+                        <div className="security-file-name-cell">
+                          <span className="security-file-name">{f.filename}</span>
+                          <span className="security-file-badges">
+                            <span className="security-csp-badge">{CSP_LABELS[f.csp] || f.csp}</span>
+                            {isArchived && (
+                              <span className="security-archived-badge">Replica vault</span>
+                            )}
+                            {f.replication_enabled && (
+                              <span className="security-replica-badge">Replicated</span>
+                            )}
+                          </span>
+                        </div>
+                      </td>
                       <td>{(f.size_bytes / 1024).toFixed(2)}</td>
                       <td className="date-col">
                         {f.upload_date ? new Date(f.upload_date).toLocaleDateString() : 'N/A'}
                       </td>
-                      <td>{renderEncryptionBadge(f)}</td>
                       <td>
-                        {isDeleting === f.filename ? (
+                        <SecurityFileInsight insight={f.insight} file={f} />
+                      </td>
+                      <td>
+                        {isDeleting === secureFileRowKey(f) ? (
                           <span className="deleting-indicator">Deleting...</span>
+                        ) : rowBusy ? (
+                          <span className="processing-indicator">
+                            {vaultActionBusy === secureFileRowKey(f, "archive") ? "Archiving…" : "Restoring…"}
+                          </span>
                         ) : showEncryptionChoice ? (
                           <button onClick={() => handleChooseEncryption(f)} className="action-btn primary-btn">
                             Encrypt this
                           </button>
                         ) : (
-                          <>
-                            <button onClick={() => handleDownload(f)} className="action-btn download-btn">
-                              Download
-                            </button>
-                            <button onClick={() => { setFileToDelete(f); setShowModal(true); }} className="action-btn delete-btn">
-                              Delete
-                            </button>
-                          </>
+                          <div className="security-file-actions">
+                            {isArchived ? (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() => handleVaultAction(f, "restore")}
+                                  className="action-btn restore-btn"
+                                >
+                                  Restore
+                                </button>
+                                <span className="security-archived-hint">
+                                  Restore to download or delete
+                                </span>
+                              </>
+                            ) : (
+                              <>
+                                <button onClick={() => handleDownload(f)} className="action-btn download-btn">
+                                  Download
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => { setFileToArchive(f); setShowArchiveModal(true); }}
+                                  className="action-btn archive-btn"
+                                >
+                                  Archive
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => { setFileToDelete(f); setShowModal(true); }}
+                                  className="action-btn delete-btn"
+                                >
+                                  Delete
+                                </button>
+                              </>
+                            )}
+                          </div>
                         )}
                       </td>
                     </tr>
@@ -1058,6 +1290,8 @@ function SecurityPage() {
               setPendingLocalFile(null);
             }}
             onComplete={handleWizardComplete}
+            securityPrefs={securityPrefs}
+            awsBucketPickerEnabled={credentialMode !== "platform"}
           />
         )}
 
@@ -1083,6 +1317,44 @@ function SecurityPage() {
           />
         )}
 
+        {showArchiveModal && fileToArchive && (
+          <div className="confirm-modal-overlay">
+            <div className="modal-content">
+              <p>
+                Archive &apos;{fileToArchive.filename}&apos;?
+                {" "}
+                This moves the encrypted file from your primary vault to the replica vault
+                {fileToArchive.csp ? ` on ${fileToArchive.csp}` : ""}
+                . Download and delete will be disabled until you restore it back to primary.
+              </p>
+              <div className="modal-buttons">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowArchiveModal(false);
+                    handleVaultAction(fileToArchive, "archive").finally(() => {
+                      setFileToArchive(null);
+                    });
+                  }}
+                  className="btn warning-btn"
+                >
+                  Yes, Archive
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowArchiveModal(false);
+                    setFileToArchive(null);
+                  }}
+                  className="btn"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {showModal && (
           <div className="confirm-modal-overlay">
             <div className="modal-content">
@@ -1090,6 +1362,13 @@ function SecurityPage() {
                 Are you sure you want to delete &apos;
                 {typeof fileToDelete === "object" ? fileToDelete?.filename : fileToDelete}
                 &apos;?
+                {typeof fileToDelete === "object" && fileToDelete?.replication_enabled && (
+                  <>
+                    {" "}
+                    This removes the file from your primary vault
+                    {fileToDelete?.csp ? ` on ${fileToDelete.csp}` : ""} and its replica copy.
+                  </>
+                )}
               </p>
               <div className="modal-buttons">
                 <button

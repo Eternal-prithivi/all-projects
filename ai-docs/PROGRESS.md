@@ -1,12 +1,22 @@
 # PROGRESS.md — Task Tracker
 
-> **Last Updated:** 2026-06-09
+> **Last Updated:** 2026-06-10
 
 ---
 
 ## 🔴 Active Task
 
-_None — Phase 19 complete._
+_None — Phase 20 complete._
+
+---
+
+## Phase 20 — Trust docs + BYOC encryption ✅
+
+- [x] **20.1** — `docs/security/TRUST_AND_ENCRYPTION.md` (BYOC, SSE, CSE custody)
+- [x] **20.2** — `docs/security/BYOC_CREDENTIAL_ENCRYPTION.md` (technical)
+- [x] **20.3** — `encryption.py` v1 prefix, idempotent encrypt, `merge_and_encrypt_credentials`
+- [x] **20.4** — `test_byoc_encryption.py` + routes merge on connect
+- [x] **20.5** — Docs index, parity matrix, CREDENTIAL_CONTRACT, ai-docs context
 
 ---
 

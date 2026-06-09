@@ -7,6 +7,16 @@
 
 ---
 
+**Phase 20 — Trust narrative + BYOC credential encryption** — COMPLETE 2026-06-10
+
+- **Docs:** Created `docs/security/TRUST_AND_ENCRYPTION.md` (user-facing custody: platform vs BYOC, SSE vs CSE, archive/replica, FAQ) and `docs/security/BYOC_CREDENTIAL_ENCRYPTION.md` (AES-GCM field format, merge, rotation). Updated `docs/README.md`, `BYOC_IMPLEMENTATION.md`, `CREDENTIAL_CONTRACT.md`, `MULTI_CLOUD_PARITY_MATRIX.md`, `manual_testing.md` (4.18–4.22), `CLIENT_SIDE_ENCRYPTION.md` cross-links.
+- **Backend:** `encryption.py` — `zenith:enc:v1:` prefix, idempotent encrypt (no double encryption), `merge_and_encrypt_credentials` for incremental field updates; `_save_*_byoc_record` merges with existing Mongo credentials. Tests: `test_byoc_encryption.py`.
+- **AI docs:** `STATUS.md`, `SCRATCHPAD.md`, `PROGRESS.md`, `AI_CONTEXT_BACKEND.md` updated per `AI_MASTER.md`.
+
+**How to test:** Read `TRUST_AND_ENCRYPTION.md`; connect BYOC → inspect Mongo `credentials.*` values start with `zenith:enc:v1:`; `pytest tests/test_byoc_encryption.py -q`.
+
+---
+
 **Phase 19 — Platform multi-region storage + page refresh UX** — COMPLETE 2026-06-09
 
 - **Backend:** `platform_storage_catalog.py` serves static bucket/container lists per region slug (`asia`, `us`, `europe`, `africa`). Upload and sync resolve destinations via `resolve_platform_storage_target` with `region_slug`. Sync stale-object removal and file list queries scoped by `cloud_bucket` + `cloud_account` (Azure). New tests: `test_platform_storage_catalog.py`, `test_storage_sync_filters.py`, `test_storage_metering.py`.

@@ -15,6 +15,8 @@ from typing import Optional
 class SensitiveScanResult:
     is_sensitive: bool
     reasons: list[str]
+    ml_scan_score: Optional[float] = None
+    ml_scan_signals: Optional[list[str]] = None
 
 
 CREDIT_CARD_PATTERN = re.compile(r"\b(?:\d[ -]*?){13,16}\b")
@@ -154,3 +156,35 @@ def scan_file_content(file_content: bytes, filename: Optional[str] = None) -> Se
         reasons.append("private_ip_address")
 
     return SensitiveScanResult(is_sensitive=bool(reasons), reasons=reasons)
+
+
+def scan_file_content_hybrid(
+    file_content: bytes,
+    filename: Optional[str] = None,
+    *,
+    ml_enabled: bool = True,
+) -> SensitiveScanResult:
+    """Rules-first scan with optional ML elevation (ML never clears rule hits)."""
+    rules = scan_file_content(file_content, filename)
+    if not ml_enabled:
+        return rules
+
+    try:
+        from app.security.security_scan_ml import ML_THRESHOLD, predict_security_risk
+
+        content_str = file_content.decode("utf-8", errors="ignore")
+        ml_score, ml_hints = predict_security_risk(content_str, filename)
+        reasons = list(rules.reasons)
+        is_sensitive = rules.is_sensitive
+        if ml_score >= ML_THRESHOLD and "ml_elevated_risk" not in reasons:
+            if not is_sensitive:
+                reasons.append("ml_elevated_risk")
+            is_sensitive = True
+        return SensitiveScanResult(
+            is_sensitive=is_sensitive,
+            reasons=reasons,
+            ml_scan_score=round(ml_score, 4),
+            ml_scan_signals=ml_hints,
+        )
+    except Exception:
+        return rules

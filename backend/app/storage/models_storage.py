@@ -20,6 +20,12 @@ class FileMetadata(BaseModel):
     # --- Fields for long-term optimization model (from our new model) ---
     last_accessed_at: Optional[datetime] = None
     access_frequency_score: int = 0
+    access_history: Optional[list] = None  # last N download timestamps for velocity signals
+
+    # Upload context for smarter lifecycle (from analyze step)
+    upload_user_priority: Optional[str] = None
+    upload_user_intent: Optional[str] = None
+    initial_planned_tier: Optional[str] = None  # ML ensemble tier at upload time
     
     # --- Fields for security feature (now correctly re-integrated) ---
     is_sensitive: bool = False
@@ -35,4 +41,11 @@ class FileMetadata(BaseModel):
     # Platform multi-region: catalog slug (asia, us, europe, africa) and Azure account name
     platform_slug: Optional[str] = None
     cloud_account: Optional[str] = None
+
+    # Lifecycle policy (auto | keep_hot | aggressive | manual)
+    lifecycle_policy: str = "auto"
+    lifecycle_pending_demotion: Optional[dict] = None
+    lifecycle_snoozed_until: Optional[datetime] = None
+    lifecycle_last_suggestion_at: Optional[datetime] = None
+    lifecycle_savings_total_usd: float = 0.0
 

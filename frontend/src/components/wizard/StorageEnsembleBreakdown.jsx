@@ -57,6 +57,7 @@ export default function StorageEnsembleBreakdown({ recommendation }) {
   const modelStatus = recommendation.model_status;
   const isEnsemble = modelStatus?.mode === 'ensemble';
   const finalTier = recommendation.determined_tier;
+  const rlPolicy = recommendation.rl_policy;
   const maxTierScore = Math.max(...Object.values(tierScores).map(Number), 0.0001);
 
   const whyParts = [];
@@ -110,6 +111,15 @@ export default function StorageEnsembleBreakdown({ recommendation }) {
           );
         })}
       </div>
+
+      {rlPolicy?.applied && (
+        <p className="rl-policy-note">
+          RL policy: {rlPolicy.blend_mode || 'active'}
+          {rlPolicy.final_tier && rlPolicy.final_tier !== rlPolicy.ensemble_tier
+            ? ` — adjusted tier from ${TIER_LABELS[rlPolicy.ensemble_tier] || rlPolicy.ensemble_tier} to ${TIER_LABELS[rlPolicy.final_tier] || rlPolicy.final_tier}`
+            : ' — agrees with ensemble'}
+        </p>
+      )}
 
       {Object.keys(tierScores).length > 0 && (
         <div className="tier-scores">

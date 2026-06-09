@@ -1,5 +1,9 @@
 # BYOC (Bring Your Own Cloud) Implementation Guide
 
+> **Trust & encryption (user-facing):** [security/TRUST_AND_ENCRYPTION.md](./security/TRUST_AND_ENCRYPTION.md)  
+> **Credential encryption (technical):** [security/BYOC_CREDENTIAL_ENCRYPTION.md](./security/BYOC_CREDENTIAL_ENCRYPTION.md)  
+> **Tri-cloud parity:** [cloud/MULTI_CLOUD_PARITY_MATRIX.md](./cloud/MULTI_CLOUD_PARITY_MATRIX.md)
+
 ## Overview
 
 Zenith offers two deployment modes:

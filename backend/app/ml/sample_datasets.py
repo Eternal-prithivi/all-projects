@@ -151,6 +151,71 @@ def generate_storage_training_rows(repeats: int = 3) -> List[Dict[str, object]]:
     return rows
 
 
+def generate_storage_edge_case_rows() -> List[Dict[str, object]]:
+    """Report §4.2.2 edge cases: small file + borderline rule score → warm, not cold."""
+    cases = [
+        {
+            "filename": "quarterly_report_Q4_2024.pdf",
+            "file_size_mb": 10.0,
+            "file_type": "document",
+            "user_priority": "cost",
+            "user_intent": "archival",
+            "keyword_boost": 3,
+            "has_date_pattern": True,
+            "rule_score": 13,
+        },
+        {
+            "filename": "backup_archive_export_2026-01-01.zip",
+            "file_size_mb": 5120.0,
+            "file_type": "archive",
+            "user_priority": "cost",
+            "user_intent": "archival",
+            "keyword_boost": 8,
+            "has_date_pattern": True,
+            "rule_score": 22,
+        },
+        {
+            "filename": "active-dashboard-api.json",
+            "file_size_mb": 2.5,
+            "file_type": "data",
+            "user_priority": "performance",
+            "user_intent": "frequent",
+            "keyword_boost": 0,
+            "has_date_pattern": False,
+            "rule_score": -2,
+        },
+    ]
+    rows: List[Dict[str, object]] = []
+    for case in cases:
+        rule_score = case["rule_score"]
+        rule_tier = _rule_tier_from_score(rule_score)
+        label_tier = _training_label(
+            file_size_mb=case["file_size_mb"],
+            file_type=case["file_type"],
+            priority=case["user_priority"],
+            intent=case["user_intent"],
+            rule_score=rule_score,
+        )
+        features = build_storage_features(
+            filename=case["filename"],
+            file_size_mb=case["file_size_mb"],
+            file_type=case["file_type"],
+            user_priority=case["user_priority"],
+            user_intent=case["user_intent"],
+            rule_score=rule_score,
+            rule_tier=rule_tier,
+        )
+        rows.append(
+            {
+                **case,
+                "rule_tier": rule_tier,
+                "label_tier": label_tier,
+                **features,
+            }
+        )
+    return rows
+
+
 def generate_workload_training_rows(repeats: int = 4) -> List[Dict[str, str]]:
     rows: List[Dict[str, str]] = []
     for cluster, templates in WORKLOAD_TEMPLATES.items():

@@ -26,8 +26,27 @@ import uuid
 from app.auth.auth_utils import get_current_user
 from app.users.user_model import User
 from app.database.mongo_client import get_database
-from app.byoc.encryption import encrypt_credential, encrypt_credentials_dict
-from app.byoc.credential_resolver import get_aws_bucket_layout, get_byoc_status
+from app.byoc.encryption import encrypt_credential, merge_and_encrypt_credentials
+from app.byoc.credential_resolver import (
+    get_aws_bucket_layout,
+    get_byoc_status,
+    normalize_azure_byoc_layout,
+    normalize_gcp_byoc_layout,
+)
+from app.byoc.gcp_bucket_helpers import (
+    GCP_PRIMARY_LOCATION_DEFAULT,
+    GCP_REPLICA_LOCATION_DEFAULT,
+    create_gcp_bucket,
+    ensure_gcp_buckets_exist,
+    suggest_gcp_bucket_names,
+    validate_gcp_bucket_name,
+)
+from app.byoc.azure_container_helpers import (
+    create_azure_container,
+    ensure_azure_containers_exist,
+    suggest_azure_container_names,
+    validate_azure_container_name,
+)
 from app.byoc.aws_bucket_discovery import (
     get_buckets_for_user,
     invalidate_bucket_cache,
@@ -210,14 +229,19 @@ class BYOCConnectRequest(BaseModel):
     
     # GCP
     service_account_json: Optional[str] = Field(None, description="GCP service account JSON content")
-    gcp_bucket_name: Optional[str] = Field(None, description="GCP bucket name")
+    gcp_bucket_name: Optional[str] = Field(None, description="GCP storage bucket name")
+    gcp_primary_location: Optional[str] = Field(GCP_PRIMARY_LOCATION_DEFAULT, description="GCS location for storage + secure")
+    gcp_replica_location: Optional[str] = Field(GCP_REPLICA_LOCATION_DEFAULT, description="GCS location for secure replica")
     gcp_billing_dataset_id: Optional[str] = Field(None, description="BigQuery billing export dataset")
     gcp_billing_table_id: Optional[str] = Field(None, description="BigQuery billing export table")
     
     # Azure
     account_name: Optional[str] = Field(None, description="Azure storage account name")
     account_key: Optional[str] = Field(None, description="Azure storage account key")
-    container_name: Optional[str] = Field(None, description="Azure container name")
+    container_name: Optional[str] = Field(None, description="Azure storage container name")
+    storage_container_name: Optional[str] = Field(None, description="Azure storage container (alias)")
+    secure_container_name: Optional[str] = Field(None, description="Azure secure vault container")
+    replica_container_name: Optional[str] = Field(None, description="Azure secure replica container")
     azure_subscription_id: Optional[str] = Field(None, description="Azure subscription for Cost Management")
     azure_tenant_id: Optional[str] = Field(None, description="Azure AD tenant ID")
     azure_client_id: Optional[str] = Field(None, description="Cost Management service principal app ID")
@@ -258,6 +282,22 @@ class GcpBucketsDiscoverRequest(BaseModel):
 class AzureContainersDiscoverRequest(BaseModel):
     account_name: str = Field(..., min_length=1)
     account_key: str = Field(..., min_length=1)
+
+
+class BYOCCheckGcpBucketRequest(BaseModel):
+    service_account_json: str
+    bucket_name: str
+    location: str = GCP_PRIMARY_LOCATION_DEFAULT
+    bucket_role: str = "storage"
+    create_if_missing: bool = False
+
+
+class BYOCCheckAzureContainerRequest(BaseModel):
+    account_name: str
+    account_key: str
+    container_name: str
+    container_role: str = "storage"
+    create_if_missing: bool = False
 
 
 class BYOCCheckBucketRequest(BaseModel):
@@ -311,6 +351,14 @@ def _resolve_aws_storage_bucket(request: BYOCConnectRequest) -> str:
     ).strip()
 
 
+def _existing_byoc_credentials(username: str, csp: str) -> dict:
+    doc = byoc_collection.find_one(
+        {"username": username, "csp": csp},
+        {"credentials": 1},
+    )
+    return (doc or {}).get("credentials") or {}
+
+
 def _save_aws_byoc_record(
     user: User,
     request: BYOCConnectRequest,
@@ -321,8 +369,11 @@ def _save_aws_byoc_record(
     primary_region: str,
     replica_region: str,
 ) -> None:
-    encrypted_creds = encrypt_credentials_dict(credentials_to_encrypt)
     credentials_to_encrypt.setdefault("region", primary_region)
+    encrypted_creds = merge_and_encrypt_credentials(
+        _existing_byoc_credentials(user.username, "AWS"),
+        credentials_to_encrypt,
+    )
 
     byoc_collection.update_one(
         {"username": user.username, "csp": "AWS"},
@@ -339,6 +390,80 @@ def _save_aws_byoc_record(
                 "primary_region": primary_region,
                 "replica_region": replica_region,
                 "region": primary_region,
+                "secure_dual_write": request.secure_dual_write,
+                "is_active": True,
+                "updated_at": datetime.utcnow(),
+            },
+            "$setOnInsert": {"created_at": datetime.utcnow()},
+        },
+        upsert=True,
+    )
+
+
+def _save_gcp_byoc_record(
+    user: User,
+    request: BYOCConnectRequest,
+    credentials_to_encrypt: dict,
+    storage_bucket: str,
+    secure_bucket: str,
+    replica_bucket: str,
+    primary_location: str,
+    replica_location: str,
+) -> None:
+    encrypted_creds = merge_and_encrypt_credentials(
+        _existing_byoc_credentials(user.username, "GCP"),
+        credentials_to_encrypt,
+    )
+    byoc_collection.update_one(
+        {"username": user.username, "csp": "GCP"},
+        {
+            "$set": {
+                "username": user.username,
+                "csp": "GCP",
+                "connection_method": request.connection_method,
+                "credentials": encrypted_creds,
+                "bucket_name": storage_bucket,
+                "storage_bucket_name": storage_bucket,
+                "gcp_bucket_name": storage_bucket,
+                "secure_bucket_name": secure_bucket,
+                "replica_bucket_name": replica_bucket,
+                "gcp_primary_location": primary_location,
+                "gcp_replica_location": replica_location,
+                "secure_dual_write": request.secure_dual_write,
+                "is_active": True,
+                "updated_at": datetime.utcnow(),
+            },
+            "$setOnInsert": {"created_at": datetime.utcnow()},
+        },
+        upsert=True,
+    )
+
+
+def _save_azure_byoc_record(
+    user: User,
+    request: BYOCConnectRequest,
+    credentials_to_encrypt: dict,
+    storage_container: str,
+    secure_container: str,
+    replica_container: str,
+) -> None:
+    encrypted_creds = merge_and_encrypt_credentials(
+        _existing_byoc_credentials(user.username, "Azure"),
+        credentials_to_encrypt,
+    )
+    byoc_collection.update_one(
+        {"username": user.username, "csp": "Azure"},
+        {
+            "$set": {
+                "username": user.username,
+                "csp": "Azure",
+                "connection_method": request.connection_method,
+                "credentials": encrypted_creds,
+                "account_name": request.account_name,
+                "container_name": storage_container,
+                "storage_container_name": storage_container,
+                "secure_container_name": secure_container,
+                "replica_container_name": replica_container,
                 "secure_dual_write": request.secure_dual_write,
                 "is_active": True,
                 "updated_at": datetime.utcnow(),
@@ -581,8 +706,11 @@ def _verify_azure_cost_management(
 
 
 @router.get("/gcp-buckets", summary="List GCS buckets (BYOC or platform)")
-async def list_gcp_buckets(user: User = Depends(get_current_user)):
-    result = list_gcp_buckets_for_user(user.username)
+async def list_gcp_buckets(
+    user: User = Depends(get_current_user),
+    surface: str = Query("storage", description="storage | security"),
+):
+    result = list_gcp_buckets_for_user(user.username, surface=surface)
     if result.get("error") and not result.get("buckets"):
         raise HTTPException(status_code=400, detail=result["error"])
     return result
@@ -601,8 +729,11 @@ async def discover_gcp_buckets(
 
 
 @router.get("/azure-containers", summary="List Azure Blob containers (BYOC or platform)")
-async def list_azure_containers(user: User = Depends(get_current_user)):
-    result = list_azure_containers_for_user(user.username)
+async def list_azure_containers(
+    user: User = Depends(get_current_user),
+    surface: str = Query("storage", description="storage | security"),
+):
+    result = list_azure_containers_for_user(user.username, surface=surface)
     if result.get("error") and not result.get("containers"):
         raise HTTPException(status_code=400, detail=result["error"])
     return result
@@ -642,12 +773,16 @@ async def verify_credentials(
         discovery = list_gcp_buckets_from_json(request.service_account_json)
         if discovery.get("error") and not discovery.get("buckets"):
             raise HTTPException(status_code=400, detail=discovery["error"])
+        suggestions = suggest_gcp_bucket_names(user.username)
         return {
             "valid": True,
             "message": message,
             "csp": "GCP",
             "project_id": discovery.get("project_id"),
             "buckets": discovery.get("buckets", []),
+            "suggestions": suggestions,
+            "primary_location": GCP_PRIMARY_LOCATION_DEFAULT,
+            "replica_location": GCP_REPLICA_LOCATION_DEFAULT,
         }
 
     if csp == "AZURE":
@@ -680,11 +815,13 @@ async def verify_credentials(
             request.azure_client_id or "",
             request.azure_client_secret or "",
         )
+        suggestions = suggest_azure_container_names(user.username)
         return {
             "valid": True,
             "message": test.message,
             "csp": "Azure",
             "containers": discovery.get("containers", []),
+            "suggestions": suggestions,
             "cost_management_verified": cost_ok,
             "cost_management_message": cost_msg,
         }
@@ -805,6 +942,113 @@ async def check_bucket_name(
         "message": messages.get(status, ""),
         "created": False,
     }
+
+
+@router.post("/check-gcp-bucket", summary="Check or create GCS bucket")
+async def check_gcp_bucket(
+    request: BYOCCheckGcpBucketRequest,
+    user: User = Depends(get_current_user),
+):
+    check_byoc_eligibility(user.username)
+    fmt = validate_gcp_bucket_name(request.bucket_name)
+    if fmt:
+        return {"bucket_name": request.bucket_name, "status": "invalid", "message": fmt}
+    location = (
+        GCP_REPLICA_LOCATION_DEFAULT
+        if request.bucket_role == "replica"
+        else (request.location or GCP_PRIMARY_LOCATION_DEFAULT)
+    )
+    try:
+        from app.byoc.gcp_bucket_discovery import _client_from_sa_json
+
+        client, _ = _client_from_sa_json(request.service_account_json)
+        exists = client.bucket(request.bucket_name).exists()
+        if exists:
+            return {
+                "bucket_name": request.bucket_name,
+                "status": "accessible",
+                "message": f"Bucket exists in your project ({location}).",
+                "created": False,
+            }
+        if request.create_if_missing:
+            ok, message = create_gcp_bucket(
+                request.service_account_json, request.bucket_name, location
+            )
+            return {
+                "bucket_name": request.bucket_name,
+                "status": "accessible" if ok else "forbidden",
+                "message": message,
+                "created": ok and message.startswith("Created"),
+            }
+        return {
+            "bucket_name": request.bucket_name,
+            "status": "available",
+            "message": "Name is available — Zenith will create this bucket when you connect.",
+            "created": False,
+        }
+    except Exception as exc:
+        return {
+            "bucket_name": request.bucket_name,
+            "status": "forbidden",
+            "message": str(exc)[:160],
+            "created": False,
+        }
+
+
+@router.post("/check-azure-container", summary="Check or create Azure container")
+async def check_azure_container(
+    request: BYOCCheckAzureContainerRequest,
+    user: User = Depends(get_current_user),
+):
+    check_byoc_eligibility(user.username)
+    fmt = validate_azure_container_name(request.container_name)
+    if fmt:
+        return {
+            "container_name": request.container_name,
+            "status": "invalid",
+            "message": fmt,
+        }
+    try:
+        from azure.storage.blob import BlobServiceClient
+
+        conn = (
+            "DefaultEndpointsProtocol=https;"
+            f"AccountName={request.account_name};"
+            f"AccountKey={request.account_key};"
+            "EndpointSuffix=core.windows.net"
+        )
+        client = BlobServiceClient.from_connection_string(conn)
+        container = client.get_container_client(request.container_name)
+        if container.exists():
+            return {
+                "container_name": request.container_name,
+                "status": "accessible",
+                "message": "Container exists and is ready.",
+                "created": False,
+            }
+        if request.create_if_missing:
+            ok, message = create_azure_container(
+                request.account_name, request.account_key, request.container_name
+            )
+            return {
+                "container_name": request.container_name,
+                "status": "accessible" if ok else "forbidden",
+                "message": message,
+                "created": ok and message.startswith("Created"),
+            }
+        return {
+            "container_name": request.container_name,
+            "status": "available",
+            "message": "Name is available — Zenith will create this container when you connect.",
+            "created": False,
+        }
+    except Exception as exc:
+        return {
+            "container_name": request.container_name,
+            "status": "forbidden",
+            "message": str(exc)[:160],
+            "created": False,
+        }
 
 
 @router.get("/policy-templates", summary="Get IAM Policy Templates")
@@ -959,22 +1203,148 @@ async def connect_cloud(request: BYOCConnectRequest, user: User = Depends(get_cu
         }
     
     elif csp == "GCP":
-        if not request.service_account_json or not request.gcp_bucket_name:
-            raise HTTPException(status_code=400, detail="GCP requires service_account_json and gcp_bucket_name.")
-        
-        test_result = test_gcp_credentials(request.service_account_json, request.gcp_bucket_name)
+        if not request.service_account_json:
+            raise HTTPException(status_code=400, detail="GCP requires service_account_json.")
+        storage_bucket = (
+            request.gcp_bucket_name
+            or request.storage_bucket_name
+            or ""
+        ).strip()
+        secure_bucket = (request.secure_bucket_name or storage_bucket).strip()
+        replica_bucket = (request.replica_bucket_name or "").strip()
+        primary_location = request.gcp_primary_location or GCP_PRIMARY_LOCATION_DEFAULT
+        replica_location = request.gcp_replica_location or GCP_REPLICA_LOCATION_DEFAULT
+
+        if not storage_bucket or not secure_bucket:
+            raise HTTPException(
+                status_code=400,
+                detail="gcp_bucket_name and secure_bucket_name are required.",
+            )
+        if request.secure_dual_write and not replica_bucket:
+            raise HTTPException(
+                status_code=400,
+                detail="replica_bucket_name is required when secure replication is enabled.",
+            )
+        for name, label in [
+            (storage_bucket, "Storage bucket"),
+            (secure_bucket, "Secure bucket"),
+            (replica_bucket, "Replica bucket") if replica_bucket else (None, None),
+        ]:
+            if not name:
+                continue
+            fmt_err = validate_gcp_bucket_name(name)
+            if fmt_err:
+                raise HTTPException(status_code=400, detail=f"{label}: {fmt_err}")
+
+        buckets_to_ensure = [
+            (storage_bucket, primary_location),
+            (secure_bucket, primary_location),
+        ]
+        if request.secure_dual_write and replica_bucket:
+            buckets_to_ensure.append((replica_bucket, replica_location))
+
+        ok, bucket_message = ensure_gcp_buckets_exist(
+            request.service_account_json, buckets_to_ensure
+        )
+        if not ok:
+            raise HTTPException(status_code=400, detail=bucket_message)
+
+        test_result = test_gcp_credentials(request.service_account_json, storage_bucket)
+        if not test_result.success:
+            raise HTTPException(status_code=400, detail=test_result.message)
+
         credentials_to_encrypt = {"service_account_json": request.service_account_json}
         if request.gcp_billing_dataset_id:
             credentials_to_encrypt["billing_dataset_id"] = request.gcp_billing_dataset_id.strip()
         if request.gcp_billing_table_id:
             credentials_to_encrypt["billing_table_id"] = request.gcp_billing_table_id.strip()
-        bucket_or_container = request.gcp_bucket_name
-    
+
+        _save_gcp_byoc_record(
+            user,
+            request,
+            credentials_to_encrypt,
+            storage_bucket,
+            secure_bucket,
+            replica_bucket if request.secure_dual_write else "",
+            primary_location,
+            replica_location,
+        )
+        logger.info(
+            "BYOC: %s connected GCP (storage=%s secure=%s replica=%s)",
+            user.username,
+            storage_bucket,
+            secure_bucket,
+            replica_bucket,
+        )
+        connect_message = "GCP account connected. Storage and Security will use your buckets."
+        if bucket_message and "Created" in bucket_message:
+            connect_message = f"{connect_message} {bucket_message}"
+        return {
+            "success": True,
+            "message": connect_message,
+            "csp": "GCP",
+            "storage_bucket_name": storage_bucket,
+            "secure_bucket_name": secure_bucket,
+            "replica_bucket_name": replica_bucket if request.secure_dual_write else None,
+            "gcp_primary_location": primary_location,
+            "gcp_replica_location": replica_location,
+            "secure_dual_write": request.secure_dual_write,
+            "bucket_name": storage_bucket,
+        }
+
     elif csp == "AZURE":
-        if not request.account_name or not request.account_key or not request.container_name:
-            raise HTTPException(status_code=400, detail="Azure requires account_name, account_key, and container_name.")
-        
-        test_result = test_azure_credentials(request.account_name, request.account_key, request.container_name)
+        if not request.account_name or not request.account_key:
+            raise HTTPException(
+                status_code=400,
+                detail="Azure requires account_name and account_key.",
+            )
+        storage_container = (
+            request.storage_container_name
+            or request.container_name
+            or ""
+        ).strip()
+        secure_container = (request.secure_container_name or storage_container).strip()
+        replica_container = (request.replica_container_name or "").strip()
+
+        if not storage_container or not secure_container:
+            raise HTTPException(
+                status_code=400,
+                detail="container_name and secure_container_name are required.",
+            )
+        if request.secure_dual_write and not replica_container:
+            raise HTTPException(
+                status_code=400,
+                detail="replica_container_name is required when secure replication is enabled.",
+            )
+        for name, label in [
+            (storage_container, "Storage container"),
+            (secure_container, "Secure container"),
+            (replica_container, "Replica container") if replica_container else (None, None),
+        ]:
+            if not name:
+                continue
+            fmt_err = validate_azure_container_name(name)
+            if fmt_err:
+                raise HTTPException(status_code=400, detail=f"{label}: {fmt_err}")
+
+        containers_to_ensure = [storage_container, secure_container]
+        if request.secure_dual_write and replica_container:
+            containers_to_ensure.append(replica_container)
+
+        ok, container_message = ensure_azure_containers_exist(
+            request.account_name,
+            request.account_key,
+            containers_to_ensure,
+        )
+        if not ok:
+            raise HTTPException(status_code=400, detail=container_message)
+
+        test_result = test_azure_credentials(
+            request.account_name, request.account_key, storage_container
+        )
+        if not test_result.success:
+            raise HTTPException(status_code=400, detail=test_result.message)
+
         credentials_to_encrypt = {
             "account_name": request.account_name,
             "account_key": request.account_key,
@@ -987,12 +1357,43 @@ async def connect_cloud(request: BYOCConnectRequest, user: User = Depends(get_cu
         ):
             if field:
                 credentials_to_encrypt[key] = field.strip()
-        bucket_or_container = request.container_name
-    
+
+        _save_azure_byoc_record(
+            user,
+            request,
+            credentials_to_encrypt,
+            storage_container,
+            secure_container,
+            replica_container if request.secure_dual_write else "",
+        )
+        logger.info(
+            "BYOC: %s connected Azure (storage=%s secure=%s replica=%s)",
+            user.username,
+            storage_container,
+            secure_container,
+            replica_container,
+        )
+        connect_message = "Azure account connected. Storage and Security will use your containers."
+        if container_message and "Created" in container_message:
+            connect_message = f"{connect_message} {container_message}"
+        return {
+            "success": True,
+            "message": connect_message,
+            "csp": "Azure",
+            "storage_container_name": storage_container,
+            "secure_container_name": secure_container,
+            "replica_container_name": replica_container if request.secure_dual_write else None,
+            "secure_dual_write": request.secure_dual_write,
+            "bucket_name": storage_container,
+        }
+
     if not test_result.success:
         raise HTTPException(status_code=400, detail={"message": test_result.message, "csp": csp, "success": False})
 
-    encrypted_creds = encrypt_credentials_dict(credentials_to_encrypt)
+    encrypted_creds = merge_and_encrypt_credentials(
+        _existing_byoc_credentials(user.username, csp),
+        credentials_to_encrypt,
+    )
 
     byoc_collection.update_one(
         {"username": user.username, "csp": csp},

@@ -28,6 +28,8 @@ from app.storage.manager import (
     delete_from_aws, delete_from_gcp, delete_from_azure,
     get_download_url_from_aws, get_download_url_from_gcp, get_download_url_from_azure,
     initiate_glacier_restore_aws,
+    initiate_archive_restore_gcp,
+    initiate_archive_restore_azure,
     list_objects_aws,
     list_objects_gcp,
     list_objects_azure,
@@ -69,6 +71,19 @@ from app.storage.storage_errors import (
 from app.billing.storage_metering import (
     list_object_api_pages,
     record_storage_meter_event,
+)
+from app.storage.lifecycle_policy import (
+    get_user_lifecycle_preferences,
+    resolve_upload_lifecycle_policy,
+    suggest_lifecycle_policy,
+)
+from app.storage.lifecycle_service import apply_lifecycle_action
+from app.storage.lifecycle_signals import build_download_access_update
+from app.storage.storage_intelligence import (
+    build_cost_preview,
+    build_file_insight,
+    compute_portfolio_health,
+    compute_savings_summary,
 )
 
 logger = setup_logger(__name__)
@@ -124,18 +139,125 @@ async def analyze_file_for_placement(
             user_intent=request.user_intent,
             recommendation=recommendation,
         )
-        return {**recommendation, "workflow": workflow["steps"]}
+        account_prefs = get_user_lifecycle_preferences(user.username)
+        return {
+            **recommendation,
+            "workflow": workflow["steps"],
+            "suggested_lifecycle_policy": suggest_lifecycle_policy(
+                request.user_priority,
+                request.user_intent,
+            ),
+            "default_lifecycle_policy": account_prefs["default_lifecycle_policy"],
+            "lifecycle_notice_days": account_prefs["lifecycle_notice_days"],
+        }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}")
 
+
+class LifecycleActionRequest(BaseModel):
+    filename: str
+    action: str
+    snooze_days: int = 30
+
+
+class CostPreviewRequest(BaseModel):
+    file_size_mb: float
+    determined_tier: str = "warm"
+    user_priority: str = "balanced"
+    user_intent: str = "active"
+    lifecycle_policy: str = "auto"
+    selected_csp: Optional[str] = None
+
+
+@router.post("/lifecycle/action")
+async def storage_lifecycle_action(
+    body: LifecycleActionRequest,
+    user: User = Depends(get_current_user),
+    files_db: Collection = Depends(get_files_collection),
+):
+    """Respond to a pending lifecycle demotion: keep_hot, snooze, or approve."""
+    try:
+        return apply_lifecycle_action(
+            files_db,
+            user.username,
+            body.filename,
+            body.action,
+            snooze_days=body.snooze_days,
+        )
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+@router.post("/intelligence/cost-preview")
+async def storage_cost_preview(
+    body: CostPreviewRequest,
+    user: User = Depends(get_current_user),
+):
+    """12-month what-if costs and tri-cloud comparison for upload wizard."""
+    _ = user
+    return build_cost_preview(
+        file_size_mb=body.file_size_mb,
+        determined_tier=body.determined_tier,
+        user_priority=body.user_priority,
+        user_intent=body.user_intent,
+        lifecycle_policy=body.lifecycle_policy,
+        selected_csp=body.selected_csp,
+    )
+
+
+@router.get("/intelligence/summary")
+async def storage_intelligence_summary(
+    user: User = Depends(get_current_user),
+    files_db: Collection = Depends(get_files_collection),
+    bucket: Optional[str] = Query(None),
+    platform_slug: Optional[str] = Query(None),
+):
+    """Portfolio health score, savings proof, and activity counts."""
+    aws = resolve_aws_credentials(user.username)
+    if platform_slug:
+        query = build_platform_region_list_filter(user.username, platform_slug)
+    else:
+        query = build_storage_list_filter(user.username, bucket, None, aws["bucket_name"])
+    files = list(files_db.find(query))
+    reports = list(
+        files_db.database["storage_lifecycle_reports"]
+        .find({})
+        .sort("ran_at", -1)
+        .limit(31)
+    )
+    return {
+        "health": compute_portfolio_health(files),
+        "savings": compute_savings_summary(files, reports),
+    }
+
+
+@router.get("/intelligence/file/{filename:path}")
+async def storage_file_intelligence(
+    filename: str,
+    user: User = Depends(get_current_user),
+    files_db: Collection = Depends(get_files_collection),
+    bucket: Optional[str] = Query(None),
+):
+    """Detailed per-file lifecycle insight."""
+    file_record = find_storage_file(files_db, user.username, filename, bucket)
+    return build_file_insight(file_record)
+
+
 @router.post("/upload", status_code=201)
-# ... (This function remains exactly the same)
 async def upload_file_to_csp(
     csp: str = Form(...),
     storage_class: str = Form(...),
     file: UploadFile = File(...),
     bucket: Optional[str] = Form(None),
     region_slug: Optional[str] = Form(None),
+    lifecycle_policy: Optional[str] = Form(None),
+    user_priority: Optional[str] = Form(None),
+    user_intent: Optional[str] = Form(None),
+    initial_planned_tier: Optional[str] = Form(None),
     user: User = Depends(get_current_user),
     files_db: Collection = Depends(get_files_collection),
 ):
@@ -275,6 +397,12 @@ async def upload_file_to_csp(
             azure = resolve_azure_credentials(user.username)
             upload_region = settings.AZURE_LOCATION or azure.get("location")
 
+    resolved_lifecycle_policy = resolve_upload_lifecycle_policy(
+        user.username,
+        explicit=lifecycle_policy,
+        user_priority=user_priority,
+        user_intent=user_intent,
+    )
     file_metadata = FileMetadata(
         filename=file.filename,
         s3_key=object_key,
@@ -286,6 +414,10 @@ async def upload_file_to_csp(
         region=upload_region,
         platform_slug=(platform_dest_meta or {}).get("platform_slug"),
         cloud_account=(platform_dest_meta or {}).get("account_name"),
+        lifecycle_policy=resolved_lifecycle_policy,
+        upload_user_priority=user_priority,
+        upload_user_intent=user_intent,
+        initial_planned_tier=initial_planned_tier,
     )
     doc = file_metadata.model_dump()
     files_db.insert_one(doc)
@@ -325,6 +457,12 @@ async def list_files(
             "platform_slug": file.get("platform_slug"),
             "cloud_account": file.get("cloud_account"),
             "s3_key": file.get("s3_key"),
+            "lifecycle_policy": file.get("lifecycle_policy", "auto"),
+            "lifecycle_pending_demotion": file.get("lifecycle_pending_demotion"),
+            "lifecycle_snoozed_until": file.get("lifecycle_snoozed_until"),
+            "initial_planned_tier": file.get("initial_planned_tier"),
+            "lifecycle_savings_total_usd": file.get("lifecycle_savings_total_usd", 0),
+            "insight": build_file_insight(file),
         })
     return files_list
 
@@ -702,10 +840,7 @@ async def generate_download_url(
     # Before we do anything else, we update the database to record this access event.
     files_db.update_one(
         {"_id": file_record["_id"]},
-        {
-            "$set": {"last_accessed_at": datetime.utcnow()}, # Set the last access time to now
-            "$inc": {"access_frequency_score": 1} # Increment the access counter by 1
-        }
+        build_download_access_update(),
     )
     logger.debug(f"Tracked access for file '{filename}'")
 
@@ -813,33 +948,59 @@ async def restore_archived_file(
     days: int = Form(7),
     bucket: Optional[str] = Query(None),
 ):
-    """Initiate archive-tier restore. AWS Glacier/Deep Archive supported; GCP/Azure return 501."""
+    """Initiate archive-tier restore for AWS Glacier, GCP ARCHIVE, or Azure Archive."""
     try:
         provider = normalize_provider(csp)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    if provider != "AWS":
-        raise restore_not_supported(provider)
-
     file_record = find_storage_file(files_db, user.username, filename, bucket)
-    if normalize_provider(file_record.get("csp", "AWS")) != "AWS":
+    record_csp = normalize_provider(file_record.get("csp", "AWS"))
+    if record_csp != provider:
         raise HTTPException(
             status_code=400,
-            detail="File record CSP does not match AWS restore request.",
+            detail=f"File record CSP ({record_csp}) does not match restore request ({provider}).",
         )
 
-    object_key = file_record.get("s3_key")
+    object_key = (
+        file_record.get("s3_key")
+        or file_record.get("object_key")
+        or file_record.get("blob_name")
+    )
+    cloud_bucket = file_record.get("cloud_bucket")
+    region = file_record.get("region")
+    cloud_account = file_record.get("cloud_account")
+
     try:
-        restore_message = initiate_glacier_restore_aws(
-            user.username,
-            object_key,
-            tier,
-            days,
-            bucket_name=file_record.get("cloud_bucket"),
-            region_name=file_record.get("region"),
-        )
-        return {"message": restore_message["message"], "provider": "aws"}
+        if provider == "AWS":
+            restore_message = initiate_glacier_restore_aws(
+                user.username,
+                object_key,
+                tier,
+                days,
+                bucket_name=cloud_bucket,
+                region_name=region,
+            )
+            return {"message": restore_message["message"], "provider": "aws"}
+        if provider == "GCP":
+            restore_message = initiate_archive_restore_gcp(
+                user.username,
+                object_key,
+                target_class="STANDARD",
+                bucket_name=cloud_bucket,
+            )
+            return {"message": restore_message["message"], "provider": "gcp"}
+        if provider == "Azure":
+            restore_message = initiate_archive_restore_azure(
+                user.username,
+                object_key,
+                target_tier="Hot",
+                container_name=cloud_bucket,
+                account_name=cloud_account,
+                rehydrate_priority=tier if tier in ("High", "Standard") else "Standard",
+            )
+            return {"message": restore_message["message"], "provider": "azure"}
+        raise restore_not_supported(provider)
     except HTTPException:
         raise
     except Exception as e:

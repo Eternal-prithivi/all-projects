@@ -9,6 +9,7 @@ const CHIP_THRESHOLD = 4;
  * GCS bucket picker — location is fixed per bucket (shown read-only).
  */
 export default function GcpBucketSelector({
+  surface = 'storage',
   storageKeyPrefix = 'zenith.storage',
   selectedBucket,
   onBucketChange,
@@ -28,6 +29,7 @@ export default function GcpBucketSelector({
     selectedMeta,
     selectBucket,
   } = useGcpBuckets({
+    surface,
     storageKeyPrefix,
     selectedBucket,
     onBucketChange,

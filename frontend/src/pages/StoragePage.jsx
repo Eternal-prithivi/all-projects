@@ -50,6 +50,9 @@ import { usePlatformStorageRegions } from "../hooks/usePlatformStorageRegions.js
 import { usePageRefresh } from "../hooks/usePageRefresh.js";
 import { minLoadingDelay } from "../utils/minLoadingDelay.js";
 import { usePreferences } from "../context/PreferencesContext.jsx";
+import StorageIntelligenceBar from "../components/storage/StorageIntelligenceBar.jsx";
+import StorageFileInsight from "../components/storage/StorageFileInsight.jsx";
+import { fetchStorageIntelligenceSummary } from "../api";
 
 // --- API FUNCTIONS (Missing from api.js) ---
 import { apiClient } from "../api";
@@ -57,6 +60,30 @@ const analyzeFile = async (data, _token) => {
   const response = await apiClient.post("/storage/analyze", data);
   return response.data;
 };
+const isArchiveStorageClass = (storageClass) => {
+  if (!storageClass) return false;
+  const upper = String(storageClass).toUpperCase();
+  return (
+    upper === "GLACIER" ||
+    upper === "DEEP_ARCHIVE" ||
+    upper === "ARCHIVE" ||
+    storageClass === "Archive"
+  );
+};
+
+const isArchiveDownloadBlocked = (message) => {
+  const msg = String(message || "");
+  if (!msg.includes("412") && !msg.toLowerCase().includes("precondition")) {
+    return false;
+  }
+  return (
+    msg.includes("GLACIER") ||
+    msg.includes("ARCHIVE") ||
+    msg.includes("Archive") ||
+    msg.toLowerCase().includes("archival")
+  );
+};
+
 const initiateArchiveRestore = async (filename, csp, tier, days, _token) => {
   const formData = new FormData();
   formData.append("tier", tier);
@@ -124,6 +151,10 @@ function StoragePage() {
 
   const [userPriority, setUserPriority] = useState("balanced");
   const [userIntent, setUserIntent] = useState("active");
+  const [lifecyclePolicy, setLifecyclePolicy] = useState("auto");
+  const [suggestedLifecyclePolicy, setSuggestedLifecyclePolicy] = useState("auto");
+  const [intelSummary, setIntelSummary] = useState(null);
+  const [intelLoading, setIntelLoading] = useState(false);
   const [showRecommendationModal, setShowRecommendationModal] = useState(false);
 
   useEffect(() => {
@@ -247,8 +278,28 @@ function StoragePage() {
   const [fileToRestore, setFileToRestore] = useState(null);
   const [restoreTier, setRestoreTier] = useState("Standard");
   const [restoreDays, setRestoreDays] = useState(7);
+  const [restoreCsp, setRestoreCsp] = useState("AWS");
   const [isRestoring, setIsRestoring] = useState(false);
 
+
+  const fetchIntelSummary = useCallback(async () => {
+    if (!token) return;
+    setIntelLoading(true);
+    try {
+      const params = {};
+      if (platformMultiRegion && platformRegionSlug) {
+        params.platform_slug = platformRegionSlug;
+      } else if (cloudProvider === "AWS" && selectedBucket) {
+        params.bucket = selectedBucket;
+      }
+      const data = await fetchStorageIntelligenceSummary(params);
+      setIntelSummary(data);
+    } catch {
+      setIntelSummary(null);
+    } finally {
+      setIntelLoading(false);
+    }
+  }, [token, platformMultiRegion, platformRegionSlug, cloudProvider, selectedBucket]);
 
   const fetchFiles = useCallback(async () => {
     if (!token) return;
@@ -273,6 +324,7 @@ function StoragePage() {
         platformSlug: platformSlugFilter,
       });
       setFiles(fileList);
+      await fetchIntelSummary();
     } catch (error) {
       notifyError(getApiErrorMessage(error, "Failed to fetch files."));
     } finally {
@@ -288,6 +340,7 @@ function StoragePage() {
     cloudProvider,
     platformMultiRegion,
     platformRegionSlug,
+    fetchIntelSummary,
   ]);
 
   const syncStorageProvider = useCallback(
@@ -492,6 +545,12 @@ function StoragePage() {
         }
       );
       setRecommendation(result);
+      setSuggestedLifecyclePolicy(
+        result.suggested_lifecycle_policy || result.default_lifecycle_policy || "auto"
+      );
+      setLifecyclePolicy(
+        result.suggested_lifecycle_policy || result.default_lifecycle_policy || "auto"
+      );
       setShowRecommendationModal(true);
     } catch {
       /* toast already shown */
@@ -536,6 +595,10 @@ function StoragePage() {
         bucket: uploadBucket,
         regionSlug:
           platformMultiRegion && platformRegionSlug ? platformRegionSlug : undefined,
+        lifecyclePolicy,
+        userPriority,
+        userIntent,
+        initialPlannedTier: recommendation?.determined_tier,
       });
       updateSuccess(
         loadingToastId,
@@ -600,12 +663,14 @@ function StoragePage() {
       updateSuccess(loadingToastId, `Download started for '${filename}'.`);
     } catch (error) {
       const msg = error.message || error.detail || "";
-      if (msg.includes("is in GLACIER storage") && msg.includes("412")) {
+      if (isArchiveDownloadBlocked(msg)) {
+        const record = typeof file === "object" ? file : files.find((f) => f.filename === filename);
+        setRestoreCsp(record?.csp || "AWS");
         setFileToRestore(filename);
         setShowRestoreModal(true);
         updateInfo(
           loadingToastId,
-          "This file is in Glacier. Restore it first, then download again."
+          "This file is in archival storage. Restore it first, then download again."
         );
       } else if (error.message?.includes("is currently being restored") && error.message?.includes("409")) {
         updateInfo(loadingToastId, error.message);
@@ -616,7 +681,11 @@ function StoragePage() {
   };
 
   // --- NEW: Function to open restore modal directly (e.g., from a button in the file list) ---
-  const openRestoreConfirmation = (filename) => {
+  const openRestoreConfirmation = (file) => {
+    const filename = typeof file === "string" ? file : file.filename;
+    const record = typeof file === "object" ? file : files.find((f) => f.filename === filename);
+    setRestoreCsp(record?.csp || "AWS");
+    setRestoreTier(record?.csp === "Azure" ? "Standard" : "Standard");
     setFileToRestore(filename);
     setShowRestoreModal(true);
   };
@@ -627,8 +696,6 @@ function StoragePage() {
 
     setIsRestoring(true);
     try {
-      const record = files.find((f) => f.filename === fileToRestore);
-      const restoreCsp = record?.csp || "AWS";
       const result = await executeWithNotification(
         async () => {
           const res = await initiateArchiveRestore(
@@ -692,61 +759,67 @@ function StoragePage() {
         refreshDisabled={isLoading || isSyncing}
       />
 
-      <div className="storage-process-info zenith-surface">
-        <div className="process-step">
-          <div className="process-icon analyze">
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
-              <circle cx="12" cy="12" r="3"/>
-            </svg>
+      <div className="page-card zenith-surface">
+        <h3 className="page-title">Intelligent File Ingestion</h3>
+        <p className="page-description">
+          Upload files for ML-guided placement across AWS, Google Cloud, or Azure. Zenith analyzes
+          size, access intent, and lifecycle policy, then recommends the best tier and cloud for cost
+          and performance.
+        </p>
+
+        <div className="storage-process-info">
+          <div className="process-step">
+            <div className="process-icon analyze">
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+                <circle cx="12" cy="12" r="3"/>
+              </svg>
+            </div>
+            <div className="process-text">
+              <strong>ML-Powered Analysis</strong>
+              <span>Analyzes file size, access patterns & intent</span>
+            </div>
           </div>
-          <div className="process-text">
-            <strong>ML-Powered Analysis</strong>
-            <span>Analyzes file size, access patterns & intent</span>
+
+          <div className="process-step">
+            <div className="process-icon recommend">
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+                <path d="M2 17l10 5 10-5M2 12l10 5 10-5"/>
+              </svg>
+            </div>
+            <div className="process-text">
+              <strong>Smart Recommendations</strong>
+              <span>AWS, GCP, or Azure based on cost & performance</span>
+            </div>
+          </div>
+
+          <div className="process-step">
+            <div className="process-icon tier">
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M3 3h7v7H3zM14 3h7v7h-7zM14 14h7v7h-7zM3 14h7v7H3z"/>
+              </svg>
+            </div>
+            <div className="process-text">
+              <strong>Intelligent Tiering</strong>
+              <span>Hot → Cool → Archive based on access</span>
+            </div>
+          </div>
+
+          <div className="process-step">
+            <div className="process-icon save">
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="12" y1="1" x2="12" y2="23"/>
+                <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+              </svg>
+            </div>
+            <div className="process-text">
+              <strong>Cost Optimization</strong>
+              <span>Save up to 60% vs standard storage</span>
+            </div>
           </div>
         </div>
 
-        <div className="process-step">
-          <div className="process-icon recommend">
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M12 2L2 7l10 5 10-5-10-5z"/>
-              <path d="M2 17l10 5 10-5M2 12l10 5 10-5"/>
-            </svg>
-          </div>
-          <div className="process-text">
-            <strong>Smart Recommendations</strong>
-            <span>AWS, GCP, or Azure based on cost & performance</span>
-          </div>
-        </div>
-
-        <div className="process-step">
-          <div className="process-icon tier">
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M3 3h7v7H3zM14 3h7v7h-7zM14 14h7v7h-7zM3 14h7v7H3z"/>
-            </svg>
-          </div>
-          <div className="process-text">
-            <strong>Intelligent Tiering</strong>
-            <span>Hot → Cool → Archive based on access</span>
-          </div>
-        </div>
-
-        <div className="process-step">
-          <div className="process-icon save">
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <line x1="12" y1="1" x2="12" y2="23"/>
-              <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
-            </svg>
-          </div>
-          <div className="process-text">
-            <strong>Cost Optimization</strong>
-            <span>Save up to 60% vs standard storage</span>
-          </div>
-        </div>
-      </div>
-
-      <div className="upload-section zenith-surface">
-        <h3 className="upload-title">Intelligent File Ingestion</h3>
         <div className="upload-form">
           <div className="file-input-group">
             <input ref={fileInputRef} type="file" onChange={handleFileChange} />
@@ -786,6 +859,8 @@ function StoragePage() {
           </button>
         </div>
       </div>
+
+      <StorageIntelligenceBar summary={intelSummary} loading={intelLoading} />
 
       {platformMultiRegion && platformRegions.length > 1 && (
         <StorageRegionScopeBar
@@ -885,6 +960,7 @@ function StoragePage() {
                 <th>Size (KB)</th>
                 <th>Upload Date</th>
                 <th>Location</th>
+                <th>Zenith insight</th>
                 <th>Actions</th>
               </tr>
             </thead>
@@ -914,6 +990,9 @@ function StoragePage() {
                         </span>
                       </div>
                     </td>
+                    <td className="insight-col">
+                      <StorageFileInsight insight={file.insight} />
+                    </td>
                     <td>
                       <button
                         onClick={() => handleDownload(file)}
@@ -921,10 +1000,9 @@ function StoragePage() {
                       >
                         Download
                       </button>
-                      {file.csp === "AWS" &&
-                       (file.storage_class === "GLACIER" || file.storage_class === "DEEP_ARCHIVE") && (
+                      {isArchiveStorageClass(file.storage_class) && (
                         <button
-                          onClick={() => openRestoreConfirmation(file.filename)}
+                          onClick={() => openRestoreConfirmation(file)}
                           className="action-btn restore-btn"
                           disabled={file.restore_status && file.restore_status.includes("ongoing-request=\"true\"")}
                         >
@@ -988,41 +1066,71 @@ function StoragePage() {
           isUploading={isUploading}
           onClose={() => setShowRecommendationModal(false)}
           onConfirmUpload={confirmAndUpload}
+          lifecyclePolicy={lifecyclePolicy}
+          onLifecyclePolicyChange={setLifecyclePolicy}
+          suggestedLifecyclePolicy={suggestedLifecyclePolicy}
+          userPriority={userPriority}
+          userIntent={userIntent}
         />
       )}
 
-      {/* --- NEW: Glacier Restore Confirmation Modal --- */}
       {showRestoreModal && (
         <div className="modal-overlay">
           <div className="modal-content">
-            <p className="restore-modal-title">Restore '{fileToRestore}' from Glacier</p>
+            <p className="restore-modal-title">
+              Restore &apos;{fileToRestore}&apos; from {restoreCsp} archive
+            </p>
             <p className="restore-modal-text">
               This file is in archival storage. It needs to be restored before
-              it can be downloaded. Restoration may take some time depending on the tier.
+              it can be downloaded. Restoration may take some time depending on the provider.
             </p>
             <div className="restore-options">
-              <label htmlFor="restore-tier">Restoration Tier:</label>
-              <select
-                id="restore-tier"
-                value={restoreTier}
-                onChange={(e) => setRestoreTier(e.target.value)}
-                className="zenith-select restore-select"
-              >
-                <option value="Standard">Standard (3-5 hours, lowest cost)</option>
-                <option value="Bulk">Bulk (5-12 hours, very low cost for large archives)</option>
-                <option value="Expedited">Expedited (1-5 minutes, higher cost)</option>
-              </select>
+              {restoreCsp === "AWS" && (
+                <>
+                  <label htmlFor="restore-tier">Restoration Tier:</label>
+                  <select
+                    id="restore-tier"
+                    value={restoreTier}
+                    onChange={(e) => setRestoreTier(e.target.value)}
+                    className="zenith-select restore-select"
+                  >
+                    <option value="Standard">Standard (3-5 hours, lowest cost)</option>
+                    <option value="Bulk">Bulk (5-12 hours, very low cost for large archives)</option>
+                    <option value="Expedited">Expedited (1-5 minutes, higher cost)</option>
+                  </select>
 
-              <label htmlFor="restore-days">Available For (Days):</label>
-              <input
-                type="number"
-                id="restore-days"
-                value={restoreDays}
-                onChange={(e) => setRestoreDays(parseInt(e.target.value))}
-                min="1"
-                max="30"
-                className="restore-input"
-              />
+                  <label htmlFor="restore-days">Available For (Days):</label>
+                  <input
+                    type="number"
+                    id="restore-days"
+                    value={restoreDays}
+                    onChange={(e) => setRestoreDays(parseInt(e.target.value, 10) || 1)}
+                    min="1"
+                    max="30"
+                    className="restore-input"
+                  />
+                </>
+              )}
+              {restoreCsp === "Azure" && (
+                <>
+                  <label htmlFor="restore-tier">Rehydration Priority:</label>
+                  <select
+                    id="restore-tier"
+                    value={restoreTier}
+                    onChange={(e) => setRestoreTier(e.target.value)}
+                    className="zenith-select restore-select"
+                  >
+                    <option value="Standard">Standard (hours)</option>
+                    <option value="High">High (faster, higher cost)</option>
+                  </select>
+                </>
+              )}
+              {restoreCsp === "GCP" && (
+                <p className="restore-modal-text">
+                  GCP will reclassify this object to Standard storage for download access.
+                  Large archives may take up to several hours.
+                </p>
+              )}
             </div>
 
             <div className="modal-buttons">

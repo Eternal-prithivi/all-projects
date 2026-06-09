@@ -54,7 +54,9 @@ class Settings(BaseSettings):
     # --- GCP Credentials ---
     GCP_SERVICE_ACCOUNT_JSON_PATH: str = ""  # Leave empty if no GCP key file (DEMO_MODE bypasses real calls)
     GCP_BUCKET_NAME: str
-    GCP_REPLICA_BUCKET_NAME: str = ""  # Optional second bucket for secure vault replication
+    GCP_SECURE_BUCKET_NAME: str  # Dedicated GCS vault (separate from GCP_BUCKET_NAME)
+    GCP_SECURE_REPLICA_BUCKET_NAME: str = ""  # Fixed replica GCS bucket for secure vault
+    GCP_REPLICA_BUCKET_NAME: str = ""  # Deprecated alias — use GCP_SECURE_REPLICA_BUCKET_NAME
     GCP_PROJECT_ID: str
     GCP_ZONE: str = "us-central1-a" # Free tier zone + a specific sub-zone
 
@@ -104,6 +106,10 @@ class Settings(BaseSettings):
     AZURE_STORAGE_ACCOUNT_NAME: str
     AZURE_STORAGE_ACCOUNT_KEY: str
     AZURE_CONTAINER_NAME: str
+    AZURE_SECURE_CONTAINER_NAME: str  # Dedicated secure vault container (separate from storage)
+    AZURE_SECURE_REPLICA_CONTAINER_NAME: str = ""  # Fixed replica container for secure vault
+    AZURE_SECURE_STORAGE_ACCOUNT_NAME: str = ""  # Optional; defaults to AZURE_STORAGE_ACCOUNT_NAME
+    AZURE_SECURE_STORAGE_ACCOUNT_KEY: str = ""  # Optional; defaults to AZURE_STORAGE_ACCOUNT_KEY
     AZURE_SUBSCRIPTION_ID: str = ""
     AZURE_TENANT_ID: str
     AZURE_CLIENT_ID: str

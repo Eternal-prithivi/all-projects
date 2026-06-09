@@ -110,12 +110,28 @@ def _storage_feedback_from_file(prediction: Dict[str, Any], file_record: Dict[st
     elif predicted_tier == "hot" and access_score == 0 and actual_tier in {"warm", "cold"}:
         score = min(score, 0.60)
 
+    upload_dt = prediction.get("created_at") or file_record.get("upload_date") or file_record.get("created_at")
+    days_since_upload = _age_days(upload_dt, _now()) if upload_dt else None
+    recommended_csp = prediction.get("final_csp")
+    actual_csp = file_record.get("csp")
+    csp_override = False
+    if recommended_csp and actual_csp:
+        try:
+            from app.cloud.providers import normalize_provider
+            csp_override = normalize_provider(recommended_csp) != normalize_provider(actual_csp)
+        except ValueError:
+            csp_override = str(recommended_csp) != str(actual_csp)
+
     return score, {
         "predicted_tier": predicted_tier,
         "actual_tier": actual_tier,
         "storage_class": file_record.get("storage_class"),
         "access_frequency_score": access_score,
         "tier_distance": distance,
+        "days_since_upload": days_since_upload,
+        "recommended_csp": recommended_csp,
+        "actual_csp": actual_csp,
+        "csp_override": csp_override,
     }
 
 
@@ -352,13 +368,28 @@ def _feedback_scores(samples: Iterable[Dict[str, Any]]) -> List[float]:
 def record_retraining_snapshot(db: Database, now: Optional[datetime] = None) -> Dict[str, Any]:
     now = now or _now()
     readiness = calculate_retraining_readiness(db)
+    last_deploy = db[RETRAINING_COLLECTION].find_one(
+        {"deployed": True},
+        sort=[("trained_at", -1)],
+    )
+    last_deploy_summary = None
+    if last_deploy:
+        last_deploy_summary = {
+            "trained_at": last_deploy.get("trained_at"),
+            "candidate_accuracy": last_deploy.get("candidate_accuracy"),
+            "baseline_accuracy": last_deploy.get("baseline_accuracy"),
+            "deployment_reason": last_deploy.get("deployment_reason"),
+        }
     snapshot = {
         **readiness,
         "trained_at": now,
         "deployed": False,
         "deployment_reason": readiness["deployment_guard"]["status"],
         "model_type": "feedback_snapshot",
+        "last_successful_deploy": last_deploy_summary,
     }
     result = db[RETRAINING_COLLECTION].insert_one(snapshot)
     snapshot["_id"] = str(result.inserted_id)
+    if isinstance(snapshot.get("trained_at"), datetime):
+        snapshot["trained_at"] = snapshot["trained_at"].isoformat()
     return snapshot

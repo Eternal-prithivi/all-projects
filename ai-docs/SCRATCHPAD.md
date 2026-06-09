@@ -2,25 +2,26 @@
 
 ## ✅ Last Known Good State
 
-**Status:** COMPLETE (2026-06-09)
+**Status:** COMPLETE (2026-06-10)
 
-**Phase 19 — Platform multi-region storage + page refresh UX** shipped.
+**Phase 20 — Trust docs + BYOC encryption hardening** shipped.
 
 **Key paths:**
-- Backend: `backend/app/cloud/platform_storage_catalog.py`, `routes_storage.py` (sync filters, `region_slug`), `file_queries.py`
-- Frontend: `PageRefreshButton`, `usePageRefresh`, `PageHeader` `onRefresh`, `CloudDestinationPanel`, `BucketSelectorLoading`, `StorageRegionScopeBar`
-- Docs: `docs/cloud/PLATFORM_STORAGE_REGIONS.md`, `docs/testing/manual_testing.md`
+- Docs: `docs/security/TRUST_AND_ENCRYPTION.md`, `docs/security/BYOC_CREDENTIAL_ENCRYPTION.md`
+- Backend: `backend/app/byoc/encryption.py` (v1 prefix, idempotent encrypt, merge)
+- Tests: `backend/tests/test_byoc_encryption.py`
+- AI context: `ai-docs/AI_CONTEXT_BACKEND.md`, parity matrix, `CREDENTIAL_CONTRACT.md`
 
-**Quality gates:** pytest 320 passed; `npm run build` green.
+**Prior (Phase 19):** Platform multi-region storage + page refresh UX.
 
-**How to test:** Storage page header **Refresh** reloads files + AWS/GCP/Azure panels (gold loading bar on all three). No per-CSP refresh buttons in bucket selectors.
+**Quality gates:** Run `pytest tests/test_byoc_encryption.py -q` after pull.
 
 ---
 
 ## Step list (completed)
 
-- [x] Step 1: Platform storage catalog + static discovery (AWS/GCP/Azure)
-- [x] Step 2: Sync/list region scoping + integration tests
-- [x] Step 3: Page-level refresh on all dashboard/admin pages
-- [x] Step 4: Shared gold loading bar for all bucket selectors
-- [x] Step 5: Docs + pytest fix + commit/push stage
+- [x] Step 1: Audit existing trust/BYOC docs — gaps found
+- [x] Step 2: Create TRUST_AND_ENCRYPTION.md + BYOC_CREDENTIAL_ENCRYPTION.md
+- [x] Step 3: Harden encryption.py (v1 prefix, merge, idempotent)
+- [x] Step 4: Wire merge in routes_byoc _save_* helpers
+- [x] Step 5: Update docs index, parity matrix, manual_testing, ai-docs

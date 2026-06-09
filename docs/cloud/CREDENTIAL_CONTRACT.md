@@ -59,37 +59,41 @@ UI pages use this endpoint. Backend returns **403** if a CSP is neither connecte
 
 | Variable | AWS | GCP | Azure |
 |----------|-----|-----|-------|
-| Primary + replica | Secure + replica S3 buckets | GCS secure bucket (BYOC/platform) | Blob secure container |
-| Replication doc | `SECURE_VAULT_REPLICATION.md` | GCP/Azure replica deferred | |
+| Primary + replica | Secure + replica S3 buckets | GCS secure + replica buckets | Blob secure + replica containers |
+| Replication doc | `SECURE_VAULT_REPLICATION.md` | Same (tri-cloud) | Same |
 
 ---
 
 ## BYOC Mongo fields (`byoc_credentials`)
 
-Common: `username`, `csp` (`AWS`|`GCP`|`Azure`), `is_active`, `connection_method`.
+Common: `username`, `csp` (`AWS`|`GCP`|`Azure`), `is_active`, `connection_method`, `secure_dual_write`.
+
+**Secrets:** Stored under `credentials` — each value encrypted with AES-256-GCM (`app/byoc/encryption.py`). See [TRUST_AND_ENCRYPTION.md](../security/TRUST_AND_ENCRYPTION.md).
 
 ### AWS
 
 | Field | Purpose |
 |-------|---------|
-| `access_key_id`, `secret_access_key` | API access |
+| `credentials.access_key_id`, `credentials.secret_access_key` (encrypted) | API access |
+| `credentials.role_arn`, `credentials.external_id` (encrypted) | IAM role method |
 | `storage_bucket_name`, `secure_bucket_name`, `replica_bucket_name` | Layout |
-| `region` / `primary_region` | Upload + TF |
+| `region` / `primary_region`, `replica_region` | Upload + TF |
 
 ### GCP
 
 | Field | Purpose |
 |-------|---------|
-| `service_account_json` (encrypted) | API access |
-| `bucket_name` / `gcp_bucket_name` | Storage + sync |
+| `credentials.service_account_json` (encrypted) | API access |
+| `storage_bucket_name`, `secure_bucket_name`, `replica_bucket_name` | Layout |
+| `gcp_primary_location`, `gcp_replica_location` | Bucket regions |
 
 ### Azure
 
 | Field | Purpose |
 |-------|---------|
-| `connection_string` or account + key | Blob storage |
-| `container_name` | Storage + sync |
-| Cost Management: tenant, client id/secret, subscription (Phase 2+) | Billing reads beyond storage |
+| `credentials.account_name`, `credentials.account_key` (encrypted) | Blob storage |
+| `storage_container_name`, `secure_container_name`, `replica_container_name` | Layout |
+| `credentials.subscription_id`, `tenant_id`, `client_id`, `client_secret` (encrypted) | Cost Management (optional) |
 
 ---
 

@@ -303,7 +303,59 @@ export const validateByocAwsStep2 = ({ awsForm = {} }) => {
   return buildResult(errors);
 };
 
-export const validateByocConnectionForm = ({ csp, method, awsForm = {}, gcpForm = {}, azureForm = {}, awsStep = null }) => {
+export const validateByocGcpStep1 = ({ gcpForm = {} }) => {
+  const errors = {};
+  const serviceAccountJson = trimValue(gcpForm.service_account_json || '');
+  if (!serviceAccountJson) {
+    errors.service_account_json = 'Service account JSON is required.';
+  } else {
+    try {
+      JSON.parse(serviceAccountJson);
+    } catch {
+      errors.service_account_json = 'Paste valid service account JSON.';
+    }
+  }
+  return buildResult(errors);
+};
+
+export const validateByocGcpStep2 = ({ gcpForm = {} }) => {
+  const errors = {};
+  const storage = trimValue(gcpForm.storage_bucket_name || gcpForm.gcp_bucket_name || '');
+  const secure = trimValue(gcpForm.secure_bucket_name || '');
+  const replica = trimValue(gcpForm.replica_bucket_name || '');
+  if (!storage) errors.storage_bucket_name = 'Storage bucket name is required.';
+  if (!secure) errors.secure_bucket_name = 'Secure bucket name is required.';
+  if (gcpForm.secure_dual_write !== false && !replica) {
+    errors.replica_bucket_name = 'Replica bucket name is required for secure replication.';
+  }
+  return buildResult(errors);
+};
+
+export const validateByocAzureStep1 = ({ azureForm = {} }) => {
+  const errors = {};
+  if (!trimValue(azureForm.account_name || '')) {
+    errors.account_name = 'Storage account name is required.';
+  }
+  if (!trimValue(azureForm.account_key || '')) {
+    errors.account_key = 'Storage account key is required.';
+  }
+  return buildResult(errors);
+};
+
+export const validateByocAzureStep2 = ({ azureForm = {} }) => {
+  const errors = {};
+  const storage = trimValue(azureForm.storage_container_name || azureForm.container_name || '');
+  const secure = trimValue(azureForm.secure_container_name || '');
+  const replica = trimValue(azureForm.replica_container_name || '');
+  if (!storage) errors.storage_container_name = 'Storage container name is required.';
+  if (!secure) errors.secure_container_name = 'Secure container name is required.';
+  if (azureForm.secure_dual_write !== false && !replica) {
+    errors.replica_container_name = 'Replica container name is required for secure replication.';
+  }
+  return buildResult(errors);
+};
+
+export const validateByocConnectionForm = ({ csp, method, awsForm = {}, gcpForm = {}, azureForm = {}, awsStep = null, gcpStep = null, azureStep = null }) => {
   const errors = {};
 
   if (!csp) {
@@ -341,35 +393,15 @@ export const validateByocConnectionForm = ({ csp, method, awsForm = {}, gcpForm 
   }
 
   if (csp === 'GCP') {
-    const serviceAccountJson = trimValue(gcpForm.service_account_json || '');
-
-    if (!serviceAccountJson) {
-      errors.service_account_json = 'Service account JSON is required.';
-    } else {
-      try {
-        JSON.parse(serviceAccountJson);
-      } catch {
-        errors.service_account_json = 'Paste valid service account JSON.';
-      }
-    }
-
-    if (!trimValue(gcpForm.gcp_bucket_name || '')) {
-      errors.gcp_bucket_name = 'Bucket name is required.';
-    }
+    if (gcpStep === 1) return validateByocGcpStep1({ gcpForm });
+    if (gcpStep === 2) return validateByocGcpStep2({ gcpForm });
+    return validateByocGcpStep2({ gcpForm });
   }
 
   if (csp === 'Azure') {
-    if (!trimValue(azureForm.account_name || '')) {
-      errors.account_name = 'Storage account name is required.';
-    }
-
-    if (!trimValue(azureForm.account_key || '')) {
-      errors.account_key = 'Storage account key is required.';
-    }
-
-    if (!trimValue(azureForm.container_name || '')) {
-      errors.container_name = 'Container name is required.';
-    }
+    if (azureStep === 1) return validateByocAzureStep1({ azureForm });
+    if (azureStep === 2) return validateByocAzureStep2({ azureForm });
+    return validateByocAzureStep2({ azureForm });
   }
 
   return buildResult(errors);

@@ -8,6 +8,7 @@ const EncryptionChoiceModal = ({ file, onClose, onChoose }) => {
   const [showPasswordForm, setShowPasswordForm] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [passwordStrength, setPasswordStrength] = useState({ level: 0, message: '' });
+  const [skipAcknowledged, setSkipAcknowledged] = useState(false);
 
   const checkPasswordStrength = (pwd) => {
     if (!pwd) {
@@ -60,11 +61,19 @@ const EncryptionChoiceModal = ({ file, onClose, onChoose }) => {
     } else {
       setShowPasswordForm(false);
     }
+    if (method !== 'none') {
+      setSkipAcknowledged(false);
+    }
   };
 
   const handleSubmit = async () => {
     if (!selectedMethod) {
       alert('Please select an encryption method');
+      return;
+    }
+
+    if (selectedMethod === 'none' && !skipAcknowledged) {
+      alert('Confirm you accept storing this file without Zenith encryption.');
       return;
     }
 
@@ -133,6 +142,28 @@ const EncryptionChoiceModal = ({ file, onClose, onChoose }) => {
                 <p className="recommendation">
                   <strong>Best for:</strong> Convenience, compliance, shared team access
                 </p>
+              </div>
+            </div>
+
+            <div
+              className={`encryption-option ${selectedMethod === 'none' ? 'selected' : ''}`}
+              onClick={() => handleMethodSelect('none')}
+            >
+              <div className="option-header">
+                <input
+                  type="radio"
+                  name="encryption"
+                  checked={selectedMethod === 'none'}
+                  onChange={() => handleMethodSelect('none')}
+                />
+                <h3>Store without encryption</h3>
+              </div>
+              <div className="option-description">
+                <p><strong>Vault + 2FA only — no Zenith encryption layer</strong></p>
+                <ul>
+                  <li className="caution">Sensitive scan flagged this file — skipping encryption is risky</li>
+                  <li className="caution">Anyone with vault or cloud access may read plaintext</li>
+                </ul>
               </div>
             </div>
 
@@ -230,6 +261,20 @@ const EncryptionChoiceModal = ({ file, onClose, onChoose }) => {
               )}
             </div>
           )}
+
+          {selectedMethod === 'none' && (
+            <label className="security-skip-encrypt-ack encryption-skip-ack">
+              <input
+                type="checkbox"
+                checked={skipAcknowledged}
+                onChange={(e) => setSkipAcknowledged(e.target.checked)}
+              />
+              <span>
+                I understand this file may contain sensitive data and I accept storing it without
+                Zenith encryption.
+              </span>
+            </label>
+          )}
         </div>
 
         <div className="encryption-modal-footer">
@@ -237,9 +282,17 @@ const EncryptionChoiceModal = ({ file, onClose, onChoose }) => {
           <button
             className="btn-encrypt"
             onClick={handleSubmit}
-            disabled={!selectedMethod || isSubmitting}
+            disabled={
+              !selectedMethod ||
+              isSubmitting ||
+              (selectedMethod === 'none' && !skipAcknowledged)
+            }
           >
-            {isSubmitting ? 'Encrypting...' : `Encrypt with ${selectedMethod || '...'}`}
+            {isSubmitting
+              ? 'Uploading...'
+              : selectedMethod === 'none'
+                ? 'Store without encryption'
+                : `Encrypt with ${selectedMethod || '...'}`}
           </button>
         </div>
       </div>

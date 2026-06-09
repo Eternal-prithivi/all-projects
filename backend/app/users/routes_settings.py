@@ -12,7 +12,7 @@
 # =============================================================================
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import List, Literal, Optional, Dict, Any
 from datetime import datetime
 from ..users.routes_users import get_current_user
@@ -45,6 +45,15 @@ class PreferencesSettings(BaseModel):
     currency: str = "USD"
     provision_engine: Literal["boto3", "terraform"] = "boto3"
     platform_region_slug: Optional[str] = None
+    default_lifecycle_policy: Literal["auto", "keep_hot", "aggressive", "manual"] = "auto"
+    lifecycle_notice_days: int = Field(default=7, ge=0, le=30)
+    default_security_encryption: Literal["ask", "server-side", "client-side"] = "ask"
+    always_ask_encryption: bool = False
+    default_security_csp: Literal["AWS", "GCP", "Azure"] = "AWS"
+    default_security_replication: bool = False
+    stale_file_days: int = Field(default=90, ge=30, le=365)
+    stale_notice_days: int = Field(default=7, ge=0, le=30)
+    ml_assisted_scan: bool = True
 
 
 class BillingSettings(BaseModel):

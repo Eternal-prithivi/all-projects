@@ -25,6 +25,8 @@ import {
   validateByocConnectionForm,
   validateByocAwsStep1,
   validateByocAwsStep2,
+  validateByocGcpStep1,
+  validateByocAzureStep1,
 } from '../utils/formValidation';
 import '../styles/settings.css';
 import PageHeader from '../components/ui/PageHeader.jsx';
@@ -56,6 +58,15 @@ const SettingsPage = () => {
     currency: 'USD',
     provisionEngine: 'boto3',
     platformRegionSlug: '',
+    defaultLifecyclePolicy: 'auto',
+    lifecycleNoticeDays: 7,
+    defaultSecurityEncryption: 'ask',
+    alwaysAskEncryption: false,
+    defaultSecurityCsp: 'AWS',
+    defaultSecurityReplication: false,
+    staleFileDays: 90,
+    staleNoticeDays: 7,
+    mlAssistedScan: true,
   });
   const [platformMultiRegion, setPlatformMultiRegion] = useState(false);
   const [platformRegions, setPlatformRegions] = useState([]);
@@ -75,9 +86,11 @@ const SettingsPage = () => {
   const [awsConnectStep, setAwsConnectStep] = useState(1);
   const [awsCredentialsVerified, setAwsCredentialsVerified] = useState(false);
   const [awsVerifying, setAwsVerifying] = useState(false);
+  const [gcpConnectStep, setGcpConnectStep] = useState(1);
   const [gcpCredentialsVerified, setGcpCredentialsVerified] = useState(false);
   const [gcpVerifying, setGcpVerifying] = useState(false);
   const [gcpDiscoveredBuckets, setGcpDiscoveredBuckets] = useState([]);
+  const [azureConnectStep, setAzureConnectStep] = useState(1);
   const [azureCredentialsVerified, setAzureCredentialsVerified] = useState(false);
   const [azureVerifying, setAzureVerifying] = useState(false);
   const [azureDiscoveredContainers, setAzureDiscoveredContainers] = useState([]);
@@ -98,6 +111,12 @@ const SettingsPage = () => {
   const [gcpForm, setGcpForm] = useState({
     service_account_json: '',
     gcp_bucket_name: '',
+    storage_bucket_name: '',
+    secure_bucket_name: '',
+    replica_bucket_name: '',
+    secure_dual_write: true,
+    gcp_primary_location: 'ASIA-SOUTH1',
+    gcp_replica_location: 'US-EAST1',
     gcp_billing_dataset_id: '',
     gcp_billing_table_id: '',
   });
@@ -105,6 +124,10 @@ const SettingsPage = () => {
     account_name: '',
     account_key: '',
     container_name: '',
+    storage_container_name: '',
+    secure_container_name: '',
+    replica_container_name: '',
+    secure_dual_write: true,
     azure_subscription_id: '',
     azure_tenant_id: '',
     azure_client_id: '',
@@ -118,6 +141,24 @@ const SettingsPage = () => {
           ? validateByocAwsStep1({ method: byocMethod, awsForm })
           : validateByocAwsStep2({ awsForm });
       }
+      if (byocActiveCSP === 'GCP') {
+        return gcpConnectStep === 1
+          ? validateByocGcpStep1({ gcpForm })
+          : validateByocConnectionForm({
+              csp: 'GCP',
+              gcpForm,
+              gcpStep: 2,
+            });
+      }
+      if (byocActiveCSP === 'Azure') {
+        return azureConnectStep === 1
+          ? validateByocAzureStep1({ azureForm })
+          : validateByocConnectionForm({
+              csp: 'Azure',
+              azureForm,
+              azureStep: 2,
+            });
+      }
       return validateByocConnectionForm({
         csp: byocActiveCSP,
         method: byocMethod,
@@ -126,7 +167,7 @@ const SettingsPage = () => {
         azureForm,
       });
     },
-    [byocActiveCSP, byocMethod, awsForm, gcpForm, azureForm, awsConnectStep]
+    [byocActiveCSP, byocMethod, awsForm, gcpForm, azureForm, awsConnectStep, gcpConnectStep, azureConnectStep]
   );
 
   const resetAwsConnectFlow = () => {
@@ -137,14 +178,18 @@ const SettingsPage = () => {
   };
 
   const resetGcpConnectFlow = () => {
+    setGcpConnectStep(1);
     setGcpCredentialsVerified(false);
     setGcpDiscoveredBuckets([]);
+    setBucketCheckStatus({});
     setByocTestResult(null);
   };
 
   const resetAzureConnectFlow = () => {
+    setAzureConnectStep(1);
     setAzureCredentialsVerified(false);
     setAzureDiscoveredContainers([]);
+    setBucketCheckStatus({});
     setByocTestResult(null);
   };
 
@@ -227,6 +272,21 @@ const SettingsPage = () => {
           data.preferences?.platform_region_slug ||
           data.platform_regions?.[0]?.slug ||
           prev.platformRegionSlug,
+        defaultLifecyclePolicy:
+          data.preferences?.default_lifecycle_policy || prev.defaultLifecyclePolicy,
+        lifecycleNoticeDays:
+          data.preferences?.lifecycle_notice_days ?? prev.lifecycleNoticeDays,
+        defaultSecurityEncryption:
+          data.preferences?.default_security_encryption || prev.defaultSecurityEncryption,
+        alwaysAskEncryption:
+          data.preferences?.always_ask_encryption ?? prev.alwaysAskEncryption,
+        defaultSecurityCsp:
+          data.preferences?.default_security_csp || prev.defaultSecurityCsp,
+        defaultSecurityReplication:
+          data.preferences?.default_security_replication ?? prev.defaultSecurityReplication,
+        staleFileDays: data.preferences?.stale_file_days ?? prev.staleFileDays,
+        staleNoticeDays: data.preferences?.stale_notice_days ?? prev.staleNoticeDays,
+        mlAssistedScan: data.preferences?.ml_assisted_scan ?? prev.mlAssistedScan,
       }));
     } catch (error) {
       console.error('Failed to fetch settings:', error);
@@ -302,15 +362,22 @@ const SettingsPage = () => {
         service_account_json: gcpForm.service_account_json,
         gcp_bucket_name: gcpForm.gcp_bucket_name || undefined,
       });
-      const buckets = response.data.buckets || [];
-      setGcpDiscoveredBuckets(buckets);
+      const suggestions = response.data.suggestions || {};
+      setGcpDiscoveredBuckets(response.data.buckets || []);
+      setGcpForm((prev) => ({
+        ...prev,
+        storage_bucket_name: suggestions.storage_bucket_name || prev.storage_bucket_name,
+        gcp_bucket_name: suggestions.gcp_bucket_name || suggestions.storage_bucket_name || prev.gcp_bucket_name,
+        secure_bucket_name: suggestions.secure_bucket_name || prev.secure_bucket_name,
+        replica_bucket_name: suggestions.replica_bucket_name || prev.replica_bucket_name,
+        gcp_primary_location: response.data.primary_location || prev.gcp_primary_location,
+        gcp_replica_location: response.data.replica_location || prev.gcp_replica_location,
+      }));
       setGcpCredentialsVerified(true);
-      if (!gcpForm.gcp_bucket_name && buckets.length === 1) {
-        setGcpForm((prev) => ({ ...prev, gcp_bucket_name: buckets[0].name }));
-      }
+      setGcpConnectStep(2);
       setByocTestResult({
         success: true,
-        message: response.data.message || 'GCP credentials verified.',
+        message: response.data.message || 'Credentials verified. Configure your buckets below.',
       });
     } catch (error) {
       const detail = error.response?.data?.detail;
@@ -342,12 +409,17 @@ const SettingsPage = () => {
         azure_client_id: azureForm.azure_client_id || undefined,
         azure_client_secret: azureForm.azure_client_secret || undefined,
       });
-      const containers = response.data.containers || [];
-      setAzureDiscoveredContainers(containers);
+      const suggestions = response.data.suggestions || {};
+      setAzureDiscoveredContainers(response.data.containers || []);
+      setAzureForm((prev) => ({
+        ...prev,
+        storage_container_name: suggestions.storage_container_name || prev.storage_container_name,
+        container_name: suggestions.container_name || suggestions.storage_container_name || prev.container_name,
+        secure_container_name: suggestions.secure_container_name || prev.secure_container_name,
+        replica_container_name: suggestions.replica_container_name || prev.replica_container_name,
+      }));
       setAzureCredentialsVerified(true);
-      if (!azureForm.container_name && containers.length === 1) {
-        setAzureForm((prev) => ({ ...prev, container_name: containers[0].name }));
-      }
+      setAzureConnectStep(2);
       const costNote = response.data.cost_management_verified
         ? ' Cost Management credentials OK.'
         : response.data.cost_management_message
@@ -450,6 +522,60 @@ const SettingsPage = () => {
     }
   };
 
+  const gcpBucketRoleForField = (field) => {
+    if (field === 'replica_bucket_name') return 'replica';
+    if (field === 'secure_bucket_name') return 'secure';
+    return 'storage';
+  };
+
+  const handleCheckGcpBucket = async (field, bucketName) => {
+    if (!bucketName || !gcpCredentialsVerified) return;
+    const location =
+      field === 'replica_bucket_name'
+        ? gcpForm.gcp_replica_location
+        : gcpForm.gcp_primary_location;
+    try {
+      const response = await apiClient.post('/byoc/check-gcp-bucket', {
+        bucket_name: bucketName,
+        bucket_role: gcpBucketRoleForField(field),
+        location,
+        service_account_json: gcpForm.service_account_json,
+        create_if_missing: true,
+      });
+      setBucketCheckStatus((prev) => ({ ...prev, [field]: response.data }));
+    } catch {
+      setBucketCheckStatus((prev) => ({
+        ...prev,
+        [field]: { status: 'forbidden', message: 'Could not check bucket.' },
+      }));
+    }
+  };
+
+  const azureContainerRoleForField = (field) => {
+    if (field === 'replica_container_name') return 'replica';
+    if (field === 'secure_container_name') return 'secure';
+    return 'storage';
+  };
+
+  const handleCheckAzureContainer = async (field, containerName) => {
+    if (!containerName || !azureCredentialsVerified) return;
+    try {
+      const response = await apiClient.post('/byoc/check-azure-container', {
+        container_name: containerName,
+        container_role: azureContainerRoleForField(field),
+        account_name: azureForm.account_name,
+        account_key: azureForm.account_key,
+        create_if_missing: true,
+      });
+      setBucketCheckStatus((prev) => ({ ...prev, [field]: response.data }));
+    } catch {
+      setBucketCheckStatus((prev) => ({
+        ...prev,
+        [field]: { status: 'forbidden', message: 'Could not check container.' },
+      }));
+    }
+  };
+
   const handleByocConnect = async () => {
     if (!byocValidation.isValid) {
       setByocTestResult({ success: false, message: getValidationErrorMessage(byocValidation.errors) });
@@ -479,8 +605,21 @@ const SettingsPage = () => {
           replica_region: REPLICA_REGION,
           bucket_name: awsForm.storage_bucket_name || awsForm.bucket_name,
         };
-      } else if (byocActiveCSP === 'GCP') Object.assign(payload, gcpForm);
-      else if (byocActiveCSP === 'Azure') Object.assign(payload, azureForm);
+      } else if (byocActiveCSP === 'GCP') {
+        const storage = gcpForm.storage_bucket_name || gcpForm.gcp_bucket_name;
+        Object.assign(payload, {
+          ...gcpForm,
+          gcp_bucket_name: storage,
+          storage_bucket_name: storage,
+        });
+      } else if (byocActiveCSP === 'Azure') {
+        const storage = azureForm.storage_container_name || azureForm.container_name;
+        Object.assign(payload, {
+          ...azureForm,
+          container_name: storage,
+          storage_container_name: storage,
+        });
+      }
 
       const response = await apiClient.post('/byoc/connect', payload);
       setByocActiveCSP(null);
@@ -536,9 +675,39 @@ const SettingsPage = () => {
     }
   };
 
+  const buildPreferencesPayload = (prefs) => ({
+    theme: prefs.theme,
+    language: prefs.language,
+    timezone: prefs.timezone,
+    date_format: prefs.dateFormat,
+    currency: prefs.currency,
+    provision_engine: prefs.provisionEngine,
+    platform_region_slug: prefs.platformRegionSlug || null,
+    default_lifecycle_policy: prefs.defaultLifecyclePolicy || 'auto',
+    lifecycle_notice_days: Number(prefs.lifecycleNoticeDays) || 7,
+    default_security_encryption: prefs.defaultSecurityEncryption || 'ask',
+    always_ask_encryption: Boolean(prefs.alwaysAskEncryption),
+    default_security_csp: prefs.defaultSecurityCsp || 'AWS',
+    default_security_replication: Boolean(prefs.defaultSecurityReplication),
+    stale_file_days: Number(prefs.staleFileDays) || 90,
+    stale_notice_days: Number(prefs.staleNoticeDays) || 7,
+    ml_assisted_scan: Boolean(prefs.mlAssistedScan),
+  });
+
   const handlePreferenceChange = (e) => {
-    const { name, value } = e.target;
-    const nextPreferences = { ...preferences, [name]: value };
+    const { name, value, type, checked } = e.target;
+    const numericFields = new Set([
+      'lifecycleNoticeDays',
+      'staleFileDays',
+      'staleNoticeDays',
+    ]);
+    const parsedValue =
+      type === 'checkbox'
+        ? checked
+        : numericFields.has(name)
+          ? Number(value)
+          : value;
+    const nextPreferences = { ...preferences, [name]: parsedValue };
     setPreferences(nextPreferences);
 
     // Apply theme immediately and persist so reload/login stay in sync
@@ -565,8 +734,26 @@ const SettingsPage = () => {
         currency: nextPreferences.currency,
         provision_engine: value,
         platform_region_slug: nextPreferences.platformRegionSlug || null,
+        default_lifecycle_policy: nextPreferences.defaultLifecyclePolicy || 'auto',
+        lifecycle_notice_days: Number(nextPreferences.lifecycleNoticeDays) || 7,
       }).catch(() => {
         notifications.error('Failed to save provisioning engine preference');
+      });
+    }
+    const autoSavePrefs = new Set([
+      'defaultLifecyclePolicy',
+      'lifecycleNoticeDays',
+      'defaultSecurityEncryption',
+      'alwaysAskEncryption',
+      'defaultSecurityCsp',
+      'defaultSecurityReplication',
+      'staleFileDays',
+      'staleNoticeDays',
+      'mlAssistedScan',
+    ]);
+    if (autoSavePrefs.has(name)) {
+      apiClient.put('/settings/preferences', buildPreferencesPayload(nextPreferences)).catch(() => {
+        notifications.error('Failed to save preferences');
       });
     }
   };
@@ -575,15 +762,7 @@ const SettingsPage = () => {
     try {
       await executeWithNotification(
         async () => {
-          await apiClient.put('/settings/preferences', {
-            theme: preferences.theme,
-            language: preferences.language,
-            timezone: preferences.timezone,
-            date_format: preferences.dateFormat,
-            currency: preferences.currency,
-            provision_engine: preferences.provisionEngine,
-            platform_region_slug: preferences.platformRegionSlug || null,
-          });
+          await apiClient.put('/settings/preferences', buildPreferencesPayload(preferences));
           updatePreferences({
             currency: preferences.currency,
             dateFormat: preferences.dateFormat,
@@ -771,13 +950,33 @@ const SettingsPage = () => {
                 {/* Expanded Connection Form */}
                 {byocActiveCSP === csp && !isConnected && (
                   <div className="byoc-connect-form">
-                    {csp === 'AWS' && (
+                    {(csp === 'AWS' || csp === 'GCP' || csp === 'Azure') && (
                       <div className="byoc-step-indicator">
-                        <span className={awsConnectStep === 1 ? 'active' : awsCredentialsVerified ? 'done' : ''}>
+                        <span
+                          className={
+                            (csp === 'AWS' && awsConnectStep === 1)
+                            || (csp === 'GCP' && gcpConnectStep === 1)
+                            || (csp === 'Azure' && azureConnectStep === 1)
+                              ? 'active'
+                              : (csp === 'AWS' && awsCredentialsVerified)
+                                || (csp === 'GCP' && gcpCredentialsVerified)
+                                || (csp === 'Azure' && azureCredentialsVerified)
+                                ? 'done'
+                                : ''
+                          }
+                        >
                           Step 1 — Verify credentials
                         </span>
-                        <span className={awsConnectStep === 2 ? 'active' : ''}>
-                          Step 2 — Bucket configuration
+                        <span
+                          className={
+                            (csp === 'AWS' && awsConnectStep === 2)
+                            || (csp === 'GCP' && gcpConnectStep === 2)
+                            || (csp === 'Azure' && azureConnectStep === 2)
+                              ? 'active'
+                              : ''
+                          }
+                        >
+                          Step 2 — {csp === 'Azure' ? 'Container' : 'Bucket'} configuration
                         </span>
                       </div>
                     )}
@@ -957,8 +1156,11 @@ const SettingsPage = () => {
                       </div>
                     )}
 
-                    {csp === 'GCP' && (
+                    {csp === 'GCP' && gcpConnectStep === 1 && (
                       <div className="byoc-fields">
+                        <p className="byoc-field-hint">
+                          Paste your GCP service account JSON. We will verify it before asking for bucket names.
+                        </p>
                         <div className="byoc-field">
                           <label>Service Account JSON</label>
                           <textarea placeholder='Paste your service account JSON key here...' rows="6"
@@ -968,29 +1170,55 @@ const SettingsPage = () => {
                             aria-describedby={byocValidation.errors.service_account_json ? 'byoc-gcp-json-error' : undefined} />
                           {byocValidation.errors.service_account_json && <p id="byoc-gcp-json-error" className="form-field-error">{byocValidation.errors.service_account_json}</p>}
                         </div>
-                        <div className="byoc-field">
-                          <label>GCP Bucket Name</label>
-                          {gcpDiscoveredBuckets.length > 0 ? (
-                            <select
-                              className="zenith-select"
-                              value={gcpForm.gcp_bucket_name}
-                              onChange={(e) => setGcpForm({ ...gcpForm, gcp_bucket_name: e.target.value })}
-                            >
-                              <option value="">Select a bucket…</option>
-                              {gcpDiscoveredBuckets.map((b) => (
-                                <option key={b.name} value={b.name}>
-                                  {b.name}
-                                  {b.location ? ` (${b.location})` : ''}
-                                </option>
-                              ))}
-                            </select>
-                          ) : (
-                            <input type="text" placeholder="my-company-bucket" value={gcpForm.gcp_bucket_name}
-                              onChange={(e) => setGcpForm({...gcpForm, gcp_bucket_name: e.target.value})}
-                              aria-invalid={!!byocValidation.errors.gcp_bucket_name}
-                              aria-describedby={byocValidation.errors.gcp_bucket_name ? 'byoc-gcp-bucket-error' : undefined} />
-                          )}
-                          {byocValidation.errors.gcp_bucket_name && <p id="byoc-gcp-bucket-error" className="form-field-error">{byocValidation.errors.gcp_bucket_name}</p>}
+                      </div>
+                    )}
+
+                    {csp === 'GCP' && gcpConnectStep === 2 && (
+                      <div className="byoc-fields">
+                        <p className="byoc-field-hint">
+                          Confirm bucket names below. Zenith will create any that do not exist yet in your GCP project
+                          (primary: {gcpForm.gcp_primary_location}; replica: {gcpForm.gcp_replica_location}).
+                        </p>
+                        {[
+                          { field: 'storage_bucket_name', label: 'Storage bucket', location: gcpForm.gcp_primary_location },
+                          { field: 'secure_bucket_name', label: 'Secure vault bucket', location: gcpForm.gcp_primary_location },
+                          ...(gcpForm.secure_dual_write
+                            ? [{ field: 'replica_bucket_name', label: 'Secure replica bucket', location: gcpForm.gcp_replica_location }]
+                            : []),
+                        ].map(({ field, label, location }) => (
+                          <div className="byoc-field" key={field}>
+                            <label>{label}</label>
+                            <input
+                              type="text"
+                              value={gcpForm[field]}
+                              onChange={(e) => setGcpForm({
+                                ...gcpForm,
+                                [field]: e.target.value,
+                                gcp_bucket_name: field === 'storage_bucket_name' ? e.target.value : gcpForm.gcp_bucket_name,
+                              })}
+                              onBlur={() => handleCheckGcpBucket(field, gcpForm[field])}
+                              aria-invalid={!!byocValidation.errors[field]}
+                            />
+                            {byocValidation.errors[field] && (
+                              <p className="form-field-error">{byocValidation.errors[field]}</p>
+                            )}
+                            {bucketCheckStatus[field] && (
+                              <p className={`byoc-bucket-check byoc-bucket-check--${bucketCheckStatus[field].status}`}>
+                                {bucketCheckStatus[field].message}
+                              </p>
+                            )}
+                            <p className="byoc-field-hint">Location: {location}</p>
+                          </div>
+                        ))}
+                        <div className="byoc-field byoc-field-checkbox">
+                          <label>
+                            <input
+                              type="checkbox"
+                              checked={gcpForm.secure_dual_write}
+                              onChange={(e) => setGcpForm({ ...gcpForm, secure_dual_write: e.target.checked })}
+                            />
+                            Replicate secure files to replica bucket (recommended)
+                          </label>
                         </div>
                         <p className="byoc-section-hint">Optional — live billing in Cost hub (BigQuery export)</p>
                         <div className="byoc-field">
@@ -1003,11 +1231,17 @@ const SettingsPage = () => {
                           <input type="text" placeholder="gcp_billing_export_v1_XXXXX" value={gcpForm.gcp_billing_table_id}
                             onChange={(e) => setGcpForm({ ...gcpForm, gcp_billing_table_id: e.target.value })} />
                         </div>
+                        <button type="button" className="btn-back-step" onClick={() => setGcpConnectStep(1)}>
+                          ← Back to credentials
+                        </button>
                       </div>
                     )}
 
-                    {csp === 'Azure' && (
+                    {csp === 'Azure' && azureConnectStep === 1 && (
                       <div className="byoc-fields">
+                        <p className="byoc-field-hint">
+                          Enter your Azure storage account credentials. We will verify them before asking for container names.
+                        </p>
                         <div className="byoc-field">
                           <label>Storage Account Name</label>
                           <input type="text" placeholder="mystorageaccount" value={azureForm.account_name}
@@ -1024,26 +1258,53 @@ const SettingsPage = () => {
                             aria-describedby={byocValidation.errors.account_key ? 'byoc-azure-key-error' : undefined} />
                           {byocValidation.errors.account_key && <p id="byoc-azure-key-error" className="form-field-error">{byocValidation.errors.account_key}</p>}
                         </div>
-                        <div className="byoc-field">
-                          <label>Container Name</label>
-                          {azureDiscoveredContainers.length > 0 ? (
-                            <select
-                              className="zenith-select"
-                              value={azureForm.container_name}
-                              onChange={(e) => setAzureForm({ ...azureForm, container_name: e.target.value })}
-                            >
-                              <option value="">Select a container…</option>
-                              {azureDiscoveredContainers.map((c) => (
-                                <option key={c.name} value={c.name}>{c.name}</option>
-                              ))}
-                            </select>
-                          ) : (
-                            <input type="text" placeholder="my-container" value={azureForm.container_name}
-                              onChange={(e) => setAzureForm({...azureForm, container_name: e.target.value})}
-                              aria-invalid={!!byocValidation.errors.container_name}
-                              aria-describedby={byocValidation.errors.container_name ? 'byoc-azure-container-error' : undefined} />
-                          )}
-                          {byocValidation.errors.container_name && <p id="byoc-azure-container-error" className="form-field-error">{byocValidation.errors.container_name}</p>}
+                      </div>
+                    )}
+
+                    {csp === 'Azure' && azureConnectStep === 2 && (
+                      <div className="byoc-fields">
+                        <p className="byoc-field-hint">
+                          Confirm container names below. Zenith will create any that do not exist yet in your storage account.
+                        </p>
+                        {[
+                          { field: 'storage_container_name', label: 'Storage container' },
+                          { field: 'secure_container_name', label: 'Secure vault container' },
+                          ...(azureForm.secure_dual_write
+                            ? [{ field: 'replica_container_name', label: 'Secure replica container' }]
+                            : []),
+                        ].map(({ field, label }) => (
+                          <div className="byoc-field" key={field}>
+                            <label>{label}</label>
+                            <input
+                              type="text"
+                              value={azureForm[field]}
+                              onChange={(e) => setAzureForm({
+                                ...azureForm,
+                                [field]: e.target.value,
+                                container_name: field === 'storage_container_name' ? e.target.value : azureForm.container_name,
+                              })}
+                              onBlur={() => handleCheckAzureContainer(field, azureForm[field])}
+                              aria-invalid={!!byocValidation.errors[field]}
+                            />
+                            {byocValidation.errors[field] && (
+                              <p className="form-field-error">{byocValidation.errors[field]}</p>
+                            )}
+                            {bucketCheckStatus[field] && (
+                              <p className={`byoc-bucket-check byoc-bucket-check--${bucketCheckStatus[field].status}`}>
+                                {bucketCheckStatus[field].message}
+                              </p>
+                            )}
+                          </div>
+                        ))}
+                        <div className="byoc-field byoc-field-checkbox">
+                          <label>
+                            <input
+                              type="checkbox"
+                              checked={azureForm.secure_dual_write}
+                              onChange={(e) => setAzureForm({ ...azureForm, secure_dual_write: e.target.checked })}
+                            />
+                            Replicate secure files to replica container (recommended)
+                          </label>
                         </div>
                         <p className="byoc-section-hint">Optional — Cost Management API (separate from storage key)</p>
                         <div className="byoc-field">
@@ -1066,6 +1327,9 @@ const SettingsPage = () => {
                           <input type="password" value={azureForm.azure_client_secret}
                             onChange={(e) => setAzureForm({ ...azureForm, azure_client_secret: e.target.value })} />
                         </div>
+                        <button type="button" className="btn-back-step" onClick={() => setAzureConnectStep(1)}>
+                          ← Back to credentials
+                        </button>
                       </div>
                     )}
 
@@ -1084,54 +1348,41 @@ const SettingsPage = () => {
                         resetGcpConnectFlow();
                         resetAzureConnectFlow();
                       }}>Cancel</button>
-                      {byocActiveCSP === 'AWS' && awsConnectStep === 1 ? (
+                      {(byocActiveCSP === 'AWS' && awsConnectStep === 1)
+                      || (byocActiveCSP === 'GCP' && gcpConnectStep === 1)
+                      || (byocActiveCSP === 'Azure' && azureConnectStep === 1) ? (
                         <button
                           className="btn-connect-save"
                           type="button"
-                          onClick={handleAwsVerifyCredentials}
-                          disabled={awsVerifying || !byocValidation.isValid}
+                          onClick={
+                            byocActiveCSP === 'AWS'
+                              ? handleAwsVerifyCredentials
+                              : byocActiveCSP === 'GCP'
+                                ? handleGcpVerifyCredentials
+                                : handleAzureVerifyCredentials
+                          }
+                          disabled={
+                            (byocActiveCSP === 'AWS' && (awsVerifying || !byocValidation.isValid))
+                            || (byocActiveCSP === 'GCP' && (gcpVerifying || !byocValidation.isValid))
+                            || (byocActiveCSP === 'Azure' && (azureVerifying || !byocValidation.isValid))
+                          }
                         >
-                          {awsVerifying ? '⏳ Verifying...' : '✓ Verify & continue'}
-                        </button>
-                      ) : byocActiveCSP === 'GCP' && !gcpCredentialsVerified ? (
-                        <button
-                          className="btn-connect-save"
-                          type="button"
-                          onClick={handleGcpVerifyCredentials}
-                          disabled={gcpVerifying || !gcpForm.service_account_json?.trim()}
-                        >
-                          {gcpVerifying ? '⏳ Verifying...' : '✓ Verify & pick bucket'}
-                        </button>
-                      ) : byocActiveCSP === 'Azure' && !azureCredentialsVerified ? (
-                        <button
-                          className="btn-connect-save"
-                          type="button"
-                          onClick={handleAzureVerifyCredentials}
-                          disabled={azureVerifying || !azureForm.account_name || !azureForm.account_key}
-                        >
-                          {azureVerifying ? '⏳ Verifying...' : '✓ Verify & pick container'}
+                          {(awsVerifying || gcpVerifying || azureVerifying) ? '⏳ Verifying...' : '✓ Verify & continue'}
                         </button>
                       ) : (
-                        <>
-                          {byocActiveCSP !== 'AWS' && (
-                            <button className="btn-test" onClick={handleByocTest} disabled={byocTesting || !byocValidation.isValid}>
-                              {byocTesting ? '⏳ Testing...' : '🔍 Test Connection'}
-                            </button>
-                          )}
-                          <button
-                            className="btn-connect-save"
-                            onClick={handleByocConnect}
-                            disabled={
-                              byocConnecting
-                              || !byocValidation.isValid
-                              || (byocActiveCSP === 'AWS' && !awsCredentialsVerified)
-                              || (byocActiveCSP === 'GCP' && !gcpCredentialsVerified)
-                              || (byocActiveCSP === 'Azure' && !azureCredentialsVerified)
-                            }
-                          >
-                            {byocConnecting ? '⏳ Connecting...' : '🔗 Complete connection'}
-                          </button>
-                        </>
+                        <button
+                          className="btn-connect-save"
+                          onClick={handleByocConnect}
+                          disabled={
+                            byocConnecting
+                            || !byocValidation.isValid
+                            || (byocActiveCSP === 'AWS' && !awsCredentialsVerified)
+                            || (byocActiveCSP === 'GCP' && !gcpCredentialsVerified)
+                            || (byocActiveCSP === 'Azure' && !azureCredentialsVerified)
+                          }
+                        >
+                          {byocConnecting ? '⏳ Connecting...' : '🔗 Complete connection'}
+                        </button>
                       )}
                     </div>
 
@@ -1210,6 +1461,152 @@ const SettingsPage = () => {
                 </div>
               );
             })}
+          </div>
+        </div>
+
+        {/* Secure vault defaults */}
+        <div className="settings-card">
+          <h3>
+            <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor">
+              <path d="M8 1a2 2 0 0 1 2 2v4.5A1.5 1.5 0 0 0 11.5 9h1A1.5 1.5 0 0 1 14 10.5V13a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-2.5A1.5 1.5 0 0 1 3.5 9h1A1.5 1.5 0 0 0 6 7.5V3a2 2 0 0 1 2-2z"/>
+            </svg>
+            Secure vault defaults
+          </h3>
+          <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '16px' }}>
+            Defaults for secure uploads, stale-file reminders, and ML-assisted scanning.
+          </p>
+          <div className="settings-group">
+            <div className="setting-item-full">
+              <label>Default encryption</label>
+              <select
+                name="defaultSecurityEncryption"
+                value={preferences.defaultSecurityEncryption}
+                onChange={handlePreferenceChange}
+                className="zenith-select settings-select"
+              >
+                <option value="ask">Ask me each time</option>
+                <option value="server-side">Cloud-managed</option>
+                <option value="client-side">Browser encryption</option>
+              </select>
+            </div>
+            <div className="setting-item-full">
+              <label>
+                <input
+                  type="checkbox"
+                  name="alwaysAskEncryption"
+                  checked={preferences.alwaysAskEncryption}
+                  onChange={handlePreferenceChange}
+                />{' '}
+                Always ask before encrypting
+              </label>
+            </div>
+            <div className="setting-item-full">
+              <label>Default cloud</label>
+              <select
+                name="defaultSecurityCsp"
+                value={preferences.defaultSecurityCsp}
+                onChange={handlePreferenceChange}
+                className="zenith-select settings-select"
+              >
+                <option value="AWS">AWS</option>
+                <option value="GCP">Google Cloud</option>
+                <option value="Azure">Azure</option>
+              </select>
+            </div>
+            <div className="setting-item-full">
+              <label>
+                <input
+                  type="checkbox"
+                  name="defaultSecurityReplication"
+                  checked={preferences.defaultSecurityReplication}
+                  onChange={handlePreferenceChange}
+                />{' '}
+                Enable replication by default (AWS/GCP)
+              </label>
+            </div>
+            <div className="setting-item-full">
+              <label>Stale file reminder after (days)</label>
+              <select
+                name="staleFileDays"
+                value={String(preferences.staleFileDays)}
+                onChange={handlePreferenceChange}
+                className="zenith-select settings-select"
+              >
+                <option value="60">60 days</option>
+                <option value="90">90 days (default)</option>
+                <option value="120">120 days</option>
+                <option value="180">180 days</option>
+              </select>
+            </div>
+            <div className="setting-item-full">
+              <label>Notice before stale action (days)</label>
+              <select
+                name="staleNoticeDays"
+                value={String(preferences.staleNoticeDays)}
+                onChange={handlePreferenceChange}
+                className="zenith-select settings-select"
+              >
+                <option value="0">0 — health bar only</option>
+                <option value="3">3 days</option>
+                <option value="7">7 days (default)</option>
+                <option value="14">14 days</option>
+              </select>
+            </div>
+            <div className="setting-item-full">
+              <label>
+                <input
+                  type="checkbox"
+                  name="mlAssistedScan"
+                  checked={preferences.mlAssistedScan}
+                  onChange={handlePreferenceChange}
+                />{' '}
+                ML-assisted sensitive scan (alongside rules)
+              </label>
+            </div>
+          </div>
+        </div>
+
+        {/* Storage lifecycle defaults */}
+        <div className="settings-card">
+          <h3>
+            <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor">
+              <path d="M8 1a2 2 0 0 1 2 2v1h1.5A1.5 1.5 0 0 1 13 5.5v8A1.5 1.5 0 0 1 11.5 15h-7A1.5 1.5 0 0 1 3 13.5v-8A1.5 1.5 0 0 1 4.5 4H6V3a2 2 0 0 1 2-2zm0 1a1 1 0 0 0-1 1v1h2V3a1 1 0 0 0-1-1zM4.5 5a.5.5 0 0 0-.5.5v8a.5.5 0 0 0 .5.5h7a.5.5 0 0 0 .5-.5v-8a.5.5 0 0 0-.5-.5h-7z"/>
+            </svg>
+            Storage lifecycle
+          </h3>
+          <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '16px' }}>
+            Defaults for new uploads. Zenith notifies you before moving files to cheaper tiers unless
+            notice period is 0 days.
+          </p>
+          <div className="settings-group">
+            <div className="setting-item-full">
+              <label>Default policy for new files</label>
+              <select
+                name="defaultLifecyclePolicy"
+                value={preferences.defaultLifecyclePolicy}
+                onChange={handlePreferenceChange}
+                className="zenith-select settings-select"
+              >
+                <option value="auto">Auto-optimize (recommended)</option>
+                <option value="keep_hot">Keep fast access</option>
+                <option value="aggressive">Archive aggressively</option>
+                <option value="manual">Suggest only — no automatic moves</option>
+              </select>
+            </div>
+            <div className="setting-item-full">
+              <label>Notice period before tier move (days)</label>
+              <select
+                name="lifecycleNoticeDays"
+                value={String(preferences.lifecycleNoticeDays)}
+                onChange={handlePreferenceChange}
+                className="zenith-select settings-select"
+              >
+                <option value="0">0 — move immediately after notify</option>
+                <option value="3">3 days</option>
+                <option value="7">7 days (default)</option>
+                <option value="14">14 days</option>
+              </select>
+            </div>
           </div>
         </div>
 

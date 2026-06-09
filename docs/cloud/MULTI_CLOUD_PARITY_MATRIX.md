@@ -1,6 +1,6 @@
 # Multi-Cloud Parity Matrix
 
-**Last updated:** 2026-06-03 (Phase 7 — parity complete)  
+**Last updated:** 2026-06-10 (BYOC tri-cloud connect wizard + trust docs)  
 **Plan:** Multi-cloud parity Phases 0–7  
 **Credential detail:** [CREDENTIAL_CONTRACT.md](./CREDENTIAL_CONTRACT.md)
 
@@ -13,9 +13,9 @@ Success criterion (every phase): With valid platform `.env` or per-user BYOC, th
 | Area | AWS | GCP | Azure | Key modules | Phase |
 |------|-----|-----|-------|-------------|-------|
 | **Storage (standard)** | Full | Full | Full | `app/storage/uploader.py`, `cloud_credentials.py`, `routes_storage.py` | 1 |
-| **Storage restore** | Glacier (`POST /restore/AWS/{filename}`) | 501 not_supported | 501 not_supported | `routes_storage.py` | 1 ✅ |
+| **Storage restore** | Glacier (`POST /restore/AWS/{filename}`) | ARCHIVE reclassify | Archive rehydration | `routes_storage.py`, `manager.py` | 1 ✅ |
 | **Cost / budgets** | Full + CE grouping | BigQuery + setup wizard | Cost Management + setup wizard | `app/cost/manager.py`, `billing_config.py` | 2 ✅ |
-| **BYOC** | Full + verify + buckets | Connect + resolver; **no step-1 verify** | Same | `app/byoc/routes_byoc.py`, `credential_resolver.py` | 3 |
+| **BYOC** | Full + 2-step verify + buckets | Full + 2-step verify + buckets | Full + 2-step verify + containers | `app/byoc/routes_byoc.py`, `credential_resolver.py`, `encryption.py` | 3 ✅ |
 | **Security vault** | Full (S3 SSE dual) | Full | Full | `app/security/routes_security.py` | 4 ✅ |
 | **VM / monitoring** | **Full VM API** (EC2) | **Full VM API** (GCE) | None | `aws_manager.py`, `manager.py`, `vm_provider.py` | 5 ✅ |
 | **Provision** | TF + Boto3 | TF (GCS) | TF (Blob) | `terraform/`, `provision_catalog.py` | 6 ✅ |
@@ -39,7 +39,8 @@ Legend: ✅ implemented · 🟡 partial · ❌ missing · 🔒 AWS-only today
 | `POST /sync/aws` | ✅ | — | — | |
 | `POST /sync/gcp` | — | ✅ | — | |
 | `POST /sync/azure` | — | — | ✅ | |
-| `POST /restore/{csp}/{filename}` | ✅ AWS | 501 | 501 | Legacy `/restore-aws/` → AWS; DEC-024 |
+| `POST /restore/{csp}/{filename}` | ✅ AWS Glacier | ✅ GCP ARCHIVE | ✅ Azure Archive | Uses file `cloud_bucket` + region/account; legacy `/restore-aws/` alias |
+| Nightly lifecycle tier change | ✅ | ✅ | ✅ | `tiering_tasks.py` passes recorded bucket/region; skips `is_sensitive` |
 
 ### Cost (`/api/cost`)
 
@@ -55,13 +56,17 @@ Legend: ✅ implemented · 🟡 partial · ❌ missing · 🔒 AWS-only today
 
 | Endpoint | AWS | GCP | Azure | Notes |
 |----------|-----|-----|-------|-------|
-| `POST /connect` | ✅ | ✅ | ✅ | |
+| `POST /connect` | ✅ | ✅ | ✅ | Storage + secure + replica; auto-create |
 | `POST /test` | ✅ | ✅ | ✅ | |
-| `POST /verify-credentials` | ✅ | ✅ | ✅ | Phase 3 ✅ |
-| `GET /aws-buckets` | ✅ | — | — | AWS |
-| `GET /gcp-buckets` + `POST …/discover` | — | ✅ | — | Phase 3 ✅ |
-| `GET /azure-containers` + `POST …/discover` | — | — | ✅ | Phase 3 ✅ |
-| `resolve_credentials()` for TF | ✅ | ✅ | ✅ | Phase 3 ✅ (BYOC only) |
+| `POST /verify-credentials` | ✅ | ✅ | ✅ | Step 1 → suggested names |
+| `POST /check-bucket-name` | ✅ | — | — | AWS |
+| `POST /check-gcp-bucket` | — | ✅ | — | |
+| `POST /check-azure-container` | — | — | ✅ | |
+| `GET /aws-buckets?surface=` | ✅ | — | — | `storage` \| `security` |
+| `GET /gcp-buckets?surface=` | — | ✅ | — | |
+| `GET /azure-containers?surface=` | — | — | ✅ | |
+| Credential encryption at rest | ✅ | ✅ | ✅ | AES-256-GCM per field — `encryption.py` |
+| `resolve_credentials()` for TF | ✅ | ✅ | ✅ | BYOC only |
 
 ### Security (`/api/security`)
 
@@ -69,7 +74,7 @@ Legend: ✅ implemented · 🟡 partial · ❌ missing · 🔒 AWS-only today
 |----------|-----|-----|-------|-------|
 | Secure upload / list / sync / download / delete | ✅ | ✅ | ✅ | Phase 4 ✅ |
 | `POST /security/sync/{csp}` | ✅ | ✅ | ✅ | Phase 4 ✅ |
-| AWS dual-bucket replica | ✅ | — | — | GCP/Azure replica deferred |
+| Secure primary + replica vault | ✅ | ✅ | ✅ | BYOC + platform; archive/restore |
 | Browser CSE upload | ✅ | ❌ | ❌ | AWS-only (501 others) |
 | OPA security rego | ✅ | stub | stub | `aws_security`, `gcp_security`, `azure_security` |
 

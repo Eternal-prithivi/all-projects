@@ -22,13 +22,13 @@ For frontend context → read `AI_CONTEXT_FRONTEND.md`
 |--------|--------------|-----------|-------|
 | **auth** | `routes_auth.py`, `routes_password_reset.py` | `auth_service.py`, `auth_utils.py`, `password_reset_service.py` | JWT login, register, forgot/reset password (email link + SMS OTP), recovery contacts |
 | **users** | `routes_users.py`, `routes_profile.py`, `routes_settings.py` | `user_model.py` | Profile edit, recovery contacts, settings preferences, BYOC, theme, currency, audit log |
-| **security** | `routes_security.py`, `routes_2fa.py` | `secure_vault.py`, `encryption_handler.py` | Tri-cloud secure vault (AWS/GCP/Azure); browser CSE AWS-only |
+| **security** | `routes_security.py`, `routes_2fa.py` | `secure_vault.py`, `encryption_handler.py`, `security_intelligence.py`, `security_policy.py`, `security_service.py`, `security_scan_ml.py`, `sensitive_file_detector.py` | Tri-cloud secure vault; vault health/cost preview; rules+ML hybrid scan; stale-file Celery job |
 | **storage** | `routes_storage.py` | `cloud_credentials.py`, `optimizer.py`, `uploader.py`, `manager.py`, `tasks.py`, `tiering_tasks.py`, `models_storage.py`, `file_queries.py` | ML ensemble analysis, multi-cloud upload/download/delete/sync, nightly lifecycle tiering; **BYOC** via `credential_resolver`; platform catalog via `platform_storage_catalog.py` |
 | **cloud** | — | `platform_storage_catalog.py`, `storage_targets.py`, `providers.py` | Static multi-region bucket/container catalog; `resolve_platform_storage_target()` for upload/sync |
 | **vm** | `routes_vm.py`, `routes_admin_cleanup.py` | `manager.py`, `vm_provider.py`, `aws_manager.py`, `gcp_runtime.py`, `metrics_collector.py` | AWS EC2 + GCP GCE lifecycle; Azure 501 (`docs/cloud/VM_MULTI_CLOUD_SCOPE.md`) |
 | **cost** | `routes_cost.py`, `routes_forecast.py`, `routes_anomaly.py`, `routes_export.py` | `manager.py`, `forecasting.py`, `tasks_anomaly.py` | Decay-weighted linear regression forecast, Z-score anomaly detection, CSV export |
 | **ml** | `routes_feedback.py` | `storage_ensemble.py`, `feedback.py`, `retraining.py`, `repository.py`, `models.py`, `acceptance.py`, `sample_datasets.py`, `tasks_feedback.py` | RF+XGBoost ensemble, feedback outcome evaluation, guarded self-retraining |
-| **byoc** | `routes_byoc.py` | `credential_resolver.py`, `encryption.py` | Connect/test/disconnect AWS IAM + STS AssumeRole, AES-256-GCM credential encryption |
+| **byoc** | `routes_byoc.py` | `credential_resolver.py`, `encryption.py`, `gcp_bucket_helpers.py`, `azure_container_helpers.py` | Tri-cloud 2-step connect; check/create buckets; field-level AES-GCM; `surface=storage\|security` discovery |
 | **admin** | `routes_admin.py` | — | Full user CRUD (create/delete/role/bulk), audit log query, CSV export, self-protection guards |
 | **billing** | `routes_billing.py` | — | Free plan display, billing history |
 | **payments** | `routes_payments.py` | — | Razorpay payment orders |
@@ -66,7 +66,7 @@ Database: `CloudResourceOptimizationDB`
 |-----------|--------|-----------|
 | `users` | auth, users, 2fa, admin | username, email, hashed_password, role, status, two_fa_*, recovery_email, phone, sessions[], activity_log[] |
 | `files` | storage | filename, s3_key, owner_username, size_bytes, csp, storage_class, last_accessed_at, access_frequency_score, is_sensitive, is_encrypted, tier_*, lifecycle_* |
-| `secure_files` | security | Same schema as `files`, separate 2FA-protected collection |
+| `secure_files` | security | filename, owner_username, encryption_*, vault_status, last_accessed_at, access_history, ml_scan_*, stale_* |
 | `ml_predictions` | ml, storage | file metadata, predicted tier, ensemble confidence, expert_votes[], outcome, feedback_score |
 | `ml_workload_descriptions` | vm, ml | workload_description, predicted_cluster, nlp_features, classifier_version, outcome |
 | `admin_actions` | admin | admin_username, action, target_user, timestamp |
@@ -127,7 +127,7 @@ Database: `CloudResourceOptimizationDB`
 | Validation | Pydantic v2 + pydantic-settings |
 | Email | Gmail SMTP (`smtplib`) via `contact/email_service.py` |
 | SMS | Twilio (optional) |
-| Encryption | BYOC credentials: AES-256-GCM. Secure vault: **SSE-S3** (`AES256`) for server-side; user-password path uses server `encryption_handler.py` — **Phase 12: browser CSE** (see `PHASE_12_SECURITY_RESEARCH_PARITY.md` §2–§3). **KMS not used.** |
+| Encryption | BYOC: AES-256-GCM per field (`byoc/encryption.py`, `zenith:enc:v1:` prefix, `merge_and_encrypt_credentials`). Secure vault: SSE (tri-cloud). Browser CSE: `upload-client-encrypted` — password never on API (AWS today). Docs: `docs/security/TRUST_AND_ENCRYPTION.md`. **KMS not used.** |
 | Payments | Razorpay |
 
 ---
@@ -151,7 +151,7 @@ Database: `CloudResourceOptimizationDB`
 | `EMAIL_USERNAME`, `EMAIL_PASSWORD` | Gmail SMTP |
 | `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_PHONE_NUMBER` | Twilio SMS (optional) |
 | `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET` | Razorpay |
-| `BYOC_ENCRYPTION_KEY` | AES key for BYOC credentials |
+| `SECRET_KEY` | Also derives BYOC credential encryption key (SHA-256); dedicated KMS path deferred |
 
 ---
 
@@ -215,7 +215,7 @@ When a user connects BYOC, operations use **their** credentials per CSP (`creden
 | Feature | AWS BYOC | GCP BYOC | Azure BYOC | Notes |
 |---------|----------|----------|------------|-------|
 | Storage upload/download/sync | Yes | Yes | Yes | `cloud_credentials.py` |
-| Secure vault (2FA) | Yes | Yes | Yes | `secure_vault.py`; AWS dual-bucket replica optional |
+| Secure vault (2FA) | Yes | Yes | Yes | `secure_vault.py`; primary + replica; archive/restore tri-cloud |
 | Cost / billing | Yes (CE) | Yes (BigQuery export IDs on BYOC) | Yes (Cost Management fields on BYOC) | `routes_billing_setup.py` |
 | VM lifecycle | Yes (EC2) | Yes (GCE) | **501** | `vm_provider.py`; see `VM_MULTI_CLOUD_SCOPE.md` |
 | Terraform provision | Yes | Yes | Yes | `terraform/gcp`, `terraform/azure`; engine forces TF for non-AWS |
@@ -245,16 +245,35 @@ Helpers: `app/storage/cloud_credentials.py`, `app/provision/byoc_credentials.py`
 3. **Feedback:** Outcome evaluated 7–30d → quality filter (score ≥ 0.5) → guarded retraining (requires +1% absolute gain)
 4. **Artifacts:** `backend/app/ml/artifacts/storage_ensemble.joblib`, `workload_classifier.joblib`
 
+### Storage Intelligence — two systems (Report §4.2 vs §4.3)
+
+| System | When | Method | Module |
+|--------|------|--------|--------|
+| **Initial placement** | Upload analyze | ML ensemble (Rule+RF+XGB) + optional RL nudge → CSP pick | `optimizer.py`, `storage_ensemble.py`, `rl_policy.py` |
+| **Lifecycle tiering** | Nightly Celery 02:00 UTC | Rule-based demotion/promotion + five-factor priority queue | `tiering_tasks.py` |
+
+Do not conflate them: the ensemble does **not** move files after upload; `tiering_tasks.py` does.
+
 ### Storage Intelligence Flow
-1. `POST /api/storage/analyze` → `optimizer.py` → ML ensemble → tier + cheapest CSP
-2. `POST /api/storage/upload` → `uploader.py` → AWS/GCP/Azure
-3. Nightly Celery Beat → `tiering_tasks.py` → five-factor lifecycle priority scoring
-4. `POST /api/storage/sync/aws` → reconcile S3 → MongoDB
+1. `POST /api/storage/analyze` → `workflow_orchestrator.py` → ML ensemble → tier + cheapest CSP
+2. `POST /api/storage/upload` → `uploader.py` → AWS/GCP/Azure (optional `region_slug` + platform catalog)
+3. `GET /api/storage/download/{filename}` → increments `access_frequency_score` (feeds lifecycle)
+4. Nightly Celery Beat → `tiering_tasks.py` → demote/promote using `file_record.cloud_bucket` + region
+5. `POST /api/storage/sync/{aws|gcp|azure}` → reconcile cloud inventory → MongoDB
 
 ### Secure Vault Sync Flow
 1. `POST /api/security/sync/aws` → list `SECURE_S3_BUCKET_NAME` under `{username}/` prefix
 2. Insert missing rows into `secure_files` (encryption flags from S3 `head_object` when available)
-3. Does not delete DB records or change S3 objects — same reconcile-only model as storage sync
+3. Stale DB rows removed when object missing from cloud (same reconcile model as storage sync)
+
+### Security Intelligence — two systems (parallel to storage)
+
+| System | When | Method | Module |
+|--------|------|--------|--------|
+| **Risk scan** | Upload / pre-scan | Regex rules + optional TF-IDF logistic regression (ML never clears rule hits) | `sensitive_file_detector.py`, `security_scan_ml.py` |
+| **Vault intelligence** | Page load / wizard | Health grade, per-file insight, hot-tier cost preview, stale awareness | `security_intelligence.py`, `security_stale_tasks.py` |
+
+APIs: `GET /api/security/intelligence/summary`, `POST /api/security/intelligence/cost-preview`, `POST /api/security/vault/action`. User prefs: `default_security_encryption`, `stale_file_days`, `ml_assisted_scan` in `users.settings.preferences`.
 
 ---
 

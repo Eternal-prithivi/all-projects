@@ -17,6 +17,13 @@ class CreateNotificationBody(BaseModel):
     link: Optional[str] = None
 
 
+class UpdateNotificationBody(BaseModel):
+    title: Optional[str] = Field(default=None, min_length=1, max_length=200)
+    message: Optional[str] = Field(default=None, min_length=1, max_length=2000)
+    type: Optional[str] = None
+    link: Optional[str] = None
+
+
 @router.post("")
 def create_notification(
     body: CreateNotificationBody,
@@ -71,6 +78,24 @@ def list_recent_notifications(
         limit=limit,
     )
     return {"notifications": items, "unread_count": unread}
+
+
+@router.patch("/{notification_id}")
+def update_notification(
+    notification_id: str,
+    body: UpdateNotificationBody,
+    current_user: UserInDB = Depends(get_current_user),
+):
+    if not notification_service.update_notification(
+        current_user.username,
+        notification_id,
+        title=body.title,
+        message=body.message,
+        type=body.type,
+        link=body.link,
+    ):
+        raise HTTPException(status_code=404, detail="Notification not found")
+    return {"success": True}
 
 
 @router.patch("/{notification_id}/read")

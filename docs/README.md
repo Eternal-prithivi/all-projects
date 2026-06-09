@@ -36,6 +36,11 @@
 - [EXECUTIVE_SUMMARY.md](./technical/EXECUTIVE_SUMMARY.md)
 - [PROJECT_SUMMARY_AND_ROADMAP.md](./technical/PROJECT_SUMMARY_AND_ROADMAP.md)
 
+## Security & trust
+- [security/TRUST_AND_ENCRYPTION.md](./security/TRUST_AND_ENCRYPTION.md) — BYOC, SSE, CSE, what Zenith can/cannot see
+- [security/BYOC_CREDENTIAL_ENCRYPTION.md](./security/BYOC_CREDENTIAL_ENCRYPTION.md) — AES-GCM field encryption (technical)
+- [security/CLIENT_SIDE_ENCRYPTION.md](./security/CLIENT_SIDE_ENCRYPTION.md) — browser zero-knowledge upload
+
 ## Other
 - [RAZORPAY_SETUP.md](./payment/RAZORPAY_SETUP.md)
 - [ACCESSIBILITY.md](./ACCESSIBILITY.md)

@@ -1,48 +1,65 @@
 // =============================================================================
-// PAGE: BillingPage.jsx  (617 lines)
+// PAGE: BillingPage.jsx
 // ROUTE: /dashboard/billing
-// PURPOSE: Invoice management + subscription status — list invoices, download PDF,
-//          view current plan, upgrade via Stripe checkout, cancel subscription
-// API: Uses apiClient → /api/billing/invoices, /api/payments/create-checkout,
-//      /api/payments/status, /api/payments/cancel
-// NOTE: Billing (invoices) ≠ Payments (Stripe). Both APIs used here — don't conflate them.
-// DO NOT:
-//   - Add Stripe keys or secrets in frontend — checkout session is created on the backend
-//   - Show invoice totals in hardcoded "$" — use PreferencesContext.currencySymbol
-//   - Remove subscription tier display — it drives feature gating in BYOC and other pages
+// PURPOSE: Subscription, cloud usage, invoices, and payment history
 // =============================================================================
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { apiClient } from '../api';
-import { toast } from 'react-toastify';
 import { useNavigate } from 'react-router-dom';
 import { PageSkeleton } from '../components/Skeletons.jsx';
-import '../styles/billing.css';
 import PageHeader from '../components/ui/PageHeader.jsx';
 import { usePageRefresh } from '../hooks/usePageRefresh.js';
+import { useNotifications } from '../hooks/useNotifications.js';
+import { usePreferences } from '../context/PreferencesContext.jsx';
+import '../styles/billing.css';
+
+const FX_USD_TO_INR = 83;
+
+const PLAN_NAMES = {
+  free: 'Free',
+  basic: 'Basic',
+  pro: 'Pro',
+  enterprise: 'Enterprise',
+};
+
+const PLAN_PRICES_INR = {
+  basic: { monthly: 499, yearly: 4990 },
+  pro: { monthly: 1499, yearly: 14990 },
+  enterprise: { monthly: 4999, yearly: 49990 },
+};
 
 function BillingPage() {
   const [subscription, setSubscription] = useState(() => {
-    try { return JSON.parse(sessionStorage.getItem('cache_billing_sub')) || null; } catch { return null; }
+    try {
+      return JSON.parse(sessionStorage.getItem('cache_billing_sub')) || null;
+    } catch {
+      return null;
+    }
   });
   const [paymentHistory, setPaymentHistory] = useState(() => {
-    try { return JSON.parse(sessionStorage.getItem('cache_billing_history')) || []; } catch { return []; }
+    try {
+      return JSON.parse(sessionStorage.getItem('cache_billing_history')) || [];
+    } catch {
+      return [];
+    }
   });
+  const [invoices, setInvoices] = useState([]);
   const [currentMonthCosts, setCurrentMonthCosts] = useState(() => {
-    try { return JSON.parse(sessionStorage.getItem('cache_billing_costs')) || null; } catch { return null; }
+    try {
+      return JSON.parse(sessionStorage.getItem('cache_billing_costs')) || null;
+    } catch {
+      return null;
+    }
   });
-  // Only show loading skeleton if we have NO cached data at all
   const [loading, setLoading] = useState(() => !sessionStorage.getItem('cache_billing_sub'));
   const [processingPayment, setProcessingPayment] = useState(false);
+  const [activeTab, setActiveTab] = useState('payments');
   const navigate = useNavigate();
   const { runPageRefresh, pageRefreshing } = usePageRefresh();
+  const { error: notifyError, info: notifyInfo } = useNotifications();
+  const { formatCurrency, formatDate } = usePreferences();
 
-  useEffect(() => {
-    loadBillingData();
-    loadCloudCosts();
-    loadRazorpayScript();
-  }, []);
-
-  const loadRazorpayScript = () => {
+  const loadRazorpayScript = useCallback(() => {
     if (document.querySelector('script[src="https://checkout.razorpay.com/v1/checkout.js"]')) {
       return;
     }
@@ -50,132 +67,122 @@ function BillingPage() {
     script.src = 'https://checkout.razorpay.com/v1/checkout.js';
     script.async = true;
     document.body.appendChild(script);
-  };
+  }, []);
 
-  const loadBillingData = async () => {
+  const loadBillingData = useCallback(async () => {
     try {
-      // Only show skeleton if we don't have cached data
       if (!sessionStorage.getItem('cache_billing_sub')) {
         setLoading(true);
       }
-      const [subRes, historyRes] = await Promise.all([
+      const [subRes, historyRes, invoicesRes] = await Promise.all([
         apiClient.get('/payments/my-subscription'),
-        apiClient.get('/payments/payment-history')
+        apiClient.get('/payments/payment-history'),
+        apiClient.get('/billing/invoices').catch(() => ({ data: { invoices: [] } })),
       ]);
-      
+
       setSubscription(subRes.data);
       setPaymentHistory(historyRes.data);
+      setInvoices(invoicesRes.data.invoices || []);
       sessionStorage.setItem('cache_billing_sub', JSON.stringify(subRes.data));
       sessionStorage.setItem('cache_billing_history', JSON.stringify(historyRes.data));
     } catch (error) {
       console.error('Failed to load billing data:', error);
-      toast.error('Failed to load billing data');
+      notifyError('Failed to load billing data.');
     } finally {
       setLoading(false);
     }
-  };
+  }, [notifyError]);
 
-  const loadCloudCosts = async () => {
+  const loadCloudCosts = useCallback(async () => {
     try {
       const response = await apiClient.get('/billing/current-month-summary');
       setCurrentMonthCosts(response.data);
       sessionStorage.setItem('cache_billing_costs', JSON.stringify(response.data));
     } catch (error) {
       console.error('Failed to load cloud costs:', error);
-      // Don't show error toast, costs are optional
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    loadBillingData();
+    loadCloudCosts();
+    loadRazorpayScript();
+  }, [loadBillingData, loadCloudCosts, loadRazorpayScript]);
+
+  const formatINR = (amount) =>
+    `₹${Number(amount || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`;
+
+  const getPlanDisplayName = (planId) => PLAN_NAMES[planId] || planId || 'Free';
 
   const calculateNextBillingAmount = () => {
     if (!subscription?.plan_id || subscription.plan_id === 'free') return 0;
-    
-    const plans = {
-      basic: { monthly: 499, yearly: 4990 },
-      pro: { monthly: 1499, yearly: 14990 },
-      enterprise: { monthly: 4999, yearly: 49990 }
-    };
-    
-    return plans[subscription.plan_id]?.[subscription.billing_cycle || 'monthly'] || 0;
+    return (
+      PLAN_PRICES_INR[subscription.plan_id]?.[subscription.billing_cycle || 'monthly'] || 0
+    );
   };
 
-  const calculateTotalBill = () => {
+  const billBreakdown = useMemo(() => {
     let cloudCostsUSD = 0;
-    let subscriptionINR = 0;
-    
-    // Add cloud usage costs (in USD)
     if (currentMonthCosts) {
       cloudCostsUSD += currentMonthCosts.costs.aws || 0;
       cloudCostsUSD += currentMonthCosts.costs.gcp || 0;
       cloudCostsUSD += currentMonthCosts.costs.azure || 0;
       cloudCostsUSD += currentMonthCosts.costs.storage_api_total || 0;
-      // Platform fee only for free tier
       if (subscription?.plan_id === 'free') {
         cloudCostsUSD += currentMonthCosts.costs.platform_fee || 0;
       }
     }
-    
-    // Add subscription fee for next month (in INR)
-    subscriptionINR = calculateNextBillingAmount();
-    
-    // Convert USD to INR (1 USD = 83 INR approx)
-    const cloudCostsINR = cloudCostsUSD * 83;
-    
+    const subscriptionINR = calculateNextBillingAmount();
+    const cloudCostsINR = cloudCostsUSD * FX_USD_TO_INR;
     return {
       cloudUSD: cloudCostsUSD,
       cloudINR: cloudCostsINR,
-      subscriptionINR: subscriptionINR,
-      totalINR: cloudCostsINR + subscriptionINR
+      subscriptionINR,
+      totalINR: cloudCostsINR + subscriptionINR,
     };
-  };
+  }, [currentMonthCosts, subscription]);
 
   const handlePayNow = async () => {
-    const billBreakdown = calculateTotalBill();
-    
     if (billBreakdown.totalINR === 0) {
-      toast.info('No payment due at this time.');
+      notifyInfo('No payment due at this time.');
       return;
     }
-
     if (!subscription?.plan_id || subscription.plan_id === 'free') {
-      toast.info('Please select a plan first to enable billing.');
+      notifyInfo('Select a paid plan to enable billing.');
       return;
     }
 
     setProcessingPayment(true);
-    
     try {
-      // Create order for total bill (cloud costs + subscription)
       const orderResponse = await apiClient.post('/payments/create-order', {
         plan_id: subscription.plan_id,
         billing_cycle: subscription.billing_cycle || 'monthly',
-        cloud_costs_usd: billBreakdown.cloudUSD  // Include cloud costs in payment
+        cloud_costs_usd: billBreakdown.cloudUSD,
       });
 
       const { order_id, amount, currency, key_id, plan_name } = orderResponse.data;
 
-      // Open Razorpay checkout
       const options = {
         key: key_id,
-        amount: amount * 100, // Convert to paise
-        currency: currency,
-        name: 'Cloud Resource Optimization',
-        description: `Total Bill - ${plan_name} Plan + Cloud Usage ($${billBreakdown.cloudUSD.toFixed(2)})`,
-        order_id: order_id,
+        amount: amount * 100,
+        currency,
+        name: 'Zenith Cloud Platform',
+        description: `${plan_name} + cloud usage (${formatCurrency(billBreakdown.cloudUSD)})`,
+        order_id,
         handler: async function (response) {
           try {
             const verifyResponse = await apiClient.post('/payments/verify-payment', {
               razorpay_order_id: response.razorpay_order_id,
               razorpay_payment_id: response.razorpay_payment_id,
-              razorpay_signature: response.razorpay_signature
+              razorpay_signature: response.razorpay_signature,
             });
-
             if (verifyResponse.data.success) {
               navigate('/billing/success');
               return;
             }
           } catch (error) {
             console.error('Payment verification failed:', error);
-            toast.error('Payment verification failed. Please contact support.');
+            notifyError('Payment verification failed. Contact support if you were charged.');
           } finally {
             setProcessingPayment(false);
           }
@@ -184,60 +191,34 @@ function BillingPage() {
           name: localStorage.getItem('username') || '',
           email: localStorage.getItem('email') || '',
         },
-        theme: {
-          color: 'var(--gold-primary)'
-        },
+        theme: { color: '#d4af37' },
         modal: {
-          ondismiss: function() {
+          ondismiss: function () {
             setProcessingPayment(false);
             navigate('/billing/cancel');
-          }
-        }
+          },
+        },
       };
 
       const razorpay = new window.Razorpay(options);
       razorpay.open();
     } catch (error) {
       console.error('Error creating order:', error);
-      toast.error('Failed to initiate payment. Please try again.');
+      notifyError('Failed to initiate payment. Please try again.');
       setProcessingPayment(false);
     }
   };
 
-  const formatDate = (dateString) => {
-    if (!dateString) return 'N/A';
-    return new Date(dateString).toLocaleDateString('en-IN', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric'
-    });
-  };
-
-  const formatCurrency = (amount) => {
-    return `₹${amount.toLocaleString('en-IN')}`;
-  };
-
-  const getPlanDisplayName = (planId) => {
-    const names = {
-      free: 'Free',
-      basic: 'Basic',
-      pro: 'Pro',
-      enterprise: 'Enterprise'
-    };
-    return names[planId] || planId;
-  };
-
-  const getStatusBadge = (status) => {
+  const getStatusBadge = () => {
     if (subscription?.status === 'active' && subscription?.current_period_end) {
-      const now = new Date();
-      const endDate = new Date(subscription.current_period_end);
-      const daysRemaining = Math.ceil((endDate - now) / (1000 * 60 * 60 * 24));
-      
+      const daysRemaining = Math.ceil(
+        (new Date(subscription.current_period_end) - new Date()) / (1000 * 60 * 60 * 24)
+      );
       if (daysRemaining < 0) return { text: 'Expired', class: 'status-expired' };
-      if (daysRemaining <= 7) return { text: 'Expiring Soon', class: 'status-warning' };
+      if (daysRemaining <= 7) return { text: 'Expiring soon', class: 'status-warning' };
       return { text: 'Active', class: 'status-active' };
     }
-    return { text: status || 'Inactive', class: 'status-inactive' };
+    return { text: subscription?.status || 'Inactive', class: 'status-inactive' };
   };
 
   if (loading) {
@@ -245,35 +226,52 @@ function BillingPage() {
   }
 
   const nextBillingAmount = calculateNextBillingAmount();
-  const billBreakdown = calculateTotalBill();
-  const statusBadge = getStatusBadge(subscription?.status);
+  const statusBadge = getStatusBadge();
   const currentPlanName = getPlanDisplayName(subscription?.plan_id || 'free');
-  const now = new Date();
-  const endDate = subscription?.current_period_end ? new Date(subscription.current_period_end) : null;
-  const daysRemaining = endDate ? Math.ceil((endDate - now) / (1000 * 60 * 60 * 24)) : 0;
-  const billingOverview = [
-    { label: 'Current plan', value: currentPlanName, detail: subscription?.billing_cycle || 'Monthly' },
-    { label: 'Next subscription', value: formatCurrency(nextBillingAmount), detail: subscription?.plan_id === 'free' ? 'No charge due' : 'Plan renewal' },
-    { label: 'This month total', value: formatCurrency(Math.round(billBreakdown.totalINR)), detail: 'Cloud + plan cost' },
-  ];
+  const endDate = subscription?.current_period_end
+    ? new Date(subscription.current_period_end)
+    : null;
+  const daysRemaining = endDate
+    ? Math.ceil((endDate - new Date()) / (1000 * 60 * 60 * 24))
+    : 0;
+  const billingPeriodProgress =
+    endDate && subscription?.current_period_start
+      ? Math.min(
+          100,
+          Math.max(
+            0,
+            ((new Date() - new Date(subscription.current_period_start)) /
+              (endDate - new Date(subscription.current_period_start))) *
+              100
+          )
+        )
+      : null;
+
+  const cloudUsageUSD =
+    currentMonthCosts
+      ? (currentMonthCosts.costs.aws || 0) +
+        (currentMonthCosts.costs.gcp || 0) +
+        (currentMonthCosts.costs.azure || 0) +
+        (currentMonthCosts.costs.storage_api_total || 0)
+      : 0;
+
+  const isPaidPlan = subscription?.plan_id && subscription.plan_id !== 'free';
 
   return (
-    <div className="billing-page">
+    <div className="billing-page animate-fade-in-up">
       <PageHeader
         className="billing-page-header"
-        kicker="Finance center"
-        title="Billing & Payments"
-        subtitle="Manage your subscription, cloud spend, and renewal timing in one place."
+        kicker="Account"
+        title="Billing"
+        subtitle="Subscription, usage, invoices, and payment history — all in one place."
         actions={
-          subscription?.plan_id !== 'free' ? (
-            <button
-              type="button"
-              className="btn-upgrade-plan-header"
-              onClick={() => navigate('/dashboard/pricing')}
-            >
-              View All Plans
-            </button>
-          ) : null
+          <button
+            type="button"
+            className="billing-btn billing-btn--outline"
+            onClick={() => navigate('/dashboard/pricing')}
+          >
+            {isPaidPlan ? 'Change plan' : 'View plans'}
+          </button>
         }
         onRefresh={() =>
           runPageRefresh(
@@ -282,416 +280,476 @@ function BillingPage() {
               await loadCloudCosts();
             },
             {
-              loadingMessage: 'Refreshing billing page…',
-              successMessage: 'Billing page refreshed.',
-              errorMessage: 'Failed to refresh billing page.',
+              loadingMessage: 'Refreshing billing…',
+              successMessage: 'Billing data refreshed.',
+              errorMessage: 'Failed to refresh billing.',
             }
           )
         }
         refreshing={pageRefreshing || loading}
       />
 
-      <div className="billing-overview-grid">
-        {billingOverview.map((item) => (
-          <div key={item.label} className="billing-overview-card">
-            <span className="billing-overview-label">{item.label}</span>
-            <strong className="billing-overview-value">{item.value}</strong>
-            <span className="billing-overview-detail">{item.detail}</span>
-          </div>
-        ))}
-        <div className="billing-overview-card accent">
-          <span className="billing-overview-label">Days remaining</span>
-          <strong className="billing-overview-value">{daysRemaining > 0 ? daysRemaining : '—'}</strong>
-          <span className="billing-overview-detail">
-            {daysRemaining > 0 ? 'Until current period ends' : 'Current period ended'}
+      {/* Summary metrics */}
+      <div className="billing-metrics stagger-children">
+        <div className="billing-metric-card">
+          <span className="billing-metric-label">Current plan</span>
+          <span className="billing-metric-value">{currentPlanName}</span>
+          <span className="billing-metric-hint capitalize">
+            {subscription?.billing_cycle || 'monthly'} billing
           </span>
+        </div>
+        <div className="billing-metric-card">
+          <span className="billing-metric-label">Cloud usage (MTD)</span>
+          <span className="billing-metric-value">{formatCurrency(cloudUsageUSD)}</span>
+          <span className="billing-metric-hint">Month to date</span>
+        </div>
+        <div className="billing-metric-card">
+          <span className="billing-metric-label">Next renewal</span>
+          <span className="billing-metric-value">
+            {endDate ? formatDate(endDate) : '—'}
+          </span>
+          <span className="billing-metric-hint">
+            {daysRemaining > 0 ? `${daysRemaining} days left` : 'No active period'}
+          </span>
+        </div>
+        <div className="billing-metric-card billing-metric-card--accent">
+          <span className="billing-metric-label">Amount due</span>
+          <span className="billing-metric-value">{formatINR(Math.round(billBreakdown.totalINR))}</span>
+          <span className="billing-metric-hint">Cloud + subscription (INR)</span>
         </div>
       </div>
 
-      {/* Current Subscription */}
-      <div className="billing-section subscription-card">
-        <div className="section-header">
-          <h2>Current Subscription</h2>
-          <span className={`status-badge ${statusBadge.class}`}>
-            {statusBadge.text}
-          </span>
+      <div className="billing-layout">
+        {/* Left column — subscription & payment */}
+        <div className="billing-layout-main">
+          <section className="zenith-glass-panel billing-panel">
+            <div className="billing-panel-header">
+              <div>
+                <h2 className="billing-panel-title">Subscription</h2>
+                <p className="billing-panel-subtitle">
+                  {isPaidPlan
+                    ? `Your ${currentPlanName} plan renews automatically via Razorpay.`
+                    : 'Upgrade to unlock multi-cloud features and remove platform fees.'}
+                </p>
+              </div>
+              <span className={`billing-status-pill ${statusBadge.class}`}>{statusBadge.text}</span>
+            </div>
+
+            {billingPeriodProgress != null && daysRemaining > 0 && (
+              <div className="billing-period-progress">
+                <div className="billing-period-progress-labels">
+                  <span>Current billing period</span>
+                  <span>{daysRemaining} day{daysRemaining !== 1 ? 's' : ''} remaining</span>
+                </div>
+                <div className="billing-period-progress-track">
+                  <div
+                    className="billing-period-progress-fill"
+                    style={{ width: `${billingPeriodProgress}%` }}
+                  />
+                </div>
+              </div>
+            )}
+
+            <dl className="billing-detail-grid">
+              <div className="billing-detail-item">
+                <dt>Plan</dt>
+                <dd>{currentPlanName}</dd>
+              </div>
+              <div className="billing-detail-item">
+                <dt>Billing cycle</dt>
+                <dd className="capitalize">{subscription?.billing_cycle || '—'}</dd>
+              </div>
+              <div className="billing-detail-item">
+                <dt>Renewal date</dt>
+                <dd>{endDate ? formatDate(endDate) : '—'}</dd>
+              </div>
+              <div className="billing-detail-item">
+                <dt>Subscription fee</dt>
+                <dd className="billing-detail-amount">
+                  {isPaidPlan ? formatINR(nextBillingAmount) : 'Free'}
+                </dd>
+              </div>
+            </dl>
+
+            <div className="billing-limits">
+              <h3 className="billing-limits-title">Included resources</h3>
+              <div className="billing-limits-row">
+                <div className="billing-limit-chip">
+                  <span className="billing-limit-chip-label">Virtual machines</span>
+                  <span className="billing-limit-chip-value">
+                    {subscription?.vm_limit === 999
+                      ? 'Unlimited'
+                      : `${subscription?.vm_limit || 2} VMs`}
+                  </span>
+                </div>
+                <div className="billing-limit-chip">
+                  <span className="billing-limit-chip-label">Storage per VM</span>
+                  <span className="billing-limit-chip-value">
+                    {subscription?.storage_gb === 1000
+                      ? '1 TB'
+                      : `${subscription?.storage_gb || 10} GB`}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="billing-panel-actions">
+              {!isPaidPlan ? (
+                <button
+                  type="button"
+                  className="billing-btn billing-btn--primary"
+                  onClick={() => navigate('/dashboard/pricing')}
+                >
+                  Upgrade plan
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="billing-btn billing-btn--ghost"
+                  onClick={() => navigate('/dashboard/pricing')}
+                >
+                  Change plan
+                </button>
+              )}
+            </div>
+          </section>
+
+          <section className="zenith-glass-panel billing-panel">
+            <h2 className="billing-panel-title">Payment method</h2>
+            <p className="billing-panel-subtitle">
+              Payments are processed securely through Razorpay at checkout.
+            </p>
+            <div className="billing-payment-provider">
+              <div className="billing-payment-provider-icon" aria-hidden>
+                <svg width="40" height="40" viewBox="0 0 48 48" fill="none">
+                  <rect width="48" height="48" rx="10" fill="url(#rp-grad)" />
+                  <path
+                    d="M18 28L22 20L26 28L30 20"
+                    stroke="white"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                  <defs>
+                    <linearGradient id="rp-grad" x1="0" y1="0" x2="48" y2="48">
+                      <stop stopColor="#072654" />
+                      <stop offset="1" stopColor="#0B3E8A" />
+                    </linearGradient>
+                  </defs>
+                </svg>
+              </div>
+              <div>
+                <p className="billing-payment-provider-name">Razorpay</p>
+                <p className="billing-payment-provider-meta">
+                  Cards, UPI, net banking, and wallets accepted at payment time.
+                </p>
+              </div>
+            </div>
+            <div className="billing-payment-methods">
+              {['Cards', 'UPI', 'Net banking', 'Wallets'].map((method) => (
+                <span key={method} className="billing-payment-method-tag">
+                  {method}
+                </span>
+              ))}
+            </div>
+          </section>
+
+          <section className="zenith-glass-panel billing-panel billing-panel--muted">
+            <h2 className="billing-panel-title">Need help?</h2>
+            <ul className="billing-help-list">
+              <li>
+                Invoices and receipts are available under the history tabs below.
+              </li>
+              <li>Payments are encrypted — card details are never stored on our servers.</li>
+              <li>
+                Questions? Email{' '}
+                <a href="mailto:support@zenith.cloud" className="billing-link">
+                  support@zenith.cloud
+                </a>
+              </li>
+            </ul>
+          </section>
         </div>
 
-        <div className="subscription-details">
-          <div className="sub-detail-row">
-            <div className="sub-detail">
-              <span className="label">Plan</span>
-              <span className="value">{getPlanDisplayName(subscription?.plan_id)}</span>
-            </div>
-            <div className="sub-detail">
-              <span className="label">Billing Cycle</span>
-              <span className="value">{subscription?.billing_cycle || 'N/A'}</span>
-            </div>
-            <div className="sub-detail">
-              <span className="label">Next Billing Date</span>
-              <span className="value">{formatDate(subscription?.current_period_end)}</span>
-            </div>
-            <div className="sub-detail">
-              <span className="label">Next Payment</span>
-              <span className="value amount">{formatCurrency(nextBillingAmount)}</span>
-            </div>
-          </div>
-
-          {subscription?.plan_id !== 'free' && daysRemaining > 0 && (
-            <div className="billing-countdown">
-              <div className="countdown-info">
-                <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd"/>
-                </svg>
-                <span>
-                  {daysRemaining} day{daysRemaining !== 1 ? 's' : ''} remaining in current billing period
-                </span>
-              </div>
-            </div>
-          )}
-
-          <div className="subscription-limits">
-            <h3>Plan Limits</h3>
-            <div className="limits-grid">
-              <div className="limit-item">
-                <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M2 5a2 2 0 012-2h12a2 2 0 012 2v10a2 2 0 01-2 2H4a2 2 0 01-2-2V5zm3.293 1.293a1 1 0 011.414 0l3 3a1 1 0 010 1.414l-3 3a1 1 0 01-1.414-1.414L7.586 10 5.293 7.707a1 1 0 010-1.414zM11 12a1 1 0 100 2h3a1 1 0 100-2h-3z" clipRule="evenodd"/>
-                </svg>
+        {/* Right column — usage & bill summary */}
+        <aside className="billing-layout-side">
+          {currentMonthCosts && (
+            <section className="zenith-glass-panel billing-panel">
+              <div className="billing-panel-header">
                 <div>
-                  <span className="limit-label">Virtual Machines</span>
-                  <span className="limit-value">
-                    {subscription?.vm_limit === 999 ? 'Unlimited' : `${subscription?.vm_limit || 2} VMs`}
-                  </span>
+                  <h2 className="billing-panel-title">Current period usage</h2>
+                  <p className="billing-panel-subtitle">
+                    {currentMonthCosts.billing_period} · {currentMonthCosts.days_remaining} days left
+                  </p>
                 </div>
               </div>
-              <div className="limit-item">
-                <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
-                  <path d="M3 12v3c0 1.657 3.134 3 7 3s7-1.343 7-3v-3c0 1.657-3.134 3-7 3s-7-1.343-7-3z"/>
-                  <path d="M3 7v3c0 1.657 3.134 3 7 3s7-1.343 7-3V7c0 1.657-3.134 3-7 3S3 8.657 3 7z"/>
-                  <path d="M17 5c0 1.657-3.134 3-7 3S3 6.657 3 5s3.134-3 7-3 7 1.343 7 3z"/>
-                </svg>
-                <div>
-                  <span className="limit-label">Storage</span>
-                  <span className="limit-value">
-                    {subscription?.storage_gb === 1000 ? '1 TB' : `${subscription?.storage_gb || 10} GB`}
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
 
-          <div className="subscription-actions">
-            {subscription?.plan_id === 'free' ? (
-              <button 
-                className="btn-upgrade-plan"
-                onClick={() => navigate('/dashboard/pricing')}
-              >
-                ⬆️ Upgrade Plan
-              </button>
-            ) : (
-              <>
-                <button 
-                  className={`btn-pay-now ${processingPayment ? 'processing' : ''}`}
+              <div className="billing-provider-costs">
+                {[
+                  { key: 'aws', label: 'AWS', amount: currentMonthCosts.costs.aws },
+                  { key: 'gcp', label: 'GCP', amount: currentMonthCosts.costs.gcp },
+                  { key: 'azure', label: 'Azure', amount: currentMonthCosts.costs.azure },
+                ].map(({ key, label, amount }) => (
+                  <div key={key} className={`billing-provider-cost billing-provider-cost--${key}`}>
+                    <span>{label}</span>
+                    <strong>{formatCurrency(amount || 0)}</strong>
+                  </div>
+                ))}
+              </div>
+
+              {(currentMonthCosts.costs.storage_api_total > 0 ||
+                currentMonthCosts.storage_metering?.operations?.length > 0) && (
+                <div className="billing-line-item">
+                  <span>Storage API metering</span>
+                  <span>{formatCurrency(currentMonthCosts.costs.storage_api_total || 0, 4)}</span>
+                </div>
+              )}
+
+              {subscription?.plan_id === 'free' && (
+                <div className="billing-line-item billing-line-item--muted">
+                  <span>Platform fee (free tier)</span>
+                  <span>{formatCurrency(currentMonthCosts.costs.platform_fee || 0)}</span>
+                </div>
+              )}
+
+              <div className="billing-divider" />
+
+              <div className="billing-line-item">
+                <span>Cloud usage subtotal</span>
+                <span>{formatCurrency(billBreakdown.cloudUSD)}</span>
+              </div>
+              <div className="billing-line-item billing-line-item--muted">
+                <span>Est. INR (@ ₹{FX_USD_TO_INR}/USD)</span>
+                <span>{formatINR(Math.round(billBreakdown.cloudINR))}</span>
+              </div>
+              {isPaidPlan && (
+                <div className="billing-line-item">
+                  <span>
+                    {currentPlanName} subscription ({subscription?.billing_cycle || 'monthly'})
+                  </span>
+                  <span>{formatINR(nextBillingAmount)}</span>
+                </div>
+              )}
+
+              <div className="billing-total-due">
+                <span>Total due</span>
+                <strong>{formatINR(Math.round(billBreakdown.totalINR))}</strong>
+              </div>
+
+              {isPaidPlan ? (
+                <button
+                  type="button"
+                  className={`billing-btn billing-btn--primary billing-btn--block ${processingPayment ? 'is-busy' : ''}`}
                   onClick={handlePayNow}
                   disabled={processingPayment}
                 >
                   {processingPayment ? (
                     <>
-                      <span className="spinner"></span> Processing...
+                      <span className="billing-spinner" aria-hidden /> Processing…
                     </>
                   ) : (
-                    `💳 Pay Total Bill - ${formatCurrency(Math.round(billBreakdown.totalINR))}`
+                    `Pay ${formatINR(Math.round(billBreakdown.totalINR))}`
                   )}
                 </button>
-                <button 
-                  className="btn-change-plan"
+              ) : (
+                <button
+                  type="button"
+                  className="billing-btn billing-btn--primary billing-btn--block"
                   onClick={() => navigate('/dashboard/pricing')}
                 >
-                  Change Plan
+                  Upgrade to pay bills
                 </button>
-              </>
-            )}
-          </div>
-        </div>
+              )}
+
+              <p className="billing-footnote">
+                Covers cloud pass-through usage and your next subscription period.
+              </p>
+
+              {currentMonthCosts.storage_metering?.operations?.length > 0 && (
+                <details className="billing-metering-details">
+                  <summary>Storage API breakdown</summary>
+                  <div className="table-responsive-scroll">
+                    <table className="billing-metering-table data-card-table">
+                      <thead>
+                        <tr>
+                          <th>Cloud</th>
+                          <th>Operation</th>
+                          <th>Count</th>
+                          <th>Est.</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {currentMonthCosts.storage_metering.operations.map((row) => (
+                          <tr key={`${row.csp}-${row.operation}`}>
+                            <td data-label="Cloud">{row.csp}</td>
+                            <td data-label="Operation">{row.label}</td>
+                            <td data-label="Count">{row.count}</td>
+                            <td data-label="Est.">{formatCurrency(row.estimated_usd, 4)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </details>
+              )}
+            </section>
+          )}
+        </aside>
       </div>
 
-      {/* Current Month Cloud Costs */}
-      {currentMonthCosts && (
-        <div className="billing-section cloud-costs-card">
-          <div className="section-header">
-            <h2>Cloud Usage Costs (This Month)</h2>
-            <span className="days-remaining-badge">
-              {currentMonthCosts.days_remaining} days remaining
-            </span>
-          </div>
-          <div className="costs-grid">
-            <div className="cost-card aws">
-              <div className="cost-header">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M6.76 12.94l-.03.06-.02.07c0 .07.02.13.06.19l.03.03.06.06.04.02.09.02h2.83l.09-.02c.02-.01.03-.02.04-.02l.06-.06.03-.03a.33.33 0 00.06-.19v-.06l-.03-.07-.06-.11-.05-.05-2.06-2.7 2.07-2.71a.48.48 0 00.08-.17v-.06c0-.07-.02-.13-.06-.19l-.03-.03-.06-.06-.04-.02-.09-.02H6.95l-.09.02-.04.02-.06.06-.03.03-.06.08L4.86 9.7l-.97-1.32-.06-.08-.03-.03-.06-.06-.04-.02-.09-.02H.83l-.09.02c-.02.01-.03.02-.04.02l-.06.06L.6 8.3a.33.33 0 00-.06.19v.06l.03.07.06.11.05.05 2.06 2.7-2.07 2.71a.48.48 0 00-.08.17v.06c0 .07.02.13.06.19l.03.03.06.06.04.02.09.02h2.78l.09-.02c.02-.01.03-.02.04-.02l.06-.06.03-.03.06-.08 1.81-2.37.97 1.32zm9.64-2.88a.39.39 0 00-.15-.08 1.23 1.23 0 00-.24-.02h-.56V8.73c0-.16-.06-.29-.18-.41a.55.55 0 00-.41-.18h-1.09a.55.55 0 00-.41.18.55.55 0 00-.18.41v1.23h-.57c-.08 0-.16.01-.24.02a.39.39 0 00-.15.08.41.41 0 00-.08.15c-.01.07-.02.15-.02.24v.82c0 .09.01.17.02.24.01.06.04.11.08.15a.39.39 0 00.15.08c.08.01.16.02.24.02h.57v3.07c0 .9.21 1.56.63 1.98.42.42 1.03.63 1.82.63.25 0 .49-.01.73-.03.23-.02.44-.05.61-.09.08-.02.15-.06.2-.12.05-.06.08-.14.08-.24v-.88c0-.09-.03-.17-.08-.24-.05-.06-.13-.1-.24-.1h-.06l-.21.02-.28.02c-.23 0-.4-.06-.51-.17s-.17-.3-.17-.56v-3.29h1.09c.08 0 .16-.01.24-.02a.39.39 0 00.15-.08c.04-.04.07-.09.08-.15.01-.07.02-.15.02-.24v-.82c0-.09-.01-.17-.02-.24a.41.41 0 00-.08-.15zM23.6 12.94c-.03.17-.08.32-.16.45-.08.13-.2.23-.36.3-.16.07-.37.11-.62.11-.23 0-.43-.03-.59-.09-.16-.06-.29-.14-.39-.24s-.17-.22-.22-.36c-.05-.14-.07-.28-.07-.44 0-.16.02-.3.06-.43.04-.13.11-.24.19-.34.08-.1.19-.18.32-.25.13-.06.29-.1.46-.12l1.39-.17v.48c0 .28-.03.52-.07.73zm1.65-3.2c-.08-.36-.21-.67-.4-.92-.19-.25-.44-.44-.75-.57-.31-.13-.69-.19-1.14-.19-.3 0-.59.03-.86.08-.27.05-.51.11-.71.18-.1.04-.17.09-.21.16-.04.06-.06.13-.06.21v.9c0 .12.04.2.11.23.07.03.13.02.18-.02.23-.1.47-.18.72-.23.25-.05.49-.07.72-.07.38 0 .66.08.84.23.18.15.27.39.27.71v.31l-1.59.19c-.35.04-.66.11-.93.21-.27.1-.5.23-.68.38-.18.15-.32.33-.41.53-.09.2-.14.42-.14.66 0 .23.04.46.13.68.09.22.22.41.39.58.17.17.38.3.63.4.25.1.54.15.87.15.47 0 .87-.08 1.2-.25.33-.17.62-.38.85-.64v.48c0 .11.04.2.12.27.08.07.18.1.3.1h1.16c.08 0 .16-.01.24-.02a.39.39 0 00.15-.08c.04-.04.07-.09.08-.15.01-.07.02-.15.02-.24v-3.35c0-.47-.05-.9-.14-1.27z"/>
-                </svg>
-                <span>AWS</span>
-              </div>
-              <div className="cost-amount">${currentMonthCosts.costs.aws.toFixed(2)}</div>
-            </div>
-            <div className="cost-card gcp">
-              <div className="cost-header">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M12.19 2.38a9.344 9.344 0 0 1 9.45 9.311 9.344 9.344 0 0 1-9.396 9.457h-.03l-.026-.001c-.02-.001-.038.005-.057.001a9.344 9.344 0 0 1-9.145-9.485A9.344 9.344 0 0 1 12.17 2.379zm-.08 4.787a4.574 4.574 0 1 0 4.614 4.532 4.573 4.573 0 0 0-4.614-4.532z"/>
-                </svg>
-                <span>GCP</span>
-              </div>
-              <div className="cost-amount">${currentMonthCosts.costs.gcp.toFixed(2)}</div>
-            </div>
-            <div className="cost-card azure">
-              <div className="cost-header">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M5.483 21.3H21.15l-3.371-5.708h-5.824zm9.694-12.307L11.725 2.7H5.08l7.531 13.067 4.153-7.214zM2.85 21.3h9.026L6.084 11.937z"/>
-                </svg>
-                <span>Azure</span>
-              </div>
-              <div className="cost-amount">${currentMonthCosts.costs.azure.toFixed(2)}</div>
-            </div>
-            {subscription?.plan_id === 'free' && (
-              <div className="cost-card platform">
-                <div className="cost-header">
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"/>
-                  </svg>
-                  <span>Platform Fee</span>
-                </div>
-                <div className="cost-amount">${currentMonthCosts.costs.platform_fee.toFixed(2)}</div>
-                <div className="cost-note-small">⭐ Removed on paid plans</div>
-              </div>
+      {/* History tabs */}
+      <section className="zenith-glass-panel billing-panel billing-history-section">
+        <div className="billing-tabs" role="tablist" aria-label="Billing history">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === 'payments'}
+            className={`billing-tab ${activeTab === 'payments' ? 'is-active' : ''}`}
+            onClick={() => setActiveTab('payments')}
+          >
+            Payments
+            {paymentHistory.length > 0 && (
+              <span className="billing-tab-count">{paymentHistory.length}</span>
             )}
-          </div>
-          <div className="cost-breakdown-summary">
-            <div className="summary-row">
-              <span>Cloud Usage (AWS + GCP + Azure)</span>
-              <span className="summary-amount">
-                ${(currentMonthCosts.costs.aws + currentMonthCosts.costs.gcp + currentMonthCosts.costs.azure).toFixed(2)} USD
-              </span>
-            </div>
-            {(currentMonthCosts.costs.storage_api_total > 0 ||
-              currentMonthCosts.storage_metering?.operations?.length > 0) && (
-              <div className="summary-row storage-api-meter-row">
-                <span>Storage API metering (list / sync / upload / download)</span>
-                <span className="summary-amount">
-                  ${(currentMonthCosts.costs.storage_api_total || 0).toFixed(4)} USD
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === 'invoices'}
+            className={`billing-tab ${activeTab === 'invoices' ? 'is-active' : ''}`}
+            onClick={() => setActiveTab('invoices')}
+          >
+            Invoices
+            {invoices.length > 0 && <span className="billing-tab-count">{invoices.length}</span>}
+          </button>
+        </div>
+
+        {activeTab === 'payments' && (
+          <div role="tabpanel">
+            {paymentHistory.length === 0 ? (
+              <div className="billing-empty-state">
+                <svg width="48" height="48" viewBox="0 0 48 48" fill="none" aria-hidden>
+                  <rect width="48" height="48" rx="12" fill="var(--gold-glow)" />
+                  <path
+                    d="M16 20h16M16 26h12M16 32h16"
+                    stroke="var(--gold-primary)"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                  />
+                </svg>
+                <p>No payments yet</p>
+                <span className="billing-empty-hint">
+                  Completed Razorpay transactions will appear here.
                 </span>
               </div>
-            )}
-            <div className="summary-row conversion-row">
-              <span>  └─ Converted to INR (@ ₹83/USD)</span>
-              <span className="summary-amount">{formatCurrency(Math.round(billBreakdown.cloudINR))}</span>
-            </div>
-            {subscription?.plan_id === 'free' && (
-              <>
-                <div className="summary-row">
-                  <span>Platform Fee</span>
-                  <span className="summary-amount">${currentMonthCosts.costs.platform_fee.toFixed(2)} USD</span>
-                </div>
-                <div className="summary-row conversion-row">
-                  <span>  └─ Converted to INR</span>
-                  <span className="summary-amount">{formatCurrency(Math.round(currentMonthCosts.costs.platform_fee * 83))}</span>
-                </div>
-              </>
-            )}
-            {subscription?.plan_id !== 'free' && (
-              <div className="summary-row highlight">
-                <span>Subscription - {getPlanDisplayName(subscription?.plan_id)} ({subscription?.billing_cycle || 'monthly'})</span>
-                <span className="summary-amount">{formatCurrency(nextBillingAmount)}</span>
-              </div>
-            )}
-          </div>
-          <div className="total-cost">
-            <span className="total-label">Total Bill Due</span>
-            <span className="total-amount">{formatCurrency(Math.round(billBreakdown.totalINR))}</span>
-          </div>
-          {subscription?.plan_id === 'free' ? (
-            <button 
-              className="btn-upgrade-plan" 
-              onClick={() => navigate('/dashboard/pricing')}
-            >
-              ⬆️ Upgrade Plan to Pay Bills
-            </button>
-          ) : (
-            <button 
-              className="btn-pay-now" 
-              onClick={handlePayNow}
-              disabled={processingPayment}
-            >
-              {processingPayment ? (
-                <>
-                  <span className="spinner"></span>
-                  Processing...
-                </>
-              ) : (
-                `Pay Total Bill - ${formatCurrency(Math.round(billBreakdown.totalINR))}`
-              )}
-            </button>
-          )}
-          <div className="cost-note">
-            💡 Pay now to cover cloud usage + subscription for the next month
-          </div>
-          {currentMonthCosts.storage_metering?.operations?.length > 0 && (
-            <div className="storage-metering-detail">
-              <h3>Storage API breakdown (pass-through)</h3>
-              <p className="storage-metering-note">
-                Estimated cloud API charges from Storage page actions — billed at published list/sync/upload/download rates.
-              </p>
-              <div className="table-responsive-scroll">
-                <table className="storage-metering-table">
+            ) : (
+              <div className="billing-table-wrap">
+                <table className="billing-table data-card-table">
                   <thead>
                     <tr>
-                      <th>Cloud</th>
-                      <th>Operation</th>
-                      <th>Count</th>
-                      <th>Est. USD</th>
+                      <th>Date</th>
+                      <th>Plan</th>
+                      <th>Cycle</th>
+                      <th>Amount</th>
+                      <th>Reference</th>
+                      <th>Status</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {currentMonthCosts.storage_metering.operations.map((row) => (
-                      <tr key={`${row.csp}-${row.operation}`}>
-                        <td>{row.csp}</td>
-                        <td>{row.label}</td>
-                        <td>{row.count}</td>
-                        <td>${Number(row.estimated_usd).toFixed(6)}</td>
+                    {paymentHistory.map((payment) => (
+                      <tr key={payment.id}>
+                        <td data-label="Date">
+                          {formatDate(payment.paid_at || payment.created)}
+                        </td>
+                        <td data-label="Plan">
+                          <span className="billing-plan-pill">
+                            {getPlanDisplayName(payment.plan_id)}
+                          </span>
+                        </td>
+                        <td data-label="Cycle" className="capitalize">
+                          {payment.billing_cycle}
+                        </td>
+                        <td data-label="Amount" className="billing-table-amount">
+                          {formatINR(payment.amount)}
+                        </td>
+                        <td data-label="Reference">
+                          <code className="billing-ref-code">
+                            {payment.payment_id?.substring(0, 18)}…
+                          </code>
+                        </td>
+                        <td data-label="Status">
+                          <span className="billing-status-pill status-active">Paid</span>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
-                  <tfoot>
-                    <tr>
-                      <td colSpan={3}><strong>Storage API subtotal</strong></td>
-                      <td>
-                        <strong>
-                          ${(currentMonthCosts.costs.storage_api_total || 0).toFixed(6)}
-                        </strong>
-                      </td>
-                    </tr>
-                  </tfoot>
                 </table>
               </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Payment Method */}
-      <div className="billing-section payment-method-card">
-        <h2>Payment Method</h2>
-        <div className="payment-method-content">
-          <div className="payment-method-display">
-            <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
-              <rect width="48" height="48" rx="8" fill="url(#razorpay-gradient)"/>
-              <path d="M18 28L22 20L26 28L30 20" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              <defs>
-                <linearGradient id="razorpay-gradient" x1="0" y1="0" x2="48" y2="48">
-                  <stop stopColor="#072654"/>
-                  <stop offset="1" stopColor="#0B3E8A"/>
-                </linearGradient>
-              </defs>
-            </svg>
-            <div>
-              <p className="payment-method-name">Razorpay</p>
-              <p className="payment-method-note">Cards, UPI, Net Banking, Wallets</p>
-              <p className="payment-method-description">
-                Secure payment processing powered by Razorpay. All major payment methods supported.
-              </p>
-            </div>
-          </div>
-          <div className="payment-badges">
-            <span className="payment-badge">💳 Cards</span>
-            <span className="payment-badge">📱 UPI</span>
-            <span className="payment-badge">🏦 Net Banking</span>
-            <span className="payment-badge">👛 Wallets</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Payment History */}
-      <div className="billing-section payment-history-card">
-        <div className="section-header">
-          <h2>Payment History</h2>
-          <span className="history-count">{paymentHistory.length} transaction{paymentHistory.length !== 1 ? 's' : ''}</span>
-        </div>
-
-        {paymentHistory.length === 0 ? (
-          <div className="no-history">
-            <svg width="80" height="80" viewBox="0 0 80 80" fill="none">
-              <rect width="80" height="80" rx="12" fill="var(--gold-glow)"/>
-              <path d="M30 35h20M30 45h15M30 55h20" stroke="var(--gold-primary)" strokeWidth="3" strokeLinecap="round"/>
-              <rect x="25" y="25" width="30" height="35" rx="2" stroke="var(--gold-primary)" strokeWidth="2"/>
-            </svg>
-            <p>No payment history yet</p>
-            {subscription?.plan_id === 'free' && (
-              <button className="btn-primary" onClick={() => navigate('/dashboard/pricing')}>
-                Upgrade to View Payments
-              </button>
             )}
           </div>
-        ) : (
-          <div className="payment-history-table-wrapper">
-            <table className="payment-history-table data-card-table">
-              <thead>
-                <tr>
-                  <th>Date</th>
-                  <th>Plan</th>
-                  <th>Billing Cycle</th>
-                  <th>Amount</th>
-                  <th>Payment ID</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {paymentHistory.map((payment) => (
-                  <tr key={payment.id}>
-                    <td className="payment-date" data-label="Date">{formatDate(payment.paid_at || payment.created)}</td>
-                    <td data-label="Plan">
-                      <span className="plan-badge">{getPlanDisplayName(payment.plan_id)}</span>
-                    </td>
-                    <td className="billing-cycle" data-label="Billing cycle">{payment.billing_cycle}</td>
-                    <td className="payment-amount" data-label="Amount">{formatCurrency(payment.amount)}</td>
-                    <td className="payment-id" data-label="Payment ID">
-                      <code>{payment.payment_id?.substring(0, 20)}...</code>
-                    </td>
-                    <td data-label="Status">
-                      <span className="payment-status-badge success">
-                        ✓ Paid
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+        )}
+
+        {activeTab === 'invoices' && (
+          <div role="tabpanel">
+            {invoices.length === 0 ? (
+              <div className="billing-empty-state">
+                <svg width="48" height="48" viewBox="0 0 48 48" fill="none" aria-hidden>
+                  <rect width="48" height="48" rx="12" fill="var(--gold-glow)" />
+                  <rect
+                    x="14"
+                    y="12"
+                    width="20"
+                    height="26"
+                    rx="2"
+                    stroke="var(--gold-primary)"
+                    strokeWidth="2"
+                  />
+                  <path d="M18 20h12M18 26h8" stroke="var(--gold-primary)" strokeWidth="2" />
+                </svg>
+                <p>No invoices yet</p>
+                <span className="billing-empty-hint">
+                  Monthly invoices are generated from your cloud usage at period end.
+                </span>
+              </div>
+            ) : (
+              <div className="billing-table-wrap">
+                <table className="billing-table data-card-table">
+                  <thead>
+                    <tr>
+                      <th>Invoice</th>
+                      <th>Period</th>
+                      <th>Amount</th>
+                      <th>Due date</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {invoices.map((inv) => (
+                      <tr key={inv.invoice_id}>
+                        <td data-label="Invoice">
+                          <code className="billing-ref-code">{inv.invoice_id}</code>
+                        </td>
+                        <td data-label="Period">{inv.billing_period}</td>
+                        <td data-label="Amount" className="billing-table-amount">
+                          {formatCurrency(inv.total)}
+                        </td>
+                        <td data-label="Due date">{formatDate(inv.due_date)}</td>
+                        <td data-label="Status">
+                          <span
+                            className={`billing-status-pill billing-invoice-status--${inv.status}`}
+                          >
+                            {inv.status}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         )}
-      </div>
-
-      {/* Billing Info */}
-      <div className="billing-section billing-info-card">
-        <h3>Billing Information</h3>
-        <div className="billing-info-content">
-          <div className="info-item">
-            <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd"/>
-            </svg>
-            <p>Payments are processed securely through Razorpay. You will be charged on your next billing date.</p>
-          </div>
-          <div className="info-item">
-            <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd"/>
-            </svg>
-            <p>All payment information is encrypted and stored securely. We never store your card details.</p>
-          </div>
-          <div className="info-item">
-            <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
-              <path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z"/>
-            </svg>
-            <p>Need help? Contact our support team at support@zenith.com or call +91-XXXXXXXXXX</p>
-          </div>
-        </div>
-      </div>
+      </section>
     </div>
   );
 }

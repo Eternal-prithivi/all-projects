@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { useAuth } from './AuthContext.jsx';
 import { apiClient } from '../api';
 
@@ -18,14 +18,38 @@ export const mapServerItem = (item) => ({
   message: item.message,
   type: item.type || 'info',
   link: item.link,
+  metadata: item.metadata || null,
   read: Boolean(item.read),
   timestamp: item.created_at ? new Date(item.created_at) : new Date(),
 });
+
+const isServerNotificationId = (id) =>
+  id && !String(id).startsWith('local-') && !Number.isFinite(Number(id));
 
 export const NotificationProvider = ({ children }) => {
   const { token } = useAuth();
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
+  /** Maps react-toastify toast id → persisted server notification id */
+  const toastIdMapRef = useRef(new Map());
+
+  const resolveNotificationId = useCallback((id) => {
+    if (id == null) return id;
+    return toastIdMapRef.current.get(id) ?? id;
+  }, []);
+
+  const matchesNotification = useCallback(
+    (notif, id) => {
+      const resolved = resolveNotificationId(id);
+      return (
+        notif.id === id ||
+        notif.id === resolved ||
+        notif.clientKey === id ||
+        notif.clientKey === resolved
+      );
+    },
+    [resolveNotificationId]
+  );
 
   const fetchRecent = useCallback(async () => {
     if (!token) return { items: [], unread: 0 };
@@ -71,8 +95,10 @@ export const NotificationProvider = ({ children }) => {
 
   const addNotification = useCallback(
     async (notification) => {
+      const clientKey = notification.id || `local-${Date.now()}`;
       const local = {
-        id: notification.id || `local-${Date.now()}`,
+        id: clientKey,
+        clientKey,
         timestamp: new Date(),
         read: false,
         ...notification,
@@ -91,26 +117,64 @@ export const NotificationProvider = ({ children }) => {
           });
           const serverId = res.data.id;
           if (serverId) {
-            setNotifications((prev) =>
-              prev.map((n) => (n.id === local.id ? { ...n, id: serverId } : n))
-            );
+            toastIdMapRef.current.set(clientKey, serverId);
+            setNotifications((prev) => {
+              let flushed = null;
+              const next = prev.map((n) => {
+                if (n.clientKey !== clientKey) return n;
+                const updated = { ...n, id: serverId };
+                if (n.type && n.type !== 'loading') {
+                  flushed = {
+                    type: n.type,
+                    message: n.message,
+                    title: n.title,
+                  };
+                }
+                return updated;
+              });
+              if (flushed) {
+                apiClient
+                  .patch(`/notifications/${serverId}`, flushed)
+                  .catch(() => {});
+              }
+              return next;
+            });
           }
-          await fetchRecent();
         } catch {
           /* keep local copy */
         }
       }
 
-      return local.id;
+      return clientKey;
     },
-    [token, fetchRecent]
+    [token]
   );
 
-  const updateNotification = useCallback((id, updates) => {
-    setNotifications((prev) =>
-      prev.map((notif) => (notif.id === id ? { ...notif, ...updates } : notif))
-    );
-  }, []);
+  const updateNotification = useCallback(
+    async (id, updates) => {
+      const resolvedId = resolveNotificationId(id);
+
+      setNotifications((prev) =>
+        prev.map((notif) =>
+          matchesNotification(notif, id) ? { ...notif, ...updates } : notif
+        )
+      );
+
+      if (token && isServerNotificationId(resolvedId)) {
+        try {
+          await apiClient.patch(`/notifications/${resolvedId}`, {
+            ...(updates.title != null ? { title: updates.title } : {}),
+            ...(updates.message != null ? { message: updates.message } : {}),
+            ...(updates.type != null ? { type: updates.type } : {}),
+            ...(updates.link != null ? { link: updates.link } : {}),
+          });
+        } catch {
+          /* local state already updated */
+        }
+      }
+    },
+    [token, resolveNotificationId, matchesNotification]
+  );
 
   const markAsRead = useCallback(
     async (id) => {
@@ -148,22 +212,27 @@ export const NotificationProvider = ({ children }) => {
 
   const deleteNotification = useCallback(
     async (id) => {
+      const resolvedId = resolveNotificationId(id);
       setNotifications((prev) => {
-        const notif = prev.find((n) => n.id === id);
+        const notif = prev.find((n) => matchesNotification(n, id));
         if (notif && !notif.read) {
           setUnreadCount((count) => Math.max(0, count - 1));
         }
-        return prev.filter((n) => n.id !== id);
+        return prev.filter((n) => !matchesNotification(n, id));
       });
-      if (token && id && !String(id).startsWith('local-')) {
+      toastIdMapRef.current.delete(id);
+      if (resolvedId !== id) {
+        toastIdMapRef.current.delete(resolvedId);
+      }
+      if (token && isServerNotificationId(resolvedId)) {
         try {
-          await apiClient.delete(`/notifications/${id}`);
+          await apiClient.delete(`/notifications/${resolvedId}`);
         } catch {
           /* ignore */
         }
       }
     },
-    [token]
+    [token, resolveNotificationId, matchesNotification]
   );
 
   const clearAll = useCallback(async () => {

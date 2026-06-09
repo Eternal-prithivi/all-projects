@@ -15,6 +15,8 @@ function CspIcon({ csp }) {
 import ZenithWizardFrame, { WizardNote } from "./wizard/ZenithWizardFrame";
 import StorageEnsembleBreakdown from "./wizard/StorageEnsembleBreakdown";
 import { CSP_LABELS } from "../hooks/useCloudAvailability";
+import { LIFECYCLE_POLICIES } from "../constants/lifecyclePolicies";
+import StorageCostPreview from "./storage/StorageCostPreview";
 
 const STEP_LABELS = ["Analysis", "Cloud", "Folder", "Review"];
 
@@ -44,6 +46,11 @@ export default function StorageUploadWizard({
   onClose,
   onConfirmUpload,
   isUploading = false,
+  lifecyclePolicy = "auto",
+  onLifecyclePolicyChange,
+  suggestedLifecyclePolicy = "auto",
+  userPriority = "balanced",
+  userIntent = "active",
 }) {
   const recommended = recommendation?.recommendation;
   const [step, setStep] = useState(0);
@@ -312,9 +319,48 @@ export default function StorageUploadWizard({
               </>
             )}
           </dl>
+
+          <h4 className="zenith-wizard-section-title lifecycle-policy-heading">
+            Lifecycle after upload
+          </h4>
+          <p className="zenith-wizard-section-desc">
+            Choose how Zenith manages this file over time. ML picks initial placement; lifecycle
+            controls future hot/warm/cold moves.
+          </p>
+          <div className="zenith-wizard-option-grid lifecycle-policy-grid">
+            {LIFECYCLE_POLICIES.map((policy) => (
+              <div
+                key={policy.id}
+                className={`zenith-wizard-option-card lifecycle-policy-card${
+                  lifecyclePolicy === policy.id ? " is-selected" : ""
+                }${policy.id === suggestedLifecyclePolicy ? " is-suggested" : ""}`}
+                onClick={() => onLifecyclePolicyChange?.(policy.id)}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => e.key === "Enter" && onLifecyclePolicyChange?.(policy.id)}
+              >
+                <h4>{policy.label}</h4>
+                <p>{policy.description}</p>
+                {policy.id === suggestedLifecyclePolicy && (
+                  <span className="lifecycle-suggested-badge">Suggested</span>
+                )}
+              </div>
+            ))}
+          </div>
+
+          <StorageCostPreview
+            fileSizeMb={file?.size ? file.size / (1024 * 1024) : 0}
+            determinedTier={recommendation?.determined_tier}
+            userPriority={userPriority}
+            userIntent={userIntent === "active" ? "frequent" : userIntent}
+            lifecyclePolicy={lifecyclePolicy}
+            selectedCsp={finalCsp}
+          />
+
           <WizardNote title="On upload">
             The file is placed in your {CSP_LABELS[finalCsp] || finalCsp} storage with the selected
-            class. Access frequency is tracked for future tier recommendations.
+            class. Access frequency is tracked. Tier changes use your lifecycle policy and account
+            notice period before moving files.
           </WizardNote>
         </div>
       )}
