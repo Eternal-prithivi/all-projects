@@ -207,8 +207,9 @@ async def create_razorpay_order(
         # Calculate price based on billing cycle
         subscription_amount = plan.price_yearly if request.billing_cycle == "yearly" else plan.price_monthly
         
-        # Add cloud costs (convert USD to INR at rate of 83)
-        cloud_costs_inr = request.cloud_costs_usd * 83.0
+        from app.config.billing_constants import FX_USD_TO_INR
+
+        cloud_costs_inr = request.cloud_costs_usd * FX_USD_TO_INR
         
         # Total amount = subscription + cloud costs
         total_amount = subscription_amount + cloud_costs_inr

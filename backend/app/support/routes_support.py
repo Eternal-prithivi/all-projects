@@ -34,6 +34,35 @@ class MessageCreate(BaseModel):
     body: str = Field(..., min_length=1, max_length=8000)
 
 
+class TicketCreate(BaseModel):
+    subject: str = Field(default="general", max_length=64)
+    category: str = Field(default="general", max_length=64)
+    body: str = Field(..., min_length=1, max_length=8000)
+
+
+@router.post("/tickets")
+async def create_my_ticket(
+    payload: TicketCreate,
+    current_user: UserInDB = Depends(get_current_user),
+):
+    category = payload.category or payload.subject or "general"
+    ticket = service.create_ticket_from_contact(
+        name=current_user.username,
+        email=current_user.email or f"{current_user.username}@users.local",
+        subject=category,
+        message=payload.body,
+        user_id=current_user.username,
+    )
+    try:
+        email_payload = service.ticket_to_email_submission(ticket, payload.body)
+        email_service.send_contact_notification(email_payload)
+    except Exception:
+        pass
+    return service.get_ticket_detail_for_user(
+        ticket["reference_code"], current_user
+    )
+
+
 @router.get("/tickets")
 def list_my_tickets(current_user: UserInDB = Depends(get_current_user)):
     tickets = service.list_user_tickets(current_user)

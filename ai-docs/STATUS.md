@@ -6,14 +6,14 @@
 
 ## Identity
 
-| Phase | **21** SaaS pages polish (zero/low-cost) · **COMPLETE** |
-| Prior | Phase 20 Trust narrative + BYOC credential encryption · COMPLETE |
+| Phase | **22** SaaS pages polish (zero/low-cost) · **COMPLETE** |
+| Prior | Phase 21 Provision intent wizard + GCP/Azure SDK parity · COMPLETE |
 
 ---
 
 ## 🔴 Active Task
 
-_None — Phase 21 shipped 2026-06-11. Next task TBD._
+_None — Phase 22 shipped 2026-06-11. Next task TBD._
 
 ---
 
@@ -29,7 +29,7 @@ _None — Phase 21 shipped 2026-06-11. Next task TBD._
 
 ---
 
-## Phase 21 summary
+## Phase 22 summary
 
 - **Trust copy:** `frontend/src/data/productFacts.js` — Help, marketing pricing, billing labels (INR)
 - **Overview:** platform status banner, plan-based storage cap, budget/team cards, cost trend from Mongo (`/api/dashboard/cost-trend`)

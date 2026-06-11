@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from app.users.routes_users import get_current_user
 from app.database.mongo_client import get_database
 from app.dashboard.cost_aggregation import get_cached_user_costs, refresh_user_costs
+from app.dashboard.cost_snapshots import get_cost_trend
 from datetime import datetime
 import logging
 
@@ -182,6 +183,12 @@ def _relative_time(dt):
     if days < 30:
         return f"{days}d ago"
     return dt.strftime("%b %d")
+
+
+@router.get("/cost-trend")
+async def dashboard_cost_trend(days: int = 7, user: dict = Depends(get_current_user)):
+    """Last N days of stored cost snapshots — Mongo only, no cloud API calls."""
+    return get_cost_trend(user.username, days=days)
 
 
 @router.post("/refresh-costs")

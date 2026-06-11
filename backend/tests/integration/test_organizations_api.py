@@ -42,6 +42,34 @@ def test_create_org_invite_and_accept(client, auth_headers, user_factory):
     assert me.json()["organization"]["name"] == "Acme Corp"
 
 
+def test_owner_can_revoke_pending_invite(client, auth_headers):
+    owner_headers, _ = auth_headers()
+
+    client.post(
+        "/api/organizations",
+        headers=owner_headers,
+        json={"name": "Revoke Test Org"},
+    )
+
+    invite = client.post(
+        "/api/organizations/invites",
+        headers=owner_headers,
+        json={"email": "pending@example.com", "role": "member"},
+    )
+    assert invite.status_code == 200
+
+    revoke = client.delete(
+        "/api/organizations/invites/pending@example.com",
+        headers=owner_headers,
+    )
+    assert revoke.status_code == 200
+
+    me = client.get("/api/organizations/me", headers=owner_headers)
+    assert me.status_code == 200
+    pending = me.json().get("pending_invites") or []
+    assert not any(i.get("email") == "pending@example.com" for i in pending)
+
+
 def test_non_member_cannot_see_org_roster(client, auth_headers):
     owner_headers, _owner = auth_headers()
     outsider_headers, _outsider = auth_headers()

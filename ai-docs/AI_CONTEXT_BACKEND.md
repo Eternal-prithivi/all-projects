@@ -184,7 +184,11 @@ Backend modules: `intent_analyzer.py`, `template_mapper.py`, `cloud_compare.py`,
 
 **SDK fast path (GCP/Azure, Settings engine Boto3):** All catalog modules implemented under `app/provision/sdk_modules/` — GCP: `gcs`, `gcp_network`, `gce`, `gcp_service_account`, `gcp_monitoring`, `firestore`; Azure: `azure_storage`, `vnet`, `azure_vm`, `azure_monitor`, `cosmos`. Orchestrated by `sdk_composer.py` (mirrors `boto3_composer.py`). Terraform remains fallback when user selects Terraform engine or SDK cannot handle config.
 
-**Organizations** (`/api/organizations`): create org, members, invites, accept invite — single org per user.
+**Organizations** (`/api/organizations`): create org, members, invites, `DELETE /invites/{email}` (revoke pending), accept invite — single org per user.
+
+**Dashboard cost trend** (`/api/dashboard`): `GET /cost-trend?days=7` reads Mongo `dashboard_cost_snapshots` only (no cloud APIs on load). Snapshots upserted in `refresh_user_costs()` when user clicks Refresh on Overview.
+
+**Billing constants:** `app/config/billing_constants.py` — `FX_USD_TO_INR = 83` (static estimate, no live FX API).
 
 **SSO** (`/api/auth/sso`): `GET providers`, `GET google/login`, `GET google/callback` — needs `GOOGLE_OAUTH_*` + `PUBLIC_API_URL` env.
 
@@ -193,6 +197,7 @@ Backend modules: `intent_analyzer.py`, `template_mapper.py`, `cloud_compare.py`,
 | Method | Path | Auth | Purpose |
 |--------|------|------|---------|
 | POST | `/api/contact/submit` | Public (+ optional JWT) | Creates `support_tickets` + first message; legacy `contact_submissions` retained |
+| POST | `/api/support/tickets` | JWT | Create ticket (category, subject, body) |
 | GET | `/api/support/tickets` | JWT | List own tickets |
 | GET/POST | `/api/support/tickets/{reference_code}[/messages]` | JWT | Thread read / customer reply |
 | POST | `/api/support/guest/request-otp` | Public (rate limited) | Send 6-digit OTP email |

@@ -32,6 +32,44 @@
   backdrop-filter: blur(12px);
 }
 
+.support-new-ticket-form {
+  margin-bottom: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.support-new-ticket-form h3 {
+  margin: 0 0 0.5rem;
+}
+
+.support-new-ticket-form label {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.support-new-ticket-form input,
+.support-new-ticket-form select,
+.support-new-ticket-form textarea {
+  width: 100%;
+  padding: 0.6rem 0.75rem;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(0, 0, 0, 0.25);
+  color: inherit;
+}
+
+.support-new-ticket-actions {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+}
+
+.support-btn--ghost {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
 .support-form .form-group {
   margin-bottom: 1rem;
 }

@@ -5,6 +5,7 @@ import LoadingSpinner from '../components/LoadingSpinner.jsx';
 import PageHeader from '../components/ui/PageHeader.jsx';
 import { usePageRefresh } from '../hooks/usePageRefresh.js';
 import { useAuth } from '../context/AuthContext.jsx';
+import { NOT_YET_AVAILABLE } from '../data/productFacts.js';
 import '../styles/settings.css';
 import '../styles/team-page.css';
 
@@ -17,6 +18,7 @@ export default function TeamPage() {
   const [inviteEmail, setInviteEmail] = useState('');
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const [lastInviteLink, setLastInviteLink] = useState('');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -59,7 +61,8 @@ export default function TeamPage() {
         role: 'member',
       });
       const link = `${window.location.origin}${res.data.invite_link}`;
-      setMessage(`Invite sent. Share link: ${link}`);
+      setLastInviteLink(link);
+      setMessage('Invite created. Copy the link below to share with your colleague.');
       setInviteEmail('');
       load();
     } catch (err) {
@@ -75,6 +78,28 @@ export default function TeamPage() {
       load();
     } catch (err) {
       setError(err.response?.data?.detail || 'Could not remove member');
+    }
+  };
+
+  const copyInviteLink = async () => {
+    if (!lastInviteLink) return;
+    try {
+      await navigator.clipboard.writeText(lastInviteLink);
+      setMessage('Invite link copied to clipboard');
+    } catch {
+      setError('Could not copy link — select and copy manually');
+    }
+  };
+
+  const revokeInvite = async (email) => {
+    if (!window.confirm(`Revoke invite for ${email}?`)) return;
+    setMessage('');
+    try {
+      await apiClient.delete(`/organizations/invites/${encodeURIComponent(email)}`);
+      setMessage(`Revoked invite for ${email}`);
+      load();
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Could not revoke invite');
     }
   };
 
@@ -121,6 +146,19 @@ export default function TeamPage() {
         <p className="team-page__alert team-page__alert--error" role="alert">
           {error}
         </p>
+      )}
+
+      <p className="team-page__billing-note" role="note">
+        {NOT_YET_AVAILABLE.orgBilling}
+      </p>
+
+      {lastInviteLink && (
+        <div className="team-page__invite-copy">
+          <code>{lastInviteLink}</code>
+          <button type="button" className="btn-save" onClick={copyInviteLink}>
+            Copy invite link
+          </button>
+        </div>
       )}
 
       <div className="settings-content stagger-children">
@@ -215,6 +253,13 @@ export default function TeamPage() {
                               : 'soon'}
                           </p>
                         </div>
+                        <button
+                          type="button"
+                          className="btn-danger-outline"
+                          onClick={() => revokeInvite(inv.email)}
+                        >
+                          Revoke
+                        </button>
                       </div>
                     ))}
                   </div>

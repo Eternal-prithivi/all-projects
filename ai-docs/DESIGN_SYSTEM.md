@@ -185,7 +185,7 @@ Files that have been upgraded to the Zenith Design System:
 - Chart color: Gold gradient (`#ffd700` → `var(--gold-primary)`)
 - Tooltip: Glassmorphism styled (dark glass background, gold border)
 - Component: `SparklineChart.jsx` wraps Recharts `AreaChart`
-- Data: Initially synthetic (7-day split from monthly total). Real data via `/api/dashboard/cost-trend` in Phase 4.
+- Data: `GET /api/dashboard/cost-trend` reads Mongo `dashboard_cost_snapshots` (populated on explicit cost Refresh only). Empty state: “Refresh costs to build your 7-day trend.”
 
 ### Progress Rings
 - SVG-based, pure CSS animation (`stroke-dashoffset` transition)

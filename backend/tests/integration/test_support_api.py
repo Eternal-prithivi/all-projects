@@ -82,6 +82,29 @@ def test_guest_otp_flow(client, db):
     assert len(thread.json()["messages"]) >= 1
 
 
+def test_authenticated_user_creates_ticket(client, auth_headers):
+    headers, user = auth_headers()
+    with patch("app.support.routes_support.email_service.send_contact_notification"):
+        response = client.post(
+            "/api/support/tickets",
+            headers=headers,
+            json={
+                "category": "billing",
+                "subject": "billing",
+                "body": "Question about my invoice",
+            },
+        )
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["ticket"]["reference_code"].startswith("ZN-")
+    assert body["messages"][0]["body"] == "Question about my invoice"
+
+    listed = client.get("/api/support/tickets", headers=headers)
+    assert listed.status_code == 200
+    refs = [t["reference_code"] for t in listed.json()["tickets"]]
+    assert body["ticket"]["reference_code"] in refs
+
+
 def test_user_lists_own_tickets(client, auth_headers):
     headers, user = auth_headers()
     with patch("app.contact.routes_contact.email_service.send_contact_notification"), patch(

@@ -7,6 +7,20 @@
 
 ---
 
+**Phase 22 — SaaS pages polish (zero/low-cost)** — COMPLETE 2026-06-11
+
+- **Trust copy:** `productFacts.js` — Help FAQs, public pricing, support email; removed stale USD/personal-email content.
+- **Overview:** Platform status banner; plan-based storage cap; budget/team cards; needs-attention strip; cost sparkline from Mongo after explicit Refresh (`dashboard_cost_snapshots`, `GET /api/dashboard/cost-trend`).
+- **Billing:** `billing_constants` FX (83); plan names from `/api/payments/plans`.
+- **Support:** `POST /api/support/tickets`; in-app New ticket on Support page.
+- **Team:** `DELETE /api/organizations/invites/{email}`; invite link copy; per-account billing callout.
+- **Admin:** Support inbox quick action; `/admin/test` dev-only.
+- **Tests/docs:** `test_dashboard_cost_trend.py`; manual_testing rows 6.4–6.10.
+
+**How to test:** `/help` INR pricing; `/dashboard` Refresh cost → sparkline; `/dashboard/support` New ticket.
+
+---
+
 **Phase 21 — Provision intent wizard + GCP/Azure SDK parity** — COMPLETE 2026-06-11
 
 - Intent-first Build wizard (5 steps): NLP, tri-cloud compare, plain-English review, success handoffs, Terraform export.

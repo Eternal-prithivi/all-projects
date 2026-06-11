@@ -10,7 +10,6 @@ export default function CostHubNav() {
       </NavLink>
       <NavLink to="/dashboard/simulator">Simulator</NavLink>
       <NavLink to="/dashboard/optimization">Optimization</NavLink>
-      <NavLink to="/dashboard/billing">Billing</NavLink>
       <NavLink to="/dashboard/pricing">Pricing</NavLink>
     </nav>
   );

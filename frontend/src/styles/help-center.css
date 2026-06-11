@@ -6,6 +6,31 @@
   padding-bottom: var(--space-2xl);
 }
 
+.help-context-banner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-md);
+  padding: var(--space-sm) var(--space-md);
+  margin: var(--space-md) auto 0;
+  max-width: 800px;
+  font-size: 0.9rem;
+}
+
+.help-context-banner a {
+  color: var(--gold-primary);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.help-context-banner a:hover {
+  text-decoration: underline;
+}
+
+.help-context-banner__topic {
+  color: var(--text-secondary);
+}
+
 /* Header */
 .help-header {
   padding: var(--space-xl) var(--space-md) var(--space-2xl);

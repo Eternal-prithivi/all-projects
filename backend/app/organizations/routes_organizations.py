@@ -204,6 +204,25 @@ def accept_invite(token: str, current_user: UserInDB = Depends(get_current_user)
     return {"success": True, "org_id": invite["org_id"]}
 
 
+@router.delete("/invites/{email}")
+def revoke_invite(
+    email: str,
+    current_user: UserInDB = Depends(get_current_user),
+):
+    m = _require_membership(current_user.username, min_role="admin")
+    normalized = email.strip().lower()
+    result = DB[INVITES].delete_one(
+        {
+            "org_id": m["org_id"],
+            "email": normalized,
+            "accepted_at": None,
+        }
+    )
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Pending invite not found")
+    return {"success": True, "email": normalized}
+
+
 @router.delete("/members/{username}")
 def remove_member(
     username: str,

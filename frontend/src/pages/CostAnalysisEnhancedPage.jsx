@@ -1,6 +1,6 @@
 // =============================================================================
 // PAGE: CostAnalysisEnhancedPage.jsx  (716 lines)
-// ROUTE: /dashboard/cost-enhanced
+// ROUTE: /dashboard/costs
 // PURPOSE: Advanced cost analytics — interactive time-range charts, per-service breakdown,
 //          Z-score anomaly detection highlights, decay-weighted forecast graph, CSV export
 // API: Uses apiClient → /api/cost/cost-data, /api/cost/anomalies, /api/cost/forecast, /api/cost/export/csv
@@ -13,6 +13,7 @@
 import React, { useState, useEffect } from 'react';
 import { apiClient, getApiErrorMessage } from '../api.js';
 import { useNotifications } from "../hooks/useNotifications";
+import { usePreferences } from '../context/PreferencesContext.jsx';
 import PageHeader from '../components/ui/PageHeader.jsx';
 import { usePageRefresh } from '../hooks/usePageRefresh.js';
 import CostHubNav from '../components/dashboard/CostHubNav.jsx';
@@ -41,6 +42,7 @@ const ProviderLogo = ({ provider }) => {
 
 const CostAnalysisEnhancedPage = () => {
   const notifications = useNotifications();
+  const { formatCurrency } = usePreferences();
   const { runPageRefresh, pageRefreshing } = usePageRefresh();
   const { getFeature } = useCloudAvailability();
   const costProviderKeys = (getFeature('cost').providers || []).map((p) => CSP_TO_COST_KEY[p]).filter(Boolean);
@@ -282,8 +284,6 @@ const CostAnalysisEnhancedPage = () => {
 
   // Process cost data
   const processCostData = (data) => {
-    console.log('Processing cost data:', data);
-    
     // Check for error/placeholder responses
     if (data?.data?.status === 'not_configured' || data?.data?.status === 'missing_config' || 
         data?.data?.status === 'missing_dependency' || data?.data?.status === 'error') {
@@ -303,21 +303,13 @@ const CostAnalysisEnhancedPage = () => {
     const serviceMap = {};
 
     // Process time series data
-    data.data.ResultsByTime.forEach((timeRange, index) => {
-      console.log(`TimeRange ${index}:`, timeRange);
-      console.log(`Has Groups? ${!!timeRange.Groups}, Groups length: ${timeRange.Groups?.length || 0}`);
-      
+    data.data.ResultsByTime.forEach((timeRange) => {
       if (timeRange.Groups && timeRange.Groups.length > 0) {
-        // AWS grouped data
-        console.log('Processing Groups:', timeRange.Groups);
         timeRange.Groups.forEach((group) => {
-          console.log('Group structure:', group);
           const serviceName = group.Keys?.[0] || 'Unknown Service';
           const costAmount = group.Metrics?.UnblendedCost?.Amount || group.Metrics?.BlendedCost?.Amount || '0';
           const cost = parseFloat(costAmount);
-          
-          console.log('Extracted service:', serviceName, 'cost:', cost);
-          
+
           if (serviceMap[serviceName]) {
             serviceMap[serviceName] += cost;
           } else {
@@ -326,8 +318,6 @@ const CostAnalysisEnhancedPage = () => {
           total += cost;
         });
       } else {
-        // Daily totals (all providers) - No service breakdown
-        console.log('No Groups, using Total:', timeRange.Total);
         const cost = parseFloat(timeRange.Total.UnblendedCost.Amount);
         
         // Since we don't have service breakdown, add to a generic "Storage Services" entry
@@ -344,26 +334,19 @@ const CostAnalysisEnhancedPage = () => {
 
     // For GCP/Azure, if Services array is provided, use it instead
     if (data?.data?.Services && data.data.Services.length > 0) {
-      console.log('Processing Services array:', data.data.Services);
       data.data.Services.forEach(svc => {
         serviceMap[svc.service || svc.name] = svc.cost;
       });
       total = data.data.TotalCost || total;
     }
 
-    console.log('Service Map:', serviceMap);
-    console.log('Service Map Keys:', Object.keys(serviceMap));
-    console.log('Service Map Entries:', Object.entries(serviceMap));
-    console.log('Total Cost:', total);
-
     setTotalCost(total);
-    
+
     const serviceArray = Object.entries(serviceMap)
       .map(([service, cost]) => ({ name: service, cost: cost }))
       .sort((a, b) => b.cost - a.cost)
-      .slice(0, 10); // Top 10 services
-    
-    console.log('Final Service Array:', serviceArray);
+      .slice(0, 10);
+
     setCostByService(serviceArray);
   };
 
@@ -540,10 +523,10 @@ const CostAnalysisEnhancedPage = () => {
             Pass-through estimate for list buckets, sync, upload, and download calls from the Storage page.
           </p>
           <div className="storage-metering-cost-pills">
-            <span>AWS: ${Number(storageMetering.estimated_usd.AWS || 0).toFixed(6)}</span>
-            <span>GCP: ${Number(storageMetering.estimated_usd.GCP || 0).toFixed(6)}</span>
-            <span>Azure: ${Number(storageMetering.estimated_usd.Azure || 0).toFixed(6)}</span>
-            <strong>Total: ${Number(storageMetering.estimated_usd.total || 0).toFixed(6)} USD</strong>
+            <span>AWS: {formatCurrency(storageMetering.estimated_usd.AWS || 0, 6)}</span>
+            <span>GCP: {formatCurrency(storageMetering.estimated_usd.GCP || 0, 6)}</span>
+            <span>Azure: {formatCurrency(storageMetering.estimated_usd.Azure || 0, 6)}</span>
+            <strong>Total: {formatCurrency(storageMetering.estimated_usd.total || 0, 6)}</strong>
           </div>
         </div>
       )}

@@ -201,6 +201,7 @@ const AdminOverviewPage = () => {
               <Link to="/admin/users" className="btn-primary">Manage Users</Link>
               <Link to="/admin/analytics" className="btn-primary">Open Analytics</Link>
               <Link to="/admin/system" className="btn-primary">View System</Link>
+              <Link to="/admin/support" className="btn-primary">Support Inbox</Link>
               <Link to="/admin/settings" className="btn-primary">Admin Settings</Link>
             </div>
           </div>

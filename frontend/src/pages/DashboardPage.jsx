@@ -1,22 +1,15 @@
 // =============================================================================
-// PAGE: DashboardPage.jsx  (384 lines)
+// PAGE: DashboardPage.jsx
 // ROUTE: /dashboard (default landing after login)
-// PURPOSE: Mission Control bento-grid overview — live stats cards, cost sparkline,
-//          storage breakdown, quick actions panel, greeting banner
-// API: Uses apiClient from api.js → /api/dashboard/stats, /api/dashboard/cost-trend
-// CONTEXTS: AuthContext (user greeting), PreferencesContext (currency/date format)
-// LAYOUT: Rendered inside DashboardLayout.jsx (which handles Sidebar + Header + OnboardingTour)
-//         Uses bento-grid CSS layout — lg (2×2), md (1×1), sm card sizes
-// TOUR: Key bento cards have data-tour attributes for react-joyride onboarding steps
-// DO NOT:
-//   - Remove data-tour attributes (data-tour="cost-card", "storage-card", etc.) — breaks onboarding
-//   - Hardcode currency symbols — use PreferencesContext.currencySymbol
-//   - Add full page layout here — Sidebar/Header are in DashboardLayout.jsx
+// PURPOSE: Mission Control bento-grid overview — live stats, cost sparkline,
+//          storage breakdown, quick actions, greeting banner
+// API: /api/dashboard/stats, /cost-trend, /recent-activity, /refresh-costs
 // =============================================================================
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useAuth } from "../context/AuthContext.jsx";
 import { usePreferences } from "../context/PreferencesContext.jsx";
 import { getDashboardStats, apiClient } from "../api.js";
+import { apiUrl } from "../config/apiBase.js";
 import StatCard from "../components/dashboard/StatCard.jsx";
 import SparklineChart from "../components/dashboard/SparklineChart.jsx";
 import ProgressRing from "../components/dashboard/ProgressRing.jsx";
@@ -39,9 +32,8 @@ import PageRefreshButton from "../components/ui/PageRefreshButton.jsx";
 import { usePageRefresh } from "../hooks/usePageRefresh.js";
 import { useCountUp } from "../hooks/useCountUp.js";
 import { DashboardSkeleton } from "../components/Skeletons.jsx";
+import { PATHS } from "../data/productFacts.js";
 import '../styles/dashboard-enhanced.css';
-
-// --- Helpers ---
 
 const getGreeting = () => {
   const hour = new Date().getHours();
@@ -51,24 +43,19 @@ const getGreeting = () => {
   return { text: "Good night", tone: "Night watch online" };
 };
 
-// getFormattedDate is now handled by PreferencesContext.formatDateFriendly()
-
-/**
- * Generate synthetic 7-day cost trend data from a monthly total.
- * This creates a realistic-looking curve until the real cost-trend API exists.
- */
-const generateCostTrend = (monthlyTotal) => {
-  const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-  const dailyAvg = monthlyTotal / 30;
-  // Create a realistic variation pattern
-  const multipliers = [0.85, 1.1, 0.95, 1.2, 1.05, 0.7, 0.6];
-  return days.map((day, i) => ({
-    name: day,
-    value: Math.round(dailyAvg * multipliers[i] * 100) / 100,
-  }));
-};
-
-// --- Main Component ---
+function platformStatusLabel(data) {
+  if (!data) return { text: 'Checking platform…', className: 'loading' };
+  if (data.demo_mode || data.services?.billing_data === 'demo_mock') {
+    return { text: 'Demo mode — sample billing data', className: 'demo' };
+  }
+  if (data.overall === 'operational') {
+    return { text: 'All systems operational', className: 'healthy' };
+  }
+  if (data.overall === 'maintenance') {
+    return { text: 'Scheduled maintenance', className: 'warn' };
+  }
+  return { text: 'Partial degradation', className: 'warn' };
+}
 
 function DashboardPage() {
   const { token, user } = useAuth();
@@ -77,75 +64,134 @@ function DashboardPage() {
   const notifications = useNotifications();
   const { runPageRefresh, pageRefreshing } = usePageRefresh();
   const [stats, setStats] = useState(null);
-  const [, setBudgets] = useState([]);
+  const [budgets, setBudgets] = useState([]);
   const [recentActivity, setRecentActivity] = useState([]);
-  const [costTrend, setCostTrend] = useState('up');
+  const [costTrendSeries, setCostTrendSeries] = useState(null);
   const [vmHealth, setVmHealth] = useState({ healthy: 0, warning: 0, critical: 0 });
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [isRefreshingCosts, setIsRefreshingCosts] = useState(false);
   const [lastCostUpdate, setLastCostUpdate] = useState(null);
   const [costByProvider, setCostByProvider] = useState({});
+  const [costDemoMode, setCostDemoMode] = useState(false);
+  const [subscription, setSubscription] = useState(null);
+  const [platformStatus, setPlatformStatus] = useState(null);
+  const [billingStatus, setBillingStatus] = useState(null);
+  const [teamOrg, setTeamOrg] = useState(null);
+  const [attention, setAttention] = useState({ anomalies: 0, tickets: 0 });
 
   const greeting = useMemo(getGreeting, []);
   const formattedDate = useMemo(() => formatDateFriendly(new Date()), [formatDateFriendly]);
 
-  // Animated counters
   const animatedCost = useCountUp(stats?.monthly_costs || 0, 1400, 2);
   const animatedVMs = useCountUp(stats?.active_vms || 0, 1000);
   const animatedAlerts = useCountUp(stats?.security_alerts || 0, 800);
 
-  // Synthetic sparkline data
-  const sparklineData = useMemo(() => {
-    if (!stats) return [];
-    return generateCostTrend(stats.monthly_costs);
-  }, [stats]);
+  const storageCapTb = useMemo(() => {
+    const vmLimit = subscription?.vm_limit || 2;
+    const storageGb = subscription?.storage_gb || 10;
+    const totalGb = vmLimit * storageGb;
+    return Math.max(totalGb / 1024, 0.01);
+  }, [subscription]);
 
-  // Storage percentage (mock: 82% as shown in design)
   const storagePercentage = useMemo(() => {
     if (!stats) return 0;
-    return Math.min(Math.round((stats.storage_used_tb / 5) * 100), 100); // 5TB assumed max
-  }, [stats]);
+    return Math.min(Math.round((stats.storage_used_tb / storageCapTb) * 100), 100);
+  }, [stats, storageCapTb]);
+
+  const sparklineData = useMemo(() => {
+    if (!costTrendSeries?.has_data) return [];
+    return (costTrendSeries.points || []).map((p) => ({
+      name: p.label,
+      value: p.value,
+    }));
+  }, [costTrendSeries]);
+
+  const trendChip = useMemo(() => {
+    if (!costTrendSeries?.trend_pct || !costTrendSeries?.has_data) return null;
+    return {
+      trend: costTrendSeries.trend_direction || 'up',
+      value: `${costTrendSeries.trend_direction === 'down' ? '-' : '+'}${costTrendSeries.trend_pct}%`,
+    };
+  }, [costTrendSeries]);
+
+  const loadCostTrend = useCallback(async () => {
+    try {
+      const res = await apiClient.get('/dashboard/cost-trend?days=7');
+      setCostTrendSeries(res.data);
+      setCostDemoMode(Boolean(res.data?.demo_mode));
+    } catch {
+      setCostTrendSeries({ has_data: false, points: [] });
+    }
+  }, []);
 
   const fetchDashboardData = useCallback(async () => {
     if (!token) return;
-    
+
     setIsLoading(true);
     setError(null);
-    
+
     try {
-      const statsData = await getDashboardStats(token);
+      const [statsData] = await Promise.all([
+        getDashboardStats(token),
+      ]);
       setStats(statsData);
       setCostByProvider(statsData.cost_by_provider || {});
-      
+
       if (statsData.vm_health) {
         setVmHealth(statsData.vm_health);
       }
 
-      try {
-        const budgetResponse = await apiClient.get('/budgets/status');
-        setBudgets(budgetResponse.data.slice(0, 3));
-      } catch (_err) {
-        console.log('Budgets not available');
-      }
+      const parallel = await Promise.allSettled([
+        apiClient.get('/budgets/status'),
+        apiClient.get('/dashboard/recent-activity?limit=6'),
+        apiClient.get('/payments/my-subscription'),
+        fetch(apiUrl('/platform/status')),
+        apiClient.get('/cost/billing-status'),
+        apiClient.get('/organizations/me'),
+        apiClient.get('/cost/anomalies/summary'),
+        apiClient.get('/support/tickets'),
+        loadCostTrend(),
+      ]);
 
-      try {
-        const activityResponse = await apiClient.get('/dashboard/recent-activity?limit=6');
-        setRecentActivity(activityResponse.data || []);
-      } catch (_err) {
-        console.log('Activity data not available');
-        setRecentActivity([]);
+      if (parallel[0].status === 'fulfilled') {
+        setBudgets((parallel[0].value.data || []).slice(0, 3));
       }
-      
-      setCostTrend(statsData.monthly_costs > 0 ? 'up' : 'stable');
-    } catch (error) {
-      console.error("Failed to fetch dashboard data:", error);
+      if (parallel[1].status === 'fulfilled') {
+        setRecentActivity(parallel[1].value.data || []);
+      }
+      if (parallel[2].status === 'fulfilled') {
+        setSubscription(parallel[2].value.data);
+      }
+      if (parallel[3].status === 'fulfilled' && parallel[3].value.ok) {
+        setPlatformStatus(await parallel[3].value.json());
+      }
+      if (parallel[4].status === 'fulfilled') {
+        setBillingStatus(parallel[4].value.data);
+      }
+      if (parallel[5].status === 'fulfilled') {
+        setTeamOrg(parallel[5].value.data);
+      }
+      const anomalyCount =
+        parallel[6].status === 'fulfilled'
+          ? parallel[6].value.data?.unacknowledged || 0
+          : 0;
+      const ticketCount =
+        parallel[7].status === 'fulfilled'
+          ? (parallel[7].value.data?.tickets || []).filter((t) => t.status === 'open').length
+          : 0;
+      setAttention({
+        anomalies: anomalyCount,
+        tickets: ticketCount,
+      });
+    } catch (err) {
+      console.error("Failed to fetch dashboard data:", err);
       setError("Failed to load dashboard data. Please try again.");
       notifications.error('Failed to load dashboard data');
     } finally {
       setIsLoading(false);
     }
-  }, [token, notifications]);
+  }, [token, notifications, loadCostTrend]);
 
   useEffect(() => {
     fetchDashboardData();
@@ -163,7 +209,9 @@ function DashboardPage() {
             cost_by_provider: response.data.cost_by_provider,
           }));
           setCostByProvider(response.data.cost_by_provider || {});
+          setCostDemoMode(Boolean(response.data.demo_mode));
           setLastCostUpdate(new Date().toLocaleTimeString());
+          await loadCostTrend();
           return response.data;
         }
         throw new Error('Refresh failed');
@@ -171,18 +219,17 @@ function DashboardPage() {
       {
         loadingMessage: 'Refreshing cost data...',
         getSuccessMessage: (result) => `Cost data refreshed: ${formatCurrency(result.monthly_costs)}`,
-
         errorMessage: 'Failed to refresh cost data',
       }
-    ).catch((error) => {
-      console.error('Failed to refresh costs:', error);
+    ).catch((err) => {
+      console.error('Failed to refresh costs:', err);
     }).finally(() => {
       setIsRefreshingCosts(false);
     });
   };
 
   const getActivityIcon = (type) => {
-    switch(type) {
+    switch (type) {
       case 'vm': return <IconServer />;
       case 'storage': return <IconHardDrive />;
       case 'cost': return <IconDollarSign />;
@@ -190,6 +237,15 @@ function DashboardPage() {
       default: return <IconActivity />;
     }
   };
+
+  const offlineProviders = useMemo(() => {
+    if (!billingStatus?.providers) return [];
+    return Object.entries(billingStatus.providers)
+      .filter(([, p]) => !p?.live)
+      .map(([key]) => key.toUpperCase());
+  }, [billingStatus]);
+
+  const statusBanner = platformStatusLabel(platformStatus);
 
   if (isLoading) {
     return <DashboardSkeleton />;
@@ -212,10 +268,11 @@ function DashboardPage() {
   }
 
   const totalVMs = vmHealth.healthy + vmHealth.warning + vmHealth.critical;
+  const hasAttention =
+    stats.security_alerts > 0 || attention.anomalies > 0 || attention.tickets > 0;
 
   return (
     <div className="dashboard-overview zenith-page-enter">
-      {/* ============ GREETING ============ */}
       <div className="mc-greeting">
         <div className="mc-greeting-text">
           <span className="mc-kicker">
@@ -225,7 +282,7 @@ function DashboardPage() {
           <h2>
             {greeting.text}, {user.username}
           </h2>
-          <p className="greeting-date">{formattedDate} — Here's your cloud overview</p>
+          <p className="greeting-date">{formattedDate} — Here&apos;s your cloud overview</p>
         </div>
         <PageRefreshButton
           onClick={() =>
@@ -239,21 +296,52 @@ function DashboardPage() {
         />
       </div>
 
-      {/* ============ BENTO GRID ============ */}
+      {hasAttention && (
+        <div className="dashboard-attention-strip" role="status">
+          <span className="dashboard-attention-strip__label">Needs attention</span>
+          {stats.security_alerts > 0 && (
+            <button type="button" className="dashboard-attention-pill" onClick={() => navigate(PATHS.security)}>
+              {stats.security_alerts} security alert{stats.security_alerts !== 1 ? 's' : ''}
+            </button>
+          )}
+          {attention.anomalies > 0 && (
+            <button type="button" className="dashboard-attention-pill" onClick={() => navigate(PATHS.costs)}>
+              {attention.anomalies} cost anomal{attention.anomalies !== 1 ? 'ies' : 'y'}
+            </button>
+          )}
+          {attention.tickets > 0 && (
+            <button type="button" className="dashboard-attention-pill" onClick={() => navigate(PATHS.support)}>
+              {attention.tickets} open ticket{attention.tickets !== 1 ? 's' : ''}
+            </button>
+          )}
+        </div>
+      )}
+
+      {offlineProviders.length > 0 && !billingStatus?.demo_mode && (
+        <div className="dashboard-setup-card bento-card" data-type="costs">
+          <h3 className="card-title">Cloud billing setup</h3>
+          <p className="card-subtitle">
+            Connect billing for: {offlineProviders.join(', ')}. Open Cost Analysis to complete setup.
+          </p>
+          <button type="button" className="view-details-btn" onClick={() => navigate(PATHS.costs)}>
+            Open Cost Analysis →
+          </button>
+        </div>
+      )}
+
       <div className="bento-grid" data-tour="bento-grid">
-        {/* --- Cost Overview (Large, 2-col, 2-row) --- */}
         <StatCard
           title="Cost Overview"
           value={`${currencySymbol}${animatedCost}`}
           icon={<IconDollarSign />}
           type="costs"
           size="lg"
-          trend={costTrend}
-          trendValue="+12.5%"
+          trend={trendChip?.trend}
+          trendValue={trendChip?.value}
           data-tour="card-costs"
           action={
-            <button 
-              className="refresh-costs-btn" 
+            <button
+              className="refresh-costs-btn"
               type="button"
               onClick={refreshCosts}
               disabled={isRefreshingCosts}
@@ -265,21 +353,28 @@ function DashboardPage() {
             </button>
           }
           subtitle={
-            lastCostUpdate
-              ? `Updated: ${lastCostUpdate}${
-                  Object.keys(costByProvider).length > 0
-                    ? ` · ${Object.entries(costByProvider)
-                        .map(([k, v]) => `${k.toUpperCase()} ${formatCurrency(v)}`)
-                        .join(' + ')}`
-                    : ''
-                }`
-              : '30-day spend (all available clouds)'
+            `${costDemoMode ? 'Demo data · ' : ''}${
+              lastCostUpdate
+                ? `Updated: ${lastCostUpdate}${
+                    Object.keys(costByProvider).length > 0
+                      ? ` · ${Object.entries(costByProvider)
+                          .map(([k, v]) => `${k.toUpperCase()} ${formatCurrency(v)}`)
+                          .join(' + ')}`
+                      : ''
+                  }`
+                : '30-day spend (all available clouds)'
+            }`
           }
         >
-          <SparklineChart data={sparklineData} height={140} showXAxis={true} />
+          {sparklineData.length > 0 ? (
+            <SparklineChart data={sparklineData} height={140} showXAxis={true} />
+          ) : (
+            <p className="dashboard-sparkline-empty">
+              Refresh costs to build your 7-day trend.
+            </p>
+          )}
         </StatCard>
 
-        {/* --- VM Health (Medium) --- */}
         <StatCard
           title="VM Health"
           icon={<IconServer />}
@@ -289,10 +384,10 @@ function DashboardPage() {
         >
           <div className="vm-rings-row">
             <div className="vm-ring-item">
-              <ProgressRing 
-                percentage={totalVMs > 0 ? (vmHealth.healthy / Math.max(totalVMs, 1)) * 100 : 0} 
-                color="var(--success)" 
-                size={56} 
+              <ProgressRing
+                percentage={totalVMs > 0 ? (vmHealth.healthy / Math.max(totalVMs, 1)) * 100 : 0}
+                color="var(--success)"
+                size={56}
                 strokeWidth={5}
               >
                 <span className="ring-count">{vmHealth.healthy}</span>
@@ -300,10 +395,10 @@ function DashboardPage() {
               <span className="ring-label">Healthy</span>
             </div>
             <div className="vm-ring-item">
-              <ProgressRing 
-                percentage={totalVMs > 0 ? (vmHealth.warning / Math.max(totalVMs, 1)) * 100 : 0} 
-                color="var(--warning)" 
-                size={56} 
+              <ProgressRing
+                percentage={totalVMs > 0 ? (vmHealth.warning / Math.max(totalVMs, 1)) * 100 : 0}
+                color="var(--warning)"
+                size={56}
                 strokeWidth={5}
               >
                 <span className="ring-count">{vmHealth.warning}</span>
@@ -311,10 +406,10 @@ function DashboardPage() {
               <span className="ring-label">Warning</span>
             </div>
             <div className="vm-ring-item">
-              <ProgressRing 
-                percentage={totalVMs > 0 ? (vmHealth.critical / Math.max(totalVMs, 1)) * 100 : 0} 
-                color="var(--danger)" 
-                size={56} 
+              <ProgressRing
+                percentage={totalVMs > 0 ? (vmHealth.critical / Math.max(totalVMs, 1)) * 100 : 0}
+                color="var(--danger)"
+                size={56}
                 strokeWidth={5}
               >
                 <span className="ring-count">{vmHealth.critical}</span>
@@ -322,12 +417,11 @@ function DashboardPage() {
               <span className="ring-label">Critical</span>
             </div>
           </div>
-          <button className="view-details-btn" type="button" onClick={() => navigate('/dashboard/vmcluster')}>
+          <button className="view-details-btn" type="button" onClick={() => navigate(PATHS.vmCluster)}>
             View VM Cluster →
           </button>
         </StatCard>
 
-        {/* --- Storage Used (Small) --- */}
         <StatCard
           title="Storage"
           icon={<IconHardDrive />}
@@ -335,20 +429,21 @@ function DashboardPage() {
           size="sm"
         >
           <div className="storage-ring-center">
-            <ProgressRing 
-              percentage={storagePercentage} 
-              color="var(--gold-primary)" 
-              size={90} 
+            <ProgressRing
+              percentage={storagePercentage}
+              color="var(--gold-primary)"
+              size={90}
               strokeWidth={7}
             >
               <span className="ring-value">{stats.storage_used_tb}</span>
               <span className="ring-unit">TB</span>
             </ProgressRing>
-            <span className="storage-capacity">{storagePercentage}% of capacity</span>
+            <span className="storage-capacity">
+              {storagePercentage}% of plan capacity ({storageCapTb.toFixed(2)} TB)
+            </span>
           </div>
         </StatCard>
 
-        {/* --- Security Alerts (Small) --- */}
         <StatCard
           title="Security"
           icon={<IconShieldCheck />}
@@ -357,38 +452,74 @@ function DashboardPage() {
           value={animatedAlerts}
           subtitle={stats.security_alerts > 0 ? "Needs attention" : "All clear"}
         >
-          <button className="view-details-btn" type="button" onClick={() => navigate('/dashboard/security')}>
+          <button className="view-details-btn" type="button" onClick={() => navigate(PATHS.security)}>
             View Security →
           </button>
         </StatCard>
+
+        {budgets.length > 0 && (
+          <div className="bento-card size-sm" data-type="costs">
+            <div className="stat-card-header">
+              <div className="stat-icon"><IconBarChart /></div>
+              <h3 className="card-title">Budget alerts</h3>
+            </div>
+            <div className="card-content dashboard-budget-list">
+              {budgets.map((b) => (
+                <div key={b.id || b.name} className="dashboard-budget-item">
+                  <span>{b.name}</span>
+                  <strong>
+                    {formatCurrency(b.current_spend || 0)} / {formatCurrency(b.amount || 0)}
+                  </strong>
+                </div>
+              ))}
+            </div>
+            <button type="button" className="view-details-btn" onClick={() => navigate(PATHS.costs)}>
+              Manage budgets →
+            </button>
+          </div>
+        )}
+
+        {teamOrg?.organization && (
+          <div className="bento-card size-sm" data-type="security">
+            <div className="stat-card-header">
+              <h3 className="card-title">Team</h3>
+            </div>
+            <div className="card-content">
+              <p className="card-value" style={{ fontSize: '1.1rem' }}>{teamOrg.organization.name}</p>
+              <p className="card-subtitle">
+                {teamOrg.members?.length || 0} member{(teamOrg.members?.length || 0) !== 1 ? 's' : ''} · your role: {teamOrg.my_role}
+              </p>
+            </div>
+            <button type="button" className="view-details-btn" onClick={() => navigate(PATHS.team)}>
+              Manage team →
+            </button>
+          </div>
+        )}
       </div>
 
-      {/* ============ QUICK ACTIONS + ACTIVITY ============ */}
       <div className="mc-bottom-row">
-        {/* Quick Actions */}
         <div className="bento-card mc-quick-actions" data-tour="quick-actions">
           <h3 className="card-title">Quick Actions</h3>
           <div className="quick-actions-grid">
-            <button className="action-btn" type="button" onClick={() => navigate('/dashboard/vmcluster')}>
+            <button className="action-btn" type="button" onClick={() => navigate(PATHS.vmCluster)}>
               <span className="action-icon"><IconServer /></span>
               <span className="action-text">Manage VMs</span>
             </button>
-            <button className="action-btn" type="button" onClick={() => navigate('/dashboard/storage')}>
+            <button className="action-btn" type="button" onClick={() => navigate(PATHS.storage)}>
               <span className="action-icon"><IconUploadCloud /></span>
               <span className="action-text">Upload Files</span>
             </button>
-            <button className="action-btn" type="button" onClick={() => navigate('/dashboard/costs')}>
+            <button className="action-btn" type="button" onClick={() => navigate(PATHS.costs)}>
               <span className="action-icon"><IconBarChart /></span>
               <span className="action-text">Cost Analysis</span>
             </button>
-            <button className="action-btn" type="button" onClick={() => navigate('/dashboard/security')}>
+            <button className="action-btn" type="button" onClick={() => navigate(PATHS.security)}>
               <span className="action-icon"><IconShieldCheck /></span>
               <span className="action-text">Security</span>
             </button>
           </div>
         </div>
 
-        {/* Activity Timeline (horizontal scroll) */}
         <div className="bento-card mc-activity-timeline">
           <h3 className="card-title">Recent Activity</h3>
           {recentActivity.length > 0 ? (
@@ -409,14 +540,15 @@ function DashboardPage() {
         </div>
       </div>
 
-      {/* System Status */}
-      <div className="system-status-banner">
+      <div className={`system-status-banner system-status-banner--${statusBanner.className}`}>
         <div className="status-indicator">
-          <span className="status-dot healthy"></span>
-          <span>All Systems Operational</span>
+          <span className={`status-dot ${statusBanner.className}`}></span>
+          <span>{statusBanner.text}</span>
         </div>
         <div className="status-info">
-          <span>Last updated: {new Date().toLocaleTimeString()}</span>
+          <button type="button" className="dashboard-status-link" onClick={() => navigate('/status')}>
+            View status page
+          </button>
         </div>
       </div>
     </div>

@@ -2,26 +2,28 @@
 
 ## ✅ Last Known Good State
 
-**Status:** COMPLETE (2026-06-10)
+**Status:** COMPLETE (2026-06-11)
 
-**Phase 20 — Trust docs + BYOC encryption hardening** shipped.
+**Phase 22 — SaaS pages polish (zero/low-cost)** shipped.
 
 **Key paths:**
-- Docs: `docs/security/TRUST_AND_ENCRYPTION.md`, `docs/security/BYOC_CREDENTIAL_ENCRYPTION.md`
-- Backend: `backend/app/byoc/encryption.py` (v1 prefix, idempotent encrypt, merge)
-- Tests: `backend/tests/test_byoc_encryption.py`
-- AI context: `ai-docs/AI_CONTEXT_BACKEND.md`, parity matrix, `CREDENTIAL_CONTRACT.md`
+- Copy SSOT: `frontend/src/data/productFacts.js`, `frontend/src/config/billingConstants.js`
+- Backend: `dashboard/cost_snapshots.py`, `GET /api/dashboard/cost-trend`, `POST /api/support/tickets`, `DELETE /api/organizations/invites/{email}`
+- Pages: `DashboardPage`, `HelpCenterPage`, `BillingPage`, `SupportPage`, `TeamPage`, `CostAnalysisEnhancedPage`
+- Tests: `test_dashboard_cost_trend.py`, org revoke + support create in integration tests
+- Manual QA: `docs/testing/manual_testing.md` rows 6.4–6.10
 
-**Prior (Phase 19):** Platform multi-region storage + page refresh UX.
+**Prior (Phase 20):** Trust docs + BYOC encryption hardening.
 
-**Quality gates:** Run `pytest tests/test_byoc_encryption.py -q` after pull.
+**Quality gates:** `pytest tests/integration/test_dashboard_cost_trend.py tests/integration/test_organizations_api.py tests/integration/test_support_api.py -q`; `cd frontend && npm run build`
 
 ---
 
 ## Step list (completed)
 
-- [x] Step 1: Audit existing trust/BYOC docs — gaps found
-- [x] Step 2: Create TRUST_AND_ENCRYPTION.md + BYOC_CREDENTIAL_ENCRYPTION.md
-- [x] Step 3: Harden encryption.py (v1 prefix, merge, idempotent)
-- [x] Step 4: Wire merge in routes_byoc _save_* helpers
-- [x] Step 5: Update docs index, parity matrix, manual_testing, ai-docs
+- [x] productFacts + Help/marketing pricing rewrite
+- [x] Billing FX constant + API plan names
+- [x] Overview honesty + cost-trend Mongo snapshots
+- [x] Cost Analysis cleanup + CostHubNav dedup
+- [x] Team revoke/copy + Support in-app tickets + Admin polish
+- [x] manual_testing.md + ai-docs context updates

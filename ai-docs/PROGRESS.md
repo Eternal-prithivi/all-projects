@@ -1,12 +1,24 @@
 # PROGRESS.md — Task Tracker
 
-> **Last Updated:** 2026-06-10
+> **Last Updated:** 2026-06-11
 
 ---
 
 ## 🔴 Active Task
 
-_None — Phase 20 complete._
+_None — Phase 22 complete._
+
+---
+
+## Phase 22 — SaaS pages polish (zero/low-cost) ✅
+
+- [x] **22.1** — `productFacts.js` + Help/marketing INR copy SSOT
+- [x] **22.2** — `billing_constants` FX + BillingPage API plan names
+- [x] **22.3** — Dashboard honesty (status, storage cap, budgets, team, attention strip)
+- [x] **22.4** — `cost_snapshots` + `GET /dashboard/cost-trend` (Mongo read on load)
+- [x] **22.5** — Cost Analysis cleanup; CostHubNav without duplicate Billing
+- [x] **22.6** — Team invite revoke + copy; Support `POST /tickets`; Admin test dev-only
+- [x] **22.7** — `manual_testing.md` 6.4–6.10 + integration tests + build
 
 ---
 

@@ -23,7 +23,7 @@ def _monthly_range() -> Tuple[str, str]:
     return start_date, end_date
 
 
-def _fetch_provider_total(username: str, provider_key: str) -> Optional[float]:
+def _fetch_provider_billing(username: str, provider_key: str) -> Optional[Dict[str, Any]]:
     from app.cost.manager import (
         get_aws_cost_and_usage,
         get_azure_billing_data,
@@ -49,6 +49,13 @@ def _fetch_provider_total(username: str, provider_key: str) -> Optional[float]:
         )
         return None
 
+    return data
+
+
+def _fetch_provider_total(username: str, provider_key: str) -> Optional[float]:
+    data = _fetch_provider_billing(username, provider_key)
+    if data is None:
+        return None
     return float(sum_billing_total(data))
 
 
@@ -66,19 +73,32 @@ def refresh_user_costs(username: str, *, force: bool = False) -> Dict[str, Any]:
     ):
         return cached
 
+    from app.dashboard.cost_snapshots import extract_daily_totals, save_daily_snapshots
+
     providers = available_providers(username, CloudFeature.COST)
     by_provider: Dict[str, float] = {}
     skipped: Dict[str, str] = {}
+    merged_daily: Dict[str, float] = {}
 
     for display in providers:
         key = normalize_provider_key(display)
         try:
-            amount = _fetch_provider_total(username, key)
-            if amount is not None:
-                by_provider[key] = round(amount, 2)
+            billing = _fetch_provider_billing(username, key)
+            if billing is None:
+                continue
+            amount = float(sum_billing_total(billing))
+            by_provider[key] = round(amount, 2)
+            for day, val in extract_daily_totals(billing).items():
+                merged_daily[day] = round(merged_daily.get(day, 0.0) + val, 4)
         except Exception as exc:
             logger.warning("Dashboard cost fetch failed %s/%s: %s", username, key, exc)
             skipped[key] = str(exc)
+
+    if merged_daily:
+        try:
+            save_daily_snapshots(username, merged_daily)
+        except Exception as exc:
+            logger.warning("Failed to save cost snapshots for %s: %s", username, exc)
 
     total = round(sum(by_provider.values()), 2)
     payload = {

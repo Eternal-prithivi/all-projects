@@ -11,22 +11,9 @@ import PageHeader from '../components/ui/PageHeader.jsx';
 import { usePageRefresh } from '../hooks/usePageRefresh.js';
 import { useNotifications } from '../hooks/useNotifications.js';
 import { usePreferences } from '../context/PreferencesContext.jsx';
+import { FX_USD_TO_INR, FX_ESTIMATE_LABEL } from '../config/billingConstants.js';
+import { getPlanById, PATHS, SUPPORT_EMAIL } from '../data/productFacts.js';
 import '../styles/billing.css';
-
-const FX_USD_TO_INR = 83;
-
-const PLAN_NAMES = {
-  free: 'Free',
-  basic: 'Basic',
-  pro: 'Pro',
-  enterprise: 'Enterprise',
-};
-
-const PLAN_PRICES_INR = {
-  basic: { monthly: 499, yearly: 4990 },
-  pro: { monthly: 1499, yearly: 14990 },
-  enterprise: { monthly: 4999, yearly: 49990 },
-};
 
 function BillingPage() {
   const [subscription, setSubscription] = useState(() => {
@@ -51,6 +38,7 @@ function BillingPage() {
       return null;
     }
   });
+  const [plans, setPlans] = useState([]);
   const [loading, setLoading] = useState(() => !sessionStorage.getItem('cache_billing_sub'));
   const [processingPayment, setProcessingPayment] = useState(false);
   const [activeTab, setActiveTab] = useState('payments');
@@ -74,15 +62,17 @@ function BillingPage() {
       if (!sessionStorage.getItem('cache_billing_sub')) {
         setLoading(true);
       }
-      const [subRes, historyRes, invoicesRes] = await Promise.all([
+      const [subRes, historyRes, invoicesRes, plansRes] = await Promise.all([
         apiClient.get('/payments/my-subscription'),
         apiClient.get('/payments/payment-history'),
         apiClient.get('/billing/invoices').catch(() => ({ data: { invoices: [] } })),
+        apiClient.get('/payments/plans').catch(() => ({ data: [] })),
       ]);
 
       setSubscription(subRes.data);
       setPaymentHistory(historyRes.data);
       setInvoices(invoicesRes.data.invoices || []);
+      setPlans(plansRes.data || []);
       sessionStorage.setItem('cache_billing_sub', JSON.stringify(subRes.data));
       sessionStorage.setItem('cache_billing_history', JSON.stringify(historyRes.data));
     } catch (error) {
@@ -112,13 +102,28 @@ function BillingPage() {
   const formatINR = (amount) =>
     `₹${Number(amount || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`;
 
-  const getPlanDisplayName = (planId) => PLAN_NAMES[planId] || planId || 'Free';
+  const resolvePlanMeta = (planId) => {
+    const fromApi = plans.find((p) => p.plan_id === planId);
+    if (fromApi) return fromApi;
+    const fallback = getPlanById(planId);
+    if (fallback) {
+      return {
+        plan_id: fallback.plan_id,
+        name: fallback.name,
+        price_monthly: fallback.price_monthly,
+        price_yearly: fallback.price_yearly,
+      };
+    }
+    return { plan_id: planId, name: planId || 'Free', price_monthly: 0, price_yearly: 0 };
+  };
+
+  const getPlanDisplayName = (planId) => resolvePlanMeta(planId).name;
 
   const calculateNextBillingAmount = () => {
     if (!subscription?.plan_id || subscription.plan_id === 'free') return 0;
-    return (
-      PLAN_PRICES_INR[subscription.plan_id]?.[subscription.billing_cycle || 'monthly'] || 0
-    );
+    const meta = resolvePlanMeta(subscription.plan_id);
+    const cycle = subscription.billing_cycle || 'monthly';
+    return cycle === 'yearly' ? meta.price_yearly || 0 : meta.price_monthly || 0;
   };
 
   const billBreakdown = useMemo(() => {
@@ -132,7 +137,12 @@ function BillingPage() {
         cloudCostsUSD += currentMonthCosts.costs.platform_fee || 0;
       }
     }
-    const subscriptionINR = calculateNextBillingAmount();
+    let subscriptionINR = 0;
+    if (subscription?.plan_id && subscription.plan_id !== 'free') {
+      const meta = resolvePlanMeta(subscription.plan_id);
+      const cycle = subscription.billing_cycle || 'monthly';
+      subscriptionINR = cycle === 'yearly' ? meta.price_yearly || 0 : meta.price_monthly || 0;
+    }
     const cloudCostsINR = cloudCostsUSD * FX_USD_TO_INR;
     return {
       cloudUSD: cloudCostsUSD,
@@ -140,7 +150,7 @@ function BillingPage() {
       subscriptionINR,
       totalINR: cloudCostsINR + subscriptionINR,
     };
-  }, [currentMonthCosts, subscription]);
+  }, [currentMonthCosts, subscription, plans]);
 
   const handlePayNow = async () => {
     if (billBreakdown.totalINR === 0) {
@@ -457,14 +467,28 @@ function BillingPage() {
           <section className="zenith-glass-panel billing-panel billing-panel--muted">
             <h2 className="billing-panel-title">Need help?</h2>
             <ul className="billing-help-list">
-              <li>
-                Invoices and receipts are available under the history tabs below.
-              </li>
+              <li>Invoices and receipts are available under the history tabs below.</li>
               <li>Payments are encrypted — card details are never stored on our servers.</li>
               <li>
-                Questions? Email{' '}
-                <a href="mailto:support@zenith.cloud" className="billing-link">
-                  support@zenith.cloud
+                Questions about your bill?{' '}
+                <button
+                  type="button"
+                  className="billing-link billing-link--btn"
+                  onClick={() => navigate(`${PATHS.support}?new=1`)}
+                >
+                  Open a support ticket
+                </button>{' '}
+                or{' '}
+                <button
+                  type="button"
+                  className="billing-link billing-link--btn"
+                  onClick={() => navigate('/help?topic=billing')}
+                >
+                  billing FAQ
+                </button>
+                . Email{' '}
+                <a href={`mailto:${SUPPORT_EMAIL}`} className="billing-link">
+                  {SUPPORT_EMAIL}
                 </a>
               </li>
             </ul>
@@ -519,7 +543,7 @@ function BillingPage() {
                 <span>{formatCurrency(billBreakdown.cloudUSD)}</span>
               </div>
               <div className="billing-line-item billing-line-item--muted">
-                <span>Est. INR (@ ₹{FX_USD_TO_INR}/USD)</span>
+                <span>{FX_ESTIMATE_LABEL}</span>
                 <span>{formatINR(Math.round(billBreakdown.cloudINR))}</span>
               </div>
               {isPaidPlan && (

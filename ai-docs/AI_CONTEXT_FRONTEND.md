@@ -1,7 +1,7 @@
 # AI_CONTEXT_FRONTEND.md — Frontend Architecture & Source Map
 
 > Read this for any frontend, UI, CSS, component, or routing task.
-> **Last Updated: 2026-06-09** — Phase 19 platform storage regions + page refresh UX.
+> **Last Updated: 2026-06-11** — Phase 22 SaaS pages polish + Phase 21 provision wizard.
 
 ---
 
@@ -38,7 +38,7 @@ For backend context → read `AI_CONTEXT_BACKEND.md`
 | `/support/ticket` | `SupportTicketPage.jsx` — guest OTP lookup + thread |
 | `/about` | `AboutPage.jsx` |
 | `/features` | `FeaturesPage.jsx` |
-| `/help` | `HelpCenterPage.jsx` — 26 FAQs, search, 6 categories |
+| `/help` | `HelpCenterPage.jsx` — FAQs from `data/productFacts.js`; `?topic=` / `?q=` deep links |
 | `/legal/terms` | `TermsOfServicePage.jsx` |
 | `/legal/privacy` | `PrivacyPolicyPage.jsx` |
 | `/legal/cookies` | `CookiePolicyPage.jsx` |
@@ -46,7 +46,7 @@ For backend context → read `AI_CONTEXT_BACKEND.md`
 | `/trust` | `TrustCenterPage.jsx` |
 | `/status` | `StatusPage.jsx` — polls `GET /api/platform/status` |
 | `/verify-email` | `VerifyEmailPage.jsx` — `POST /api/auth/verify-email?token=` |
-| `/pricing` | `PublicPricingPage.jsx` — shared `data/marketingPricing.js` |
+| `/pricing` | `PublicPricingPage.jsx` — re-exports `data/marketingPricing.js` → `productFacts.js` |
 | `/docs` | `DocsHubPage.jsx` — links to Swagger + Help |
 | `/session-expired` | `SessionExpiredPage.jsx` |
 | `/billing/success`, `/billing/cancel` | `BillingSuccessPage.jsx`, `BillingCancelPage.jsx` |
@@ -61,8 +61,8 @@ For backend context → read `AI_CONTEXT_BACKEND.md`
 
 | Route | Page File | Notes |
 |-------|----------|----|
-| `/dashboard` | `DashboardPage.jsx` | Bento grid, Mission Control layout, greeting |
-| `/dashboard/costs` | `CostAnalysisEnhancedPage.jsx` | Cost hub sub-nav (simulator, optimization, billing) |
+| `/dashboard` | `DashboardPage.jsx` | Bento grid; platform status; cost trend from `/api/dashboard/cost-trend`; team/budget cards |
+| `/dashboard/costs` | `CostAnalysisEnhancedPage.jsx` | Cost hub sub-nav (simulator, optimization, pricing — Billing in sidebar only) |
 | `/dashboard/simulator` | `CostSimulatorPage.jsx` | |
 | `/dashboard/optimization` | `CostOptimizationPage.jsx` | |
 | `/dashboard/billing` | `BillingPage.jsx` | |
@@ -75,8 +75,8 @@ For backend context → read `AI_CONTEXT_BACKEND.md`
 | `/dashboard/profile` | `ProfilePage.jsx` | |
 | `/dashboard/settings` | `SettingsPage.jsx` | Infrastructure provisioning engine (Boto3/Terraform); Preferences + Restart Tour |
 | `/dashboard/notifications` | `NotificationsPage.jsx` | Paginated history; All/Unread tabs; type filters |
-| `/dashboard/team` | `TeamPage.jsx` | Org create, invites, members |
-| `/dashboard/support` | `SupportPage.jsx` | Logged-in ticket list + chat thread (10s poll + WS) |
+| `/dashboard/team` | `TeamPage.jsx` | Org create, invites (copy link, revoke), members; per-account billing callout |
+| `/dashboard/support` | `SupportPage.jsx` | New ticket form + list + thread (10s poll + WS) |
 | `/invite/:token` | `AcceptInvitePage.jsx` | Accept team invite |
 | `/auth/sso/callback` | `SsoCallbackPage.jsx` | OAuth redirect handler |
 
@@ -91,7 +91,7 @@ For backend context → read `AI_CONTEXT_BACKEND.md`
 | `/admin/payments` | `AdminPaymentsPage.jsx` |
 | `/admin/system` | `AdminSystemPage.jsx` |
 | `/admin/settings` | `AdminSettingsPage.jsx` |
-| `/admin/test` | `AdminTestPage.jsx` |
+| `/admin/test` | `AdminTestPage.jsx` | **Dev only** (`import.meta.env.DEV`) |
 | `/admin/support` | `AdminSupportPage.jsx` | Support inbox — reply, status |
 
 ---
