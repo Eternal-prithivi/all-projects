@@ -15,7 +15,7 @@ jobs:
         run: |
           BASE="${{ secrets.UPTIME_API_URL }}"
           BASE="${BASE%/}"
-          curl -fsS "${BASE}/health" | tee health.json
+          curl -fsS "${BASE}/health/ready" | tee health.json
           curl -fsS "${BASE}/api/platform/status" | tee status.json
           python3 -c "import json; h=json.load(open('health.json')); assert h.get('mongo_connected') is True, h"
 

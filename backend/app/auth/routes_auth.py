@@ -153,7 +153,8 @@ def login_for_access_token_route(
     client_ip = get_client_ip(request)
     device_label = parse_user_agent(request.headers.get("user-agent"))
     device_fingerprint = (request.headers.get("x-device-fingerprint") or "").strip() or None
-    location_label = resolve_geo_location(client_ip)
+    # Short timeout — login must not block on a free external geo API (especially after cold start).
+    location_label = resolve_geo_location(client_ip, timeout=0.8)
 
     try:
         DB = get_database()

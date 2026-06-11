@@ -50,7 +50,7 @@ def parse_user_agent(user_agent: Optional[str]) -> str:
     return browser
 
 
-def resolve_geo_location(ip: str) -> str:
+def resolve_geo_location(ip: str, timeout: float = 2.5) -> str:
     """Best-effort city/country from IP (free tier ip-api.com). Falls back gracefully."""
     if not ip or ip in ("Unknown", "127.0.0.1", "::1", "localhost"):
         return "Local network"
@@ -58,7 +58,7 @@ def resolve_geo_location(ip: str) -> str:
         return "Local network"
     try:
         url = f"http://ip-api.com/json/{ip}?fields=status,country,city"
-        with urllib.request.urlopen(url, timeout=2.5) as resp:
+        with urllib.request.urlopen(url, timeout=timeout) as resp:
             data = json.loads(resp.read().decode("utf-8"))
         if data.get("status") == "success":
             city = (data.get("city") or "").strip()

@@ -1,5 +1,6 @@
-# Pings Render /health every 5 minutes so the free-tier web service does not spin down
-# after ~15 minutes of no traffic. Scheduled workflows run only on the repository DEFAULT branch.
+# Pings Render /health/ready every 5 minutes so the free-tier web service stays warm
+# (MongoDB + app deps), not just the lightweight /health liveness probe.
+# Scheduled workflows run only on the repository DEFAULT branch.
 #
 # Optional: set secret RENDER_API_URL (e.g. https://zenith-backend-707i.onrender.com)
 name: Render keep-alive
@@ -16,15 +17,29 @@ concurrency:
 jobs:
   ping:
     runs-on: ubuntu-latest
-    timeout-minutes: 2
+    timeout-minutes: 8
     steps:
-      - name: Wake Render backend (/health)
+      - name: Wake Render backend (/health/ready, with retries)
         env:
           RENDER_API_URL: ${{ secrets.RENDER_API_URL }}
         run: |
           BASE="${RENDER_API_URL:-https://zenith-backend-707i.onrender.com}"
           BASE="${BASE%/}"
-          echo "Pinging ${BASE}/health"
-          curl -fsS --max-time 90 "${BASE}/health"
-          echo ""
-          echo "OK — backend received traffic (helps prevent Render free-tier sleep)."
+          URL="${BASE}/health/ready"
+          echo "Warming ${URL} (MongoDB + dependencies — not just /health)"
+
+          for attempt in 1 2 3; do
+            echo "Attempt ${attempt}/3..."
+            if curl -fsS --max-time 120 "${URL}"; then
+              echo ""
+              echo "OK — backend is warm (attempt ${attempt})."
+              exit 0
+            fi
+            if [ "${attempt}" -lt 3 ]; then
+              echo "Wake failed; waiting 30s before retry (cold start can take 1–2 min)..."
+              sleep 30
+            fi
+          done
+
+          echo "All attempts failed — Render may be down or cold start exceeded ~4 min."
+          exit 1

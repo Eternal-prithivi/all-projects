@@ -25,11 +25,12 @@ describe('renderKeepAlive', () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
-  it('pings /health in production', () => {
+  it('pings /health/ready in production', () => {
     vi.stubEnv('MODE', 'production');
+    fetch.mockResolvedValue({ ok: true, json: async () => ({ mongo_connected: true }) });
     const stop = startRenderKeepAlive();
     expect(fetch).toHaveBeenCalledWith(
-      'https://zenith-backend-707i.onrender.com/health',
+      'https://zenith-backend-707i.onrender.com/health/ready',
       expect.objectContaining({ method: 'GET' })
     );
     vi.advanceTimersByTime(5 * 60 * 1000);
@@ -38,9 +39,9 @@ describe('renderKeepAlive', () => {
     vi.unstubAllEnvs();
   });
 
-  it('wakeRenderBackend returns true when health responds', async () => {
+  it('wakeRenderBackend returns true when ready responds with mongo_connected', async () => {
     vi.stubEnv('MODE', 'production');
-    fetch.mockResolvedValueOnce({ ok: true });
+    fetch.mockResolvedValueOnce({ ok: true, json: async () => ({ mongo_connected: true }) });
     await expect(wakeRenderBackend()).resolves.toBe(true);
     vi.unstubAllEnvs();
   });
