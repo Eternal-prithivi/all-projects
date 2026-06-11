@@ -321,7 +321,7 @@ def build_gcp_secure_storage_client(
             "GCP_SERVICE_ACCOUNT_JSON_PATH is missing or points to a file that does not exist."
         )
     client = gcp_storage.Client.from_service_account_json(path)
-    return client, settings.GCP_SECURE_BUCKET_NAME.strip(), False
+    return client, settings.gcp_secure_bucket, False
 
 
 def build_azure_secure_blob_service(
@@ -356,7 +356,7 @@ def build_azure_secure_blob_service(
         settings.AZURE_SECURE_STORAGE_ACCOUNT_KEY.strip()
         or settings.AZURE_STORAGE_ACCOUNT_KEY
     ).strip()
-    container = settings.AZURE_SECURE_CONTAINER_NAME.strip()
+    container = settings.azure_secure_container
     client, _, is_byoc = build_azure_blob_service(
         username,
         account_name=acct,
