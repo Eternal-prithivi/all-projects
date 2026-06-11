@@ -18,6 +18,15 @@ aservices:
         value: production
       - key: FRONTEND_URL
         value: https://rajverse.me
+      # Secure vault targets (non-secret resource names — keys stay in Render dashboard)
+      - key: GCP_SECURE_BUCKET_NAME
+        value: zenith-secure-gcp
+      - key: GCP_SECURE_REPLICA_BUCKET_NAME
+        value: zenith-secure-gcp-replica
+      - key: AZURE_SECURE_CONTAINER_NAME
+        value: zenith-secure
+      - key: AZURE_SECURE_REPLICA_CONTAINER_NAME
+        value: zenith-secure-replica
       # Multi-region platform storage: mount catalog JSON in the image or set via Render secret.
       # See docs/cloud/PLATFORM_STORAGE_REGIONS.md
       # - key: PLATFORM_STORAGE_CATALOG_JSON
@@ -36,3 +45,11 @@ aservices:
     envVars:
       - key: ENVIRONMENT
         value: production
+      - key: GCP_SECURE_BUCKET_NAME
+        value: zenith-secure-gcp
+      - key: GCP_SECURE_REPLICA_BUCKET_NAME
+        value: zenith-secure-gcp-replica
+      - key: AZURE_SECURE_CONTAINER_NAME
+        value: zenith-secure
+      - key: AZURE_SECURE_REPLICA_CONTAINER_NAME
+        value: zenith-secure-replica

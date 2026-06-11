@@ -175,9 +175,9 @@ def platform_secure_primary_name(csp: str) -> str:
 
     csp_u = (csp or "").strip().upper()
     if csp_u == "GCP":
-        return settings.gcp_secure_bucket
+        return (settings.GCP_SECURE_BUCKET_NAME or "").strip()
     if csp_u == "AZURE":
-        return settings.azure_secure_container
+        return (settings.AZURE_SECURE_CONTAINER_NAME or "").strip()
     return (settings.SECURE_S3_BUCKET_NAME or "").strip()
 
 

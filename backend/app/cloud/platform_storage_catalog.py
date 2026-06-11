@@ -332,7 +332,7 @@ def _legacy_security_buckets_for_csp(csp: str) -> List[Dict[str, Any]]:
             },
         ]
     if csp_u == "GCP":
-        secure = settings.gcp_secure_bucket
+        secure = (settings.GCP_SECURE_BUCKET_NAME or "").strip()
         if not secure:
             return []
         out = [
@@ -360,7 +360,7 @@ def _legacy_security_buckets_for_csp(csp: str) -> List[Dict[str, Any]]:
             )
         return out
     if csp_u == "AZURE":
-        secure = settings.azure_secure_container
+        secure = (settings.AZURE_SECURE_CONTAINER_NAME or "").strip()
         if not secure:
             return []
         acct = (
