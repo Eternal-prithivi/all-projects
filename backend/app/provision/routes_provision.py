@@ -28,6 +28,7 @@ from __future__ import annotations
 import asyncio
 import csv
 import io
+import json
 import logging
 import threading
 import time
@@ -44,11 +45,21 @@ from pydantic import BaseModel
 from app.database.mongo_client import get_database
 from app.users.routes_users import get_current_user
 from app.provision.models import (
+    CompareCloudsBody,
     DeploymentRecord,
     DeploymentStatus,
     DriftStatus,
+    IntentAnalyzeBody,
     ProvisionConfig,
     ProvisionTemplate,
+)
+from app.provision.intent_analyzer import analyze_provision_intent
+from app.provision.cloud_compare import compare_clouds_for_intent
+from app.provision.review_summary import build_review_summary
+from app.provision.created_resources import (
+    resources_from_terraform_state,
+    resources_from_boto3_context,
+    resources_from_sdk_context,
 )
 from app.provision.terraform_runner import (
     TerraformRunner,
@@ -408,6 +419,47 @@ async def run_cost_estimate(
     return result.model_dump()
 
 
+@router.post("/analyze-intent")
+async def analyze_intent(
+    body: IntentAnalyzeBody,
+    user: dict = Depends(get_current_user),
+):
+    """NLP + follow-ups → provision template and size recommendation."""
+    return analyze_provision_intent(
+        body.workload_description,
+        body.follow_up_answers,
+    )
+
+
+@router.post("/compare-clouds")
+async def compare_clouds(
+    body: CompareCloudsBody,
+    user: dict = Depends(get_current_user),
+):
+    """Tri-cloud cost and fit comparison for a template profile."""
+    return {
+        "comparisons": compare_clouds_for_intent(
+            user.username,
+            template=body.template,
+            size_profile=body.size_profile,
+            environment=body.environment,
+            fit_base=body.fit_base,
+            reasons=body.reasons,
+        ),
+    }
+
+
+@router.post("/review-summary")
+async def review_summary(
+    config: ProvisionConfig,
+    user: dict = Depends(get_current_user),
+):
+    """Plain-English review bullets before deploy."""
+    config_dict = config.model_dump()
+    _prepare_provision_config(config_dict)
+    return build_review_summary(config_dict)
+
+
 # ── Plan / Apply / Destroy / Remediate ──
 
 
@@ -689,6 +741,7 @@ async def run_apply(
         ctx_out = apply_result.get("boto3_context") or {}
         resources_count = len(ctx_out) if apply_result["success"] else 0
         new_status = DeploymentStatus.DEPLOYED if apply_result["success"] else DeploymentStatus.APPLY_FAILED
+        created = resources_from_boto3_context(config_dict, ctx_out) if apply_result["success"] else []
         collection.update_one(
             {"deployment_name": deployment_id},
             {"$set": {
@@ -698,6 +751,7 @@ async def run_apply(
                 "provision_engine": "boto3",
                 "fast_path": True,
                 "boto3_context": ctx_out,
+                "created_resources": created,
                 "updated_at": datetime.utcnow(),
             }},
         )
@@ -711,9 +765,11 @@ async def run_apply(
             "success": apply_result["success"],
             "status": new_status,
             "resources_count": resources_count,
+            "created_resources": created,
             "output": apply_result.get("output", ""),
             "error": apply_result.get("error"),
             "provision_engine": "boto3",
+            "deployment_id": deployment_id,
         }
 
     if engine == "sdk":
@@ -722,6 +778,7 @@ async def run_apply(
         ctx_out = apply_result.get("sdk_context") or {}
         resources_count = len(ctx_out) if apply_result["success"] else 0
         new_status = DeploymentStatus.DEPLOYED if apply_result["success"] else DeploymentStatus.APPLY_FAILED
+        created = resources_from_sdk_context(config_dict, ctx_out) if apply_result["success"] else []
         collection.update_one(
             {"deployment_name": deployment_id},
             {"$set": {
@@ -731,6 +788,7 @@ async def run_apply(
                 "provision_engine": "sdk",
                 "fast_path": True,
                 "sdk_context": ctx_out,
+                "created_resources": created,
                 "updated_at": datetime.utcnow(),
             }},
         )
@@ -744,9 +802,11 @@ async def run_apply(
             "success": apply_result["success"],
             "status": new_status,
             "resources_count": resources_count,
+            "created_resources": created,
             "output": apply_result.get("output", ""),
             "error": apply_result.get("error"),
             "provision_engine": "sdk",
+            "deployment_id": deployment_id,
         }
 
     workspace = deployment.get("terraform_workspace", "")
@@ -759,6 +819,11 @@ async def run_apply(
 
     new_status = DeploymentStatus.DEPLOYED if apply_result["success"] else DeploymentStatus.APPLY_FAILED
     resources = runner.get_state_resources() if apply_result["success"] else []
+    created = (
+        resources_from_terraform_state(config_dict, resources)
+        if apply_result["success"]
+        else []
+    )
 
     collection.update_one(
         {"deployment_name": deployment_id},
@@ -766,6 +831,7 @@ async def run_apply(
             "status": new_status,
             "apply_output": apply_result.get("output", ""),
             "resources_count": len(resources),
+            "created_resources": created,
             "updated_at": datetime.utcnow(),
         }},
     )
@@ -781,6 +847,7 @@ async def run_apply(
         "success": apply_result["success"],
         "status": new_status,
         "resources_count": len(resources),
+        "created_resources": created,
         "output": apply_result.get("output", ""),
         "error": apply_result.get("error"),
     }
@@ -1027,6 +1094,85 @@ async def get_deployment(
         raise HTTPException(status_code=404, detail="Deployment not found")
     deployment["_id"] = str(deployment["_id"])
     return deployment
+
+
+@router.get("/deployments/{deployment_id}/handoff")
+async def deployment_handoff(
+    deployment_id: str,
+    user: dict = Depends(get_current_user),
+):
+    """Resource summary and navigation hints after a successful deploy."""
+    collection = _get_deployments_collection()
+    deployment = collection.find_one(
+        {"deployment_name": deployment_id, "user_id": user.username}
+    )
+    if not deployment:
+        raise HTTPException(status_code=404, detail="Deployment not found")
+
+    config = deployment.get("config") or {}
+    created = deployment.get("created_resources") or []
+    cost = deployment.get("cost_estimate") or {}
+    has_vm = any(r.get("type") == "vm" for r in created) or config.get("enable_ec2") or config.get("enable_gce") or config.get("enable_azure_vm")
+    has_storage = any(r.get("type") == "bucket" for r in created) or config.get("enable_s3") or config.get("enable_gcs") or config.get("enable_azure_storage")
+
+    return {
+        "deployment_id": deployment_id,
+        "deployment_display_name": config.get("deployment_display_name") or deployment_id,
+        "csp": deployment.get("csp") or config.get("csp", "AWS"),
+        "status": deployment.get("status"),
+        "created_resources": created,
+        "estimated_monthly": cost.get("total_monthly_cost", "0.00"),
+        "workload_description": config.get("workload_description"),
+        "handoff_links": {
+            "vm": has_vm,
+            "storage": has_storage,
+            "security": True,
+            "cost": True,
+        },
+    }
+
+
+@router.get("/deployments/{deployment_id}/export/terraform")
+async def export_terraform_bundle(
+    deployment_id: str,
+    user: dict = Depends(get_current_user),
+):
+    """Download terraform.tfvars (and workspace main.tf if present) for a deployment."""
+    import zipfile
+    from pathlib import Path
+
+    collection = _get_deployments_collection()
+    deployment = collection.find_one(
+        {"deployment_name": deployment_id, "user_id": user.username}
+    )
+    if not deployment:
+        raise HTTPException(status_code=404, detail="Deployment not found")
+
+    workspace = deployment.get("terraform_workspace") or ""
+    if not workspace or workspace in _FAST_PATH_WORKSPACE_MARKERS:
+        config = deployment.get("config") or {}
+        tfvars_body = "\n".join(f'{k} = "{v}"' if isinstance(v, str) else f"{k} = {json.dumps(v)}" for k, v in config.items() if v is not None)
+        return Response(
+            content=tfvars_body,
+            media_type="text/plain",
+            headers={"Content-Disposition": f'attachment; filename="{deployment_id}.tfvars.json"'},
+        )
+
+    ws_path = Path(workspace)
+    if not ws_path.is_dir():
+        raise HTTPException(status_code=404, detail="Terraform workspace not found on server")
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        for pattern in ("*.tf", "*.tfvars", "*.tfvars.json"):
+            for fp in ws_path.glob(pattern):
+                zf.write(fp, arcname=fp.name)
+    buf.seek(0)
+    return Response(
+        content=buf.getvalue(),
+        media_type="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="{deployment_id}-terraform.zip"'},
+    )
 
 
 @router.post("/deployments/{deployment_id}/drift")
@@ -1342,6 +1488,9 @@ def _save_deployment(
         "created_at": datetime.utcnow(),
         "updated_at": datetime.utcnow(),
         "destroyed_at": None,
+        "workload_description": config.get("workload_description"),
+        "intent_recommendation": config.get("intent_recommendation"),
+        "created_resources": [],
     }
 
     # Upsert — update if exists, insert if new

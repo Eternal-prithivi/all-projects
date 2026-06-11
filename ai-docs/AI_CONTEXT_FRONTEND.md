@@ -69,6 +69,7 @@ For backend context → read `AI_CONTEXT_BACKEND.md`
 | `/dashboard/pricing` | `PricingPage.jsx` | |
 | `/dashboard/storage` | `StoragePage.jsx` | Uses `AuthContext` — tanjiro mock removed ✅ |
 | `/dashboard/vmcluster` | `VMClusterPage.jsx` | |
+| `/dashboard/provision` | `ProvisionPage.jsx` | Infrastructure — **Build** tab: intent-first wizard (`ProvisionDeployWizard`); Manage/Activity/Policies unchanged |
 | `/dashboard/security` | `SecurityPage.jsx` | 2FA vault; tri-cloud sync; BYOC secure pickers (AWS/GCP/Azure via `SecurityVaultDestinationSummary`); trust docs: `docs/security/TRUST_AND_ENCRYPTION.md` |
 | `/dashboard/security-settings` | `SecuritySettingsPage.jsx` | |
 | `/dashboard/profile` | `ProfilePage.jsx` | |
@@ -128,6 +129,11 @@ For backend context → read `AI_CONTEXT_BACKEND.md`
 | `PlatformRegionPills.jsx` | Platform region slug pills (`asia`, `us`, …) |
 | `StorageRegionScopeBar.jsx` | Region context bar between upload and file list |
 | `IndeterminateProgressBar.jsx` | Sliding gold progress bar (toasts, bucket selectors) |
+| `provision/ProvisionDeployWizard.jsx` | 5-step Build wizard: Intent → Cloud → Configure → Review → Build |
+| `provision/ProvisionIntentPanel.jsx` | Step 0 — plain-English workload + NLP follow-ups |
+| `provision/TriCloudComparePanel.jsx` | Step 1 — tri-cloud cost/fit cards + template tiles |
+| `provision/PlainEnglishReview.jsx` | Step 3 — human-readable deploy summary |
+| `provision/ProvisionSuccessPanel.jsx` | Post-apply modal — created resources + handoff links |
 
 ### Hooks (storage & refresh)
 

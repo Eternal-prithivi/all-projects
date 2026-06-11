@@ -6,7 +6,7 @@
 
 **Cost gate:** **ASK** rows need approval before running (VM, Provision Apply, live billing).
 
-**Last updated:** 2026-06-10
+**Last updated:** 2026-06-11
 
 ---
 
@@ -139,6 +139,13 @@
 | - [ ] | 6.1 | Main dashboard | `/dashboard` | Widgets load |
 | - [ ] | 6.2 | Docs hub | `/docs` | Links work |
 | - [ ] | 6.3 | Razorpay test checkout | `/dashboard/billing` | Lands on success/cancel page |
+| - [ ] | 6.4 | Overview platform status | `/dashboard` | Banner shows demo or operational (not always hardcoded green) |
+| - [ ] | 6.5 | Cost trend refresh | `/dashboard` | Click Refresh on cost card → 7-day sparkline appears (demo OK) |
+| - [ ] | 6.6 | Help pricing accuracy | `/help` | Plans show ₹0 / ₹499 / ₹1,499 / ₹4,999 INR (not USD) |
+| - [ ] | 6.7 | Help topic deep link | `/help?topic=billing` | Billing FAQ category pre-selected |
+| - [ ] | 6.8 | In-app support ticket | `/dashboard/support` | New ticket → thread opens with reference code |
+| - [ ] | 6.9 | Team invite revoke | `/dashboard/team` | Pending invite → Revoke removes row |
+| - [ ] | 6.10 | Billing help links | `/dashboard/billing` | Support ticket + billing FAQ links work |
 
 ---
 
@@ -160,9 +167,20 @@
 
 ## Phase 8 — Provision (**ASK** before Apply)
 
+**Build wizard (5 steps):** Intent → Cloud compare → Configure → Review → Build. Success modal shows handoff links; destroy stays on **Manage** tab.
+
 | Done | # | Test | Route | Cloud | Est. cost | Pass when |
 |------|---|------|-------|-------|-----------|-----------|
-| - [ ] | 8.1 | Manage / Activity / Policies tabs | `/dashboard/provision` | All | $0 | Tabs load |
+| - [ ] | 8.1 | Manage / Activity / Policies tabs | `/dashboard/provision` | All | $0 | Tabs load; **Build** tab shows intent-first wizard |
+| - [ ] | 8.1a | Intent step — NLP suggestion | Build tab step 0 | All | $0 | Typing a goal returns template + follow-ups |
+| - [ ] | 8.1b | Tri-cloud compare cards | Build tab step 1 | All | $0 | AWS/GCP/Azure cost + fit cards; selecting one sets CSP |
+| - [ ] | 8.1c | Configure — env tag + disk | Build tab step 2 | All | $0 | Environment selector + boot disk GB when VM enabled |
+| - [ ] | 8.1d | Review — plain-English summary | Build tab step 3 | All | $0 | Bullets + policy gate + cost table before plan |
+| - [ ] | 8.1e | Success handoff + Terraform export | Build tab step 4–5 | All | $0 | After apply: success modal with VM/Storage/Security/Cost links; Download Terraform when available |
+| - [ ] | 8.1f | Intent auto-applies template flags | Build tab step 0→1 | All | $0 | After NLP suggestion, Step 1 Next enabled without re-clicking template |
+| - [ ] | 8.1g | GCP backend-app — SDK plan (no Terraform) | Build tab | GCP | $0 | Settings engine Boto3; plan shows Cloud SDK fast path for GCE+VPC |
+| - [ ] | 8.1h | Azure backend-app — SDK plan (no Terraform) | Build tab | Azure | $0 | Settings engine Boto3; plan shows Cloud SDK fast path for VM+VNet |
+| - [ ] | 8.1i | Disk size affects deploy | Configure step | AWS/GCP/Azure | ASK | Boot disk GB from wizard reflected in created VM volume |
 | - [ ] | 8.2 | static-site — plan only | `/dashboard/provision` | GCP | $0 | Plan succeeds |
 | - [ ] | 8.3 | static-site — apply + destroy | `/dashboard/provision` | GCP | Low | Resources gone |
 | - [ ] | 8.4 | static-site — plan only | `/dashboard/provision` | Azure | $0 | Plan succeeds |

@@ -84,3 +84,29 @@ rules:
     isolation and security group assignment. Enable VPC when using EC2.
   severity: block
   condition: enable_ec2 == True and enable_vpc == False
+
+- name: expensive_vm_size
+  description: >-
+    VM size is not free-tier eligible for the selected cloud. Review cost before
+    deploying to development or learning environments.
+  severity: warning
+  condition: vm_enabled == True and vm_size not in ['t2.micro', 't3.micro', 't4g.micro', 'e2-micro', 'Standard_B1s']
+
+- name: prod_without_monitoring
+  description: >-
+    A virtual machine is enabled in production but monitoring is disabled.
+    Enable CloudWatch, GCP Monitoring, or Azure Monitor for production stacks.
+  severity: warning
+  condition: environment in ['production', 'prod'] and vm_enabled == True and monitoring_enabled == False
+
+- name: gce_without_network
+  description: >-
+    Compute Engine requires a VPC network. Enable GCP VPC Network with GCE.
+  severity: block
+  condition: enable_gce == True and enable_gcp_network == False
+
+- name: azure_vm_without_vnet
+  description: >-
+    Azure VM requires a Virtual Network. Enable VNet when using Azure VM.
+  severity: block
+  condition: enable_azure_vm == True and enable_vnet == False

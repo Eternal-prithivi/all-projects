@@ -107,6 +107,12 @@ variable "instance_name" {
   default     = "main-instance"
 }
 
+variable "disk_size_gb" {
+  description = "Root disk size in GB for EC2."
+  type        = number
+  default     = 30
+}
+
 # --- S3 ---
 variable "bucket_name" {
   description = "Name for the S3 bucket. Must be globally unique."

@@ -45,6 +45,11 @@ resource "aws_instance" "main" {
   subnet_id              = var.subnet_id
   vpc_security_group_ids = [aws_security_group.ec2_sg[0].id]
 
+  root_block_device {
+    volume_size = var.disk_size_gb
+    volume_type = "gp3"
+  }
+
   tags = merge(var.tags, {
     Name = var.instance_name
   })

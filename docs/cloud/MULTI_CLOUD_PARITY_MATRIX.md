@@ -1,6 +1,6 @@
 # Multi-Cloud Parity Matrix
 
-**Last updated:** 2026-06-10 (BYOC tri-cloud connect wizard + trust docs)  
+**Last updated:** 2026-06-11 (Provision intent wizard + GCP/Azure SDK fast path)  
 **Plan:** Multi-cloud parity Phases 0–7  
 **Credential detail:** [CREDENTIAL_CONTRACT.md](./CREDENTIAL_CONTRACT.md)
 
@@ -18,7 +18,7 @@ Success criterion (every phase): With valid platform `.env` or per-user BYOC, th
 | **BYOC** | Full + 2-step verify + buckets | Full + 2-step verify + buckets | Full + 2-step verify + containers | `app/byoc/routes_byoc.py`, `credential_resolver.py`, `encryption.py` | 3 ✅ |
 | **Security vault** | Full (S3 SSE dual) | Full | Full | `app/security/routes_security.py` | 4 ✅ |
 | **VM / monitoring** | **Full VM API** (EC2) | **Full VM API** (GCE) | None | `aws_manager.py`, `manager.py`, `vm_provider.py` | 5 ✅ |
-| **Provision** | TF + Boto3 | TF (GCS) | TF (Blob) | `terraform/`, `provision_catalog.py` | 6 ✅ |
+| **Provision** | Boto3 + TF (all modules) | SDK + TF (all modules) | SDK + TF (all modules) | `sdk_composer.py`, `provision_catalog.py`, `terraform/` | 6 ✅ + SDK parity 2026-06-11 |
 | **Pricing** | Static table | Static table | Static table | `pricing_fetcher.py`, `PRICING_DATA_SOURCE.md` | 7 ✅ |
 
 ---
@@ -91,10 +91,13 @@ Legend: ✅ implemented · 🟡 partial · ❌ missing · 🔒 AWS-only today
 | Endpoint | AWS | GCP | Azure | Notes |
 |----------|-----|-----|-------|-------|
 | Plan / apply / destroy / drift | ✅ | ✅ | ✅ | Templates: static-site, backend-app, serverless-db per CSP |
+| Intent wizard APIs | ✅ | ✅ | ✅ | `POST /analyze-intent`, `/compare-clouds`, `/review-summary` |
+| Handoff + Terraform export | ✅ | ✅ | ✅ | `GET /deployments/{id}/handoff`, `/export/terraform` |
 | Provision templates | 3 (S3, VPC+EC2, DynamoDB) | 3 (GCS, GCE+VPC, Firestore) | 3 (Blob, VM+VNet, Cosmos) | Legacy keys static-gcs / static-blob kept |
-| `GET /templates?csp=` / `GET /modules?csp=` | ✅ | ✅ | ✅ | Per-provider catalog |
-| Engine resolver | boto3 \| terraform | sdk \| terraform | sdk \| terraform | SDK = GCS/Blob fast path (Settings → Boto3) |
-| Scheduled drift | ✅ BYOC per CSP | ✅ | ✅ | Celery uses `resolve_provision_terraform_env` |
+| `GET /templates?csp=` / `GET /modules?csp=` | ✅ | ✅ | ✅ | Per-provider catalog incl. AWS `enable_billing` |
+| **SDK fast path modules** | — (Boto3) | gcs, gcp_network, gce, gcp_service_account, gcp_monitoring, firestore | azure_storage, vnet, azure_vm, azure_monitor, cosmos | `app/provision/sdk_modules/` |
+| Engine resolver | boto3 \| terraform | **sdk primary** \| terraform | **sdk primary** \| terraform | SDK when Settings → Boto3; TF fallback |
+| Scheduled drift | ✅ BYOC per CSP | ✅ SDK + TF | ✅ SDK + TF | Celery uses BYOC env per CSP |
 
 ---
 

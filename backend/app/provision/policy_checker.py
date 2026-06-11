@@ -31,23 +31,63 @@ def config_to_policy_dict(config: dict[str, Any]) -> dict[str, Any]:
     Security defaults are safe (no public S3, no open SSH, etc.) unless
     the user explicitly enables risky settings.
     """
+    from app.cloud.providers import normalize_provider
+
+    csp = normalize_provider(config.get("csp") or "AWS")
+    env = config.get("environment", "free-tier")
+    vm_size = (
+        config.get("instance_type")
+        or config.get("machine_type")
+        or config.get("vm_size")
+        or "t2.micro"
+    )
+    vm_enabled = bool(
+        config.get("enable_ec2")
+        or config.get("enable_gce")
+        or config.get("enable_azure_vm")
+    )
+    storage_enabled = bool(
+        config.get("enable_s3")
+        or config.get("enable_gcs")
+        or config.get("enable_azure_storage")
+    )
+    monitoring_enabled = bool(
+        config.get("enable_cloudwatch")
+        or config.get("enable_gcp_monitoring")
+        or config.get("enable_azure_monitor")
+    )
+    network_enabled = bool(
+        config.get("enable_vpc")
+        or config.get("enable_gcp_network")
+        or config.get("enable_vnet")
+    )
     return {
+        "csp": csp,
         "s3_bucket_public": False,
         "ssh_open_to_world": False,
         "rdp_open_to_world": False,
         "iam_wildcard": False,
         "instance_type": config.get("instance_type", "t2.micro"),
+        "vm_size": vm_size,
+        "vm_enabled": vm_enabled,
+        "storage_enabled": storage_enabled,
+        "monitoring_enabled": monitoring_enabled,
+        "network_enabled": network_enabled,
         "s3_encryption": True,
         "tags": config.get("tags", {}),
-        "cloudtrail_enabled": config.get("environment", "") == "production",
-        "environment": config.get("environment", "free-tier"),
+        "cloudtrail_enabled": env in ("production", "prod"),
+        "environment": env,
         "enable_s3": config.get("enable_s3", False),
         "bucket_name": config.get("bucket_name", ""),
         "budget_limit": config.get("budget_limit", "1"),
         "enable_cloudwatch": config.get("enable_cloudwatch", False),
         "enable_ec2": config.get("enable_ec2", False),
+        "enable_gce": config.get("enable_gce", False),
+        "enable_azure_vm": config.get("enable_azure_vm", False),
         "vpc_cidr": config.get("vpc_cidr", "10.0.0.0/16"),
         "enable_vpc": config.get("enable_vpc", False),
+        "enable_gcp_network": config.get("enable_gcp_network", False),
+        "enable_vnet": config.get("enable_vnet", False),
     }
 
 

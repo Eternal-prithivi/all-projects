@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 from typing import Any
 
 from botocore.exceptions import ClientError
@@ -80,6 +81,7 @@ def apply_ec2(config: dict, aws_creds: dict, region: str, ctx: DeployContext) ->
         ami = _resolve_ami(ec2, region, (config.get("ami_id") or "").strip())
         tags = config.get("tags") or {}
         name = config.get("instance_name", "main-instance")
+        disk_gb = max(8, min(int(config.get("disk_size_gb") or 30), 2000))
         inst = ec2.run_instances(
             ImageId=ami,
             InstanceType=config.get("instance_type", "t2.micro"),
@@ -87,6 +89,16 @@ def apply_ec2(config: dict, aws_creds: dict, region: str, ctx: DeployContext) ->
             MaxCount=1,
             SubnetId=ctx.subnet_id,
             SecurityGroupIds=[sg_id],
+            BlockDeviceMappings=[
+                {
+                    "DeviceName": "/dev/xvda",
+                    "Ebs": {
+                        "VolumeSize": disk_gb,
+                        "DeleteOnTermination": True,
+                        "VolumeType": "gp3",
+                    },
+                }
+            ],
             TagSpecifications=[
                 {
                     "ResourceType": "instance",
@@ -96,7 +108,17 @@ def apply_ec2(config: dict, aws_creds: dict, region: str, ctx: DeployContext) ->
             ],
         )
         ctx.instance_id = inst["Instances"][0]["InstanceId"]
-        return {"success": True, "steps": [f"✓ EC2 instance {ctx.instance_id}"], "error": None}
+        for _ in range(24):
+            desc = ec2.describe_instances(InstanceIds=[ctx.instance_id])
+            reservations = desc.get("Reservations") or []
+            if reservations and reservations[0].get("Instances"):
+                pub = reservations[0]["Instances"][0].get("PublicIpAddress")
+                if pub:
+                    ctx.public_ip = pub
+                    break
+            time.sleep(2)
+        ip_note = f" ({ctx.public_ip})" if ctx.public_ip else ""
+        return {"success": True, "steps": [f"✓ EC2 instance {ctx.instance_id}{ip_note}"], "error": None}
     except ClientError as exc:
         return {"success": False, "steps": [], "error": aws_err(exc)}
 

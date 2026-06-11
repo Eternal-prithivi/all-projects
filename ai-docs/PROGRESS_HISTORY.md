@@ -7,6 +7,16 @@
 
 ---
 
+**Phase 21 — Provision intent wizard + GCP/Azure SDK parity** — COMPLETE 2026-06-11
+
+- Intent-first Build wizard (5 steps): NLP, tri-cloud compare, plain-English review, success handoffs, Terraform export.
+- New APIs: `POST /analyze-intent`, `/compare-clouds`, `/review-summary`, `GET /deployments/{id}/handoff`, `/export/terraform`.
+- GCP SDK modules: `gcp_network`, `gce`, `gcp_service_account`, `gcp_monitoring`, `firestore` (+ existing `gcs`).
+- Azure SDK modules: `vnet`, `azure_vm`, `azure_monitor`, `cosmos` (+ refactored `azure_storage`).
+- Wiring: intent auto-applies template flags, `disk_size_gb` end-to-end, Boto3 public IP handoff, multicloud policy rules, AWS billing module in catalog.
+- Tests: `test_sdk_composer_parity.py`, `test_provision_sdk_gcp/azure.py`, `test_provision_disk.py`, intent/compare API tests.
+- Docs: `manual_testing.md`, `MULTI_CLOUD_PARITY_MATRIX.md`, `AI_CONTEXT_BACKEND.md`, `AI_CONTEXT_FRONTEND.md`.
+
 **Phase 20 — Trust narrative + BYOC credential encryption** — COMPLETE 2026-06-10
 
 - **Docs:** Created `docs/security/TRUST_AND_ENCRYPTION.md` (user-facing custody: platform vs BYOC, SSE vs CSE, archive/replica, FAQ) and `docs/security/BYOC_CREDENTIAL_ENCRYPTION.md` (AES-GCM field format, merge, rotation). Updated `docs/README.md`, `BYOC_IMPLEMENTATION.md`, `CREDENTIAL_CONTRACT.md`, `MULTI_CLOUD_PARITY_MATRIX.md`, `manual_testing.md` (4.18–4.22), `CLIENT_SIDE_ENCRYPTION.md` cross-links.

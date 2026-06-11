@@ -77,6 +77,27 @@ PAID_INSTANCE_COSTS: dict[str, str] = {
     "r5.large": "91.98",
 }
 
+GCP_VM_COSTS: dict[str, str] = {
+    "e2-micro": "0.00",
+    "e2-small": "12.23",
+    "e2-medium": "24.46",
+    "e2-standard-2": "48.92",
+}
+
+AZURE_VM_COSTS: dict[str, str] = {
+    "Standard_B1s": "0.00",
+    "Standard_B2s": "30.37",
+    "Standard_B2ms": "60.74",
+}
+
+GCP_GCS_COST = {"name": "GCS bucket (5GB free/month)", "monthly_cost": "0.00", "note": "Standard storage free tier eligible."}
+GCP_FIRESTORE_COST = {"name": "Firestore (free tier)", "monthly_cost": "0.00", "note": "Generous free reads/writes."}
+AZURE_BLOB_COST = {"name": "Azure Blob container", "monthly_cost": "0.00", "note": "First 5GB LRS hot tier often free."}
+AZURE_COSMOS_COST = {"name": "Cosmos DB SQL API", "monthly_cost": "5.00", "note": "Approximate minimum serverless cost."}
+
+# Approximate EBS/GCE/Azure disk $/GB-month beyond included boot
+DISK_GB_MONTHLY_RATE = 0.10
+
 
 _INFRACOST_AVAILABLE: bool | None = None
 
@@ -149,20 +170,42 @@ def estimate_with_infracost(workspace_dir: str) -> CostEstimate:
         return CostEstimate(available=False, error=str(e))
 
 
+def _add_disk_cost(resources: list[dict[str, Any]], total: float, config: dict[str, Any]) -> float:
+    disk_gb = int(config.get("disk_size_gb") or 30)
+    has_vm = (
+        config.get("enable_ec2")
+        or config.get("enable_gce")
+        or config.get("enable_azure_vm")
+    )
+    if has_vm and disk_gb > 30:
+        extra = disk_gb - 30
+        cost = round(extra * DISK_GB_MONTHLY_RATE, 2)
+        resources.append({
+            "name": f"Additional disk ({extra} GB beyond 30GB)",
+            "monthly_cost": f"{cost:.2f}",
+            "note": "Approximate block storage charge.",
+        })
+        return total + cost
+    return total
+
+
 def estimate_from_config(config: dict[str, Any]) -> CostEstimate:
     """
     Estimate cost from config using the built-in lookup table.
     Used as fallback when Infracost is not available.
     """
+    from app.cloud.providers import normalize_provider
+
+    csp = normalize_provider(config.get("csp") or "AWS")
     resources: list[dict[str, Any]] = []
     total = 0.0
 
-    # Always-included: billing module
-    resources.append({
-        "name": FREE_TIER_COSTS["billing"]["name"],
-        "monthly_cost": FREE_TIER_COSTS["billing"]["monthly_cost"],
-        "note": FREE_TIER_COSTS["billing"]["note"],
-    })
+    if csp == "AWS":
+        resources.append({
+            "name": FREE_TIER_COSTS["billing"]["name"],
+            "monthly_cost": FREE_TIER_COSTS["billing"]["monthly_cost"],
+            "note": FREE_TIER_COSTS["billing"]["note"],
+        })
 
     if config.get("enable_vpc", False):
         resources.append({
@@ -217,6 +260,76 @@ def estimate_from_config(config: dict[str, Any]) -> CostEstimate:
             "monthly_cost": FREE_TIER_COSTS["dynamodb"]["monthly_cost"],
             "note": FREE_TIER_COSTS["dynamodb"]["note"],
         })
+
+    if config.get("enable_gcp_network", False):
+        resources.append({
+            "name": "GCP VPC network",
+            "monthly_cost": "0.00",
+            "note": "VPC is free; egress charges apply separately.",
+        })
+
+    if config.get("enable_gce", False):
+        mt = config.get("machine_type", "e2-micro")
+        cost = GCP_VM_COSTS.get(mt, "24.46")
+        resources.append({
+            "name": f"Compute Engine {mt}",
+            "monthly_cost": cost,
+            "note": "e2-micro free tier eligible in select regions." if cost == "0.00" else "Paid instance size.",
+        })
+        total += float(cost)
+
+    if config.get("enable_gcs", False):
+        resources.append(dict(GCP_GCS_COST))
+
+    if config.get("enable_gcp_service_account", False):
+        resources.append({
+            "name": "GCP service account",
+            "monthly_cost": "0.00",
+            "note": "IAM is free.",
+        })
+
+    if config.get("enable_gcp_monitoring", False):
+        resources.append({
+            "name": "Cloud Monitoring alert",
+            "monthly_cost": "0.00",
+            "note": "Basic alerting free tier.",
+        })
+
+    if config.get("enable_firestore", False):
+        resources.append(dict(GCP_FIRESTORE_COST))
+
+    if config.get("enable_vnet", False):
+        resources.append({
+            "name": "Azure VNet",
+            "monthly_cost": "0.00",
+            "note": "VNet is free.",
+        })
+
+    if config.get("enable_azure_vm", False):
+        size = config.get("vm_size", "Standard_B1s")
+        cost = AZURE_VM_COSTS.get(size, "30.37")
+        resources.append({
+            "name": f"Azure VM {size}",
+            "monthly_cost": cost,
+            "note": "B1s free tier eligible for 12 months." if cost == "0.00" else "Paid VM size.",
+        })
+        total += float(cost)
+
+    if config.get("enable_azure_storage", False):
+        resources.append(dict(AZURE_BLOB_COST))
+
+    if config.get("enable_azure_monitor", False):
+        resources.append({
+            "name": "Azure Monitor action group",
+            "monthly_cost": "0.00",
+            "note": "Email alerts low cost.",
+        })
+
+    if config.get("enable_cosmos", False):
+        resources.append(dict(AZURE_COSMOS_COST))
+        total += float(AZURE_COSMOS_COST["monthly_cost"])
+
+    total = _add_disk_cost(resources, total, config)
 
     return CostEstimate(
         available=True,

@@ -41,6 +41,9 @@ def _sanitize_azure_storage_account(name: str) -> str:
 
 def normalize_provision_config(config: dict[str, Any]) -> None:
     """In-place normalization for resource names used in terraform.tfvars."""
+    from app.provision.provision_defaults import apply_safe_defaults
+
+    apply_safe_defaults(config)
     if config.get("enable_gcs"):
         raw = config.get("bucket_name") or ""
         config["bucket_name"] = _sanitize_gcs_bucket_name(str(raw))

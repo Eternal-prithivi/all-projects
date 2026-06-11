@@ -1,19 +1,19 @@
 # STATUS.md — Live Project Snapshot
 
-**Last Updated:** 2026-06-10 (Trust docs + BYOC encryption hardening)
+**Last Updated:** 2026-06-11 (SaaS pages polish — Overview, Help, Support, Team, Billing)
 
 ---
 
 ## Identity
 
-| Phase | **20** Trust narrative + BYOC credential encryption · **COMPLETE** |
-| Prior | Phase 19 Platform multi-region storage + page refresh UX · COMPLETE |
+| Phase | **21** SaaS pages polish (zero/low-cost) · **COMPLETE** |
+| Prior | Phase 20 Trust narrative + BYOC credential encryption · COMPLETE |
 
 ---
 
 ## 🔴 Active Task
 
-_None — Phase 20 shipped 2026-06-10. Next task TBD._
+_None — Phase 21 shipped 2026-06-11. Next task TBD._
 
 ---
 
@@ -21,11 +21,21 @@ _None — Phase 20 shipped 2026-06-10. Next task TBD._
 
 | Check | Status |
 |-------|--------|
-| Backend pytest | ✅ encryption + layout tests pass (`test_byoc_encryption.py`) |
-| Frontend build | ✅ green (2026-06-09) |
-| E2E playbook | `docs/testing/manual_testing.md` |
+| Backend pytest | ✅ integration: org revoke, support create ticket, dashboard cost-trend |
+| Frontend build | ✅ green (2026-06-11) |
+| E2E playbook | `docs/testing/manual_testing.md` (rows 6.4–6.10) |
 | Trust docs | `docs/security/TRUST_AND_ENCRYPTION.md` |
 | Render deploy branch | `stage` → auto-deploy |
+
+---
+
+## Phase 21 summary
+
+- **Trust copy:** `frontend/src/data/productFacts.js` — Help, marketing pricing, billing labels (INR)
+- **Overview:** platform status banner, plan-based storage cap, budget/team cards, cost trend from Mongo (`/api/dashboard/cost-trend`)
+- **Support:** `POST /api/support/tickets` + in-app New ticket UI
+- **Team:** `DELETE /api/organizations/invites/{email}`, copy invite link, billing callout
+- **Cost:** CostHubNav deduped; demo-safe refresh-only sparkline snapshots
 
 ---
 

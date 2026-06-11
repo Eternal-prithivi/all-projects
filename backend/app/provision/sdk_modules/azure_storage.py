@@ -5,22 +5,13 @@ from typing import Any
 from azure.core.exceptions import ResourceExistsError, ResourceNotFoundError
 from azure.storage.blob import BlobServiceClient
 
-from app.provision.sdk_clients import azure_credential_and_subscription
+from app.provision.sdk_clients import azure_credential_and_subscription, azure_storage_mgmt_client
+from app.provision.sdk_modules.azure_resource_group import ensure_resource_group
 from app.provision.sdk_modules.context import SdkDeployContext
 
 
 def _storage_mgmt(cloud_env: dict[str, str]):
-    from azure.mgmt.storage import StorageManagementClient
-
-    credential, subscription = azure_credential_and_subscription(cloud_env)
-    return StorageManagementClient(credential, subscription), credential
-
-
-def _resource_mgmt(cloud_env: dict[str, str]):
-    from azure.mgmt.resource import ResourceManagementClient
-
-    credential, subscription = azure_credential_and_subscription(cloud_env)
-    return ResourceManagementClient(credential, subscription), credential, subscription
+    return azure_storage_mgmt_client(cloud_env)
 
 
 def plan_azure_storage(config: dict, cloud_env: dict[str, str]) -> dict[str, Any]:
@@ -49,11 +40,13 @@ def apply_azure_storage(
     location = config.get("azure_location") or "eastus"
     steps: list[str] = []
     try:
-        resource_client, credential, subscription = _resource_mgmt(cloud_env)
-        resource_client.resource_groups.create_or_update(rg, {"location": location})
-        steps.append(f"✓ Resource group '{rg}'")
+        ok, rg_steps, err = ensure_resource_group(config, cloud_env, ctx)
+        steps.extend(rg_steps)
+        if not ok:
+            return {"success": False, "steps": steps, "error": err}
+        rg = ctx.azure_resource_group
 
-        storage_client, _ = _storage_mgmt(cloud_env)
+        storage_client, credential = _storage_mgmt(cloud_env)
         existing = [
             a.name
             for a in storage_client.storage_accounts.list_by_resource_group(rg)
@@ -114,11 +107,6 @@ def destroy_azure_storage(
         storage_client, _ = _storage_mgmt(cloud_env)
         storage_client.storage_accounts.delete(rg, sa_name)
         steps.append(f"✓ Deleted storage account '{sa_name}'")
-
-        from azure.mgmt.resource import ResourceManagementClient
-
-        ResourceManagementClient(credential, subscription).resource_groups.begin_delete(rg)
-        steps.append(f"✓ Deleting resource group '{rg}' (async)")
         return {"success": True, "steps": steps, "error": None}
     except Exception as exc:
         return {"success": False, "steps": steps, "error": str(exc)}
@@ -135,7 +123,9 @@ def check_azure_storage_drift(
     details: list[str] = []
     changes = 0
     try:
-        resource_client, credential, _ = _resource_mgmt(cloud_env)
+        from app.provision.sdk_clients import azure_resource_client
+
+        resource_client, credential, _ = azure_resource_client(cloud_env)
         resource_client.resource_groups.get(rg)
 
         storage_client, _ = _storage_mgmt(cloud_env)

@@ -17,6 +17,30 @@ def test_config_to_policy_dict_safe_defaults():
     assert policy["instance_type"] == "t2.micro"
 
 
+def test_gcp_expensive_vm_warning():
+    config = {
+        "csp": "GCP",
+        "enable_gce": True,
+        "enable_gcp_network": True,
+        "machine_type": "e2-medium",
+        "tags": {"Owner": "tester"},
+        "environment": "dev",
+    }
+    result = evaluate_yaml_policies(config)
+    assert any(v.rule_name == "expensive_vm_size" for v in result.warnings)
+
+
+def test_azure_vm_without_vnet_blocks():
+    config = {
+        "csp": "Azure",
+        "enable_azure_vm": True,
+        "enable_vnet": False,
+        "tags": {"Owner": "tester"},
+    }
+    result = evaluate_yaml_policies(config)
+    assert any(v.rule_name == "azure_vm_without_vnet" for v in result.blocks)
+
+
 def test_expensive_instance_type_warning():
     config = {
         "instance_type": "m5.large",

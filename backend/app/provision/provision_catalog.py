@@ -106,6 +106,7 @@ AWS_MODULES = [
     {"key": "iam", "name": "IAM", "flag": "enable_iam", "desc": "Identity & Access Management role"},
     {"key": "cloudwatch", "name": "CloudWatch", "flag": "enable_cloudwatch", "requires": ["ec2"], "desc": "Monitoring & email alerting"},
     {"key": "dynamodb", "name": "DynamoDB", "flag": "enable_dynamodb", "desc": "NoSQL database table (25 RCU/WCU free tier)"},
+    {"key": "billing", "name": "AWS Budgets", "flag": "enable_billing", "desc": "Monthly cost budget with email alerts (requires budgets:* IAM)"},
 ]
 
 GCP_MODULES = [

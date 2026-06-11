@@ -134,6 +134,14 @@ class ProvisionConfig(BaseModel):
     dynamodb_write_capacity: int = 5
     dynamodb_enable_pitr: bool = False
 
+    # Intent / wizard metadata
+    workload_description: Optional[str] = None
+    follow_up_answers: Optional[dict[str, str]] = None
+    intent_recommendation: Optional[dict[str, Any]] = None
+    deployment_display_name: str = ""
+    size_profile: str = "micro"
+    disk_size_gb: int = Field(default=30, ge=8, le=2000)
+
     # Tags
     tags: dict[str, str] = Field(default_factory=dict)
     environment: str = "free-tier"
@@ -154,6 +162,19 @@ class PolicyCheckResult(BaseModel):
     blocks: list[PolicyViolation] = Field(default_factory=list)
     warnings: list[PolicyViolation] = Field(default_factory=list)
     can_deploy: bool = True
+
+
+class IntentAnalyzeBody(BaseModel):
+    workload_description: str = Field(..., min_length=1)
+    follow_up_answers: Optional[dict[str, str]] = None
+
+
+class CompareCloudsBody(BaseModel):
+    template: str
+    size_profile: str = "micro"
+    environment: str = "free-tier"
+    fit_base: int = Field(default=70, ge=0, le=100)
+    reasons: Optional[list[str]] = None
 
 
 class CostEstimate(BaseModel):

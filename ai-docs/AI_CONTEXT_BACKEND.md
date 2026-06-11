@@ -92,7 +92,7 @@ Database: `CloudResourceOptimizationDB`
 /api/dashboard   → routes_dashboard.py (stats, cost-trend)
 /api/storage     → routes_storage.py (analyze, upload, files, download, delete, sync/{aws|gcp|azure})
 /api/security    → routes_security.py (upload-secure, list-secure, download, delete, sync/{csp})
-/api/provision   → routes_provision.py (plan, apply, destroy, drift, templates?csp=, modules?csp=)
+/api/provision   → routes_provision.py (analyze-intent, compare-clouds, review-summary, plan, apply, destroy, drift, templates?csp=, modules?csp=, deployments/{id}/handoff, deployments/{id}/export/terraform)
 /api/platform    → routes_platform.py (GET /status — cloud_connectivity per CSP)
 /api/2fa         → routes_2fa.py (status, enable, finalize, verify, disable)
 /api/vm          → routes_vm.py (request, release, clusters, assignment, analyze-workload, migrate)
@@ -167,7 +167,22 @@ Auth: `POST /api/auth/verify-email?token=` — marks `email_verified` when `emai
 
 **Notifications** (`/api/notifications`): paginated `GET ?limit&skip&read&type`, `GET /recent?limit=8`, create, mark read, delete — `user_notifications` (180d TTL).
 
-**Provision governance** (`/api/provision`): `GET/POST/PUT/DELETE policy-rules/custom`, `PUT/DELETE policy-rules/builtin/{name}` (per-user overrides), `GET audit-log?limit=10&period_days`, `GET audit-log/export` — collections `provision_custom_policies`, `provision_policy_overrides`, `provision_audit_log` (90d TTL).
+**Provision** (`/api/provision`):
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| POST | `/analyze-intent` | NLP + follow-ups → template/size recommendation |
+| POST | `/compare-clouds` | Tri-cloud cost + fit for template profile |
+| POST | `/review-summary` | Plain-English bullets before deploy |
+| POST | `/policy-check`, `/estimate`, `/plan`, `/apply/{id}`, `/destroy/{id}` | Existing deploy flow |
+| GET | `/deployments/{id}/handoff` | Created resources + navigation hints after apply |
+| GET | `/deployments/{id}/export/terraform` | Download `.tf` workspace zip or tfvars JSON |
+
+**Provision governance** (same router): `GET/POST/PUT/DELETE policy-rules/custom`, `PUT/DELETE policy-rules/builtin/{name}` (per-user overrides), `GET audit-log?limit=10&period_days`, `GET audit-log/export` — collections `provision_custom_policies`, `provision_policy_overrides`, `provision_audit_log` (90d TTL).
+
+Backend modules: `intent_analyzer.py`, `template_mapper.py`, `cloud_compare.py`, `review_summary.py`, `provision_defaults.py`, `created_resources.py`.
+
+**SDK fast path (GCP/Azure, Settings engine Boto3):** All catalog modules implemented under `app/provision/sdk_modules/` — GCP: `gcs`, `gcp_network`, `gce`, `gcp_service_account`, `gcp_monitoring`, `firestore`; Azure: `azure_storage`, `vnet`, `azure_vm`, `azure_monitor`, `cosmos`. Orchestrated by `sdk_composer.py` (mirrors `boto3_composer.py`). Terraform remains fallback when user selects Terraform engine or SDK cannot handle config.
 
 **Organizations** (`/api/organizations`): create org, members, invites, accept invite — single org per user.
 

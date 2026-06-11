@@ -72,3 +72,8 @@ variable "tags" {
   type    = map(string)
   default = {}
 }
+
+variable "disk_size_gb" {
+  type    = number
+  default = 30
+}

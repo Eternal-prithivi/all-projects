@@ -32,6 +32,7 @@ module "ec2" {
   instance_name = var.instance_name
   subnet_id     = module.vpc.public_subnet_id
   vpc_id        = module.vpc.vpc_id
+  disk_size_gb  = var.disk_size_gb
   tags          = var.tags
 }
 

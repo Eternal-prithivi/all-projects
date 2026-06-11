@@ -20,7 +20,9 @@ ALLOWED_POLICY_KEYS = frozenset({
     "s3_bucket_public", "ssh_open_to_world", "rdp_open_to_world", "iam_wildcard",
     "instance_type", "s3_encryption", "tags", "cloudtrail_enabled", "environment",
     "enable_s3", "bucket_name", "budget_limit", "enable_cloudwatch", "enable_ec2",
-    "vpc_cidr", "enable_vpc", "True", "False", "None",
+    "vpc_cidr", "enable_vpc", "csp", "vm_size", "vm_enabled", "storage_enabled",
+    "monitoring_enabled", "network_enabled", "enable_gce", "enable_azure_vm",
+    "enable_gcp_network", "enable_vnet", "True", "False", "None",
 })
 
 # Reject obvious injection patterns in user-supplied conditions

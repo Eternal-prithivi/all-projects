@@ -1241,4 +1241,161 @@ html.theme-light .provision-action-status {
     flex: 1 1 auto;
     min-height: var(--touch-min, 44px);
   }
+
+  .compare-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── Intent-first wizard (Phase provision upgrade) ── */
+.provision-intent-textarea {
+  width: 100%;
+  min-height: 120px;
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius-md, 8px);
+  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.12));
+  background: var(--surface-elevated, rgba(0, 0, 0, 0.2));
+  color: var(--text-primary, #fff);
+  resize: vertical;
+}
+
+.provision-intent-recommendation {
+  margin-top: 1rem;
+  padding: 1rem;
+  border-radius: var(--radius-md, 8px);
+  background: var(--glass-bg, rgba(255, 255, 255, 0.04));
+  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.1));
+}
+
+.provision-intent-confidence {
+  opacity: 0.85;
+  font-size: 0.9em;
+}
+
+.provision-intent-ready {
+  margin: 0.5rem 0 0;
+  font-size: 0.9rem;
+  color: var(--success, #2ecc71);
+}
+
+.provision-intent-reasons {
+  margin: 0.5rem 0 0 1.25rem;
+  font-size: 0.9rem;
+  opacity: 0.9;
+}
+
+.compare-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1rem;
+  margin-top: 1.5rem;
+}
+
+.compare-card {
+  text-align: left;
+  padding: 1rem;
+  border-radius: var(--radius-md, 8px);
+  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.12));
+  background: var(--glass-bg, rgba(255, 255, 255, 0.03));
+  cursor: pointer;
+  color: inherit;
+  position: relative;
+}
+
+.compare-card.selected {
+  border-color: var(--accent, #6c9eff);
+  box-shadow: 0 0 0 1px var(--accent, #6c9eff);
+}
+
+.compare-badge {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+  background: var(--accent, #6c9eff);
+  color: #fff;
+}
+
+.compare-badge.value {
+  background: var(--success, #2ecc71);
+}
+
+.compare-cost {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin: 0.35rem 0;
+}
+
+.compare-fit,
+.compare-instance {
+  font-size: 0.85rem;
+  opacity: 0.85;
+  margin: 0.15rem 0;
+}
+
+.plain-english-review {
+  margin-bottom: 1.5rem;
+  padding: 1rem 1.25rem;
+  border-radius: var(--radius-md, 8px);
+  background: var(--glass-bg, rgba(255, 255, 255, 0.04));
+  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.1));
+}
+
+.plain-english-bullets {
+  margin: 0.5rem 0 0 1.25rem;
+  line-height: 1.5;
+}
+
+.plain-english-warnings p {
+  margin: 0.5rem 0 0;
+  color: var(--warning, #f0ad4e);
+}
+
+.provision-success-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.provision-success-modal {
+  max-width: 480px;
+  width: 100%;
+  padding: 1.5rem;
+  border-radius: var(--radius-lg, 12px);
+  background: var(--surface-card, #1a1d24);
+  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.12));
+}
+
+.provision-success-resources {
+  margin: 1rem 0;
+  padding-left: 1.25rem;
+  font-size: 0.9rem;
+}
+
+.provision-success-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 1rem 0;
+}
+
+.provision-success-actions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: flex-end;
+  margin-top: 1rem;
+}
+
+.provision-success-hint {
+  font-size: 0.9rem;
+  opacity: 0.85;
+  margin-bottom: 0.25rem;
 }

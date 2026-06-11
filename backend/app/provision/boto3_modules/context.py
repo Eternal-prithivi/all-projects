@@ -18,6 +18,7 @@ class DeployContext:
     bucket_name: Optional[str] = None
     dynamodb_table: Optional[str] = None
     budget_name: Optional[str] = None
+    public_ip: Optional[str] = None
 
     def to_dict(self) -> dict[str, str]:
         out: dict[str, str] = {}
@@ -32,6 +33,7 @@ class DeployContext:
             ("bucket_name", self.bucket_name),
             ("dynamodb_table", self.dynamodb_table),
             ("budget_name", self.budget_name),
+            ("public_ip", self.public_ip),
         ):
             if val:
                 out[key] = val
@@ -52,4 +54,5 @@ class DeployContext:
             bucket_name=data.get("bucket_name"),
             dynamodb_table=data.get("dynamodb_table"),
             budget_name=data.get("budget_name"),
+            public_ip=data.get("public_ip"),
         )

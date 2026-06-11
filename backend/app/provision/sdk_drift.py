@@ -6,15 +6,44 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any, Callable, Optional
 
 from app.cloud.providers import normalize_provider
 from app.provision.models import DriftReport, DriftStatus
 from app.provision.sdk_composer import apply_sdk, enabled_sdk_modules
-from app.provision.sdk_modules import azure_storage, gcp_gcs
+from app.provision.sdk_modules import (
+    azure_cosmos,
+    azure_monitor,
+    azure_storage,
+    azure_vm,
+    azure_vnet,
+    gcp_firestore,
+    gcp_gce,
+    gcp_gcs,
+    gcp_monitoring,
+    gcp_network,
+    gcp_service_account,
+)
 from app.provision.sdk_modules.context import SdkDeployContext
 
 logger = logging.getLogger(__name__)
+
+_GCP_DRIFT: dict[str, Callable] = {
+    "gcp_network": gcp_network.check_gcp_network_drift,
+    "gce": gcp_gce.check_gce_drift,
+    "gcp_service_account": gcp_service_account.check_gcp_service_account_drift,
+    "gcp_monitoring": gcp_monitoring.check_gcp_monitoring_drift,
+    "gcs": gcp_gcs.check_gcs_drift,
+    "firestore": gcp_firestore.check_firestore_drift,
+}
+
+_AZURE_DRIFT: dict[str, Callable] = {
+    "vnet": azure_vnet.check_vnet_drift,
+    "azure_vm": azure_vm.check_azure_vm_drift,
+    "azure_monitor": azure_monitor.check_azure_monitor_drift,
+    "azure_storage": azure_storage.check_azure_storage_drift,
+    "cosmos": azure_cosmos.check_cosmos_drift,
+}
 
 
 def detect_drift_sdk(
@@ -24,15 +53,16 @@ def detect_drift_sdk(
 ) -> DriftReport:
     ctx = SdkDeployContext.from_dict(sdk_context)
     csp = normalize_provider(config.get("csp") or "AWS")
+    drift_map = _GCP_DRIFT if csp == "GCP" else _AZURE_DRIFT
     details: list[str] = []
     changes = 0
 
     try:
         for mod in enabled_sdk_modules(config):
-            if mod == "gcs":
-                c, d = gcp_gcs.check_gcs_drift(config, cloud_env, ctx)
-            else:
-                c, d = azure_storage.check_azure_storage_drift(config, cloud_env, ctx)
+            checker = drift_map.get(mod)
+            if not checker:
+                continue
+            c, d = checker(config, cloud_env, ctx)
             changes += c
             details.extend(d)
 

@@ -1,8 +1,12 @@
-// ProvisionDeployWizard.jsx — optional Terraform deploy (uses BYOC from Settings)
-import React, { useState, useEffect, useRef } from 'react';
+// ProvisionDeployWizard.jsx — intent-first stack provisioning (uses BYOC from Settings)
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { FaDatabase, FaGlobe, FaServer } from 'react-icons/fa';
 import api from '../../api';
 import { getApiBaseUrl, getApiRoot } from '../../config/apiBase.js';
+import ProvisionIntentPanel from './ProvisionIntentPanel.jsx';
+import TriCloudComparePanel from './TriCloudComparePanel.jsx';
+import PlainEnglishReview from './PlainEnglishReview.jsx';
+import ProvisionSuccessPanel from './ProvisionSuccessPanel.jsx';
 
 /** API catalog uses icon keys; map to react-icons for consistent 48×48 tiles. */
 const TEMPLATE_ICON_MAP = {
@@ -58,7 +62,7 @@ const MODULES = [
   { key: 'dynamodb', name: 'DynamoDB', desc: 'NoSQL database table', flag: 'enable_dynamodb' },
 ];
 
-const STEP_LABELS = ['Choose', 'Configure', 'Review', 'Deploy'];
+const STEP_LABELS = ['Intent', 'Cloud', 'Configure', 'Review', 'Build'];
 
 /** Initial POST returns quickly; poll status for terraform output. */
 const PLAN_START_TIMEOUT_MS = 120 * 1000;
@@ -161,6 +165,7 @@ const EMPTY_FLAGS = {
   enable_azure_vm: false,
   enable_azure_monitor: false,
   enable_cosmos: false,
+  enable_billing: false,
 };
 
 export default function ProvisionDeployWizard({
@@ -219,6 +224,7 @@ export default function ProvisionDeployWizard({
     enable_iam: false,
     enable_cloudwatch: false,
     enable_dynamodb: false,
+    enable_billing: false,
     vpc_cidr: '10.0.0.0/16',
     instance_type: 't2.micro',
     instance_name: '',
@@ -234,7 +240,24 @@ export default function ProvisionDeployWizard({
     dynamodb_write_capacity: 5,
     tags: { Env: 'free-tier' },
     environment: 'free-tier',
+    workload_description: '',
+    size_profile: 'micro',
+    disk_size_gb: 30,
+    deployment_display_name: '',
   });
+
+  const [workloadDescription, setWorkloadDescription] = useState('');
+  const [followUpAnswers, setFollowUpAnswers] = useState({});
+  const [intentAnalysis, setIntentAnalysis] = useState(null);
+  const [isAnalyzingIntent, setIsAnalyzingIntent] = useState(false);
+  const [cloudComparisons, setCloudComparisons] = useState([]);
+  const [compareLoading, setCompareLoading] = useState(false);
+  const [reviewSummary, setReviewSummary] = useState(null);
+  const [reviewSummaryLoading, setReviewSummaryLoading] = useState(false);
+  const [showAdvancedModules, setShowAdvancedModules] = useState(false);
+  const [successOpen, setSuccessOpen] = useState(false);
+  const [handoffData, setHandoffData] = useState(null);
+  const intentDebounceRef = useRef(null);
 
   const [policyResult, setPolicyResult] = useState(null);
   const [costEstimate, setCostEstimate] = useState(null);
@@ -330,7 +353,141 @@ export default function ProvisionDeployWizard({
 
   const hasAnyModule = modules.some((m) => config[m.flag]);
 
-  // ── Step 2: Config field update ──
+  const applyTemplateByKey = useCallback(async (tmplKey, sizeProfile, trimmedDesc) => {
+    let list = templates;
+    if (!list.find((t) => t.key === tmplKey)) {
+      try {
+        const tRes = await api.get('/provision/templates', { params: { csp } });
+        list = tRes.data.templates || [];
+        setTemplates(list);
+      } catch {
+        list = [];
+      }
+    }
+    const tmpl = list.find((t) => t.key === tmplKey);
+    if (tmpl) {
+      setSelectedTemplate(tmpl.key);
+      const services = { ...EMPTY_FLAGS };
+      Object.entries(tmpl.services || {}).forEach(([k, v]) => {
+        services[k] = !!v;
+      });
+      setConfig((prev) => ({
+        ...prev,
+        template: tmpl.key,
+        ...services,
+        size_profile: sizeProfile || prev.size_profile || 'micro',
+        workload_description: trimmedDesc ?? prev.workload_description,
+      }));
+    } else {
+      setSelectedTemplate(tmplKey);
+      setConfig((prev) => ({
+        ...prev,
+        template: tmplKey,
+        size_profile: sizeProfile || 'micro',
+        workload_description: trimmedDesc ?? prev.workload_description,
+      }));
+    }
+  }, [templates, csp]);
+
+  const runIntentAnalysis = useCallback(async () => {
+    const trimmed = workloadDescription.trim();
+    if (trimmed.length < 3) {
+      setIntentAnalysis(null);
+      return;
+    }
+    setIsAnalyzingIntent(true);
+    try {
+      const res = await api.post('/provision/analyze-intent', {
+        workload_description: trimmed,
+        follow_up_answers: Object.keys(followUpAnswers).length ? followUpAnswers : null,
+      });
+      setIntentAnalysis(res.data);
+      if (res.data?.recommendation?.template) {
+        await applyTemplateByKey(
+          res.data.recommendation.template,
+          res.data.recommendation.size_profile || 'micro',
+          trimmed,
+        );
+      }
+    } catch (err) {
+      console.error('Intent analysis failed', err);
+    } finally {
+      setIsAnalyzingIntent(false);
+    }
+  }, [workloadDescription, followUpAnswers, applyTemplateByKey]);
+
+  useEffect(() => {
+    if (intentDebounceRef.current) clearTimeout(intentDebounceRef.current);
+    if (workloadDescription.trim().length < 3) {
+      setIntentAnalysis(null);
+      return undefined;
+    }
+    intentDebounceRef.current = setTimeout(runIntentAnalysis, 500);
+    return () => {
+      if (intentDebounceRef.current) clearTimeout(intentDebounceRef.current);
+    };
+  }, [workloadDescription, followUpAnswers, runIntentAnalysis]);
+
+  const loadCloudCompare = useCallback(async () => {
+    const template = selectedTemplate || intentAnalysis?.recommendation?.template || 'backend-app';
+    const sizeProfile = config.size_profile || intentAnalysis?.recommendation?.size_profile || 'micro';
+    setCompareLoading(true);
+    try {
+      const res = await api.post('/provision/compare-clouds', {
+        template,
+        size_profile: sizeProfile,
+        environment: config.environment,
+        fit_base: intentAnalysis?.recommendation?.confidence || 70,
+        reasons: intentAnalysis?.recommendation?.reasons,
+      });
+      setCloudComparisons(res.data.comparisons || []);
+    } catch (err) {
+      console.error('Cloud compare failed', err);
+      setCloudComparisons([]);
+    } finally {
+      setCompareLoading(false);
+    }
+  }, [selectedTemplate, intentAnalysis, config.size_profile, config.environment]);
+
+  useEffect(() => {
+    if (step === 1) {
+      loadCloudCompare();
+    }
+  }, [step, loadCloudCompare]);
+
+  const applyCompareSelection = async (row) => {
+    setCsp(row.csp);
+    const tmplKey = row.template || selectedTemplate;
+    try {
+      const tRes = await api.get('/provision/templates', { params: { csp: row.csp } });
+      const list = tRes.data.templates || [];
+      setTemplates(list);
+      const tmpl = list.find((t) => t.key === tmplKey);
+      if (tmpl) selectTemplate(tmpl);
+      else {
+        setSelectedTemplate(tmplKey);
+        setConfig((prev) => ({ ...prev, csp: row.csp, template: tmplKey }));
+      }
+    } catch {
+      setConfig((prev) => ({
+        ...prev,
+        csp: row.csp,
+        template: tmplKey,
+        size_profile: prev.size_profile || 'micro',
+      }));
+    }
+  };
+
+  const handleFollowUpChange = (questionId, value) => {
+    setFollowUpAnswers((prev) => {
+      const next = { ...prev };
+      if (!value) delete next[questionId];
+      else next[questionId] = value;
+      return next;
+    });
+  };
+
+  // ── Config field update ──
   const updateConfig = (key, value) => {
     setConfig(prev => ({ ...prev, [key]: value }));
   };
@@ -444,7 +601,18 @@ export default function ProvisionDeployWizard({
       });
       if (res.data.success) {
         setPlanOutput(prev => prev + '\n\n✅ Apply complete! ' + res.data.resources_count + ' resources created.');
-        onDeployed?.();
+        const depId = res.data.deployment_id || deploymentId;
+        try {
+          const handoffRes = await api.get(`/provision/deployments/${depId}/handoff`);
+          setHandoffData(handoffRes.data);
+        } catch {
+          setHandoffData({
+            deployment_id: depId,
+            created_resources: res.data.created_resources || [],
+            csp: config.csp,
+          });
+        }
+        setSuccessOpen(true);
       } else {
         setError(res.data.error || `${engineLabel} apply failed`);
         setPlanOutput(prev => prev + '\n\n❌ Apply failed: ' + (res.data.error || 'unknown error'));
@@ -457,44 +625,83 @@ export default function ProvisionDeployWizard({
   };
 
   const nextStep = () => {
-    if (step === 2) {
+    if (step === 0 && workloadDescription.trim().length < 3) {
+      setError('Please describe what you want to build.');
+      return;
+    }
+    if (step === 0) {
+      setConfig((prev) => ({
+        ...prev,
+        workload_description: workloadDescription.trim(),
+        intent_recommendation: intentAnalysis?.recommendation,
+      }));
+    }
+    if (step === 3) {
       if (!policyResult?.can_deploy) return;
-      setStep(3);
+      setStep(4);
       runPlan();
       return;
     }
-    setStep((s) => Math.min(s + 1, 3));
+    setStep((s) => Math.min(s + 1, 4));
   };
 
   const prevStep = () => {
-    if (step === 2) {
+    if (step === 3) {
       setPolicyResult(null);
       setCostEstimate(null);
+      setReviewSummary(null);
     }
     setStep((s) => Math.max(s - 1, 0));
   };
 
-  // Auto-run review when user reaches the Review step (no extra click)
+  const downloadTerraformExport = async () => {
+    if (!deploymentId) return;
+    try {
+      const res = await api.get(`/provision/deployments/${deploymentId}/export/terraform`, {
+        responseType: 'blob',
+      });
+      const isZip = res.headers['content-type']?.includes('zip');
+      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = isZip ? `${deploymentId}-terraform.zip` : `${deploymentId}.tfvars.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Terraform export not available for this deployment');
+    }
+  };
+
+  // Auto-run review when user reaches the Review step
   useEffect(() => {
-    if (step !== 2) return;
+    if (step !== 3) return;
     let cancelled = false;
     (async () => {
       setLoading(true);
+      setReviewSummaryLoading(true);
       setError(null);
+      const payload = { ...config, csp, workload_description: workloadDescription.trim() };
       try {
-        const [policyRes, costRes] = await Promise.all([
-          api.post('/provision/policy-check', config),
-          api.post('/provision/estimate', config),
+        const [policyRes, costRes, summaryRes] = await Promise.all([
+          api.post('/provision/policy-check', payload),
+          api.post('/provision/estimate', payload),
+          api.post('/provision/review-summary', payload),
         ]);
         if (cancelled) return;
         setPolicyResult(policyRes.data);
         setCostEstimate(costRes.data);
+        setReviewSummary(summaryRes.data);
       } catch (err) {
         if (!cancelled) {
           setError(err.response?.data?.detail || 'Failed to run review');
         }
       } finally {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) {
+          setLoading(false);
+          setReviewSummaryLoading(false);
+        }
       }
     })();
     return () => { cancelled = true; };
@@ -507,33 +714,32 @@ export default function ProvisionDeployWizard({
     }
   }, [planOutput]);
 
-  const canProceedStep0 = hasAnyModule;
+  const canProceedStep0 = workloadDescription.trim().length >= 3;
+  const canProceedStep1 = hasAnyModule && Boolean(csp);
 
   return (
     <div className="provision-deploy-wizard">
+      <ProvisionSuccessPanel
+        open={successOpen}
+        handoff={handoffData}
+        deploymentId={deploymentId}
+        onClose={() => {
+          setSuccessOpen(false);
+          onDeployed?.();
+        }}
+        onViewDeployments={() => {
+          setSuccessOpen(false);
+          onDeployed?.();
+        }}
+      />
+
       <div className="section-header">
-        <h3>Deploy a new stack (optional)</h3>
+        <h3>Build a new stack</h3>
         <p>
-          Uses BYOC credentials from Settings. Provider: <strong>{csp}</strong> · Engine:{' '}
+          Describe what you need — we help you choose and build once. Provider: <strong>{csp}</strong> · Engine:{' '}
           <strong>{engineLabel}</strong>
           {csp === 'AWS' && ' (change in Settings → Infrastructure provisioning)'}.
         </p>
-      </div>
-
-      <div className="provision-config-row" style={{ marginBottom: '1rem' }}>
-        <label className="provision-label" htmlFor="provision-csp">Cloud provider</label>
-        <select
-          id="provision-csp"
-          className="zenith-select"
-          value={csp}
-          onChange={(e) => handleCspChange(e.target.value)}
-        >
-          {CSP_OPTIONS.filter((opt) => availableProviders.includes(opt.value)).map((opt) => (
-            <option key={opt.value} value={opt.value}>
-              {opt.label}
-            </option>
-          ))}
-        </select>
       </div>
 
       <div className="wizard-steps">
@@ -554,70 +760,74 @@ export default function ProvisionDeployWizard({
         </div>
       )}
 
-      {/* ════════ Step 0: Choose ════════ */}
+      {/* Step 0: Intent */}
       {step === 0 && (
         <div>
-          <div className="section-header">
-            <h3>Quick Start Templates</h3>
-            <p>Select a pre-configured template or customize individual modules below.</p>
-          </div>
-
-          <div className="template-grid">
-            {templates.map(tmpl => (
-              <div
-                key={tmpl.key}
-                className={`template-card ${selectedTemplate === tmpl.key ? 'selected' : ''}`}
-                onClick={() => selectTemplate(tmpl)}
-                id={`template-${tmpl.key}`}
-              >
-                <div className="template-card-icon">
-                  <TemplateCardIcon icon={tmpl.icon} />
-                </div>
-                <h3>{tmpl.name}</h3>
-                <p>{tmpl.description}</p>
-                <span className="cost-badge">{tmpl.estimated_cost || tmpl.cost}</span>
-              </div>
-            ))}
-          </div>
-
-          <div className="or-divider">or customize</div>
-
-          <div className="section-header">
-            <h3>Individual Modules</h3>
-            <p>Toggle modules for {csp}. Dependencies are auto-resolved where applicable.</p>
-          </div>
-
-          <div className="module-toggles">
-            {modules.map(mod => (
-              <div
-                key={mod.key}
-                className={`module-toggle ${config[mod.flag] ? 'enabled' : ''}`}
-                onClick={() => toggleModule(mod.flag)}
-                id={`module-${mod.key}`}
-              >
-                <div className="module-toggle-switch" />
-                <div className="module-toggle-info">
-                  <h4>{mod.name}</h4>
-                  <p>{mod.desc || mod.name}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-
+          <ProvisionIntentPanel
+            workloadDescription={workloadDescription}
+            onWorkloadChange={setWorkloadDescription}
+            analysis={intentAnalysis}
+            isAnalyzing={isAnalyzingIntent}
+            followUpAnswers={followUpAnswers}
+            onFollowUpChange={handleFollowUpChange}
+          />
           <div className="provision-actions">
-            <button
-              className="btn-provision primary"
-              disabled={!canProceedStep0}
-              onClick={nextStep}
-            >
+            <button className="btn-provision primary" disabled={!canProceedStep0} onClick={nextStep} type="button">
+              Next: Compare clouds →
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Step 1: Cloud & template */}
+      {step === 1 && (
+        <div>
+          <TriCloudComparePanel
+            comparisons={cloudComparisons}
+            loading={compareLoading}
+            selectedCsp={csp}
+            onSelect={applyCompareSelection}
+            templates={templates}
+            selectedTemplate={selectedTemplate}
+            onSelectTemplate={(tmpl) => selectTemplate(tmpl)}
+          />
+          <button
+            type="button"
+            className="btn-provision secondary"
+            style={{ marginTop: '1rem' }}
+            onClick={() => setShowAdvancedModules((v) => !v)}
+          >
+            {showAdvancedModules ? 'Hide advanced modules' : 'Advanced: customize modules'}
+          </button>
+          {showAdvancedModules && (
+            <div className="module-toggles" style={{ marginTop: '1rem' }}>
+              {modules.map(mod => (
+                <div
+                  key={mod.key}
+                  className={`module-toggle ${config[mod.flag] ? 'enabled' : ''}`}
+                  onClick={() => toggleModule(mod.flag)}
+                  id={`module-${mod.key}`}
+                >
+                  <div className="module-toggle-switch" />
+                  <div className="module-toggle-info">
+                    <h4>{mod.name}</h4>
+                    <p>{mod.desc || mod.name}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="provision-actions">
+            <button className="btn-provision secondary" onClick={prevStep} type="button">← Back</button>
+            <button className="btn-provision primary" disabled={!canProceedStep1} onClick={nextStep} type="button">
               Next: Configure →
             </button>
           </div>
         </div>
       )}
 
-      {/* ════════ Step 1: Configure ════════ */}
-      {step === 1 && (
+      {/* Step 2: Configure */}
+      {step === 2 && (
         <div>
           <div className="section-header">
             <h3>Configure Resources</h3>
@@ -625,6 +835,43 @@ export default function ProvisionDeployWizard({
           </div>
 
           <div className="config-form">
+            <div className="config-field">
+              <label htmlFor="provision-display-name">Deployment name</label>
+              <input
+                id="provision-display-name"
+                type="text"
+                value={config.deployment_display_name}
+                onChange={(e) => updateConfig('deployment_display_name', e.target.value)}
+                placeholder="my-api-stack"
+              />
+            </div>
+            <div className="config-field">
+              <label htmlFor="provision-environment">Environment</label>
+              <select
+                id="provision-environment"
+                className="zenith-select"
+                value={config.environment}
+                onChange={(e) => updateConfig('environment', e.target.value)}
+              >
+                <option value="dev">Development</option>
+                <option value="staging">Staging</option>
+                <option value="prod">Production</option>
+                <option value="free-tier">Free tier / learning</option>
+              </select>
+            </div>
+            {(config.enable_ec2 || config.enable_gce || config.enable_azure_vm) && (
+              <div className="config-field">
+                <label htmlFor="provision-disk-gb">Boot disk size (GB)</label>
+                <input
+                  id="provision-disk-gb"
+                  type="number"
+                  min={8}
+                  max={2000}
+                  value={config.disk_size_gb}
+                  onChange={(e) => updateConfig('disk_size_gb', Number(e.target.value))}
+                />
+              </div>
+            )}
             {csp === 'AWS' && (
             <div className="config-field">
               <label>AWS Region</label>
@@ -904,25 +1151,28 @@ export default function ProvisionDeployWizard({
               </div>
             )}
 
-            <div className="config-field">
-              <label>Budget Limit (USD/month)</label>
-              <input
-                type="text"
-                value={config.budget_limit}
-                onChange={e => updateConfig('budget_limit', e.target.value)}
-                placeholder="1"
-              />
-            </div>
-
-            <div className="config-field">
-              <label>Budget Alert Email</label>
-              <input
-                type="email"
-                value={config.budget_email}
-                onChange={e => updateConfig('budget_email', e.target.value)}
-                placeholder="billing@example.com"
-              />
-            </div>
+            {csp === 'AWS' && config.enable_billing && (
+              <>
+                <div className="config-field">
+                  <label>Budget Limit (USD/month)</label>
+                  <input
+                    type="text"
+                    value={config.budget_limit}
+                    onChange={e => updateConfig('budget_limit', e.target.value)}
+                    placeholder="1"
+                  />
+                </div>
+                <div className="config-field">
+                  <label>Budget Alert Email</label>
+                  <input
+                    type="email"
+                    value={config.budget_email}
+                    onChange={e => updateConfig('budget_email', e.target.value)}
+                    placeholder="billing@example.com"
+                  />
+                </div>
+              </>
+            )}
           </div>
 
           <div className="provision-actions">
@@ -934,13 +1184,15 @@ export default function ProvisionDeployWizard({
         </div>
       )}
 
-      {/* ════════ Step 2: Review ════════ */}
-      {step === 2 && (
+      {/* Step 3: Review */}
+      {step === 3 && (
         <div>
           <div className="section-header">
-            <h3>Policy Check & Cost Estimate</h3>
-            <p>Review security policies and estimated costs before deploying.</p>
+            <h3>Review before build</h3>
+            <p>Plain-English summary, security policies, and estimated costs.</p>
           </div>
+
+          <PlainEnglishReview summary={reviewSummary} loading={reviewSummaryLoading} />
 
           {loading && (
             <div className="provision-loading">
@@ -1035,12 +1287,12 @@ export default function ProvisionDeployWizard({
         </div>
       )}
 
-      {/* ════════ Step 3: Deploy ════════ */}
-      {step === 3 && (
+      {/* Step 4: Build */}
+      {step === 4 && (
         <div>
           <div className="section-header">
             <h3>{engineLabel} plan &amp; apply</h3>
-            <p>Review the execution plan, then apply to create real AWS resources.</p>
+            <p>Review the execution plan, then apply to create real {csp} resources.</p>
           </div>
 
           {loading && !planOutput && (
@@ -1067,20 +1319,31 @@ export default function ProvisionDeployWizard({
               ← Start Over
             </button>
             {deploymentId && (
-              <button
-                className="btn-provision primary"
-                disabled={loading || !planReady}
-                title={!planReady ? `Wait for ${engineLabel} plan to finish successfully` : undefined}
-                onClick={runApply}
-              >
-                {loading && planReady ? (
-                  <><div className="provision-spinner" style={{ width: 16, height: 16 }} /> Applying in AWS…</>
-                ) : planReady ? (
-                  '🚀 Apply — Create Resources'
-                ) : (
-                  '⏳ Waiting for plan…'
-                )}
-              </button>
+              <>
+                <button
+                  type="button"
+                  className="btn-provision secondary"
+                  onClick={downloadTerraformExport}
+                  disabled={!planReady}
+                >
+                  Download Terraform
+                </button>
+                <button
+                  className="btn-provision primary"
+                  disabled={loading || !planReady}
+                  title={!planReady ? `Wait for ${engineLabel} plan to finish successfully` : undefined}
+                  onClick={runApply}
+                  type="button"
+                >
+                  {loading && planReady ? (
+                    <><div className="provision-spinner" style={{ width: 16, height: 16 }} /> Applying on {csp}…</>
+                  ) : planReady ? (
+                    '🚀 Apply — Create Resources'
+                  ) : (
+                    '⏳ Waiting for plan…'
+                  )}
+                </button>
+              </>
             )}
           </div>
         </div>

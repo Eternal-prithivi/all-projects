@@ -21,7 +21,7 @@ const TABS = [
   { id: 'manage', label: 'Deployments' },
   { id: 'activity', label: 'Activity' },
   { id: 'policies', label: 'Policies' },
-  { id: 'deploy', label: 'New stack' },
+  { id: 'deploy', label: 'Build' },
 ];
 
 export default function ProvisionPage() {
@@ -93,8 +93,8 @@ export default function ProvisionPage() {
         title="Infrastructure governance"
         subtitle={
           credentialMode === 'byoc'
-            ? 'Deploy on your connected cloud accounts (credentials from Settings).'
-            : 'Deploy on Zenith platform clouds — connect BYOC in Settings to use your own accounts.'
+            ? 'Describe what you need — build the right stack once in your connected cloud accounts.'
+            : 'Describe what you need — build on Zenith platform clouds or connect BYOC in Settings.'
         }
         onRefresh={() =>
           runPageRefresh(reloadProvisionStatus, {
