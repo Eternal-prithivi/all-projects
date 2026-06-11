@@ -233,15 +233,16 @@ def read_root():
     return {"message": "Welcome to the Zenith API!"}
 
 
-@app.get("/health", tags=["Health"])
+@app.api_route("/health", methods=["GET", "HEAD"], tags=["Health"])
 def health_check():
     """
     Liveness probe for Render — must respond in <5s without waiting on MongoDB/Terraform.
+    HEAD is supported for UptimeRobot free tier (GET is paid-only on their HTTP monitors).
     """
     return {"status": "ok", "service": "zenith-api"}
 
 
-@app.get("/health/ready", tags=["Health"])
+@app.api_route("/health/ready", methods=["GET", "HEAD"], tags=["Health"])
 def health_ready():
     """Readiness probe — includes dependency status (may be slower)."""
     from app.ops.celery_health import celery_health_snapshot

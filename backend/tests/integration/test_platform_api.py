@@ -37,3 +37,10 @@ def test_health_ready_includes_celery(client):
     body = response.json()
     assert "celery" in body
     assert "beat_schedule" in body["celery"]
+
+
+def test_health_endpoints_accept_head_for_uptimerobot_free_tier(client):
+    """UptimeRobot free plan only allows HEAD — must not return 405."""
+    for path in ("/health", "/health/ready"):
+        response = client.head(path)
+        assert response.status_code == 200, f"{path} HEAD -> {response.status_code}"
