@@ -11,7 +11,9 @@ from app.provision.boto3_modules.context import DeployContext
 from app.provision.boto3_modules.dynamodb import apply_dynamodb
 from app.provision.boto3_modules.iam import apply_iam
 from app.provision.boto3_modules.s3 import apply_s3
+from app.provision.boto3_modules.ec2 import apply_ec2
 from app.provision.boto3_modules.vpc import apply_vpc
+from botocore.exceptions import ClientError
 
 AWS_CREDS = {
     "AWS_ACCESS_KEY_ID": "AKIATEST",
@@ -61,6 +63,10 @@ def test_apply_order_includes_all_modules():
         assert mod in APPLY_ORDER
 
 
+def test_apply_order_iam_before_ec2():
+    assert APPLY_ORDER.index("iam") < APPLY_ORDER.index("ec2")
+
+
 @patch("app.provision.boto3_modules.s3.client")
 def test_apply_s3_encryption_and_versioning(mock_client_fn):
     s3 = MagicMock()
@@ -83,7 +89,8 @@ def test_apply_vpc_map_public_ip(mock_client_fn):
     }
     ec2.create_vpc.return_value = {"Vpc": {"VpcId": "vpc-1"}}
     ec2.create_subnet.side_effect = [
-        {"Subnet": {"SubnetId": "subnet-pub"}},
+        {"Subnet": {"SubnetId": "subnet-pub-a"}},
+        {"Subnet": {"SubnetId": "subnet-pub-b"}},
         {"Subnet": {"SubnetId": "subnet-priv"}},
     ]
     ec2.create_internet_gateway.return_value = {"InternetGateway": {"InternetGatewayId": "igw-1"}}
@@ -92,10 +99,92 @@ def test_apply_vpc_map_public_ip(mock_client_fn):
     ctx = DeployContext()
     result = apply_vpc(_config(enable_vpc=True), AWS_CREDS, "ap-south-1", ctx)
     assert result["success"] is True
-    ec2.modify_subnet_attribute.assert_called_once_with(
-        SubnetId="subnet-pub",
-        MapPublicIpOnLaunch={"Value": True},
+    assert ctx.public_subnet_ids == ["subnet-pub-a", "subnet-pub-b"]
+    assert ctx.subnet_id == "subnet-pub-a"
+    ec2.describe_availability_zones.assert_called_once_with(
+        Filters=[{"Name": "state", "Values": ["available"]}],
     )
+    assert ec2.modify_subnet_attribute.call_count == 2
+    assert ec2.associate_route_table.call_count == 2
+
+
+@patch("app.provision.boto3_modules.ec2.client")
+def test_apply_ec2_retries_other_subnet_on_capacity(mock_client_fn):
+    ec2 = MagicMock()
+    mock_client_fn.return_value = ec2
+    ec2.create_security_group.return_value = {"GroupId": "sg-1"}
+    ec2.describe_images.return_value = {"Images": [{"ImageId": "ami-test", "CreationDate": "2024-01-01"}]}
+
+    def _describe_subnets(**kwargs):
+        subnet_ids = kwargs.get("SubnetIds") or []
+        if subnet_ids:
+            sid = subnet_ids[0]
+            az = "ap-south-1a" if sid == "subnet-a" else "ap-south-1b"
+            return {"Subnets": [{"SubnetId": sid, "AvailabilityZone": az}]}
+        return {"Subnets": []}
+
+    ec2.describe_subnets.side_effect = _describe_subnets
+
+    capacity_error = ClientError(
+        {"Error": {"Code": "InsufficientInstanceCapacity", "Message": "no capacity in 1a"}},
+        "RunInstances",
+    )
+    success_resp = {"Instances": [{"InstanceId": "i-123"}]}
+    # Exhaust free-tier types in AZ-a, then succeed in AZ-b.
+    ec2.run_instances.side_effect = [capacity_error] * 4 + [success_resp]
+    ec2.describe_instances.return_value = {
+        "Reservations": [{"Instances": [{"PublicIpAddress": "1.2.3.4"}]}]
+    }
+
+    ctx = DeployContext(
+        vpc_id="vpc-1",
+        subnet_id="subnet-a",
+        public_subnet_ids=["subnet-a", "subnet-b"],
+    )
+    with patch("app.provision.boto3_modules.ec2.time.sleep"):
+        result = apply_ec2(
+            _config(enable_vpc=True, enable_ec2=True, instance_type="t2.micro"),
+            AWS_CREDS,
+            "ap-south-1",
+            ctx,
+        )
+    assert result["success"] is True
+    assert ctx.instance_id == "i-123"
+    assert ctx.subnet_id == "subnet-b"
+    assert ctx.launched_instance_type == "t2.micro"
+    assert ec2.run_instances.call_count == 5
+
+
+@patch("app.provision.boto3_modules.ec2.client")
+def test_apply_ec2_falls_back_instance_type(mock_client_fn):
+    ec2 = MagicMock()
+    mock_client_fn.return_value = ec2
+    ec2.create_security_group.return_value = {"GroupId": "sg-1"}
+    ec2.describe_images.return_value = {"Images": [{"ImageId": "ami-test", "CreationDate": "2024-01-01"}]}
+    ec2.describe_subnets.return_value = {
+        "Subnets": [{"SubnetId": "subnet-a", "AvailabilityZone": "ap-south-1a"}]
+    }
+
+    capacity_error = ClientError(
+        {"Error": {"Code": "InsufficientInstanceCapacity", "Message": "no t2"}},
+        "RunInstances",
+    )
+    success_resp = {"Instances": [{"InstanceId": "i-456"}]}
+    ec2.run_instances.side_effect = [capacity_error, success_resp]
+    ec2.describe_instances.return_value = {"Reservations": [{"Instances": [{}]}]}
+
+    ctx = DeployContext(vpc_id="vpc-1", subnet_id="subnet-a", public_subnet_ids=["subnet-a"])
+    with patch("app.provision.boto3_modules.ec2.time.sleep"):
+        result = apply_ec2(
+            _config(enable_vpc=True, enable_ec2=True, instance_type="t2.micro"),
+            AWS_CREDS,
+            "ap-south-1",
+            ctx,
+        )
+    assert result["success"] is True
+    assert ctx.launched_instance_type == "t3.micro"
+    second_call = ec2.run_instances.call_args_list[1][1]
+    assert second_call["InstanceType"] == "t3.micro"
 
 
 @patch("app.provision.boto3_modules.iam.client")

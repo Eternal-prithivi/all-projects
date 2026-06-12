@@ -24,28 +24,34 @@ import {
   IconDownload,
 } from '../components/dashboard/Icons.jsx';
 import '../styles/costanalysis.css';
+import CloudCapabilityBanner from '../components/cloud/CloudCapabilityBanner.jsx';
+import FeatureLockedState from '../components/cloud/FeatureLockedState.jsx';
+import CredentialSourceBadge from '../components/cloud/CredentialSourceBadge.jsx';
 import {
   useCloudAvailability,
   CSP_TO_COST_KEY,
   COST_KEY_TO_CSP,
 } from '../hooks/useCloudAvailability.js';
+import { usePlanEntitlementsContext } from '../context/PlanEntitlementsContext.jsx';
+import PlanUpgradeGate from '../components/billing/PlanUpgradeGate.jsx';
+import { NAV_ID_LABELS, MIN_PLAN_LABELS } from '../config/planNavConfig.js';
+import { PATHS } from '../data/productFacts.js';
+import { Link } from 'react-router-dom';
+import CloudProviderLogo from '../components/cloud/CloudProviderLogo.jsx';
 
-const ProviderLogo = ({ provider }) => {
-  const logoMap = {
-    'aws': '/images/aws.png',
-    'gcp': '/images/google-cloud_logo.png',
-    'azure': '/images/Microsoft_Azure.png'
-  };
-
-  return <img src={logoMap[provider]} alt={provider.toUpperCase()} className="provider-logo" />;
-};
+const ProviderLogo = ({ provider }) => (
+  <CloudProviderLogo provider={provider} className="provider-logo" />
+);
 
 const CostAnalysisEnhancedPage = () => {
   const notifications = useNotifications();
   const { formatCurrency } = usePreferences();
   const { runPageRefresh, pageRefreshing } = usePageRefresh();
-  const { getFeature } = useCloudAvailability();
+  const { getFeature, getLockedProviders, getCredentialSource } = useCloudAvailability();
+  const { isFeatureEnabled, planName, getNavMeta, openUpgradeDrawer } = usePlanEntitlementsContext();
   const costProviderKeys = (getFeature('cost').providers || []).map((p) => CSP_TO_COST_KEY[p]).filter(Boolean);
+  const lockedCostProviders = getLockedProviders('cost');
+  const costFullyBlocked = !costProviderKeys.length && lockedCostProviders.length > 0;
 
   // Core state
   const [selectedProvider, setSelectedProvider] = useState('aws');
@@ -516,6 +522,24 @@ const CostAnalysisEnhancedPage = () => {
         refreshing={pageRefreshing || loading}
       />
       <CostHubNav />
+      {!isFeatureEnabled('live_billing') && (
+        <div className="dashboard-demo-banner" role="status">
+          <span>Free plan — live cost refresh is disabled. Charts may show demo or cached sample data.</span>
+          <Link to={PATHS.pricing}>Upgrade for live billing</Link>
+        </div>
+      )}
+      <CloudCapabilityBanner
+        feature="cost"
+        lockedProviders={lockedCostProviders}
+        className="cost-capability-banner"
+      />
+      {costFullyBlocked && (
+        <FeatureLockedState
+          featureLabel="Cost analysis"
+          lockedProviders={lockedCostProviders}
+          className="cost-feature-locked"
+        />
+      )}
       {storageMetering?.estimated_usd && (
         <div className="storage-metering-cost-banner zenith-surface" role="status">
           <h3 className="storage-metering-cost-title">Storage API metering (this month)</h3>
@@ -639,6 +663,11 @@ const CostAnalysisEnhancedPage = () => {
         </div>
       )}
 
+      <div className="cost-provider-meta">
+        <CredentialSourceBadge
+          source={getCredentialSource(COST_KEY_TO_CSP[selectedProvider], 'cost')}
+        />
+      </div>
       {selectedProvider !== 'aws' && (
         <p className="cost-api-note" role="note">
           Service breakdown uses provider-native APIs for {selectedProvider.toUpperCase()}.{' '}
@@ -646,7 +675,7 @@ const CostAnalysisEnhancedPage = () => {
         </p>
       )}
       {/* Anomaly Alerts Banner */}
-      {anomalySummary && anomalySummary.total_unacknowledged > 0 && (
+      {isFeatureEnabled('ai_recommendations') && anomalySummary && anomalySummary.total_unacknowledged > 0 && (
         <div className="anomaly-banner">
           <span className="anomaly-icon"><IconAlert aria-hidden="true" /></span>
           <span>
@@ -660,7 +689,7 @@ const CostAnalysisEnhancedPage = () => {
       )}
 
       {/* Anomalies Panel */}
-      {showAnomalies && (
+      {isFeatureEnabled('ai_recommendations') && showAnomalies && (
         <div className="anomalies-panel">
           <h3>Cost Anomalies</h3>
           {anomalies.length === 0 ? (
@@ -845,14 +874,27 @@ const CostAnalysisEnhancedPage = () => {
 
       {/* Action Buttons */}
       <div className="action-buttons">
-        <button type="button" onClick={fetchForecast} className="forecast-btn">
-          <IconBarChart aria-hidden="true" />
-          View Forecast
-        </button>
-        <button type="button" onClick={fetchDemoForecast} className="forecast-btn" title="Test ML model with synthetic data">
-          <IconActivity aria-hidden="true" />
-          Demo ML
-        </button>
+        {isFeatureEnabled('ai_recommendations') ? (
+          <>
+            <button type="button" onClick={fetchForecast} className="forecast-btn">
+              <IconBarChart aria-hidden="true" />
+              View Forecast
+            </button>
+            <button type="button" onClick={fetchDemoForecast} className="forecast-btn" title="Test ML model with synthetic data">
+              <IconActivity aria-hidden="true" />
+              Demo ML
+            </button>
+          </>
+        ) : (
+          <button
+            type="button"
+            className="forecast-btn"
+            onClick={() => openUpgradeDrawer('cost_optimization')}
+          >
+            <IconBarChart aria-hidden="true" />
+            Forecast (Pro)
+          </button>
+        )}
         <button type="button" onClick={() => exportReport('csv')} disabled={!costData} className="export-btn">
           <IconDownload aria-hidden="true" />
           Export CSV
@@ -864,7 +906,16 @@ const CostAnalysisEnhancedPage = () => {
       </div>
 
       {/* Forecast Panel */}
-      {showForecast && forecast && (
+      {!isFeatureEnabled('ai_recommendations') && showForecast && (
+        <PlanUpgradeGate
+          featureLabel={NAV_ID_LABELS.cost_optimization}
+          currentPlan={planName}
+          requiredPlan={MIN_PLAN_LABELS[getNavMeta('cost_optimization')?.min_plan] || 'Pro'}
+          requiredPlanId={getNavMeta('cost_optimization')?.min_plan || 'pro'}
+          compact
+        />
+      )}
+      {isFeatureEnabled('ai_recommendations') && showForecast && forecast && (
         <div className="forecast-panel">
           <div className="forecast-header">
             <h3>Cost Forecast - Next 30 Days</h3>

@@ -4,7 +4,13 @@ from typing import Any
 
 from botocore.exceptions import ClientError
 
-from app.provision.boto3_modules.common import aws_err, cidr_subnet, client
+from app.provision.boto3_modules.common import (
+    MAX_PUBLIC_AZS,
+    PUBLIC_SUBNET_CIDR_SLOTS,
+    aws_err,
+    cidr_subnet,
+    client,
+)
 from app.provision.boto3_modules.context import DeployContext
 
 
@@ -35,32 +41,10 @@ def apply_vpc(config: dict, aws_creds: dict, region: str, ctx: DeployContext) ->
             ec2.create_tags(Resources=[vpc_id], Tags=[{"Key": "Name", "Value": "main-vpc"}])
         ctx.vpc_id = vpc_id
 
-        azs = ec2.describe_availability_zones(Filter=[{"Name": "state", "Values": ["available"]}])
+        azs = ec2.describe_availability_zones(Filters=[{"Name": "state", "Values": ["available"]}])
         names = [z["ZoneName"] for z in azs.get("AvailabilityZones", [])]
-        az0 = names[0] if names else f"{region}a"
-        az1 = names[1] if len(names) > 1 else az0
-
-        pub_cidr = cidr_subnet(cidr, 8, 1)
-        priv_cidr = cidr_subnet(cidr, 8, 2)
-
-        pub = ec2.create_subnet(
-            VpcId=vpc_id,
-            CidrBlock=pub_cidr,
-            AvailabilityZone=az0,
-            TagSpecifications=[{"ResourceType": "subnet", "Tags": [{"Key": "Name", "Value": "public-subnet"}]}],
-        )
-        ctx.subnet_id = pub["Subnet"]["SubnetId"]
-        ec2.modify_subnet_attribute(
-            SubnetId=ctx.subnet_id,
-            MapPublicIpOnLaunch={"Value": True},
-        )
-
-        ec2.create_subnet(
-            VpcId=vpc_id,
-            CidrBlock=priv_cidr,
-            AvailabilityZone=az1,
-            TagSpecifications=[{"ResourceType": "subnet", "Tags": [{"Key": "Name", "Value": "private-subnet"}]}],
-        )
+        if not names:
+            names = [f"{region}a", f"{region}b"]
 
         igw = ec2.create_internet_gateway(
             TagSpecifications=[{"ResourceType": "internet-gateway", "Tags": [{"Key": "Name", "Value": "main-igw"}]}],
@@ -74,9 +58,46 @@ def apply_vpc(config: dict, aws_creds: dict, region: str, ctx: DeployContext) ->
         )
         rt_id = rt["RouteTable"]["RouteTableId"]
         ec2.create_route(RouteTableId=rt_id, DestinationCidrBlock="0.0.0.0/0", GatewayId=igw_id)
-        ec2.associate_route_table(RouteTableId=rt_id, SubnetId=ctx.subnet_id)
 
-        return {"success": True, "steps": [f"✓ VPC {vpc_id} + subnets + IGW"], "error": None}
+        public_subnet_ids: list[str] = []
+        for i, az in enumerate(names[:MAX_PUBLIC_AZS]):
+            slot = PUBLIC_SUBNET_CIDR_SLOTS[i]
+            pub = ec2.create_subnet(
+                VpcId=vpc_id,
+                CidrBlock=cidr_subnet(cidr, 8, slot),
+                AvailabilityZone=az,
+                TagSpecifications=[
+                    {
+                        "ResourceType": "subnet",
+                        "Tags": [{"Key": "Name", "Value": f"public-subnet-{az}"}],
+                    }
+                ],
+            )
+            subnet_id = pub["Subnet"]["SubnetId"]
+            public_subnet_ids.append(subnet_id)
+            ec2.modify_subnet_attribute(
+                SubnetId=subnet_id,
+                MapPublicIpOnLaunch={"Value": True},
+            )
+            ec2.associate_route_table(RouteTableId=rt_id, SubnetId=subnet_id)
+
+        ctx.public_subnet_ids = public_subnet_ids
+        ctx.subnet_id = public_subnet_ids[0] if public_subnet_ids else None
+
+        priv_az = names[1] if len(names) > 1 else names[0]
+        ec2.create_subnet(
+            VpcId=vpc_id,
+            CidrBlock=cidr_subnet(cidr, 8, 2),
+            AvailabilityZone=priv_az,
+            TagSpecifications=[{"ResourceType": "subnet", "Tags": [{"Key": "Name", "Value": "private-subnet"}]}],
+        )
+
+        az_note = ", ".join(names[:MAX_PUBLIC_AZS])
+        return {
+            "success": True,
+            "steps": [f"✓ VPC {vpc_id} + public subnets ({az_note}) + IGW"],
+            "error": None,
+        }
     except ClientError as exc:
         return {"success": False, "steps": [], "error": aws_err(exc)}
 

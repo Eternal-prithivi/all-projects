@@ -176,9 +176,11 @@ def get_user_cloud_credentials(username: str, csp: str) -> Optional[Dict[str, An
     Returns:
         Dict with decrypted credentials, or None if no BYOC config.
     """
+    from app.cloud.providers import normalize_provider
+
     record = byoc_collection.find_one({
         "username": username,
-        "csp": csp.upper(),
+        "csp": normalize_provider(csp),
         "is_active": True
     })
     

@@ -261,6 +261,9 @@ async def get_api_keys(current_user: User = Depends(get_current_user)):
 @router.post("/api-keys")
 async def generate_api_key(current_user: User = Depends(get_current_user)):
     """Generate a new API key"""
+    from app.payments.plan_entitlements import require_feature
+
+    require_feature(current_user.username, "api_access")
     try:
         # Generate secure API key
         api_key = f"sk-prod-{secrets.token_urlsafe(32)}"

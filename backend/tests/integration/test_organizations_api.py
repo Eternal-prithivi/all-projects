@@ -70,6 +70,32 @@ def test_owner_can_revoke_pending_invite(client, auth_headers):
     assert not any(i.get("email") == "pending@example.com" for i in pending)
 
 
+def test_invite_returns_email_sent_flag(client, auth_headers, monkeypatch):
+    owner_headers, _ = auth_headers()
+    client.post(
+        "/api/organizations",
+        headers=owner_headers,
+        json={"name": "Email Flag Org"},
+    )
+
+    monkeypatch.setattr(
+        "app.organizations.routes_organizations.email_service.send_org_invite",
+        lambda **kwargs: True,
+    )
+    monkeypatch.setattr(
+        "app.organizations.routes_organizations.email_service.sender_email",
+        "test@example.com",
+    )
+
+    invite = client.post(
+        "/api/organizations/invites",
+        headers=owner_headers,
+        json={"email": "newhire@example.com", "role": "member"},
+    )
+    assert invite.status_code == 200
+    assert invite.json().get("email_sent") is True
+
+
 def test_non_member_cannot_see_org_roster(client, auth_headers):
     owner_headers, _owner = auth_headers()
     outsider_headers, _outsider = auth_headers()

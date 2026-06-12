@@ -25,6 +25,7 @@ import { PreferencesProvider } from "./context/PreferencesContext.jsx";
 import ThemeSync from "./components/ThemeSync.jsx";
 import ErrorBoundary from "./components/ErrorBoundary.jsx";
 import LazyLoadFallback from "./components/LazyLoadFallback.jsx";
+import PlanFeatureRoute from "./components/billing/PlanFeatureRoute.jsx";
 import "./index.css";
 
 // Optional Sentry — only load the chunk when DSN is configured (avoids dev errors without npm install)
@@ -51,6 +52,7 @@ const SecurityPage = lazyWithRetry(() => import("./pages/SecurityPage.jsx"));
 const SecuritySettingsPage = lazyWithRetry(() => import("./pages/SecuritySettingsPage.jsx"));
 const ProfilePage = lazyWithRetry(() => import("./pages/ProfilePage.jsx"));
 const SettingsPage = lazyWithRetry(() => import("./pages/SettingsPage.jsx"));
+const ByocSetupHelpPage = lazyWithRetry(() => import("./pages/ByocSetupHelpPage.jsx"));
 const BillingPage = lazyWithRetry(() => import("./pages/BillingPage.jsx"));
 const PricingPage = lazyWithRetry(() => import("./pages/PricingPage.jsx"));
 const ContactPage = lazyWithRetry(() => import("./pages/ContactPage.jsx"));
@@ -139,14 +141,33 @@ const router = createBrowserRouter([
               { path: "costs", element: <Suspense fallback={<LazyLoadFallback />}><CostAnalysisPage /></Suspense> },
               { path: "billing", element: <Suspense fallback={<LazyLoadFallback />}><BillingPage /></Suspense> },
               { path: "pricing", element: <Suspense fallback={<LazyLoadFallback />}><PricingPage /></Suspense> },
-              { path: "simulator", element: <Suspense fallback={<LazyLoadFallback />}><CostSimulatorPage /></Suspense> },
-              { path: "optimization", element: <Suspense fallback={<LazyLoadFallback />}><CostOptimizationPage /></Suspense> },
+              {
+                path: "simulator",
+                element: (
+                  <Suspense fallback={<LazyLoadFallback />}>
+                    <PlanFeatureRoute navId="cost_simulator">
+                      <CostSimulatorPage />
+                    </PlanFeatureRoute>
+                  </Suspense>
+                ),
+              },
+              {
+                path: "optimization",
+                element: (
+                  <Suspense fallback={<LazyLoadFallback />}>
+                    <PlanFeatureRoute navId="cost_optimization">
+                      <CostOptimizationPage />
+                    </PlanFeatureRoute>
+                  </Suspense>
+                ),
+              },
               { path: "storage", element: <Suspense fallback={<LazyLoadFallback />}><StoragePage /></Suspense> },
               { path: "vmcluster", element: <Suspense fallback={<LazyLoadFallback />}><VMClusterPage /></Suspense> },
               { path: "security", element: <Suspense fallback={<LazyLoadFallback />}><SecurityPage /></Suspense> },
               { path: "security-settings", element: <Suspense fallback={<LazyLoadFallback />}><SecuritySettingsPage /></Suspense> },
               { path: "profile", element: <Suspense fallback={<LazyLoadFallback />}><ProfilePage /></Suspense> },
               { path: "settings", element: <Suspense fallback={<LazyLoadFallback />}><SettingsPage /></Suspense> },
+              { path: "help/byoc-setup", element: <Suspense fallback={<LazyLoadFallback />}><ByocSetupHelpPage /></Suspense> },
               { path: "provision", element: <Suspense fallback={<LazyLoadFallback />}><ProvisionPage /></Suspense> },
               { path: "notifications", element: <Suspense fallback={<LazyLoadFallback />}><NotificationsPage /></Suspense> },
               { path: "team", element: <Suspense fallback={<LazyLoadFallback />}><TeamPage /></Suspense> },
@@ -186,8 +207,8 @@ ReactDOM.createRoot(document.getElementById("root")).render(
     <ErrorBoundary>
       <AuthProvider>
         <ThemeProvider>
-          <ThemeSync />
           <PreferencesProvider>
+            <ThemeSync />
             <RouterProvider router={router} />
           </PreferencesProvider>
         </ThemeProvider>

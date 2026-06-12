@@ -5,27 +5,22 @@ from __future__ import annotations
 from typing import Any, Dict, Optional
 
 from app.vm.nlp_workload import analyze_workload_nlp
-from app.vm.workload_guidance import (
-    assess_workload_readiness,
-    build_follow_up_questions,
-    merge_follow_up_answers,
-)
+from app.vm.contextual_followups import build_contextual_follow_up_questions
+from app.vm.workload_guidance import assess_workload_readiness, merge_follow_up_answers
 from app.provision.template_mapper import recommend_from_text, recommendation_to_dict
 
 
 def analyze_provision_intent(
     workload_description: str,
     follow_up_answers: Optional[Dict[str, str]] = None,
+    *,
+    csp: str = "AWS",
 ) -> Dict[str, Any]:
     """
     Analyze user intent for infrastructure provisioning (not VM pool assignment).
     """
     effective = merge_follow_up_answers(workload_description or "", follow_up_answers)
     readiness = assess_workload_readiness(effective)
-    follow_up_questions = build_follow_up_questions(
-        readiness.get("missing_signals", []),
-        follow_up_answers,
-    )
 
     nlp_confidence = 50
     cluster_type = None
@@ -40,14 +35,25 @@ def analyze_provision_intent(
 
     recommendation = recommend_from_text(
         effective,
+        csp=csp,
         cluster_type=cluster_type,
         nlp_confidence=nlp_confidence,
+    )
+
+    module_keys = [m["key"] for m in recommendation.suggested_modules]
+    follow_up_questions, follow_up_context = build_contextual_follow_up_questions(
+        effective,
+        cluster_type=cluster_type,
+        module_keys=module_keys,
+        csp=csp,
+        follow_up_answers=follow_up_answers,
     )
 
     return {
         "effective_description": effective,
         "readiness": readiness,
         "follow_up_questions": follow_up_questions,
+        "follow_up_context": follow_up_context,
         "nlp_confidence": nlp_confidence,
         "nlp_cluster": cluster_type.value if cluster_type else None,
         "nlp_features": nlp_features,

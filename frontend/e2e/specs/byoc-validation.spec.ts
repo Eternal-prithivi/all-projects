@@ -21,6 +21,11 @@ test.describe('BYOC form validation', () => {
             gcp: { connected: false },
             azure: { connected: false },
           },
+          capabilities: {
+            aws: { connected: false, features: {}, unlocked_features: [], gaps: [] },
+            gcp: { connected: false, features: {}, unlocked_features: [], gaps: [] },
+            azure: { connected: false, features: {}, unlocked_features: [], gaps: [] },
+          },
         }),
       });
     });
@@ -34,6 +39,7 @@ test.describe('BYOC form validation', () => {
     const connectButtons = page.getByRole('button', { name: /^connect$/i });
     await connectButtons.nth(1).click();
 
+    await expect(page.getByText(/step 1 — verify credentials/i)).toBeVisible();
     await expect(page.getByText(/service account json is required/i)).toBeVisible();
     await expect(page.getByText(/bucket name is required/i)).toBeVisible();
   });

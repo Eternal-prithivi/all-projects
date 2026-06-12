@@ -1,0 +1,147 @@
+.plan-upgrade-gate {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 0.75rem;
+  padding: 2.5rem 1.5rem;
+  border: 1px dashed rgba(212, 175, 55, 0.35);
+  border-radius: 12px;
+  background: rgba(212, 175, 55, 0.04);
+  min-height: 220px;
+}
+
+.plan-upgrade-gate--compact {
+  min-height: 160px;
+  padding: 1.5rem 1rem;
+}
+
+.plan-upgrade-gate__icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(212, 175, 55, 0.12);
+  color: var(--gold-primary, #d4af37);
+  font-size: 1.1rem;
+}
+
+.plan-upgrade-gate h3 {
+  margin: 0;
+  font-size: 1.15rem;
+}
+
+.plan-upgrade-gate p {
+  margin: 0;
+  max-width: 420px;
+  color: rgba(255, 255, 255, 0.72);
+  line-height: 1.5;
+}
+
+.plan-upgrade-gate__cta {
+  margin-top: 0.5rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.55rem 1.25rem;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #ffe566, #d4af37);
+  color: #0a0a0a;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.plan-upgrade-gate__cta:hover {
+  filter: brightness(1.05);
+}
+
+.plan-upgrade-drawer-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 10050;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  justify-content: flex-end;
+}
+
+.plan-upgrade-drawer {
+  width: min(380px, 100%);
+  height: 100%;
+  background: #121212;
+  border-left: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 2rem 1.5rem;
+  position: relative;
+  box-shadow: -8px 0 32px rgba(0, 0, 0, 0.35);
+}
+
+.plan-upgrade-drawer__close {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 1.1rem;
+  cursor: pointer;
+}
+
+.plan-upgrade-drawer__icon {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(212, 175, 55, 0.12);
+  color: var(--gold-primary, #d4af37);
+  margin-bottom: 1rem;
+}
+
+.plan-upgrade-drawer h2 {
+  margin: 0 0 0.5rem;
+}
+
+.plan-upgrade-drawer__feature {
+  font-weight: 600;
+  color: var(--gold-primary, #d4af37);
+}
+
+.plan-upgrade-drawer p {
+  color: rgba(255, 255, 255, 0.72);
+  line-height: 1.5;
+}
+
+.rail-link--locked {
+  opacity: 0.72;
+}
+
+.rail-link-lock {
+  margin-left: auto;
+  font-size: 0.7rem;
+  color: var(--gold-primary, #d4af37);
+  opacity: 0.9;
+}
+
+.dashboard-demo-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  padding: 0.75rem 1rem;
+  margin-bottom: 1rem;
+  border-radius: 10px;
+  border: 1px solid rgba(212, 175, 55, 0.25);
+  background: rgba(212, 175, 55, 0.08);
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 0.92rem;
+}
+
+.dashboard-demo-banner a {
+  color: var(--gold-primary, #d4af37);
+  font-weight: 600;
+  text-decoration: none;
+}

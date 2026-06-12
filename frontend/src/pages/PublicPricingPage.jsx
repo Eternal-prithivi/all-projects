@@ -12,7 +12,8 @@ export default function PublicPricingPage() {
           <span className="landing-section__eyebrow">Pricing</span>
           <h1 className="landing-section__title">Simple, transparent plans</h1>
           <p className="landing-section__subtitle">
-            Start free. Scale when your infrastructure grows. All plans include multi-cloud management.
+            Start free with demo insights and platform cloud. Upgrade for live billing, infrastructure
+            provisioning, BYOC, and team governance.
           </p>
         </div>
         <div className="landing-pricing__grid reveal-stagger">
@@ -26,6 +27,9 @@ export default function PublicPricingPage() {
             >
               {plan.featured && <span className="landing-pricing__badge">Most popular</span>}
               <h3 className="landing-pricing__tier">{plan.tier}</h3>
+              {plan.description && (
+                <p className="landing-pricing__tagline">{plan.description}</p>
+              )}
               <div className="landing-pricing__price">
                 <span className="landing-pricing__currency">₹</span>
                 <span className="landing-pricing__amount">{plan.amount}</span>

@@ -7,49 +7,8 @@ import { toast } from 'react-toastify';
 import { PageSkeleton } from '../components/Skeletons.jsx';
 import PageHeader from '../components/ui/PageHeader.jsx';
 import { usePageRefresh } from '../hooks/usePageRefresh.js';
+import { getPlanCapabilityBlocks } from '../data/productFacts.js';
 import '../styles/pricing.css';
-
-/** Compact capability blocks — avoids tall bullet lists on wide cards */
-function getPlanBlocks(plan) {
-  const vm =
-    plan.vm_limit >= 999 ? 'Unlimited' : `${plan.vm_limit} VMs`;
-  const storage =
-    plan.storage_gb >= 1000 ? '1 TB / VM' : `${plan.storage_gb} GB / VM`;
-
-  const byPlan = {
-    free: [
-      { title: 'Compute', detail: vm },
-      { title: 'Storage', detail: storage },
-      { title: 'Monitoring', detail: 'Basic' },
-      { title: 'Support', detail: 'Community' },
-    ],
-    basic: [
-      { title: 'Compute', detail: vm },
-      { title: 'Storage', detail: storage },
-      { title: 'Cloud', detail: 'AWS · GCP · Azure' },
-      { title: 'Support', detail: 'Email · 24h' },
-    ],
-    pro: [
-      { title: 'Compute', detail: vm },
-      { title: 'Storage', detail: storage },
-      { title: 'Intelligence', detail: 'AI + cost analytics' },
-      { title: 'Support', detail: 'Priority · 4h' },
-    ],
-    enterprise: [
-      { title: 'Compute', detail: vm },
-      { title: 'Storage', detail: storage },
-      { title: 'Operations', detail: 'SLA · white-label' },
-      { title: 'Support', detail: '24/7 · dedicated AM' },
-    ],
-  };
-
-  return byPlan[plan.plan_id] ?? [
-    { title: 'Compute', detail: vm },
-    { title: 'Storage', detail: storage },
-    { title: 'Includes', detail: plan.features[0] ?? '—' },
-    { title: 'Plus', detail: plan.features[1] ?? '—' },
-  ];
-}
 
 const PricingPage = () => {
   const [plans, setPlans] = useState([]);
@@ -170,7 +129,7 @@ const PricingPage = () => {
       <div className="pricing-container">
         <PageHeader
           title="Choose Your Plan"
-          subtitle="Select the perfect plan for your cloud resource needs"
+          subtitle="Start free with platform cloud. Scale to BYOC, provisioning governance, and team billing on Pro."
           premium={false}
           actions={
             currentSubscription ? (
@@ -262,7 +221,7 @@ const PricingPage = () => {
                 </div>
 
                 <div className="plan-feature-blocks" aria-label={`${plan.name} highlights`}>
-                  {getPlanBlocks(plan).map((block) => (
+                  {getPlanCapabilityBlocks(plan).map((block) => (
                     <div key={block.title} className="plan-feature-block">
                       <span className="block-title">{block.title}</span>
                       <span className="block-detail">{block.detail}</span>

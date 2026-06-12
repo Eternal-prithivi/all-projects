@@ -6,7 +6,7 @@ from azure.core.exceptions import ResourceExistsError, ResourceNotFoundError
 from azure.storage.blob import BlobServiceClient
 
 from app.provision.sdk_clients import azure_credential_and_subscription, azure_storage_mgmt_client
-from app.provision.sdk_modules.azure_resource_group import ensure_resource_group
+from app.provision.sdk_modules.azure_resource_group import azure_effective_location, ensure_resource_group
 from app.provision.sdk_modules.context import SdkDeployContext
 
 
@@ -21,7 +21,7 @@ def plan_azure_storage(config: dict, cloud_env: dict[str, str]) -> dict[str, Any
     rg = config.get("resource_group_name") or "zenith-rg"
     container = config.get("container_name") or "zenith-static"
     location = config.get("azure_location") or "eastus"
-    lines = [
+    lines = [  # plan uses requested region; apply resolves via ensure_resource_group
         f"  + azurerm_resource_group.main ({rg}, {location})",
         f"  + azurerm_storage_account.main ({sa_name})",
         f"  + azurerm_storage_container.static ({container})",
@@ -37,7 +37,6 @@ def apply_azure_storage(
     sa_name = (config.get("storage_account_name") or "").strip()
     rg = config.get("resource_group_name") or "zenith-rg"
     container = config.get("container_name") or "zenith-static"
-    location = config.get("azure_location") or "eastus"
     steps: list[str] = []
     try:
         ok, rg_steps, err = ensure_resource_group(config, cloud_env, ctx)
@@ -45,6 +44,7 @@ def apply_azure_storage(
         if not ok:
             return {"success": False, "steps": steps, "error": err}
         rg = ctx.azure_resource_group
+        location = azure_effective_location(config, ctx)
 
         storage_client, credential = _storage_mgmt(cloud_env)
         existing = [

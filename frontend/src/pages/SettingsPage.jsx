@@ -20,18 +20,26 @@ import { useTheme } from "../context/ThemeContext";
 import { usePreferences } from "../context/PreferencesContext";
 import { apiClient } from '../api';
 import LoadingSpinner from '../components/LoadingSpinner';
+import { usePlanEntitlementsContext } from '../context/PlanEntitlementsContext.jsx';
+import PlanUpgradeGate from '../components/billing/PlanUpgradeGate.jsx';
+import { NAV_ID_LABELS, MIN_PLAN_LABELS } from '../config/planNavConfig.js';
 import {
   getValidationErrorMessage,
   validateByocConnectionForm,
   validateByocAwsStep1,
   validateByocAwsStep2,
   validateByocGcpStep1,
+  validateByocGcpStep2,
   validateByocAzureStep1,
+  validateByocAzureStep2,
 } from '../utils/formValidation';
+import ByocSetupGuidePanel from '../components/byoc/ByocSetupGuidePanel.jsx';
+import ByocConnectSummaryModal from '../components/byoc/ByocConnectSummaryModal.jsx';
 import '../styles/settings.css';
 import PageHeader from '../components/ui/PageHeader.jsx';
 import { usePageRefresh } from '../hooks/usePageRefresh.js';
 import PlatformRegionPills from '../components/PlatformRegionPills.jsx';
+import CloudProviderLogo from '../components/cloud/CloudProviderLogo.jsx';
 
 const SettingsPage = () => {
   const notifications = useNotifications();
@@ -39,7 +47,12 @@ const SettingsPage = () => {
   const { runPageRefresh, pageRefreshing } = usePageRefresh();
   const { theme, setTheme } = useTheme();
   const { updatePreferences } = usePreferences();
-  
+  const {
+    isFeatureEnabled,
+    planName,
+    getNavMeta,
+  } = usePlanEntitlementsContext();
+
   const [isLoading, setIsLoading] = useState(true);
   const [apiKeys, setApiKeys] = useState([]);
   const [notificationSettings, setNotificationSettings] = useState({
@@ -73,7 +86,11 @@ const SettingsPage = () => {
 
   // BYOC State
   const [byocStatus, setByocStatus] = useState(null);
+  const [byocCapabilities, setByocCapabilities] = useState(null);
   const [byocEligible, setByocEligible] = useState(false);
+  const [azureExtending, setAzureExtending] = useState(false);
+  const [gcpExtending, setGcpExtending] = useState(false);
+  const [connectSummary, setConnectSummary] = useState(null);
   const [byocCurrentPlan, setByocCurrentPlan] = useState('free');
   const [subscription, setSubscription] = useState(null);
   const [byocActiveCSP, setByocActiveCSP] = useState(null); // Which CSP form is open
@@ -142,22 +159,14 @@ const SettingsPage = () => {
           : validateByocAwsStep2({ awsForm });
       }
       if (byocActiveCSP === 'GCP') {
-        return gcpConnectStep === 1
-          ? validateByocGcpStep1({ gcpForm })
-          : validateByocConnectionForm({
-              csp: 'GCP',
-              gcpForm,
-              gcpStep: 2,
-            });
+        if (gcpConnectStep === 1) return validateByocGcpStep1({ gcpForm });
+        if (gcpConnectStep === 2) return validateByocGcpStep2({ gcpForm });
+        return { isValid: true, errors: {} };
       }
       if (byocActiveCSP === 'Azure') {
-        return azureConnectStep === 1
-          ? validateByocAzureStep1({ azureForm })
-          : validateByocConnectionForm({
-              csp: 'Azure',
-              azureForm,
-              azureStep: 2,
-            });
+        if (azureConnectStep === 1) return validateByocAzureStep1({ azureForm });
+        if (azureConnectStep === 2) return validateByocAzureStep2({ azureForm });
+        return { isValid: true, errors: {} };
       }
       return validateByocConnectionForm({
         csp: byocActiveCSP,
@@ -200,6 +209,15 @@ const SettingsPage = () => {
     fetchSubscription();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- initial load on mount
   }, []);
+
+  useEffect(() => {
+    if (!window.location.hash || isLoading) return;
+    const id = window.location.hash.replace('#', '');
+    const el = document.getElementById(id);
+    if (el) {
+      setTimeout(() => el.scrollIntoView({ behavior: 'smooth', block: 'start' }), 200);
+    }
+  }, [isLoading, byocCapabilities]);
 
   const fetchSubscription = async () => {
     try {
@@ -308,6 +326,7 @@ const SettingsPage = () => {
     try {
       const response = await apiClient.get('/byoc/status');
       setByocStatus(response.data.connections);
+      setByocCapabilities(response.data.capabilities || null);
       setByocEligible(response.data.eligible);
       setByocCurrentPlan(response.data.current_plan);
     } catch (error) {
@@ -576,7 +595,19 @@ const SettingsPage = () => {
     }
   };
 
-  const handleByocConnect = async () => {
+  const gcpTier2Complete = () => {
+    const ds = (gcpForm.gcp_billing_dataset_id || '').trim();
+    const tb = (gcpForm.gcp_billing_table_id || '').trim();
+    return Boolean(ds && tb);
+  };
+
+  const azureTier2Complete = () => {
+    const f = azureForm;
+    return ['azure_subscription_id', 'azure_tenant_id', 'azure_client_id', 'azure_client_secret']
+      .every((k) => (f[k] || '').trim());
+  };
+
+  const handleByocConnect = async ({ skipTier2 = false } = {}) => {
     if (!byocValidation.isValid) {
       setByocTestResult({ success: false, message: getValidationErrorMessage(byocValidation.errors) });
       return;
@@ -594,10 +625,11 @@ const SettingsPage = () => {
       return;
     }
 
+    const activeCsp = byocActiveCSP;
     setByocConnecting(true);
     try {
-      let payload = { csp: byocActiveCSP, connection_method: byocMethod };
-      if (byocActiveCSP === 'AWS') {
+      let payload = { csp: activeCsp, connection_method: byocMethod };
+      if (activeCsp === 'AWS') {
         payload = {
           ...payload,
           ...awsForm,
@@ -605,20 +637,30 @@ const SettingsPage = () => {
           replica_region: REPLICA_REGION,
           bucket_name: awsForm.storage_bucket_name || awsForm.bucket_name,
         };
-      } else if (byocActiveCSP === 'GCP') {
+      } else if (activeCsp === 'GCP') {
         const storage = gcpForm.storage_bucket_name || gcpForm.gcp_bucket_name;
         Object.assign(payload, {
           ...gcpForm,
           gcp_bucket_name: storage,
           storage_bucket_name: storage,
         });
-      } else if (byocActiveCSP === 'Azure') {
+        if (skipTier2) {
+          payload.gcp_billing_dataset_id = '';
+          payload.gcp_billing_table_id = '';
+        }
+      } else if (activeCsp === 'Azure') {
         const storage = azureForm.storage_container_name || azureForm.container_name;
         Object.assign(payload, {
           ...azureForm,
           container_name: storage,
           storage_container_name: storage,
         });
+        if (skipTier2) {
+          payload.azure_subscription_id = '';
+          payload.azure_tenant_id = '';
+          payload.azure_client_id = '';
+          payload.azure_client_secret = '';
+        }
       }
 
       const response = await apiClient.post('/byoc/connect', payload);
@@ -626,14 +668,14 @@ const SettingsPage = () => {
       resetAwsConnectFlow();
       resetGcpConnectFlow();
       resetAzureConnectFlow();
-      setByocTestResult({
-        success: true,
-        message: response.data.message || response.data.bucket_message || 'Connected successfully.',
-      });
+      setConnectSummary({ ...response.data, csp: activeCsp });
       fetchByocStatus();
     } catch (error) {
       const detail = error.response?.data?.detail;
-      setByocTestResult({ success: false, message: detail?.message || detail || 'Failed to connect' });
+      setByocTestResult({
+        success: false,
+        message: typeof detail === 'object' ? detail.message || detail.code : detail || 'Failed to connect',
+      });
     } finally {
       setByocConnecting(false);
     }
@@ -647,6 +689,83 @@ const SettingsPage = () => {
     } catch (error) {
       console.error('Failed to disconnect:', error);
     }
+  };
+
+  const handleGcpExtendBilling = async () => {
+    const ds = (gcpForm.gcp_billing_dataset_id || '').trim();
+    const tb = (gcpForm.gcp_billing_table_id || '').trim();
+    if (!ds || !tb) {
+      setByocTestResult({ success: false, message: 'Both billing dataset ID and table ID are required.' });
+      return;
+    }
+    setGcpExtending(true);
+    try {
+      const response = await apiClient.patch('/byoc/gcp/billing', {
+        billing_dataset_id: ds,
+        billing_table_id: tb,
+      });
+      setByocTestResult({ success: true, message: response.data.message || 'GCP billing export saved.' });
+      fetchByocStatus();
+    } catch (error) {
+      const detail = error.response?.data?.detail;
+      setByocTestResult({
+        success: false,
+        message: typeof detail === 'object' ? detail.message : detail || 'Failed to save billing export',
+      });
+    } finally {
+      setGcpExtending(false);
+    }
+  };
+
+  const handleAzureExtendCompute = async () => {
+    const { azure_subscription_id, azure_tenant_id, azure_client_id, azure_client_secret } = azureForm;
+    if (!azure_subscription_id?.trim() || !azure_tenant_id?.trim() || !azure_client_id?.trim() || !azure_client_secret?.trim()) {
+      setByocTestResult({ success: false, message: 'All service principal fields are required.' });
+      return;
+    }
+    setAzureExtending(true);
+    try {
+      const response = await apiClient.patch('/byoc/azure/compute', {
+        subscription_id: azure_subscription_id.trim(),
+        tenant_id: azure_tenant_id.trim(),
+        client_id: azure_client_id.trim(),
+        client_secret: azure_client_secret.trim(),
+      });
+      setByocTestResult({ success: true, message: response.data.message || 'Azure compute credentials saved.' });
+      fetchByocStatus();
+    } catch (error) {
+      const detail = error.response?.data?.detail;
+      setByocTestResult({
+        success: false,
+        message: typeof detail === 'string' ? detail : detail?.message || 'Failed to save service principal',
+      });
+    } finally {
+      setAzureExtending(false);
+    }
+  };
+
+  const renderCapabilityBadges = (cspKey) => {
+    const cap = byocCapabilities?.[cspKey];
+    if (!cap?.connected) return null;
+    const labels = {
+      storage: 'Storage',
+      security: 'Security',
+      vm: 'VMs',
+      provision: 'Provision',
+      cost: 'Cost',
+    };
+    return (
+      <div className="byoc-capability-badges" aria-label="Unlocked features">
+        {Object.entries(labels).map(([key, label]) => (
+          <span
+            key={key}
+            className={`byoc-cap-badge ${cap.features?.[key] ? 'unlocked' : 'locked'}`}
+          >
+            {label}
+          </span>
+        ))}
+      </div>
+    );
   };
 
   const handleNotificationChange = async (key) => {
@@ -847,54 +966,35 @@ const SettingsPage = () => {
     },
   };
 
-  // BYOC Cloud Icons
-  const CloudIcon = ({ csp }) => {
-    const icons = {
-      AWS: (
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-          <path d="M7.164 16.12c-1.876-.56-3.227-1.3-3.227-1.3l-.427.858s1.514.826 3.586 1.424l.068-.982z" fill="#F90"/>
-          <path d="M12 4C7.6 4 4.5 6.8 4.5 10.5c0 2.4 1.5 4.5 3.8 5.7l.2-1c-1.8-1-3-2.7-3-4.7C5.5 7.3 8.2 5 12 5s6.5 2.3 6.5 5.5c0 2-1.2 3.7-3 4.7l.2 1c2.3-1.2 3.8-3.3 3.8-5.7C19.5 6.8 16.4 4 12 4z" fill="#F90"/>
-        </svg>
-      ),
-      GCP: (
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-          <path d="M12 6l-6 10.4h12L12 6z" fill="#4285F4"/>
-          <circle cx="12" cy="16.4" r="3" fill="#34A853"/>
-        </svg>
-      ),
-      Azure: (
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-          <path d="M5 5h6l-3 14H5l3-14zm4 0l7 14h3L12 5H9z" fill="#0078D4"/>
-        </svg>
-      ),
-    };
-    return icons[csp] || null;
-  };
+  const CloudIcon = ({ csp }) => (
+    <CloudProviderLogo
+      provider={csp}
+      className="byoc-provider-logo"
+      width={24}
+      height={24}
+      alt=""
+      aria-hidden="true"
+    />
+  );
 
   // BYOC Section Renderer
   const renderByocSection = () => {
-    if (!byocEligible) {
+    if (!isFeatureEnabled('byoc')) {
       return (
         <div className="settings-card byoc-card">
-          <h3>
-            <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor">
-              <path d="M4.406 3.342A5.53 5.53 0 0 1 8 2c2.69 0 4.923 2 5.166 4.579C14.758 6.804 16 8.137 16 9.773 16 11.569 14.502 13 12.687 13H3.781C1.708 13 0 11.366 0 9.318c0-1.763 1.266-3.223 2.942-3.593.143-.863.698-1.723 1.464-2.383z"/>
-            </svg>
-            Bring Your Own Cloud (BYOC)
-            <span className="byoc-badge byoc-badge-locked">Pro / Enterprise</span>
-          </h3>
-          <div className="byoc-upgrade-prompt">
-            <p>Connect your own AWS, GCP, or Azure accounts. All cloud operations will use your infrastructure — you only pay the platform fee.</p>
-            <p className="byoc-plan-note">
-              <strong>Your current plan:</strong> <span className="plan-badge">{byocCurrentPlan}</span> — Upgrade to <strong>Pro</strong> or <strong>Enterprise</strong> to unlock BYOC.
-            </p>
-          </div>
+          <PlanUpgradeGate
+            featureLabel={NAV_ID_LABELS.byoc}
+            currentPlan={planName || byocCurrentPlan}
+            requiredPlan={MIN_PLAN_LABELS[getNavMeta('byoc')?.min_plan] || 'Pro'}
+            requiredPlanId={getNavMeta('byoc')?.min_plan || 'pro'}
+            compact
+          />
         </div>
       );
     }
 
     return (
-      <div className="settings-card byoc-card">
+      <div className="settings-card byoc-card" id="byoc-section">
         <h3>
           <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor">
             <path d="M4.406 3.342A5.53 5.53 0 0 1 8 2c2.69 0 4.923 2 5.166 4.579C14.758 6.804 16 8.137 16 9.773 16 11.569 14.502 13 12.687 13H3.781C1.708 13 0 11.366 0 9.318c0-1.763 1.266-3.223 2.942-3.593.143-.863.698-1.723 1.464-2.383z"/>
@@ -903,14 +1003,23 @@ const SettingsPage = () => {
           <span className="byoc-badge byoc-badge-active">Active</span>
         </h3>
         <p className="byoc-description">
-          Connect your own cloud accounts. Operations will use your infrastructure — you only pay the Zenith platform fee.
+          Connect your own cloud accounts. Operations run on your infrastructure — you pay only the Zenith platform fee.
+        </p>
+        <p className="byoc-description byoc-description--secondary">
+          <Link to="/dashboard/help/byoc-setup" className="byoc-help-link">
+            View setup guide for optional billing and compute credentials
+          </Link>
         </p>
 
         {/* Cloud Provider Cards */}
         <div className="byoc-providers">
           {['AWS', 'GCP', 'Azure'].map((csp) => {
-            const connection = byocStatus?.[csp.toLowerCase()];
+            const cspKey = csp.toLowerCase();
+            const connection = byocStatus?.[cspKey];
             const isConnected = connection?.connected;
+            const capEntry = byocCapabilities?.[cspKey];
+            const needsAzureExtend = csp === 'Azure' && capEntry?.connected && !capEntry?.features?.provision;
+            const needsGcpBilling = csp === 'GCP' && capEntry?.connected && !capEntry?.features?.cost;
 
             return (
               <div key={csp} className={`byoc-provider-card ${isConnected ? 'connected' : ''}`}>
@@ -946,6 +1055,71 @@ const SettingsPage = () => {
                     }}>Connect</button>
                   )}
                 </div>
+                {isConnected && renderCapabilityBadges(cspKey)}
+                {needsGcpBilling && (
+                  <div className="byoc-complete-setup-card" id="byoc-gcp-billing">
+                    <h5>Complete setup — Unlock Cost</h5>
+                    <p className="byoc-field-hint">
+                      Storage, Security, VMs, and Provision work now. Add BigQuery billing export IDs for Cost analysis.
+                    </p>
+                    <ByocSetupGuidePanel tier="gcp_billing" />
+                    <div className="byoc-field">
+                      <label>Billing dataset ID</label>
+                      <input type="text" value={gcpForm.gcp_billing_dataset_id}
+                        onChange={(e) => setGcpForm({ ...gcpForm, gcp_billing_dataset_id: e.target.value })} />
+                    </div>
+                    <div className="byoc-field">
+                      <label>Billing table ID</label>
+                      <input type="text" value={gcpForm.gcp_billing_table_id}
+                        onChange={(e) => setGcpForm({ ...gcpForm, gcp_billing_table_id: e.target.value })} />
+                    </div>
+                    <button
+                      type="button"
+                      className="btn-connect-save"
+                      onClick={handleGcpExtendBilling}
+                      disabled={gcpExtending}
+                    >
+                      {gcpExtending ? 'Saving…' : 'Save billing export'}
+                    </button>
+                  </div>
+                )}
+                {needsAzureExtend && (
+                  <div className="byoc-complete-setup-card" id="byoc-azure-compute">
+                    <h5>Complete setup — Unlock VMs, Provision &amp; Cost</h5>
+                    <ByocSetupGuidePanel tier="azure_compute" />
+                    <p className="byoc-field-hint">
+                      Storage is connected. Add your Azure service principal without reconnecting storage.
+                    </p>
+                    <div className="byoc-field">
+                      <label>Subscription ID</label>
+                      <input type="text" value={azureForm.azure_subscription_id}
+                        onChange={(e) => setAzureForm({ ...azureForm, azure_subscription_id: e.target.value })} />
+                    </div>
+                    <div className="byoc-field">
+                      <label>Tenant ID</label>
+                      <input type="text" value={azureForm.azure_tenant_id}
+                        onChange={(e) => setAzureForm({ ...azureForm, azure_tenant_id: e.target.value })} />
+                    </div>
+                    <div className="byoc-field">
+                      <label>Client ID</label>
+                      <input type="text" value={azureForm.azure_client_id}
+                        onChange={(e) => setAzureForm({ ...azureForm, azure_client_id: e.target.value })} />
+                    </div>
+                    <div className="byoc-field">
+                      <label>Client secret</label>
+                      <input type="password" value={azureForm.azure_client_secret}
+                        onChange={(e) => setAzureForm({ ...azureForm, azure_client_secret: e.target.value })} />
+                    </div>
+                    <button
+                      type="button"
+                      className="btn-connect-save"
+                      onClick={handleAzureExtendCompute}
+                      disabled={azureExtending}
+                    >
+                      {azureExtending ? 'Saving…' : 'Save service principal'}
+                    </button>
+                  </div>
+                )}
 
                 {/* Expanded Connection Form */}
                 {byocActiveCSP === csp && !isConnected && (
@@ -973,11 +1147,25 @@ const SettingsPage = () => {
                             || (csp === 'GCP' && gcpConnectStep === 2)
                             || (csp === 'Azure' && azureConnectStep === 2)
                               ? 'active'
-                              : ''
+                              : (csp === 'GCP' && gcpConnectStep > 2) || (csp === 'Azure' && azureConnectStep > 2)
+                                ? 'done'
+                                : ''
                           }
                         >
                           Step 2 — {csp === 'Azure' ? 'Container' : 'Bucket'} configuration
                         </span>
+                        {(csp === 'GCP' || csp === 'Azure') && (
+                          <span
+                            className={
+                              (csp === 'GCP' && gcpConnectStep === 3)
+                              || (csp === 'Azure' && azureConnectStep === 3)
+                                ? 'active recommended'
+                                : ''
+                            }
+                          >
+                            Step 3 — Recommended
+                          </span>
+                        )}
                       </div>
                     )}
                     {/* Method Selection */}
@@ -1220,7 +1408,19 @@ const SettingsPage = () => {
                             Replicate secure files to replica bucket (recommended)
                           </label>
                         </div>
-                        <p className="byoc-section-hint">Optional — live billing in Cost hub (BigQuery export)</p>
+                        <button type="button" className="btn-back-step" onClick={() => setGcpConnectStep(1)}>
+                          ← Back to credentials
+                        </button>
+                      </div>
+                    )}
+
+                    {csp === 'GCP' && gcpConnectStep === 3 && (
+                      <div className="byoc-fields">
+                        <p className="byoc-field-hint byoc-recommended-hint">
+                          <strong>Recommended — not required.</strong> Storage connect works without this step.
+                          Skipping leaves Cost blocked until you add billing export IDs in Settings.
+                        </p>
+                        <ByocSetupGuidePanel tier="gcp_billing" defaultOpen />
                         <div className="byoc-field">
                           <label>Billing dataset ID</label>
                           <input type="text" placeholder="billing_export" value={gcpForm.gcp_billing_dataset_id}
@@ -1231,8 +1431,8 @@ const SettingsPage = () => {
                           <input type="text" placeholder="gcp_billing_export_v1_XXXXX" value={gcpForm.gcp_billing_table_id}
                             onChange={(e) => setGcpForm({ ...gcpForm, gcp_billing_table_id: e.target.value })} />
                         </div>
-                        <button type="button" className="btn-back-step" onClick={() => setGcpConnectStep(1)}>
-                          ← Back to credentials
+                        <button type="button" className="btn-back-step" onClick={() => setGcpConnectStep(2)}>
+                          ← Back to buckets
                         </button>
                       </div>
                     )}
@@ -1306,7 +1506,19 @@ const SettingsPage = () => {
                             Replicate secure files to replica container (recommended)
                           </label>
                         </div>
-                        <p className="byoc-section-hint">Optional — Cost Management API (separate from storage key)</p>
+                        <button type="button" className="btn-back-step" onClick={() => setAzureConnectStep(1)}>
+                          ← Back to credentials
+                        </button>
+                      </div>
+                    )}
+
+                    {csp === 'Azure' && azureConnectStep === 3 && (
+                      <div className="byoc-fields">
+                        <p className="byoc-field-hint byoc-recommended-hint">
+                          <strong>Recommended — not required.</strong> Storage and Security work without this step.
+                          Skipping leaves VMs, Provision, and Cost blocked until you add a service principal.
+                        </p>
+                        <ByocSetupGuidePanel tier="azure_compute" defaultOpen />
                         <div className="byoc-field">
                           <label>Subscription ID</label>
                           <input type="text" value={azureForm.azure_subscription_id}
@@ -1318,17 +1530,17 @@ const SettingsPage = () => {
                             onChange={(e) => setAzureForm({ ...azureForm, azure_tenant_id: e.target.value })} />
                         </div>
                         <div className="byoc-field">
-                          <label>Cost reader client ID</label>
+                          <label>Application (client) ID</label>
                           <input type="text" value={azureForm.azure_client_id}
                             onChange={(e) => setAzureForm({ ...azureForm, azure_client_id: e.target.value })} />
                         </div>
                         <div className="byoc-field">
-                          <label>Cost reader client secret</label>
+                          <label>Client secret</label>
                           <input type="password" value={azureForm.azure_client_secret}
                             onChange={(e) => setAzureForm({ ...azureForm, azure_client_secret: e.target.value })} />
                         </div>
-                        <button type="button" className="btn-back-step" onClick={() => setAzureConnectStep(1)}>
-                          ← Back to credentials
+                        <button type="button" className="btn-back-step" onClick={() => setAzureConnectStep(2)}>
+                          ← Back to containers
                         </button>
                       </div>
                     )}
@@ -1369,10 +1581,45 @@ const SettingsPage = () => {
                         >
                           {(awsVerifying || gcpVerifying || azureVerifying) ? '⏳ Verifying...' : '✓ Verify & continue'}
                         </button>
+                      ) : (byocActiveCSP === 'GCP' && gcpConnectStep === 2) || (byocActiveCSP === 'Azure' && azureConnectStep === 2) ? (
+                        <button
+                          className="btn-connect-save"
+                          type="button"
+                          onClick={() => {
+                            if (byocActiveCSP === 'GCP') setGcpConnectStep(3);
+                            else setAzureConnectStep(3);
+                          }}
+                          disabled={!byocValidation.isValid || byocConnecting}
+                        >
+                          Continue to recommended step →
+                        </button>
+                      ) : (byocActiveCSP === 'GCP' && gcpConnectStep === 3) || (byocActiveCSP === 'Azure' && azureConnectStep === 3) ? (
+                        <>
+                          <button
+                            className="btn-secondary"
+                            type="button"
+                            onClick={() => handleByocConnect({ skipTier2: true })}
+                            disabled={byocConnecting}
+                          >
+                            Skip for now — connect storage only
+                          </button>
+                          <button
+                            className="btn-connect-save"
+                            type="button"
+                            onClick={() => handleByocConnect({ skipTier2: false })}
+                            disabled={
+                              byocConnecting
+                              || (byocActiveCSP === 'GCP' && !gcpTier2Complete())
+                              || (byocActiveCSP === 'Azure' && !azureTier2Complete())
+                            }
+                          >
+                            {byocConnecting ? '⏳ Connecting...' : 'Connect with recommended credentials'}
+                          </button>
+                        </>
                       ) : (
                         <button
                           className="btn-connect-save"
-                          onClick={handleByocConnect}
+                          onClick={() => handleByocConnect({ skipTier2: true })}
                           disabled={
                             byocConnecting
                             || !byocValidation.isValid
@@ -1424,6 +1671,14 @@ const SettingsPage = () => {
         }
         refreshing={pageRefreshing}
       />
+
+      {connectSummary && (
+        <ByocConnectSummaryModal
+          data={connectSummary}
+          csp={connectSummary.csp}
+          onClose={() => setConnectSummary(null)}
+        />
+      )}
 
       <div className="settings-content stagger-children">
         {/* BYOC Section — First for visibility */}
@@ -1619,7 +1874,7 @@ const SettingsPage = () => {
             Infrastructure provisioning
           </h3>
           <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '16px' }}>
-            Choose how new stacks are deployed. Boto3 is fast and works on Render free tier.
+            Choose how new stacks are deployed. Fast path (Cloud SDK) works on AWS, GCP, and Azure without Terraform.
             Terraform provides full IaC with state (best on localhost or Render Docker).
           </p>
           <div className="settings-group">
@@ -1631,7 +1886,7 @@ const SettingsPage = () => {
                 onChange={handlePreferenceChange}
                 className="zenith-select settings-select"
               >
-                <option value="boto3">Boto3 — fast (recommended for Render)</option>
+                <option value="boto3">Fast path — Cloud SDK (recommended for Render)</option>
                 <option value="terraform">Terraform — full plan &amp; state</option>
               </select>
             </div>
@@ -1794,23 +2049,33 @@ const SettingsPage = () => {
             </svg>
             API Keys
           </h3>
-          <div className="settings-group">
-            <p className="info-text">Generate and manage API keys for programmatic access to your resources</p>
-            {apiKeys.map((key) => (
-              <div key={key.key_id} className="api-key-item">
-                <div className="api-key-info">
-                  <h4>Production API Key</h4>
-                  <code>{key.key_preview}</code>
-                  <p className="key-created">Created: {new Date(key.created_at).toLocaleDateString()}</p>
+          {!isFeatureEnabled('api_access') ? (
+            <PlanUpgradeGate
+              featureLabel={NAV_ID_LABELS.api_access}
+              currentPlan={planName}
+              requiredPlan={MIN_PLAN_LABELS[getNavMeta('api_access')?.min_plan] || 'Pro'}
+              requiredPlanId={getNavMeta('api_access')?.min_plan || 'pro'}
+              compact
+            />
+          ) : (
+            <div className="settings-group">
+              <p className="info-text">Generate and manage API keys for programmatic access to your resources</p>
+              {apiKeys.map((key) => (
+                <div key={key.key_id} className="api-key-item">
+                  <div className="api-key-info">
+                    <h4>Production API Key</h4>
+                    <code>{key.key_preview}</code>
+                    <p className="key-created">Created: {new Date(key.created_at).toLocaleDateString()}</p>
+                  </div>
+                  <button className="btn-danger-outline" onClick={() => handleRevokeApiKey(key.key_id)}>Revoke</button>
                 </div>
-                <button className="btn-danger-outline" onClick={() => handleRevokeApiKey(key.key_id)}>Revoke</button>
-              </div>
-            ))}
-            {apiKeys.length === 0 && (
-              <p className="info-text">No API keys generated yet</p>
-            )}
-            <button className="btn-secondary" onClick={handleGenerateApiKey}>Generate New API Key</button>
-          </div>
+              ))}
+              {apiKeys.length === 0 && (
+                <p className="info-text">No API keys generated yet</p>
+              )}
+              <button className="btn-secondary" onClick={handleGenerateApiKey}>Generate New API Key</button>
+            </div>
+          )}
         </div>
       </div>
     </div>

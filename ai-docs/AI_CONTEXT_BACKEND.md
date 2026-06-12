@@ -184,7 +184,7 @@ Backend modules: `intent_analyzer.py`, `template_mapper.py`, `cloud_compare.py`,
 
 **SDK fast path (GCP/Azure, Settings engine Boto3):** All catalog modules implemented under `app/provision/sdk_modules/` — GCP: `gcs`, `gcp_network`, `gce`, `gcp_service_account`, `gcp_monitoring`, `firestore`; Azure: `azure_storage`, `vnet`, `azure_vm`, `azure_monitor`, `cosmos`. Orchestrated by `sdk_composer.py` (mirrors `boto3_composer.py`). Terraform remains fallback when user selects Terraform engine or SDK cannot handle config.
 
-**Organizations** (`/api/organizations`): create org, members, invites, `DELETE /invites/{email}` (revoke pending), accept invite — single org per user.
+**Organizations** (`/api/organizations`): create org, members, invites (email + link), `PATCH /members/{username}/role`, `POST /transfer-ownership`, `GET /summary` (org cloud rollups; admin-only per-member spend), `PATCH /settings` (org budget, approval threshold), `GET /recommendations`, `GET/PATCH /approvals`, `GET /resources/summary`, `PATCH /resources/reassign`. **Org billing** (`/api/organizations/billing`): checkout, verify, seats, cancel, migrate-personal — `app/organizations/billing.py`, `routes_billing.py`. **Subscription resolver:** `get_effective_subscription()` in `subscription_service.py` (org plan overrides personal when member). **Resource ACL:** `app/organizations/resource_acl.py`; quotas `limits.py`. Shared Razorpay helper: `app/payments/checkout.py`. Celery: `check_org_budget_alerts`. Provision `/plan` returns 202 when member estimate exceeds org threshold. Architecture: `ai-docs/ORG_BILLING_ARCHITECTURE.md`.
 
 **Dashboard cost trend** (`/api/dashboard`): `GET /cost-trend?days=7` reads Mongo `dashboard_cost_snapshots` only (no cloud APIs on load). Snapshots upserted in `refresh_user_costs()` when user clicks Refresh on Overview.
 
@@ -220,7 +220,7 @@ Collections: `support_tickets`, `support_messages`, `support_ticket_otps`. Migra
 
 ```bash
 cd backend && source .venv/bin/activate   # venv is at backend/.venv — NOT project root
-uvicorn app.main:app --reload              # → http://localhost:8000 (Swagger: /docs)
+uvicorn app.main:app --reload --reload-dir app   # → http://localhost:8000 (Swagger: /docs); or ./run_dev.sh
 celery -A app.celery_worker worker --loglevel=info   # Terminal 3
 celery -A app.celery_worker beat --loglevel=info     # Terminal 4
 python -m pytest -q                                   # 260+ tests (2026-06-03)

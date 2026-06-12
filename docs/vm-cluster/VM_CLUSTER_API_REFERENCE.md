@@ -1,7 +1,21 @@
 # VM Cluster Management - API Reference
 
 ## Overview
-The VM cluster management system provides intelligent workload assignment, auto-scaling, and predictive migration recommendations across 4 GCP VMs (2 general-purpose, 2 storage-optimized).
+The VM cluster management system provides intelligent workload assignment, ephemeral on-demand provisioning, and predictive migration recommendations across **7 specialized clusters** with **4 tiered slots each** (28 pool slots per cloud provider).
+
+| Cluster | Slug | Slot tiers (vm-1 → vm-4) |
+|---------|------|---------------------------|
+| General | `general` | micro → small → medium → standard |
+| Storage | `storage` | small → medium → large → xlarge |
+| Memory | `memory` | medium → large → xlarge → highmem |
+| Performance | `performance` | small → medium → large → compute |
+| AI/ML | `ai_ml` | small → medium → large → accelerator |
+| Database | `database` | small → medium → large → iops |
+| Network | `network` | small → medium → large → network |
+
+**Topology:** ring (4 nodes per cluster in UI)  
+**Providers:** GCP, AWS, Azure — all platform regions (`asia`, `us`, `europe`, `africa`)  
+**Feature flag:** `VM_EXTENDED_CLUSTERS_ENABLED=true` (default) exposes all 7 clusters; when `false`, pool/UI limit to General + Storage.
 
 **Base URL:** `http://localhost:8000/api/vm`
 
@@ -19,6 +33,55 @@ For demo/testing, authentication is simplified and returns `demo_user`.
 
 ## Core Endpoints
 
+### 0. Cluster catalog (UI metadata)
+**GET** `/clusters?csp=GCP`
+
+Returns all 7 clusters with slot tiers, display labels, badge classes, and intended specs (no live cloud call).
+
+**Response shape:**
+```json
+{
+  "csp": "GCP",
+  "topology": "ring",
+  "clusters": [
+    {
+      "cluster_type": "general",
+      "label": "General",
+      "badge_class": "general",
+      "max_vms": 4,
+      "slots": [
+        {
+          "slot_index": 1,
+          "vm_name": "general-micro-vm-1",
+          "tier": "micro",
+          "tier_label": "Micro",
+          "display_name": "General · Micro",
+          "intended_spec": { "machine_type": "e2-micro", "disk_gb": 10 }
+        }
+      ]
+    }
+  ]
+}
+```
+
+---
+
+### 0b. Pool status (request modal)
+**GET** `/pool?csp=GCP&platform_region_slug=us`
+
+Returns live slot status per cluster for the active CSP and platform region.
+
+**Response:** `clusters` map keyed by slug (`general`, `storage`, …) each with `slots[]` containing `vm_name`, `tier`, `display_name`, `status`, `active_users`, `compute_target`.
+
+---
+
+### 0c. VM configuration (topology click)
+**GET** `/config/{vm_name}?csp=GCP&platform_region_slug=us`
+
+Unified config for provisioned or **unprovisioned** slots. Unprovisioned slots return catalog intended spec with `status: NOT_PROVISIONED`.
+
+---
+
 ### 1. Request VM Assignment
 **POST** `/request`
 
@@ -28,7 +91,10 @@ Intelligently assigns user to optimal VM based on workload analysis.
 ```json
 {
   "workload_description": "Running a PostgreSQL database with 500GB of data",
-  "cluster_preference": "STORAGE",  // Optional: "GENERAL" or "STORAGE"
+  "cluster_preference": "DATABASE",  // Optional: GENERAL, STORAGE, MEMORY, PERFORMANCE, AI_ML, DATABASE, NETWORK
+  "vm_preference": "database-medium-vm-2",  // Optional: specific pool slot ID
+  "csp": "GCP",
+  "platform_region_slug": "us",
   "priority_level": 1  // 1=High, 2=Normal, 3=Low
 }
 ```

@@ -20,12 +20,17 @@ from app.contact.email_templates import (
     contact_admin_text,
     contact_auto_reply_html,
     contact_auto_reply_text,
+    org_budget_alert_html,
+    org_budget_alert_text,
+    org_invite_html,
+    org_invite_text,
     reference_code,
     subject_label,
     ticket_otp_html,
     ticket_otp_text,
     ticket_resolved_html,
     ticket_resolved_text,
+    frontend_base,
 )
 from app.utils.logger import setup_logger
 
@@ -360,6 +365,76 @@ class EmailService:
             return True
         except Exception as e:
             logger.error("Failed to send admin customer reply notice: %s", e)
+            return False
+
+
+    def send_org_invite(
+        self,
+        *,
+        to_email: str,
+        org_name: str,
+        invite_token: str,
+        role: str,
+        invited_by: str,
+    ) -> bool:
+        if not self.sender_email or not self.sender_password:
+            logger.warning("Email credentials not configured, skipping org invite email")
+            return False
+        try:
+            link = f"{frontend_base()}/invite/{invite_token}"
+            self._send_html_email(
+                to_email=to_email,
+                subject=f"[Zenith] Join {org_name} on Zenith",
+                html_body=org_invite_html(
+                    org_name=org_name,
+                    invite_link=link,
+                    role=role,
+                    invited_by=invited_by,
+                ),
+                text_body=org_invite_text(
+                    org_name=org_name,
+                    invite_link=link,
+                    role=role,
+                    invited_by=invited_by,
+                ),
+            )
+            return True
+        except Exception as e:
+            logger.error("Failed to send org invite email: %s", e)
+            return False
+
+    def send_org_budget_alert(
+        self,
+        *,
+        to_email: str,
+        org_name: str,
+        spend_usd: float,
+        budget_usd: float,
+        status: str,
+    ) -> bool:
+        if not self.sender_email or not self.sender_password:
+            return False
+        try:
+            label = "exceeded" if status == "exceeded" else "warning"
+            self._send_html_email(
+                to_email=to_email,
+                subject=f"[Zenith] Team budget {label} — {org_name}",
+                html_body=org_budget_alert_html(
+                    org_name=org_name,
+                    spend_usd=spend_usd,
+                    budget_usd=budget_usd,
+                    status=status,
+                ),
+                text_body=org_budget_alert_text(
+                    org_name=org_name,
+                    spend_usd=spend_usd,
+                    budget_usd=budget_usd,
+                    status=status,
+                ),
+            )
+            return True
+        except Exception as e:
+            logger.error("Failed to send org budget alert: %s", e)
             return False
 
 

@@ -8,22 +8,27 @@ function WorkloadGuidancePanel({
   isAnalyzing,
   followUpAnswers,
   onFollowUpChange,
+  className = "",
+  title = "Prompt readiness for NLP",
+  idleHint = "Describe your workload above — we'll show how complete your prompt is and suggest a cluster before you request a VM.",
 }) {
+  const rootClass = ["workload-guidance", className].filter(Boolean).join(" ");
+
   if (!analysis && !isAnalyzing) {
     return (
-      <div className="workload-guidance workload-guidance--idle">
-        <p className="guidance-hint">
-          Describe your workload above — we&apos;ll show how complete your prompt is
-          and suggest a cluster before you request a VM.
-        </p>
+      <div className={`${rootClass} workload-guidance--idle`}>
+        <p className="guidance-hint">{idleHint}</p>
       </div>
     );
   }
 
   if (isAnalyzing && !analysis) {
     return (
-      <div className="workload-guidance workload-guidance--loading">
-        <p className="guidance-hint">Analyzing workload…</p>
+      <div className={`${rootClass} workload-guidance--loading`}>
+        <p className="guidance-hint">
+          <span className="guidance-spinner" aria-hidden="true" />
+          Analyzing your description…
+        </p>
       </div>
     );
   }
@@ -31,6 +36,7 @@ function WorkloadGuidancePanel({
   const readiness = analysis?.readiness || {};
   const score = readiness.readiness_score ?? 0;
   const questions = analysis?.follow_up_questions || [];
+  const followUpContext = analysis?.follow_up_context;
   const matchedKeywords = readiness.matched_keywords || [];
   const missingSignals = readiness.missing_signals || [];
   const matchedSignals = readiness.matched_signals || [];
@@ -38,27 +44,39 @@ function WorkloadGuidancePanel({
   const barClass =
     score >= 85 ? "high" : score >= 70 ? "good" : score >= 50 ? "fair" : "low";
 
-  return (
-    <div className="workload-guidance workload-guidance--active animate-fade-in-up">
-      <div className="guidance-header">
-        <span className="guidance-title">Prompt readiness for NLP</span>
-        <span className={`guidance-score guidance-score--${barClass}`}>{score}%</span>
-      </div>
+  const hasSignalGrid = matchedSignals.length > 0 || missingSignals.length > 0;
 
-      <div
-        className="readiness-bar"
-        role="progressbar"
-        aria-valuenow={score}
-        aria-valuemin={0}
-        aria-valuemax={100}
-        aria-label="Workload description readiness"
-      >
+  return (
+    <div className={`${rootClass} workload-guidance--active animate-fade-in-up`}>
+      <div className={`guidance-readiness readiness-status--${barClass}`}>
+        <div className="guidance-header">
+          <span className="guidance-title">{title}</span>
+          <span className={`guidance-score guidance-score--${barClass}`} aria-label={`${score} percent ready`}>
+            {score}%
+          </span>
+        </div>
+
         <div
-          className={`readiness-bar-fill readiness-bar-fill--${barClass}`}
-          style={{ width: `${score}%` }}
-        />
+          className="readiness-bar"
+          role="progressbar"
+          aria-valuenow={score}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-label="Workload description readiness"
+        >
+          <div
+            className={`readiness-bar-fill readiness-bar-fill--${barClass}`}
+            style={{ width: `${Math.max(score, 4)}%` }}
+          />
+        </div>
+
+        {readiness.readiness_label && (
+          <p className="readiness-label">
+            <span className="readiness-label-dot" aria-hidden="true" />
+            {readiness.readiness_label}
+          </p>
+        )}
       </div>
-      <p className="readiness-label">{readiness.readiness_label}</p>
 
       {analysis?.recommended_cluster && (
         <div className="guidance-preview">
@@ -72,29 +90,33 @@ function WorkloadGuidancePanel({
         </div>
       )}
 
-      {matchedSignals.length > 0 && (
-        <div className="guidance-section">
-          <span className="guidance-section-label">Detected</span>
-          <div className="signal-chips signal-chips--matched">
-            {matchedSignals.map((s) => (
-              <span key={s.id} className="signal-chip signal-chip--ok">
-                {s.label}
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
+      {hasSignalGrid && (
+        <div className="guidance-signals-grid">
+          {matchedSignals.length > 0 && (
+            <div className="guidance-section guidance-section--detected">
+              <span className="guidance-section-label">Detected</span>
+              <div className="signal-chips signal-chips--matched">
+                {matchedSignals.map((s) => (
+                  <span key={s.id} className="signal-chip signal-chip--ok">
+                    {s.label}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
 
-      {missingSignals.length > 0 && (
-        <div className="guidance-section">
-          <span className="guidance-section-label">Still helpful to add</span>
-          <div className="signal-chips signal-chips--missing">
-            {missingSignals.map((s) => (
-              <span key={s.id} className="signal-chip signal-chip--missing" title={s.hint}>
-                {s.label}
-              </span>
-            ))}
-          </div>
+          {missingSignals.length > 0 && (
+            <div className="guidance-section guidance-section--missing">
+              <span className="guidance-section-label">Still helpful to add</span>
+              <div className="signal-chips signal-chips--missing">
+                {missingSignals.map((s) => (
+                  <span key={s.id} className="signal-chip signal-chip--missing" title={s.hint}>
+                    {s.label}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -113,12 +135,18 @@ function WorkloadGuidancePanel({
 
       {questions.length > 0 && (
         <div className="guidance-questions">
-          <span className="guidance-section-label">Quick questions (improves accuracy)</span>
+          <span className="guidance-section-label">
+            {followUpContext?.intro || "A few details to sharpen the recommendation"}
+          </span>
+          {followUpContext?.label && (
+            <span className="guidance-context-tag">{followUpContext.label}</span>
+          )}
           {questions.map((q) => (
-            <div key={q.id} className="form-group">
+            <div key={q.id} className="guidance-question form-group">
               <label htmlFor={`followup-${q.id}`}>{q.question}</label>
               <select
                 id={`followup-${q.id}`}
+                className="guidance-select"
                 value={followUpAnswers[q.id] || ""}
                 onChange={(e) => onFollowUpChange(q.id, e.target.value)}
               >

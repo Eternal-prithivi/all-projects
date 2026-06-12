@@ -196,9 +196,14 @@ def build_security_file_insight(
     elif vault_status == "archived":
         status = "watch"
         next_action = "archived"
-        reasons.append(
-            "File is in the replica vault — restore to primary before download or delete"
-        )
+        if file_record.get("archive_password_hash"):
+            reasons.append(
+                "File is in the replica vault — enter your archive password to restore, download, or delete"
+            )
+        else:
+            reasons.append(
+                "File is in the replica vault — restore, download, or delete without a legacy archive password"
+            )
     elif inactive is not None and inactive >= stale_threshold_days and vault_status == "active":
         status = "watch"
         next_action = "review_stale"

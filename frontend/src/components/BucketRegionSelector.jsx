@@ -5,6 +5,7 @@ import {
   useAwsBuckets,
 } from '../hooks/useAwsBuckets';
 import BucketSelectorLoading from './BucketSelectorLoading.jsx';
+import CloudProviderLogo from './cloud/CloudProviderLogo.jsx';
 import '../styles/bucket-selector.css';
 
 const CHIP_THRESHOLD = 4;
@@ -100,7 +101,7 @@ export default function BucketRegionSelector({
       <div className="bucket-selector-top">
         <div className="bucket-selector-heading">
           <span className="bucket-selector-icon bucket-selector-icon--aws" aria-hidden="true">
-            <img src="/images/aws.png" alt="" width={20} height={20} />
+            <CloudProviderLogo provider="AWS" alt="" width={20} height={20} />
           </span>
           <div>
             <h3 className="bucket-selector-title">{title}</h3>

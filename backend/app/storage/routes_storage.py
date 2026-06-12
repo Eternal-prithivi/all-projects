@@ -403,6 +403,11 @@ async def upload_file_to_csp(
         user_priority=user_priority,
         user_intent=user_intent,
     )
+    from app.organizations.limits import maybe_assert_org_quotas
+    from app.organizations.resource_acl import org_tags_for_create
+
+    maybe_assert_org_quotas(user.username, storage_bytes=file_size)
+
     file_metadata = FileMetadata(
         filename=file.filename,
         s3_key=object_key,
@@ -420,6 +425,7 @@ async def upload_file_to_csp(
         initial_planned_tier=initial_planned_tier,
     )
     doc = file_metadata.model_dump()
+    doc.update(org_tags_for_create(user.username))
     files_db.insert_one(doc)
     record_storage_meter_event(user.username, csp, "upload", count=1)
     return {

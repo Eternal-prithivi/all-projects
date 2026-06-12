@@ -17,6 +17,7 @@ import React, { useState, useEffect, useCallback, useRef, useMemo } from "react"
 import { useNotifications } from "../hooks/useNotifications";
 import EncryptionChoiceModal from "../components/EncryptionChoiceModal";
 import DecryptionPasswordModal from "../components/DecryptionPasswordModal";
+import ArchivePasswordModal from "../components/ArchivePasswordModal";
 import SecureUploadWizard from "../components/SecureUploadWizard";
 import {
   encryptFileInBrowser,
@@ -55,6 +56,7 @@ import CloudProviderToolbar, {
   filterFilesByCloudProvider,
 } from "../components/CloudProviderSelect.jsx";
 import CloudAvailabilityBanner from "../components/CloudAvailabilityBanner.jsx";
+import CredentialSourceBadge from "../components/cloud/CredentialSourceBadge.jsx";
 import {
   useCloudAvailability,
   buildCloudProviderOptions,
@@ -76,7 +78,7 @@ function SecurityPage() {
     updateSuccess,
     updateError,
   } = notifications;
-  const { loading: availLoading, getFeature, credentialMode } = useCloudAvailability();
+  const { loading: availLoading, getFeature, credentialMode, getCredentialSource } = useCloudAvailability();
   const securityProviders = getFeature("security").providers || [];
   const securityToolbarOptions = useMemo(
     () => buildCloudProviderOptions(securityProviders),
@@ -111,6 +113,13 @@ function SecurityPage() {
   const fileInputRef = useRef(null);
   const [showModal, setShowModal] = useState(false);
   const [showArchiveModal, setShowArchiveModal] = useState(false);
+  const [archiveFormPassword, setArchiveFormPassword] = useState("");
+  const [archiveFormConfirm, setArchiveFormConfirm] = useState("");
+  const [showArchivePasswordModal, setShowArchivePasswordModal] = useState(false);
+  const [archivePasswordAction, setArchivePasswordAction] = useState("restore");
+  const [fileForArchivePassword, setFileForArchivePassword] = useState(null);
+  const [pendingArchivePassword, setPendingArchivePassword] = useState("");
+  const [archivePasswordSubmitting, setArchivePasswordSubmitting] = useState(false);
   const [fileToDelete, setFileToDelete] = useState(null);
   const [fileToArchive, setFileToArchive] = useState(null);
   const [isDeleting, setIsDeleting] = useState(null);
@@ -708,13 +717,13 @@ function SecurityPage() {
   const secureFileRowKey = (file, action = "") =>
     `${action}:${file.csp || "AWS"}:${file.filename}`;
 
-  const handleVaultAction = async (file, action) => {
+  const handleVaultAction = async (file, action, archivePassword) => {
     const busyKey = secureFileRowKey(file, action);
     setVaultActionBusy(busyKey);
     const labels = {
       archive: {
         loading: `Moving '${file.filename}' to replica vault…`,
-        success: `'${file.filename}' moved to your replica vault. It is off primary storage until you restore.`,
+        success: `'${file.filename}' moved to your replica vault. Use your archive password to restore, download, or delete.`,
         error: "Could not archive file.",
       },
       restore: {
@@ -727,7 +736,7 @@ function SecurityPage() {
     try {
       await executeWithNotification(
         async () => {
-          await securityVaultAction(token, file.filename, action);
+          await securityVaultAction(token, file.filename, action, { archivePassword });
           await fetchSecureFiles();
         },
         {
@@ -738,13 +747,77 @@ function SecurityPage() {
       );
     } catch {
       /* toast already shown */
+      throw new Error(copy.error);
     } finally {
       setVaultActionBusy(null);
     }
   };
 
-  const handleDelete = async (fileRef) => {
+  const openArchivePasswordModal = (file, action) => {
+    setFileForArchivePassword(file);
+    setArchivePasswordAction(action);
+    setShowArchivePasswordModal(true);
+  };
+
+  const handleArchivedPasswordConfirm = async (archivePassword) => {
+    if (!fileForArchivePassword) return;
+    setArchivePasswordSubmitting(true);
+    try {
+      if (archivePasswordAction === "restore") {
+        await handleVaultAction(fileForArchivePassword, "restore", archivePassword);
+        setShowArchivePasswordModal(false);
+        setFileForArchivePassword(null);
+      } else if (archivePasswordAction === "delete") {
+        await executeWithNotification(
+          async () => {
+            await deleteSecureFile(fileForArchivePassword.filename, token, {
+              bucket: fileForArchivePassword.cloud_bucket || selectedBucket || undefined,
+              archivePassword,
+            });
+            await fetchSecureFiles();
+          },
+          {
+            loadingMessage: `Deleting '${fileForArchivePassword.filename}'…`,
+            successMessage: `'${fileForArchivePassword.filename}' was deleted.`,
+            getErrorMessage: (err) => err.detail || "Could not delete file.",
+          }
+        );
+        setShowArchivePasswordModal(false);
+        setFileForArchivePassword(null);
+      } else if (archivePasswordAction === "download") {
+        const file = fileForArchivePassword;
+        if (file.client_side_encrypted) {
+          setPendingArchivePassword(archivePassword);
+          setFileToDecrypt(file);
+          setShowArchivePasswordModal(false);
+          setFileForArchivePassword(null);
+          setShowDecryptionModal(true);
+          return;
+        }
+        const response = await getSecureDownloadUrl(file.filename, token, {
+          bucket: file.cloud_bucket || selectedBucket || undefined,
+          archivePassword,
+        });
+        window.open(response.presigned_url, "_blank");
+        setShowArchivePasswordModal(false);
+        setFileForArchivePassword(null);
+      }
+    } catch (err) {
+      throw err;
+    } finally {
+      setArchivePasswordSubmitting(false);
+    }
+  };
+
+  const handleDelete = async (fileRef, archivePassword) => {
     const filename = typeof fileRef === "string" ? fileRef : fileRef.filename;
+    const fileObj = typeof fileRef === "object" ? fileRef : null;
+    const isArchived = fileObj && (fileObj.vault_status || "active") === "archived";
+    if (isArchived && !archivePassword) {
+      openArchivePasswordModal(fileObj, "delete");
+      setShowModal(false);
+      return;
+    }
     const bucket =
       typeof fileRef === "object"
         ? fileRef.cloud_bucket || selectedBucket
@@ -758,7 +831,10 @@ function SecurityPage() {
     try {
       await executeWithNotification(
         async () => {
-          await deleteSecureFile(filename, token, { bucket: bucket || undefined });
+          await deleteSecureFile(filename, token, {
+            bucket: bucket || undefined,
+            archivePassword: archivePassword || undefined,
+          });
           await fetchSecureFiles();
         },
         {
@@ -775,6 +851,11 @@ function SecurityPage() {
   };
 
   const handleDownload = async (file) => {
+    const isArchived = (file.vault_status || "active") === "archived";
+    if (isArchived) {
+      openArchivePasswordModal(file, "download");
+      return;
+    }
     const loadingToastId = showLoading(`Preparing secure download for '${file.filename}'…`);
     try {
       const response = await getSecureDownloadUrl(file.filename, token, {
@@ -805,12 +886,14 @@ function SecurityPage() {
     try {
       const ciphertextBlob = await downloadClientCiphertext(filename, token, {
         bucket: fileToDecrypt.cloud_bucket || selectedBucket || undefined,
+        archivePassword: pendingArchivePassword || undefined,
       });
       const plainBlob = await decryptBlobInBrowser(ciphertextBlob, password);
       downloadBlob(plainBlob, filename);
       updateSuccess(loadingToastId, "File decrypted in your browser and downloaded.");
       setShowDecryptionModal(false);
       setFileToDecrypt(null);
+      setPendingArchivePassword("");
     } catch (error) {
       const detail = error.detail || error.message || "Decryption failed";
       updateError(loadingToastId, detail);
@@ -1127,18 +1210,23 @@ function SecurityPage() {
                   <option value="all">All</option>
                 </select>
               </div>
-              <CloudProviderToolbar
-                className="security-cloud-toolbar"
-                provider={cloudProvider}
-                onProviderChange={setCloudProvider}
-                onAction={handleSyncWithSecureBucket}
-                actionLabel={secureSyncActionLabel}
-                actionBusy={isSyncing}
-                actionDisabled={!canAccessSecureArea}
-                actionClassName="btn sync-btn"
-                selectAriaLabel="Filter secure files by cloud provider"
-                providerOptions={securityToolbarOptions}
-              />
+              <div className="security-cloud-toolbar-row">
+                <CloudProviderToolbar
+                  className="security-cloud-toolbar"
+                  provider={cloudProvider}
+                  onProviderChange={setCloudProvider}
+                  onAction={handleSyncWithSecureBucket}
+                  actionLabel={secureSyncActionLabel}
+                  actionBusy={isSyncing}
+                  actionDisabled={!canAccessSecureArea}
+                  actionClassName="btn sync-btn"
+                  selectAriaLabel="Filter secure files by cloud provider"
+                  providerOptions={securityToolbarOptions}
+                />
+                {cloudProvider && cloudProvider !== 'ALL' && (
+                  <CredentialSourceBadge source={getCredentialSource(cloudProvider, 'security')} />
+                )}
+              </div>
             </div>
           </div>
           <div className="security-vault-lifecycle-note" role="note">
@@ -1147,15 +1235,16 @@ function SecurityPage() {
               <li>
                 <strong>Archive</strong> moves the file from primary to the replica vault
                 {credentialMode === "platform" ? " (second region)" : ""}
-                . While archived, download and delete are disabled — only <strong>Restore</strong> is
-                available. Restore moves the file back to primary and removes the replica copy so you
-                are not charged twice.
+                {" "}
+                and locks it with an <strong>archive password</strong> you choose. While archived,
+                use that password to <strong>restore</strong>, <strong>download</strong>, or{" "}
+                <strong>delete</strong> the file from the replica vault.
               </li>
               <li>
                 <strong>Delete</strong> permanently removes the file from cloud storage
                 {credentialMode === "platform" ? " (primary and replica)" : ""}
                 {" "}
-                and cannot be undone. Only available for active files.
+                and cannot be undone. Archived files require your archive password.
               </li>
             </ul>
           </div>
@@ -1203,6 +1292,11 @@ function SecurityPage() {
                             {isArchived && (
                               <span className="security-archived-badge">Replica vault</span>
                             )}
+                            {isArchived && f.archive_password_protected && (
+                              <span className="security-archived-badge security-archived-badge--locked">
+                                Password locked
+                              </span>
+                            )}
                             {f.replication_enabled && (
                               <span className="security-replica-badge">Replicated</span>
                             )}
@@ -1233,13 +1327,27 @@ function SecurityPage() {
                               <>
                                 <button
                                   type="button"
-                                  onClick={() => handleVaultAction(f, "restore")}
+                                  onClick={() => openArchivePasswordModal(f, "restore")}
                                   className="action-btn restore-btn"
                                 >
                                   Restore
                                 </button>
+                                <button
+                                  type="button"
+                                  onClick={() => openArchivePasswordModal(f, "download")}
+                                  className="action-btn download-btn"
+                                >
+                                  Download
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => openArchivePasswordModal(f, "delete")}
+                                  className="action-btn delete-btn"
+                                >
+                                  Delete
+                                </button>
                                 <span className="security-archived-hint">
-                                  Restore to download or delete
+                                  Archive password required
                                 </span>
                               </>
                             ) : (
@@ -1312,6 +1420,7 @@ function SecurityPage() {
             onClose={() => {
               setShowDecryptionModal(false);
               setFileToDecrypt(null);
+              setPendingArchivePassword("");
             }}
             onDecrypt={handleDecryptDownload}
           />
@@ -1319,32 +1428,73 @@ function SecurityPage() {
 
         {showArchiveModal && fileToArchive && (
           <div className="confirm-modal-overlay">
-            <div className="modal-content">
+            <div className="modal-content archive-password-modal">
               <p>
                 Archive &apos;{fileToArchive.filename}&apos;?
                 {" "}
                 This moves the encrypted file from your primary vault to the replica vault
                 {fileToArchive.csp ? ` on ${fileToArchive.csp}` : ""}
-                . Download and delete will be disabled until you restore it back to primary.
+                . Choose an archive password — you will need it to restore, download, or delete
+                this file while it stays archived.
               </p>
+              <div className="form-group">
+                <label htmlFor="archive-set-password">Archive password</label>
+                <input
+                  id="archive-set-password"
+                  type="password"
+                  className="password-input"
+                  value={archiveFormPassword}
+                  onChange={(e) => setArchiveFormPassword(e.target.value)}
+                  placeholder="At least 6 characters"
+                  autoComplete="new-password"
+                />
+              </div>
+              <div className="form-group">
+                <label htmlFor="archive-confirm-password">Confirm password</label>
+                <input
+                  id="archive-confirm-password"
+                  type="password"
+                  className="password-input"
+                  value={archiveFormConfirm}
+                  onChange={(e) => setArchiveFormConfirm(e.target.value)}
+                  placeholder="Re-enter archive password"
+                  autoComplete="new-password"
+                />
+              </div>
               <div className="modal-buttons">
                 <button
                   type="button"
-                  onClick={() => {
+                  onClick={async () => {
+                    if (archiveFormPassword.length < 6) {
+                      notifications.error("Archive password must be at least 6 characters.");
+                      return;
+                    }
+                    if (archiveFormPassword !== archiveFormConfirm) {
+                      notifications.error("Archive passwords do not match.");
+                      return;
+                    }
                     setShowArchiveModal(false);
-                    handleVaultAction(fileToArchive, "archive").finally(() => {
+                    try {
+                      await handleVaultAction(fileToArchive, "archive", archiveFormPassword);
+                    } catch {
+                      /* toast shown */
+                    } finally {
                       setFileToArchive(null);
-                    });
+                      setArchiveFormPassword("");
+                      setArchiveFormConfirm("");
+                    }
                   }}
                   className="btn warning-btn"
                 >
-                  Yes, Archive
+                  Archive with password
                 </button>
                 <button
                   type="button"
                   onClick={() => {
                     setShowArchiveModal(false);
                     setFileToArchive(null);
+                    setArchiveFormPassword("");
+                    setArchiveFormConfirm("");
                   }}
                   className="btn"
                 >
@@ -1353,6 +1503,19 @@ function SecurityPage() {
               </div>
             </div>
           </div>
+        )}
+
+        {showArchivePasswordModal && fileForArchivePassword && (
+          <ArchivePasswordModal
+            file={fileForArchivePassword}
+            action={archivePasswordAction}
+            isSubmitting={archivePasswordSubmitting}
+            onClose={() => {
+              setShowArchivePasswordModal(false);
+              setFileForArchivePassword(null);
+            }}
+            onConfirm={handleArchivedPasswordConfirm}
+          />
         )}
 
         {showModal && (

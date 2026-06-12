@@ -41,8 +41,10 @@ def build_storage_list_filter(
     region: Optional[str],
     default_bucket: str,
 ) -> Dict[str, Any]:
-    """Filter files for list endpoint."""
-    clauses: List[Dict[str, Any]] = [{"owner_username": username}]
+    """Filter files for list endpoint (org-aware)."""
+    from app.organizations.resource_acl import list_filter_for_user
+
+    clauses: List[Dict[str, Any]] = [list_filter_for_user(username, owner_field="owner_username")]
     if bucket:
         if bucket == default_bucket:
             clauses.append(

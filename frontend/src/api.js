@@ -58,11 +58,30 @@ apiClient.interceptors.response.use(
 
 // ---------------- AUTH ----------------
 
+/** Format a single FastAPI/Pydantic validation entry for display. */
+const formatValidationEntry = (entry) => {
+  if (typeof entry === "string") return entry;
+  if (!entry || typeof entry !== "object") return String(entry);
+  if (entry.msg) {
+    const loc = Array.isArray(entry.loc) ? entry.loc.filter((p) => p !== "body").join(".") : "";
+    return loc ? `${loc}: ${entry.msg}` : entry.msg;
+  }
+  return JSON.stringify(entry);
+};
+
 /** Parse FastAPI / Zenith error payloads for UI messages */
 export const getApiErrorMessage = (error, fallback = "Something went wrong.") => {
   if (!error) return fallback;
-  const detail = error.detail ?? error.response?.data?.detail;
+  const data = error.response?.data;
+  const detail = error.detail ?? data?.detail;
+
   if (typeof detail === "string") return detail;
+
+  if (Array.isArray(detail)) {
+    const messages = detail.map(formatValidationEntry).filter(Boolean);
+    if (messages.length) return messages.join("; ");
+  }
+
   if (detail && typeof detail === "object") {
     const parts = [];
     if (detail.message) parts.push(detail.message);
@@ -71,7 +90,14 @@ export const getApiErrorMessage = (error, fallback = "Something went wrong.") =>
     }
     if (parts.length) return parts.join(" ");
     if (detail.error) return String(detail.error);
+    if (detail.msg) return formatValidationEntry(detail);
   }
+
+  if (data && typeof data === "object") {
+    if (data.error) return String(data.error);
+    if (data.message) return String(data.message);
+  }
+
   if (error.message && !error.message.includes("Network Error")) return error.message;
   if (!error.response) {
     return "Cannot reach the server. Start the backend (http://localhost:8000) and try again.";
@@ -210,10 +236,20 @@ export const fetchSecurityCostPreview = async (token, payload) => {
   return response.data;
 };
 
-export const securityVaultAction = async (token, filename, action, { snoozeDays = 30 } = {}) => {
+export const securityVaultAction = async (
+  token,
+  filename,
+  action,
+  { snoozeDays = 30, archivePassword } = {},
+) => {
   const response = await apiClient.post(
     "/security/vault/action",
-    { filename, action, snooze_days: snoozeDays },
+    {
+      filename,
+      action,
+      snooze_days: snoozeDays,
+      archive_password: archivePassword || undefined,
+    },
     { headers: { Authorization: `Bearer ${token}` } },
   );
   return response.data;
@@ -439,10 +475,11 @@ export const listSecureFiles = async (token, { bucket, region } = {}) => {
   }
 };
 
-export const getSecureDownloadUrl = async (filename, token, { bucket } = {}) => {
+export const getSecureDownloadUrl = async (filename, token, { bucket, archivePassword } = {}) => {
   try {
     const params = {};
     if (bucket) params.bucket = bucket;
+    if (archivePassword) params.archive_password = archivePassword;
     const response = await apiClient.get(`/security/download/${filename}`, {
       params,
       headers: { Authorization: `Bearer ${token}` },
@@ -453,10 +490,11 @@ export const getSecureDownloadUrl = async (filename, token, { bucket } = {}) => 
   }
 };
 
-export const deleteSecureFile = async (filename, token, { bucket } = {}) => {
+export const deleteSecureFile = async (filename, token, { bucket, archivePassword } = {}) => {
   try {
     const params = {};
     if (bucket) params.bucket = bucket;
+    if (archivePassword) params.archive_password = archivePassword;
     await apiClient.delete(`/security/delete/${filename}`, {
       params,
       headers: { Authorization: `Bearer ${token}` },
@@ -517,10 +555,11 @@ export const uploadClientEncrypted = async (
   }
 };
 
-export const downloadClientCiphertext = async (filename, token, { bucket } = {}) => {
+export const downloadClientCiphertext = async (filename, token, { bucket, archivePassword } = {}) => {
   try {
     const params = {};
     if (bucket) params.bucket = bucket;
+    if (archivePassword) params.archive_password = archivePassword;
     const response = await apiClient.get(
       `/security/download-ciphertext/${encodeURIComponent(filename)}`,
       {
@@ -566,7 +605,12 @@ export const chooseEncryption = async (
   }
 };
 
-export const decryptAndDownload = async (filename, password, token) => {
+export const decryptAndDownload = async (
+  filename,
+  password,
+  token,
+  { archivePassword } = {},
+) => {
   try {
     console.log('Making decrypt request for:', filename);
     const response = await apiClient.post(
@@ -574,6 +618,7 @@ export const decryptAndDownload = async (filename, password, token) => {
       {
         filename,
         password,
+        archive_password: archivePassword || undefined,
       },
       {
         headers: {

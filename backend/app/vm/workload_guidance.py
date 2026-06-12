@@ -115,7 +115,9 @@ def merge_follow_up_answers(
     for signal_id, answer in follow_up_answers.items():
         if not answer or not str(answer).strip():
             continue
-        label = READINESS_SIGNALS.get(signal_id, {}).get("label", signal_id.replace("_", " "))
+        from app.vm.contextual_followups import answer_label
+
+        label = READINESS_SIGNALS.get(signal_id, {}).get("label") or answer_label(signal_id)
         extras.append(f"{label}: {str(answer).strip()}")
 
     if not extras:
@@ -207,24 +209,32 @@ def build_follow_up_questions(
     missing_signals: List[Dict[str, str]],
     follow_up_answers: Optional[Dict[str, str]] = None,
 ) -> List[Dict[str, Any]]:
-    """Return up to 3 guided questions for missing signals."""
+    """
+    Return guided questions only for signals still missing from the description.
+
+    There are four fixed signal slots (workload type, technology, scale, environment).
+    Each slot has one template question; we only surface slots not already detected
+    in the user's text (or merged follow-up answers). Answered slots are omitted.
+    """
     answers = follow_up_answers or {}
     questions: List[Dict[str, Any]] = []
 
-    for item in missing_signals[:3]:
+    for item in missing_signals:
         signal_id = item["id"]
+        current = answers.get(signal_id, "")
+        if current and str(current).strip():
+            # User already answered this slot — do not ask again
+            continue
         template = FOLLOW_UP_TEMPLATES.get(signal_id)
         if not template:
             continue
-        current = answers.get(signal_id, "")
         questions.append(
             {
                 "id": signal_id,
                 "question": template["question"],
                 "options": template["options"],
                 "hint": item.get("hint", ""),
-                "answered": bool(current and str(current).strip()),
-                "current_answer": current or None,
+                "signal_label": item.get("label", signal_id),
             }
         )
     return questions

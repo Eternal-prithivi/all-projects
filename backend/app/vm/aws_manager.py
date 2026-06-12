@@ -9,8 +9,14 @@ from botocore.exceptions import ClientError
 
 from app.provision.boto3_modules.common import client
 from app.provision.boto3_modules.ec2 import _resolve_ami
+from app.provision.provision_config_options import ec2_os_root_device, normalize_ec2_os
 from app.utils.logger import setup_logger
 from app.vm.aws_runtime import aws_boto_credentials, aws_region
+from app.vm.cluster_catalog import (
+    cluster_create_spec,
+    cluster_types,
+    cluster_vms as catalog_cluster_vms,
+)
 from app.vm.models import ClusterType
 
 logger = setup_logger(__name__)
@@ -19,27 +25,7 @@ ZENITH_TAG = "zenith_managed"
 CLUSTER_TAG = "zenith_cluster"
 
 AWS_CLUSTER_VMS: dict[ClusterType, list[str]] = {
-    ClusterType.GENERAL: ["general-aws-vm-1", "general-aws-vm-2"],
-    ClusterType.STORAGE: ["storage-aws-vm-1", "storage-aws-vm-2"],
-    ClusterType.MEMORY: ["memory-aws-vm-1", "memory-aws-vm-2"],
-    ClusterType.PERFORMANCE: ["performance-aws-vm-1", "performance-aws-vm-2"],
-    ClusterType.AI_ML: ["ai-ml-aws-vm-1", "ai-ml-aws-vm-2"],
-}
-
-_CLUSTER_INSTANCE_TYPES: dict[str, str] = {
-    "general": "t2.micro",
-    "storage": "t2.small",
-    "memory": "t2.small",
-    "performance": "t2.medium",
-    "ai_ml": "t2.medium",
-}
-
-_CLUSTER_DISK_GB: dict[str, int] = {
-    "general": 8,
-    "storage": 20,
-    "memory": 16,
-    "performance": 30,
-    "ai_ml": 40,
+    ct: catalog_cluster_vms("AWS", ct) for ct in cluster_types()
 }
 
 
@@ -97,7 +83,42 @@ def _get_default_vpc_subnet(ec2) -> tuple[str, str]:
         subnet_list = subnets.get("Subnets", [])
     if not subnet_list:
         raise ValueError("No subnet found in default VPC for EC2 launch.")
+    for sub in subnet_list:
+        if sub.get("MapPublicIpOnLaunch"):
+            return vpc_id, sub["SubnetId"]
     return vpc_id, subnet_list[0]["SubnetId"]
+
+
+def _default_security_group_id(ec2, vpc_id: str) -> Optional[str]:
+    groups = ec2.describe_security_groups(
+        Filters=[
+            {"Name": "vpc-id", "Values": [vpc_id]},
+            {"Name": "group-name", "Values": ["default"]},
+        ]
+    ).get("SecurityGroups", [])
+    return groups[0]["GroupId"] if groups else None
+
+
+def _resolve_vm_ami(ec2, region: str, source_image: str = "") -> tuple[str, str]:
+    """
+    Resolve AMI id and root device for VM cluster launches.
+
+    ``source_image`` may be an AMI id (``ami-…``), an EC2_OS_IMAGES key, or empty for default.
+    """
+    src = (source_image or "").strip()
+    config: dict[str, str] = {}
+    if src.startswith("ami-"):
+        config["ami_id"] = src
+        os_key = "ubuntu_22_04"
+    elif src:
+        os_key = normalize_ec2_os(src)
+        config["ec2_os"] = os_key
+    else:
+        os_key = "ubuntu_22_04"
+        config["ec2_os"] = os_key
+    ami_id = _resolve_ami(ec2, region, config)
+    root_device = ec2_os_root_device(os_key)
+    return ami_id, root_device
 
 
 def list_vms() -> List[Dict[str, Any]]:
@@ -173,7 +194,15 @@ def get_vm_details(name: str, zone: Optional[str] = None) -> Dict[str, Any]:
         }
     except Exception as exc:
         logger.error("Error fetching AWS VM %s: %s", name, exc)
-        raise
+        return {
+            "name": name,
+            "status": "UNKNOWN",
+            "machine_type": "unknown",
+            "zone": zone or aws_region(),
+            "external_ip": "N/A",
+            "creation_timestamp": None,
+            "labels": {},
+        }
 
 
 def create_vm(
@@ -182,6 +211,9 @@ def create_vm(
     source_image: str = "",
     disk_size_gb: int = 8,
     labels: Optional[Dict[str, str]] = None,
+    *,
+    disk_type: str = "",
+    disk_iops: Optional[int] = None,
 ) -> Dict[str, Any]:
     ec2 = _ec2()
     region = aws_region()
@@ -194,7 +226,8 @@ def create_vm(
         }
 
     vpc_id, subnet_id = _get_default_vpc_subnet(ec2)
-    ami_id = _resolve_ami(ec2, region, (source_image or "").strip())
+    ami_id, root_device = _resolve_vm_ami(ec2, region, source_image)
+    sg_id = _default_security_group_id(ec2, vpc_id)
     cluster = (labels or {}).get("cluster_type", "general")
     tags = [
         {"Key": "Name", "Value": name},
@@ -205,14 +238,41 @@ def create_vm(
         if key not in ("Name", ZENITH_TAG, CLUSTER_TAG):
             tags.append({"Key": key, "Value": str(value)})
 
-    resp = ec2.run_instances(
-        ImageId=ami_id,
-        InstanceType=machine_type,
-        MinCount=1,
-        MaxCount=1,
-        SubnetId=subnet_id,
-        TagSpecifications=[{"ResourceType": "instance", "Tags": tags}],
-    )
+    network_interface: dict[str, Any] = {
+        "SubnetId": subnet_id,
+        "DeviceIndex": 0,
+        "AssociatePublicIpAddress": True,
+    }
+    if sg_id:
+        network_interface["Groups"] = [sg_id]
+
+    try:
+        volume_type = disk_type or "gp3"
+        ebs: dict[str, Any] = {
+            "VolumeSize": max(8, int(disk_size_gb)),
+            "VolumeType": volume_type,
+            "DeleteOnTermination": True,
+        }
+        if disk_iops and volume_type in ("gp3", "io2", "io1"):
+            ebs["Iops"] = disk_iops
+        resp = ec2.run_instances(
+            ImageId=ami_id,
+            InstanceType=machine_type,
+            MinCount=1,
+            MaxCount=1,
+            NetworkInterfaces=[network_interface],
+            BlockDeviceMappings=[
+                {
+                    "DeviceName": root_device,
+                    "Ebs": ebs,
+                }
+            ],
+            TagSpecifications=[{"ResourceType": "instance", "Tags": tags}],
+        )
+    except ClientError as exc:
+        code = exc.response.get("Error", {}).get("Code", "")
+        msg = exc.response.get("Error", {}).get("Message", str(exc))
+        raise ValueError(f"AWS EC2 launch failed ({code}): {msg}") from exc
     instance_ids = [i["InstanceId"] for i in resp.get("Instances", [])]
     if not instance_ids:
         raise ValueError("EC2 RunInstances returned no instances")
@@ -255,16 +315,21 @@ def delete_vm(name: str) -> Dict[str, Any]:
     inst = _instance_by_name(ec2, name)
     if not inst:
         return {"name": name, "status": "DELETED"}
-    ec2.terminate_instances(InstanceIds=[inst["InstanceId"]])
+    instance_id = inst["InstanceId"]
+    ec2.terminate_instances(InstanceIds=[instance_id])
+    try:
+        ec2.get_waiter("instance_terminated").wait(InstanceIds=[instance_id])
+    except Exception as exc:
+        logger.debug("Waiting for %s termination: %s", name, exc)
     return {"name": name, "status": "DELETED"}
 
 
-def cluster_machine_type(cluster_type: ClusterType) -> str:
-    return _CLUSTER_INSTANCE_TYPES.get(cluster_type.value, "t2.micro")
+def cluster_machine_type(cluster_type: ClusterType, slot_id: Optional[str] = None) -> str:
+    return cluster_create_spec("AWS", cluster_type, slot_id).machine_type
 
 
-def cluster_disk_gb(cluster_type: ClusterType) -> int:
-    return _CLUSTER_DISK_GB.get(cluster_type.value, 8)
+def cluster_disk_gb(cluster_type: ClusterType, slot_id: Optional[str] = None) -> int:
+    return cluster_create_spec("AWS", cluster_type, slot_id).disk_gb
 
 
 def aws_configured() -> bool:

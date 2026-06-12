@@ -5,7 +5,7 @@
 #   - routes_auth.py is mounted TWICE: /api/auth AND /auth (legacy alias)
 #   - Admin routes have NO prefix — they mount directly (admin/dashboard, audit-logs)
 #   - CORS: allow_origins=["*"] — RESTRICT before public deployment
-# ENTRY POINT: uvicorn app.main:app --reload → http://localhost:8000
+# ENTRY POINT: uvicorn app.main:app --reload --reload-dir app → http://localhost:8000
 # API DOCS: http://localhost:8000/docs (Swagger auto-generated)
 # DO NOT:
 #   - Add new routers without checking for prefix conflicts

@@ -8,6 +8,11 @@ from typing import Any, Dict, Optional
 from pymongo.collection import Collection
 
 from app.notifications import service as notification_service
+from app.security.archive_password import (
+    ArchivePasswordError,
+    hash_archive_password,
+    require_archived_file_access,
+)
 from app.security.security_policy import SNOOZE_DAYS_DEFAULT, get_user_security_preferences
 from app.storage.secure_vault import (
     SecureVaultArchiveError,
@@ -82,6 +87,7 @@ def apply_vault_action(
     action: str,
     *,
     snooze_days: int = SNOOZE_DAYS_DEFAULT,
+    archive_password: Optional[str] = None,
 ) -> Dict[str, Any]:
     file_doc = find_secure_file_doc(files_db, username, filename)
     if not file_doc:
@@ -117,6 +123,12 @@ def apply_vault_action(
         object_key = file_doc.get("s3_key") or storage.object_key(username, filename)
         try:
             if action == "archive":
+                if (file_doc.get("vault_status") or "active") == "archived":
+                    return {"ok": False, "detail": "File is already archived."}
+                try:
+                    password_hash = hash_archive_password(archive_password or "")
+                except ArchivePasswordError as exc:
+                    return {"ok": False, "detail": str(exc)}
                 replica_name = archive_secure_vault_object(storage, object_key)
                 files_db.update_one(
                     {"_id": file_doc["_id"]},
@@ -126,6 +138,7 @@ def apply_vault_action(
                             "vault_storage_location": "replica",
                             "cloud_bucket": replica_name,
                             "archived_at": now,
+                            "archive_password_hash": password_hash,
                         },
                         "$unset": {"stale_pending_action": ""},
                     },
@@ -136,8 +149,13 @@ def apply_vault_action(
                     "vault_status": "archived",
                     "vault_storage_location": "replica",
                     "cloud_bucket": replica_name,
+                    "archive_password_protected": True,
                 }
 
+            try:
+                require_archived_file_access(file_doc, archive_password)
+            except ArchivePasswordError as exc:
+                return {"ok": False, "detail": str(exc)}
             primary_name = restore_secure_vault_object(storage, object_key)
             files_db.update_one(
                 {"_id": file_doc["_id"]},
@@ -148,7 +166,11 @@ def apply_vault_action(
                         "cloud_bucket": primary_name,
                         "replication_enabled": False,
                     },
-                    "$unset": {"archived_at": "", "stale_pending_action": ""},
+                    "$unset": {
+                        "archived_at": "",
+                        "stale_pending_action": "",
+                        "archive_password_hash": "",
+                    },
                 },
             )
             return {
@@ -163,10 +185,10 @@ def apply_vault_action(
 
     if action == "approve_delete":
         if (file_doc.get("vault_status") or "active") == "archived":
-            return {
-                "ok": False,
-                "detail": "File is archived. Restore it before deleting.",
-            }
+            try:
+                require_archived_file_access(file_doc, archive_password)
+            except ArchivePasswordError as exc:
+                return {"ok": False, "detail": str(exc)}
         file_csp = file_doc.get("csp") or "AWS"
         storage = resolve_secure_storage(username, file_csp)
         object_key = file_doc.get("s3_key") or storage.object_key(username, filename)

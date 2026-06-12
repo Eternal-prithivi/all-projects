@@ -37,7 +37,7 @@ zenith_ensure_python_tooling
 zenith_ensure_npm
 
 echo -e "${GREEN}[1/2] Starting Backend API (port ${BACKEND_PORT})...${NC}"
-(cd "$BACKEND_DIR" && "$UVICORN_BIN" app.main:app --reload --port "$BACKEND_PORT") >"$BACKEND_LOG" 2>&1 &
+(cd "$BACKEND_DIR" && "$UVICORN_BIN" app.main:app "${UVICORN_DEV_ARGS[@]}" --port "$BACKEND_PORT") >"$BACKEND_LOG" 2>&1 &
 BACKEND_PID=$!
 zenith_wait_for_service "$BACKEND_PID" "$BACKEND_LOG" "Backend API" || exit 1
 echo -e "${GREEN_UL}✅ Backend API started (PID: ${BACKEND_PID})${NC}"

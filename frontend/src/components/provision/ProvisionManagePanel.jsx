@@ -1,6 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import api from '../../api';
+import api, { getApiErrorMessage } from '../../api';
+import { useAuth } from '../../context/AuthContext.jsx';
+import { useOrgContext } from '../../hooks/useOrgContext.js';
+import OrgResourceMeta from '../OrgResourceMeta.jsx';
 import {
   getEngineLabel,
   getLoadingMessage,
@@ -40,6 +43,8 @@ function DeploymentRow({
   deleteLabel,
   onSelect,
   onDelete,
+  orgName,
+  currentUsername,
 }) {
   return (
     <div
@@ -52,6 +57,11 @@ function DeploymentRow({
     >
       <div className="deployment-info">
         <h4>{dep.deployment_name}</h4>
+        <OrgResourceMeta
+          orgName={dep.org_id ? orgName : null}
+          createdBy={dep.created_by || dep.user_id}
+          currentUsername={currentUsername}
+        />
         <div className="deployment-meta">
           <span className={`deployment-status ${getStatusClass(dep.status)}`}>
             {dep.status}
@@ -79,6 +89,9 @@ function DeploymentRow({
 }
 
 export default function ProvisionManagePanel({ onDeploymentsChange }) {
+  const { user } = useAuth();
+  const { orgName, isAdmin } = useOrgContext();
+  const [showOnlyMine, setShowOnlyMine] = useState(false);
   const [recent, setRecent] = useState([]);
   const [history, setHistory] = useState([]);
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -101,6 +114,18 @@ export default function ProvisionManagePanel({ onDeploymentsChange }) {
     () => (detail ? getProvisionEngine(detail) : actionEngine),
     [detail, actionEngine]
   );
+
+  const filterDeployments = useCallback(
+    (list) => {
+      if (!isAdmin || !showOnlyMine) return list;
+      const me = user?.username;
+      return list.filter((d) => (d.created_by || d.user_id) === me);
+    },
+    [isAdmin, showOnlyMine, user?.username]
+  );
+
+  const visibleRecent = useMemo(() => filterDeployments(recent), [recent, filterDeployments]);
+  const visibleHistory = useMemo(() => filterDeployments(history), [history, filterDeployments]);
 
   const loadDeployments = useCallback(async () => {
     try {
@@ -133,7 +158,7 @@ export default function ProvisionManagePanel({ onDeploymentsChange }) {
       const res = await api.get(`/provision/deployments/${deploymentName}`);
       setDetail(res.data);
     } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to load deployment');
+      setError(getApiErrorMessage(err, 'Failed to load deployment'));
     } finally {
       if (!quiet) {
         setLoadingAction((current) => (current === 'detail' ? null : current));
@@ -145,7 +170,7 @@ export default function ProvisionManagePanel({ onDeploymentsChange }) {
     e.stopPropagation();
     const isLive = dep.status === 'deployed';
     const msg = isLive
-      ? 'Archive this deployment? AWS resources are NOT removed — open it and use Destroy first if you want to tear down infrastructure.'
+      ? 'Archive this deployment? Live cloud resources are NOT removed — open it and use Destroy first if you want to tear down infrastructure.'
       : 'Remove this from recent deployments? It will move to history.';
     if (!window.confirm(msg)) return;
 
@@ -159,7 +184,7 @@ export default function ProvisionManagePanel({ onDeploymentsChange }) {
       }
       await loadDeployments();
     } catch (err) {
-      setError(err.response?.data?.detail || 'Could not archive deployment');
+      setError(getApiErrorMessage(err, 'Could not archive deployment'));
     } finally {
       setLoadingAction(null);
     }
@@ -181,11 +206,14 @@ export default function ProvisionManagePanel({ onDeploymentsChange }) {
       }
       await loadDeployments();
     } catch (err) {
-      setError(err.response?.data?.detail || 'Could not delete record');
+      setError(getApiErrorMessage(err, 'Could not delete record'));
     } finally {
       setLoadingAction(null);
     }
   };
+
+  const deploymentCsp = (dep) =>
+    (dep?.config?.csp || dep?.csp || 'AWS');
 
   const runDriftCheck = async (depId) => {
     const dep = findDeployment(depId) || detail;
@@ -199,7 +227,7 @@ export default function ProvisionManagePanel({ onDeploymentsChange }) {
       await loadDeployments();
       if (selectedId === depId) await loadDetail(depId, { quiet: true });
     } catch (err) {
-      setError(err.response?.data?.detail || 'Drift check failed');
+      setError(getApiErrorMessage(err, 'Drift check failed'));
     } finally {
       setLoadingAction(null);
     }
@@ -209,7 +237,7 @@ export default function ProvisionManagePanel({ onDeploymentsChange }) {
     const dep = findDeployment(depId) || detail;
     const engine = getProvisionEngine(dep);
     setActionEngine(engine);
-    if (!checkOnly && !window.confirm(getRemediateConfirmMessage(engine))) return;
+    if (!checkOnly && !window.confirm(getRemediateConfirmMessage(engine, deploymentCsp(dep)))) return;
     setLoadingAction(checkOnly ? 'remediate-preview' : 'remediate-apply');
     setError(null);
     try {
@@ -218,7 +246,7 @@ export default function ProvisionManagePanel({ onDeploymentsChange }) {
       await loadDeployments();
       if (selectedId === depId) await loadDetail(depId, { quiet: true });
     } catch (err) {
-      setError(err.response?.data?.detail || 'Remediation failed');
+      setError(getApiErrorMessage(err, 'Remediation failed'));
     } finally {
       setLoadingAction(null);
     }
@@ -234,7 +262,7 @@ export default function ProvisionManagePanel({ onDeploymentsChange }) {
       setDetail(null);
       await loadDeployments();
     } catch (err) {
-      setError(err.response?.data?.detail || 'Destroy failed');
+      setError(getApiErrorMessage(err, 'Destroy failed'));
     } finally {
       setLoadingAction(null);
     }
@@ -254,8 +282,8 @@ export default function ProvisionManagePanel({ onDeploymentsChange }) {
       <div className="provision-empty-state">
         <h3>No deployments yet</h3>
         <p>
-          Use <strong>New stack</strong> to deploy optional infrastructure (Boto3 or Terraform), or focus on
-          cost, storage, and VM optimization — your AWS account is already linked in Settings.
+          Use <strong>Build</strong> to deploy optional infrastructure (Cloud SDK fast path or Terraform), or focus on
+          cost, storage, and VM optimization — connect AWS, GCP, or Azure in Settings.
         </p>
         <Link to="/dashboard/costs" className="btn-provision secondary" style={{ marginTop: '1rem', display: 'inline-block' }}>
           Open cost analysis →
@@ -277,14 +305,26 @@ export default function ProvisionManagePanel({ onDeploymentsChange }) {
           <div className="deployments-section-header">
             <h3>Recent deployments</h3>
             <span className="deployments-section-hint">Up to 3 most recent (older ones move to History automatically)</span>
+            {isAdmin && orgName && (
+              <div className="org-resource-filter">
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={!showOnlyMine}
+                    onChange={(e) => setShowOnlyMine(!e.target.checked)}
+                  />
+                  Show all team resources
+                </label>
+              </div>
+            )}
           </div>
 
-          {recent.length === 0 ? (
+          {visibleRecent.length === 0 ? (
             <p className="provision-empty-hint">
               No recent deployments. Open history below or create a new stack.
             </p>
           ) : (
-            recent.map((dep) => (
+            visibleRecent.map((dep) => (
               <DeploymentRow
                 key={dep._id || dep.deployment_name}
                 dep={dep}
@@ -294,6 +334,8 @@ export default function ProvisionManagePanel({ onDeploymentsChange }) {
                 deleteLabel="Archive"
                 onSelect={loadDetail}
                 onDelete={archiveDeployment}
+                orgName={orgName}
+                currentUsername={user?.username}
               />
             ))
           )}
@@ -312,9 +354,9 @@ export default function ProvisionManagePanel({ onDeploymentsChange }) {
                 <div className="deployments-history-list">
                   <p className="provision-empty-hint deployments-history-note">
                     Archived stacks (including auto-archived when you have more than 3 recent).
-                    Use Archive to hide a stack without destroying AWS. Remove clears the record only.
+                    Use Archive to hide a stack without destroying cloud resources. Remove clears the record only.
                   </p>
-                  {history.map((dep) => (
+                  {visibleHistory.map((dep) => (
                     <DeploymentRow
                       key={dep._id || dep.deployment_name}
                       dep={dep}
@@ -324,6 +366,8 @@ export default function ProvisionManagePanel({ onDeploymentsChange }) {
                       deleteLabel={dep.archived ? 'Remove' : 'Archive'}
                       onSelect={loadDetail}
                       onDelete={dep.archived ? permanentlyRemove : archiveDeployment}
+                      orgName={orgName}
+                      currentUsername={user?.username}
                     />
                   ))}
                 </div>
@@ -350,7 +394,7 @@ export default function ProvisionManagePanel({ onDeploymentsChange }) {
                   {loadingAction === 'detail' && 'Loading'}
                   {loadingAction === 'delete' && 'Updating list'}
                 </strong>
-                <p>{getLoadingMessage(loadingAction, actionEngine)}</p>
+                <p>{getLoadingMessage(loadingAction, actionEngine, deploymentCsp(detail || findDeployment(selectedId)))}</p>
               </div>
             </div>
           )}
@@ -361,7 +405,9 @@ export default function ProvisionManagePanel({ onDeploymentsChange }) {
             <>
               <h3>{detail.deployment_name}</h3>
               <p className="provision-empty-hint">
-                Engine: <strong>{getEngineLabel(detailEngine)}</strong>
+                Engine: <strong>{getEngineLabel(detailEngine, deploymentCsp(detail))}</strong>
+                {' · '}
+                Cloud: <strong>{deploymentCsp(detail)}</strong>
                 {' · '}
                 Modules: {(detail.enabled_modules || []).join(', ') || '—'} ·{' '}
                 {detail.resources_count || 0} resources

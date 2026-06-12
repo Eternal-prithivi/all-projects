@@ -6,7 +6,12 @@
 
 ## 🔴 Active Task
 
-_None — Phase 22 complete._
+**Provision page fixes** — IN PROGRESS (2026-06-12)
+
+- [x] Fix `getApiErrorMessage` for FastAPI validation arrays
+- [x] Update provision panels to use shared error formatter
+- [x] Unit test + API smoke + build verify
+- [ ] Additional provision issues (user-reported)
 
 ---
 

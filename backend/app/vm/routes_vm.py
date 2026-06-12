@@ -20,6 +20,8 @@ from pydantic import BaseModel, Field
 from google.cloud import compute_v1
 from app.cloud.providers import normalize_provider
 from app.vm import vm_provider
+from app.vm.cluster_catalog import cluster_types, infer_cluster_from_vm_name, clusters_metadata
+from app.vm.vm_config import build_vm_configuration
 from app.vm.manager import (
     assign_vm_to_user,
     migrate_user,
@@ -27,14 +29,14 @@ from app.vm.manager import (
     get_user_assignment,
     get_cluster_health,
     _get_instance_client,
-    CLUSTER_VMS,
 )
 from app.vm.vm_provider import vm_runtime_context
 from app.vm.aws_runtime import set_aws_username, reset_aws_username
 from app.vm.azure_runtime import set_azure_username, reset_azure_username
 from app.vm.models import (
     VMRequestModel, VMAssignmentResponse, VMTransferRequest,
-    VMMetricsResponse, ClusterType, MigrationRecommendation, VMStatus
+    VMMetricsResponse, ClusterType, MigrationRecommendation, VMStatus,
+    VmCostEstimateResponse, VmCostRangeResponse,
 )
 from app.vm.migration_recommender import MigrationRecommender
 from app.vm.workload_analyzer import WorkloadAnalyzer
@@ -148,7 +150,7 @@ async def _get_cluster_vm_counts(csp: str = "GCP"):
     counts = {}
     active_statuses = {"RUNNING", "PROVISIONING", "STAGING"}
 
-    for cluster_type in CLUSTER_VMS:
+    for cluster_type in cluster_types():
         cluster_name = cluster_type.value
         pool_names = vm_provider.cluster_vms(csp, cluster_type)
         cluster_vms = [
@@ -167,26 +169,170 @@ async def _get_cluster_vm_counts(csp: str = "GCP"):
 
 
 def _cluster_max_vms(cluster_type: ClusterType) -> int:
-    if cluster_type == ClusterType.STORAGE:
-        return settings.STORAGE_CLUSTER_MAX_VMS
-    return settings.PERFORMANCE_CLUSTER_MAX_VMS
+    return vm_provider.cluster_max_vms(cluster_type)
 
 
-def _cluster_machine_type(cluster_type: ClusterType) -> str:
-    if cluster_type == ClusterType.STORAGE:
-        return settings.STORAGE_VM_MACHINE_TYPE
-    return settings.PERFORMANCE_VM_MACHINE_TYPE
+def _cluster_machine_type(cluster_type: ClusterType, slot_id: Optional[str] = None) -> str:
+    spec = vm_provider.cluster_create_spec("GCP", cluster_type, slot_id)
+    return spec.machine_type
 
 
-def _cluster_disk_size_gb(cluster_type: ClusterType) -> int:
-    if cluster_type == ClusterType.STORAGE:
-        return settings.STORAGE_VM_DISK_SIZE_GB
-    if cluster_type == ClusterType.MEMORY:
-        return max(20, settings.STORAGE_VM_DISK_SIZE_GB)
-    return 10
+def _cluster_disk_size_gb(cluster_type: ClusterType, slot_id: Optional[str] = None) -> int:
+    spec = vm_provider.cluster_create_spec("GCP", cluster_type, slot_id)
+    return spec.disk_gb
+
+
+def _validate_platform_region_slug(slug: Optional[str]) -> Optional[str]:
+    if not slug or not str(slug).strip():
+        return None
+    from app.cloud.platform_storage_catalog import get_region_by_slug
+
+    key = str(slug).strip().lower()
+    if not get_region_by_slug(key):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid platform region '{slug}'. Choose asia, us, europe, or africa.",
+        )
+    return key
 
 
 # --- API Endpoints ---
+
+
+@router.get("/regions", summary="Platform region pills for VM provisioning")
+async def get_vm_platform_regions(
+    _user: User = Depends(get_current_user),
+) -> Dict[str, Any]:
+    from app.cloud.platform_storage_catalog import catalog_is_multi_region, default_platform_slug
+    from app.vm.platform_regions import list_vm_platform_regions
+
+    regions = list_vm_platform_regions()
+    return {
+        "multi_region": catalog_is_multi_region(),
+        "default_slug": default_platform_slug(),
+        "regions": regions,
+    }
+
+
+@router.get("/clusters", summary="Cluster catalog metadata for UI")
+async def get_vm_clusters(
+    csp: str = Query("GCP"),
+    _user: User = Depends(get_current_user),
+) -> Dict[str, Any]:
+    provider = normalize_provider(csp)
+    if not getattr(settings, "VM_EXTENDED_CLUSTERS_ENABLED", True):
+        from app.vm.cluster_catalog import get_cluster_definition
+        clusters = [
+            clusters_metadata(provider)[i]
+            for i, ct in enumerate(cluster_types())
+            if ct in (ClusterType.GENERAL, ClusterType.STORAGE)
+        ]
+    else:
+        clusters = clusters_metadata(provider)
+    return {
+        "csp": provider,
+        "topology": "ring",
+        "clusters": clusters,
+    }
+
+
+@router.get(
+    "/cost-estimate",
+    summary="Approximate monthly cost before provisioning a VM slot",
+)
+async def get_vm_cost_estimate(
+    csp: str = Query("GCP"),
+    vm_name: Optional[str] = Query(None, description="Pool slot id, e.g. general-small-vm-2"),
+    cluster_type: Optional[str] = Query(None, description="Cluster when vm_name omitted"),
+    range_only: bool = Query(False, description="Return min/max across all slots in cluster"),
+    _user: User = Depends(get_current_user),
+) -> Dict[str, Any]:
+    from app.vm.vm_cost_estimate import estimate_cluster_cost_range, estimate_vm_slot_cost
+
+    provider = normalize_provider(csp)
+    ct: Optional[ClusterType] = None
+    if cluster_type:
+        ct = ClusterType(cluster_type)
+    elif vm_name:
+        ct = infer_cluster_from_vm_name(vm_name)
+
+    if range_only and ct:
+        return estimate_cluster_cost_range(provider, ct)
+
+    if vm_name:
+        return estimate_vm_slot_cost(provider, vm_name=vm_name, cluster_type=ct)
+
+    if ct:
+        return estimate_cluster_cost_range(provider, ct)
+
+    return estimate_vm_slot_cost(provider, cluster_type=ClusterType.GENERAL)
+
+
+@router.get("/pool", summary="Cluster VM pool slots and live status")
+async def get_vm_pool(
+    csp: str = Query("GCP"),
+    platform_region_slug: Optional[str] = Query(None),
+    current_user: User = Depends(get_current_user),
+) -> Dict[str, Any]:
+    """
+    Pool slot names per cluster with cloud status — for the request modal.
+    """
+    from app.vm.platform_regions import resolve_vm_compute
+    from app.vm.cluster_catalog import find_slot_by_vm_name, get_cluster_definition
+
+    slug = _validate_platform_region_slug(platform_region_slug)
+    provider = normalize_provider(csp)
+    compute = resolve_vm_compute(provider, slug)
+
+    active_cluster_types = cluster_types()
+    if not getattr(settings, "VM_EXTENDED_CLUSTERS_ENABLED", True):
+        active_cluster_types = [ClusterType.GENERAL, ClusterType.STORAGE]
+
+    with vm_runtime_context(current_user.username, provider, slug):
+        zone = vm_provider.vm_zone(provider)
+        clusters: Dict[str, Any] = {}
+        for cluster_type in active_cluster_types:
+            definition = get_cluster_definition(cluster_type)
+            names = vm_provider.cluster_vms(provider, cluster_type)
+            slots = []
+            for name in names:
+                details = vm_provider.get_vm_details(provider, name, zone)
+                slot_def = find_slot_by_vm_name(name, provider)
+                active_users = DB["vm_assignments"].count_documents({
+                    "vm_name": name,
+                    "status": "active",
+                })
+                slots.append({
+                    "vm_name": name,
+                    "tier": slot_def.tier if slot_def else None,
+                    "tier_label": slot_def.tier_label if slot_def else None,
+                    "display_name": (
+                        f"{definition.label} · {slot_def.tier_label}"
+                        if slot_def
+                        else name
+                    ),
+                    "status": details.get("status", "UNKNOWN"),
+                    "external_ip": details.get("external_ip"),
+                    "active_users": active_users,
+                    "available": details.get("status") != "RUNNING" or active_users == 0,
+                    "intended_spec": slot_def.spec_for(provider).to_dict() if slot_def else None,
+                })
+            clusters[cluster_type.value] = {
+                "cluster_type": cluster_type.value.upper(),
+                "label": definition.label,
+                "max_vms": vm_provider.cluster_max_vms(cluster_type),
+                "slots": slots,
+            }
+
+    return {
+        "csp": provider,
+        "ephemeral": bool(getattr(settings, "VM_DELETE_ON_IDLE", True)),
+        "platform_region_slug": compute["platform_region_slug"],
+        "platform_region_label": compute["label"],
+        "compute_target": compute["compute_target"],
+        "clusters": clusters,
+    }
+
 
 @router.get("/status", summary="Get VM Cluster Status")
 async def get_vm_cluster_status(
@@ -229,7 +375,7 @@ async def provision_or_assign_vm(
     try:
         cluster_type = ClusterType(cluster_name)
     except ValueError:
-        allowed = ", ".join(cluster.value for cluster in CLUSTER_VMS)
+        allowed = ", ".join(cluster.value for cluster in cluster_types())
         raise HTTPException(status_code=400, detail=f"Invalid cluster_type. Must be one of: {allowed}.")
 
     with vm_runtime_context(current_user.username, provider):
@@ -268,7 +414,7 @@ async def _provision_or_assign_inner(
             machine_type = _cluster_machine_type(cluster_type)
             disk_size = _cluster_disk_size_gb(cluster_type)
             suffix = "vm"
-            source_image = "debian-cloud/debian-11"
+            source_image = "debian-cloud/debian-12"
         new_vm_name = f"{cluster_type.value}-{suffix}-{cluster_status['current_count'] + 1}"
         labels = {"cluster_type": cluster_type.value}
 
@@ -384,11 +530,8 @@ async def analyze_workload_description(
     Uses report §4.1 pipeline (TextBlob + spaCy + tech dictionaries).
     Includes readiness score, missing signals, and follow-up question prompts.
     """
-    from app.vm.workload_guidance import (
-        assess_workload_readiness,
-        build_follow_up_questions,
-        merge_follow_up_answers,
-    )
+    from app.vm.contextual_followups import build_contextual_follow_up_questions
+    from app.vm.workload_guidance import assess_workload_readiness, merge_follow_up_answers
 
     effective_description = merge_follow_up_answers(
         body.workload_description,
@@ -396,9 +539,11 @@ async def analyze_workload_description(
     )
     cluster, confidence, details = WorkloadAnalyzer.analyze(effective_description)
     readiness = assess_workload_readiness(effective_description)
-    follow_up_questions = build_follow_up_questions(
-        readiness.get("missing_signals", []),
-        body.follow_up_answers,
+    follow_up_questions, follow_up_context = build_contextual_follow_up_questions(
+        effective_description,
+        cluster_type=cluster,
+        csp="AWS",
+        follow_up_answers=body.follow_up_answers,
     )
     return {
         "recommended_cluster": cluster.value,
@@ -408,6 +553,7 @@ async def analyze_workload_description(
         "auto_assign_eligible": details.get("auto_assign_eligible", confidence >= 85),
         "readiness": readiness,
         "follow_up_questions": follow_up_questions,
+        "follow_up_context": follow_up_context,
         "effective_description": effective_description,
         "analysis": details,
     }
@@ -426,20 +572,25 @@ async def request_vm_assignment(
         from app.vm.workload_guidance import merge_follow_up_answers
 
         provider = normalize_provider(request.csp or "GCP")
+        from app.byoc.capabilities import assert_byoc_feature_ready
         from app.cloud.availability import CloudFeature, assert_provider_available
 
+        assert_byoc_feature_ready(current_user.username, provider, CloudFeature.VM)
         assert_provider_available(current_user.username, provider, CloudFeature.VM)
         effective_workload = merge_follow_up_answers(
             request.workload_description or "",
             request.follow_up_answers,
         )
-        with vm_runtime_context(current_user.username, provider):
+        region_slug = _validate_platform_region_slug(request.platform_region_slug)
+        with vm_runtime_context(current_user.username, provider, region_slug):
             vm_name, vm_ip, ssh_command, cluster_type, assigned_at, expires_at = assign_vm_to_user(
                 user_id=current_user.username,
                 workload_description=effective_workload,
                 cluster_preference=request.cluster_preference,
                 priority_level=request.priority_level,
                 csp=provider,
+                vm_preference=request.vm_preference,
+                platform_region_slug=region_slug,
             )
 
         invalidate_all_caches()
@@ -457,8 +608,22 @@ async def request_vm_assignment(
         )
     except HTTPException:
         raise
+    except ValueError as e:
+        raise HTTPException(status_code=409, detail=str(e))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"VM assignment failed: {str(e)}")
+        logger.exception("VM assignment failed for user %s", current_user.username)
+        detail = str(e)
+        try:
+            from azure.core.exceptions import HttpResponseError
+
+            if isinstance(e, HttpResponseError):
+                detail = e.message or detail
+        except ImportError:
+            pass
+        raise HTTPException(
+            status_code=409,
+            detail=f"VM assignment failed: {detail}",
+        )
 
 
 @router.post("/migrate", response_model=dict)
@@ -472,8 +637,10 @@ async def migrate_vm(
     """
     try:
         provider = normalize_provider(request.csp or "GCP")
+        from app.byoc.capabilities import assert_byoc_feature_ready
         from app.cloud.availability import CloudFeature, assert_provider_available
 
+        assert_byoc_feature_ready(current_user.username, provider, CloudFeature.VM)
         assert_provider_available(current_user.username, provider, CloudFeature.VM)
         with vm_runtime_context(current_user.username, provider):
             result = migrate_user(
@@ -597,7 +764,7 @@ async def _collect_vm_metrics(
         logger.debug(f"Collecting metrics for {vm_name} (Mode: {mode_msg})")
         
         # Determine cluster type
-        cluster_type = ClusterType.GENERAL if "general" in vm_name else ClusterType.STORAGE
+        cluster_type = infer_cluster_from_vm_name(vm_name)
         
         vm_details = vm_provider.get_vm_details(
             provider, vm_name, vm_provider.vm_zone(provider)
@@ -658,106 +825,29 @@ async def _collect_vm_metrics(
 
 
 @router.get("/config/{vm_name}", summary="Get Detailed VM Configuration")
-async def get_vm_configuration(vm_name: str) -> Dict[str, Any]:
+async def get_vm_configuration(
+    vm_name: str,
+    csp: str = Query("GCP"),
+    platform_region_slug: Optional[str] = Query(None),
+    current_user: User = Depends(get_current_user),
+) -> Dict[str, Any]:
     """
-    Get comprehensive VM configuration details including:
-    - Machine type (CPU cores, memory)
-    - Disk configuration (size, type)
-    - Network configuration
-    - Current metrics
+    Comprehensive VM configuration — live cloud details or catalog-intended spec
+    when the slot is not yet provisioned.
     """
+    provider = normalize_provider(csp)
+    slug = _validate_platform_region_slug(platform_region_slug)
     try:
-        # Get VM instance details from GCP
-        request = compute_v1.GetInstanceRequest(
-            project=settings.GCP_PROJECT_ID,
-            zone=settings.GCP_ZONE,
-            instance=vm_name,
-        )
-        instance = _get_instance_client().get(request=request)
-        
-        # Parse machine type to get CPU and memory info
-        machine_type = instance.machine_type.split('/')[-1]
-        
-        # Common GCP machine types specs
-        machine_specs = {
-            'e2-micro': {'cpus': 2, 'memory_gb': 1},
-            'e2-small': {'cpus': 2, 'memory_gb': 2},
-            'e2-medium': {'cpus': 2, 'memory_gb': 4},
-            'e2-standard-2': {'cpus': 2, 'memory_gb': 8},
-            'e2-standard-4': {'cpus': 4, 'memory_gb': 16},
-            'n1-standard-1': {'cpus': 1, 'memory_gb': 3.75},
-            'n1-standard-2': {'cpus': 2, 'memory_gb': 7.5},
-        }
-        
-        specs = machine_specs.get(machine_type, {'cpus': 2, 'memory_gb': 1})
-        
-        # Get disk information
-        disks = []
-        for disk in instance.disks:
-            disk_info = {
-                'name': disk.device_name,
-                'size_gb': disk.disk_size_gb if hasattr(disk, 'disk_size_gb') else 10,
-                'type': disk.type_ if hasattr(disk, 'type_') else 'PERSISTENT',
-                'boot': disk.boot if hasattr(disk, 'boot') else False
-            }
-            disks.append(disk_info)
-        
-        # Get network information
-        networks = []
-        for interface in instance.network_interfaces:
-            network_info = {
-                'network': interface.network.split('/')[-1] if interface.network else 'default',
-                'internal_ip': interface.network_i_p if hasattr(interface, 'network_i_p') else 'N/A',
-            }
-            
-            # Get external IP if available
-            if interface.access_configs:
-                access_config = interface.access_configs[0]
-                external_ip = getattr(access_config, 'natIP', getattr(access_config, 'nat_i_p', 'N/A'))
-                network_info['external_ip'] = external_ip
-            else:
-                network_info['external_ip'] = None
-            
-            networks.append(network_info)
-        
-        # Get current metrics
-        active_users = DB["vm_assignments"].count_documents({
-            "vm_name": vm_name,
-            "status": "active"
-        })
-        
-        latest_metrics = DB["vm_metrics"].find_one(
-            {"vm_name": vm_name},
-            sort=[("collected_at", -1)]
-        )
-        
-        # Get cluster type
-        cluster_type = "GENERAL" if "general" in vm_name else "STORAGE"
-        
-        return {
-            'vm_name': vm_name,
-            'status': instance.status,
-            'cluster_type': cluster_type,
-            'machine_type': machine_type,
-            'cpu_cores': specs['cpus'],
-            'memory_gb': specs['memory_gb'],
-            'disks': disks,
-            'total_disk_gb': sum(d['size_gb'] for d in disks),
-            'networks': networks,
-            'zone': settings.GCP_ZONE,
-            'created': instance.creation_timestamp,
-            'active_users': active_users,
-            'current_metrics': {
-                'cpu_usage': latest_metrics.get('cpu_usage', 0) if latest_metrics else 0,
-                'memory_usage': latest_metrics.get('memory_usage', 0) if latest_metrics else 0,
-                'disk_usage_gb': latest_metrics.get('disk_usage_gb', 0) if latest_metrics else 0,
-                'network_in_mb': latest_metrics.get('network_in_mb', 0) if latest_metrics else 0,
-                'network_out_mb': latest_metrics.get('network_out_mb', 0) if latest_metrics else 0,
-            } if latest_metrics else None
-        }
-        
+        with vm_runtime_context(current_user.username, provider, slug):
+            return build_vm_configuration(
+                vm_name, provider, platform_region_slug=slug
+            )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to get VM configuration: {str(e)}")
+        logger.exception("Failed to get VM configuration for %s", vm_name)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to get VM configuration: {str(e)}",
+        )
 
 
 @router.get("/admin/recommendations", response_model=List[MigrationRecommendation], summary="Get AI Migration Recommendations")
@@ -787,7 +877,11 @@ async def get_migration_recommendations(
         collector = VMMetricsCollector()
         
         # Determine which clusters to analyze
-        clusters_to_analyze = [cluster_type] if cluster_type else [ClusterType.GENERAL, ClusterType.STORAGE]
+        clusters_to_analyze = (
+            [cluster_type]
+            if cluster_type
+            else list(cluster_types())
+        )
         
         all_recommendations = []
         for cluster in clusters_to_analyze:
@@ -795,21 +889,20 @@ async def get_migration_recommendations(
             cluster_vms = vm_provider.cluster_vms("GCP", cluster)
             vm_metrics = []
             
+            live_vms = {v["name"]: v for v in vm_provider.list_vms("GCP")}
             for vm_name in cluster_vms:
+                if vm_name not in live_vms:
+                    logger.debug("Skipping %s for recommendations (not provisioned in GCP)", vm_name)
+                    continue
                 try:
-                    # Get active user count
                     active_users = DB["vm_assignments"].count_documents({
                         "vm_name": vm_name,
                         "status": "active"
                     })
-                    
-                    vm_details = vm_provider.get_vm_details(
-                        "GCP", vm_name, vm_provider.vm_zone("GCP")
-                    )
+                    vm_details = live_vms[vm_name]
                     last_started = None
                     if vm_details.get("status") == "RUNNING":
-                        last_started = datetime.utcnow()  # Simplified for recommendations
-                    
+                        last_started = datetime.utcnow()
                     metrics = await collector.collect_all_metrics(
                         vm_name=vm_name,
                         cluster_type=cluster,
@@ -818,7 +911,11 @@ async def get_migration_recommendations(
                     )
                     vm_metrics.append(metrics)
                 except Exception as e:
-                    logger.warning(f"Skipping {vm_name} for recommendations (GCP unavailable): {type(e).__name__}")
+                    logger.debug(
+                        "Skipping %s for recommendations: %s",
+                        vm_name,
+                        e,
+                    )
                     continue
             
             if len(vm_metrics) < 2:
@@ -922,7 +1019,7 @@ async def predict_cluster_load(cluster_type: ClusterType) -> Dict[str, Any]:
                     "status": "active"
                 })
                 
-                vm_cluster = ClusterType.GENERAL if "general" in vm_name else ClusterType.STORAGE
+                vm_cluster = infer_cluster_from_vm_name(vm_name)
                 
                 vm_details = vm_provider.get_vm_details(
                     "GCP", vm_name, vm_provider.vm_zone("GCP")
@@ -999,45 +1096,67 @@ async def download_ssh_key(
                 }}
             )
             
-            # Inject key into VM metadata
+            # Inject key into GCP VM metadata (AWS/Azure keys are set at provision time)
             try:
                 vm_name = assignment["vm_name"]
-                ssh_keys_value = format_ssh_metadata("vmuser", public_key)
-                
-                # Get current VM metadata
-                metadata_request = compute_v1.GetInstanceRequest(
-                    project=settings.GCP_PROJECT_ID,
-                    zone=settings.GCP_ZONE,
-                    instance=vm_name
-                )
-                instance = _get_instance_client().get(request=metadata_request)
-                
-                # Add or update SSH keys
-                metadata_items = list(instance.metadata.items) if instance.metadata and instance.metadata.items else []
-                
-                ssh_keys_found = False
-                for i, item in enumerate(metadata_items):
-                    if item.key == "ssh-keys":
-                        metadata_items[i].value = f"{item.value}\n{ssh_keys_value}"
-                        ssh_keys_found = True
-                        break
-                
-                if not ssh_keys_found:
-                    metadata_items.append(compute_v1.Items(key="ssh-keys", value=ssh_keys_value))
-                
-                # Update VM metadata
-                update_request = compute_v1.SetMetadataInstanceRequest(
-                    project=settings.GCP_PROJECT_ID,
-                    zone=settings.GCP_ZONE,
-                    instance=vm_name,
-                    metadata_resource=compute_v1.Metadata(
-                        items=metadata_items,
-                        fingerprint=instance.metadata.fingerprint if instance.metadata else None
+                csp = assignment.get("csp") or "GCP"
+                region_slug = assignment.get("platform_region_slug")
+                provider = normalize_provider(csp)
+                if provider != "GCP":
+                    logger.info(
+                        "Skipping GCP metadata SSH inject for %s on %s",
+                        vm_name,
+                        provider,
                     )
-                )
-                operation = _get_instance_client().set_metadata(request=update_request)
-                operation.result()
-                logger.info(f"SSH key injected into {vm_name}")
+                else:
+                    with vm_runtime_context(
+                        current_user.username, provider, region_slug
+                    ):
+                        zone = vm_provider.vm_zone(provider)
+                        ssh_keys_value = format_ssh_metadata("vmuser", public_key)
+                        metadata_request = compute_v1.GetInstanceRequest(
+                            project=settings.GCP_PROJECT_ID,
+                            zone=zone,
+                            instance=vm_name,
+                        )
+                        instance = _get_instance_client().get(request=metadata_request)
+                        metadata_items = list(
+                            instance.metadata.items
+                            if instance.metadata and instance.metadata.items
+                            else []
+                        )
+                        ssh_keys_found = False
+                        for i, item in enumerate(metadata_items):
+                            if item.key == "ssh-keys":
+                                metadata_items[i].value = (
+                                    f"{item.value}\n{ssh_keys_value}"
+                                )
+                                ssh_keys_found = True
+                                break
+                        if not ssh_keys_found:
+                            metadata_items.append(
+                                compute_v1.Items(
+                                    key="ssh-keys", value=ssh_keys_value
+                                )
+                            )
+                        update_request = compute_v1.SetMetadataInstanceRequest(
+                            project=settings.GCP_PROJECT_ID,
+                            zone=zone,
+                            instance=vm_name,
+                            metadata_resource=compute_v1.Metadata(
+                                items=metadata_items,
+                                fingerprint=(
+                                    instance.metadata.fingerprint
+                                    if instance.metadata
+                                    else None
+                                ),
+                            ),
+                        )
+                        operation = _get_instance_client().set_metadata(
+                            request=update_request
+                        )
+                        operation.result()
+                        logger.info("SSH key injected into %s", vm_name)
             except Exception as e:
                 logger.warning(f"Could not inject SSH key: {e}")
             

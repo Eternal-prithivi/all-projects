@@ -23,7 +23,10 @@ SUCCESS = "#3ecf8e"
 SUBJECT_LABELS = {
     "general": "General inquiry",
     "support": "Technical support",
+    "technical": "Technical support",
     "billing": "Billing question",
+    "account": "Account",
+    "others": "Other",
     "feature": "Feature request",
     "bug": "Bug report",
 }
@@ -532,4 +535,88 @@ From: {requester_name}
 {preview[:500]}
 
 Open admin inbox to respond.
+"""
+
+
+def org_invite_html(
+    *,
+    org_name: str,
+    invite_link: str,
+    role: str,
+    invited_by: str,
+) -> str:
+    body = f"""
+    <p style="margin:0 0 14px;color:{TEXT_SECONDARY};">
+      <strong style="color:{TEXT_PRIMARY};">{_esc(invited_by)}</strong> invited you to join
+      <strong style="color:{GOLD_LIGHT};">{_esc(org_name)}</strong> on Zenith as
+      <strong>{_esc(role)}</strong>.
+    </p>
+    <p style="margin:0 0 18px;color:{TEXT_SECONDARY};font-size:14px;">
+      This link expires in 7 days. Sign in with the email address that received this invite.
+    </p>
+    {primary_button(invite_link, "Accept invitation")}
+    """
+    return zenith_email_html(
+        preheader=f"Join {org_name} on Zenith",
+        eyebrow="Team invitation",
+        title="You're invited to a team workspace",
+        body_html=body,
+        footer_note="If you did not expect this invite, you can ignore this email.",
+    )
+
+
+def org_invite_text(*, org_name: str, invite_link: str, role: str, invited_by: str) -> str:
+    return f"""You're invited to join {org_name} on Zenith
+
+{invited_by} invited you as {role}.
+
+Accept invitation: {invite_link}
+
+This link expires in 7 days. Sign in with the email address that received this invite.
+"""
+
+
+def org_budget_alert_html(
+    *,
+    org_name: str,
+    spend_usd: float,
+    budget_usd: float,
+    status: str,
+) -> str:
+    base = frontend_base()
+    label = "exceeded" if status == "exceeded" else "approaching"
+    body = f"""
+    <p style="margin:0 0 14px;color:{TEXT_SECONDARY};">
+      Team cloud spend for <strong style="color:{TEXT_PRIMARY};">{_esc(org_name)}</strong> is
+      <strong style="color:{GOLD_LIGHT};">{label}</strong> your monthly org budget.
+    </p>
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin:0 0 18px;">
+      <tr><td style="padding:8px 0;color:{TEXT_MUTED};font-size:13px;">Current spend</td>
+          <td style="padding:8px 0;text-align:right;color:{TEXT_PRIMARY};font-weight:600;">${_esc(f'{spend_usd:.2f}')}</td></tr>
+      <tr><td style="padding:8px 0;color:{TEXT_MUTED};font-size:13px;">Monthly budget</td>
+          <td style="padding:8px 0;text-align:right;color:{TEXT_PRIMARY};font-weight:600;">${_esc(f'{budget_usd:.2f}')}</td></tr>
+    </table>
+    {primary_button(f"{base}/dashboard/team", "Review team spend")}
+    """
+    return zenith_email_html(
+        preheader=f"{org_name} budget {label}",
+        eyebrow="Org budget alert",
+        title=f"Team budget {label}",
+        body_html=body,
+        footer_note="Billing remains per Zenith account; this is a team visibility alert.",
+    )
+
+
+def org_budget_alert_text(
+    *, org_name: str, spend_usd: float, budget_usd: float, status: str
+) -> str:
+    label = "exceeded" if status == "exceeded" else "approaching"
+    return f"""Team budget alert — {org_name}
+
+Team spend is {label} your monthly org budget.
+
+Current spend: ${spend_usd:.2f}
+Monthly budget: ${budget_usd:.2f}
+
+Review: {frontend_base()}/dashboard/team
 """

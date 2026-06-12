@@ -14,6 +14,26 @@ def test_recommend_static_site():
     assert rec.confidence >= 40
 
 
+def test_recommend_s3_bucket_suggests_s3_module():
+    rec = recommend_from_text("I need a s3 bucket for file storage", csp="AWS")
+    assert rec.template == "static-site"
+    assert rec.module_flags.get("enable_s3") is True
+    assert rec.module_flags.get("enable_dynamodb") is False
+    assert any(m["key"] == "s3" for m in rec.suggested_modules)
+
+
+def test_recommend_dynamodb_module():
+    rec = recommend_from_text("I need a DynamoDB table for key-value data", csp="AWS")
+    assert rec.template == "serverless-db"
+    assert rec.module_flags.get("enable_dynamodb") is True
+
+
+def test_recommend_api_enables_compute_stack():
+    rec = recommend_from_text("Node.js API on a small server with CloudWatch alerts", csp="AWS")
+    assert rec.module_flags.get("enable_ec2") is True
+    assert rec.module_flags.get("enable_vpc") is True
+
+
 def test_recommend_serverless_db():
     rec = recommend_from_text("PostgreSQL database with nightly backups and 500GB data")
     assert rec.template in ("serverless-db", "backend-app")
@@ -33,7 +53,18 @@ def test_analyze_provision_intent_shape():
         "static-site",
         "backend-app",
         "serverless-db",
+        "custom",
     )
+    assert "suggested_modules" in result["recommendation"]
+    assert "module_flags" in result["recommendation"]
+
+
+def test_analyze_s3_intent_not_database():
+    result = analyze_provision_intent("I need a s3 bucket for file storage", None, csp="AWS")
+    rec = result["recommendation"]
+    assert rec["template"] == "static-site"
+    assert rec["module_flags"].get("enable_s3") is True
+    assert rec["module_flags"].get("enable_dynamodb") is False
 
 
 def test_review_summary_backend_app():

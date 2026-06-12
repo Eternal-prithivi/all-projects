@@ -25,16 +25,98 @@ import {
 import '../styles/costsimulator.css';
 import PageRefreshButton from '../components/ui/PageRefreshButton.jsx';
 import { usePageRefresh } from '../hooks/usePageRefresh.js';
+import CloudProviderLogo from '../components/cloud/CloudProviderLogo.jsx';
 
-const ProviderLogo = ({ provider }) => {
-  const logoMap = {
-    'aws': '/images/aws.png',
-    'gcp': '/images/google-cloud_logo.png',
-    'azure': '/images/Microsoft_Azure.png'
+const ProviderLogo = ({ provider }) => (
+  <CloudProviderLogo provider={provider} className="provider-logo-small" />
+);
+
+function getFallbackPricing() {
+  return {
+    storage: {
+      standard: {
+        storage: { aws: 0.023, gcp: 0.020, azure: 0.018 },
+        requests: { aws: 0.0004 / 1000, gcp: 0.0005 / 1000, azure: 0.0004 / 1000 },
+        dataTransfer: { aws: 0.09, gcp: 0.12, azure: 0.087 },
+      },
+      infrequent: {
+        storage: { aws: 0.0125, gcp: 0.010, azure: 0.010 },
+        requests: { aws: 0.001 / 1000, gcp: 0.001 / 1000, azure: 0.001 / 1000 },
+        dataTransfer: { aws: 0.09, gcp: 0.12, azure: 0.087 },
+      },
+      archive: {
+        storage: { aws: 0.004, gcp: 0.0012, azure: 0.002 },
+        requests: { aws: 0.05 / 1000, gcp: 0.05 / 1000, azure: 0.02 / 1000 },
+        dataTransfer: { aws: 0.09, gcp: 0.12, azure: 0.087 },
+      },
+    },
+    compute: {
+      general: {
+        ondemand: {
+          cpu: { aws: 0.0416, gcp: 0.0475, azure: 0.040 },
+          memory: { aws: 0.0052, gcp: 0.0064, azure: 0.005 },
+        },
+        '1year': {
+          cpu: { aws: 0.0270, gcp: 0.0332, azure: 0.028 },
+          memory: { aws: 0.0034, gcp: 0.0045, azure: 0.0035 },
+        },
+        '3year': {
+          cpu: { aws: 0.0166, gcp: 0.0237, azure: 0.018 },
+          memory: { aws: 0.0021, gcp: 0.0032, azure: 0.0022 },
+        },
+      },
+      compute: {
+        ondemand: {
+          cpu: { aws: 0.051, gcp: 0.0594, azure: 0.048 },
+          memory: { aws: 0.0034, gcp: 0.0042, azure: 0.0033 },
+        },
+        '1year': {
+          cpu: { aws: 0.0331, gcp: 0.0416, azure: 0.0336 },
+          memory: { aws: 0.0022, gcp: 0.0029, azure: 0.0023 },
+        },
+        '3year': {
+          cpu: { aws: 0.0204, gcp: 0.0297, azure: 0.0216 },
+          memory: { aws: 0.0014, gcp: 0.0021, azure: 0.0015 },
+        },
+      },
+      memory: {
+        ondemand: {
+          cpu: { aws: 0.0532, gcp: 0.0641, azure: 0.051 },
+          memory: { aws: 0.0067, gcp: 0.0086, azure: 0.0064 },
+        },
+        '1year': {
+          cpu: { aws: 0.0346, gcp: 0.0449, azure: 0.0357 },
+          memory: { aws: 0.0044, gcp: 0.0060, azure: 0.0045 },
+        },
+        '3year': {
+          cpu: { aws: 0.0213, gcp: 0.0320, azure: 0.0229 },
+          memory: { aws: 0.0027, gcp: 0.0043, azure: 0.0029 },
+        },
+      },
+      dataTransfer: { aws: 0.09, gcp: 0.12, azure: 0.087 },
+    },
+    database: {
+      mysql: {
+        storage: { aws: 0.115, gcp: 0.170, azure: 0.125 },
+        iops: { aws: 0.10 / 1000, gcp: 0, azure: 0 },
+        backup: { aws: 0.095, gcp: 0.080, azure: 0.10 },
+      },
+      postgres: {
+        storage: { aws: 0.115, gcp: 0.170, azure: 0.125 },
+        iops: { aws: 0.10 / 1000, gcp: 0, azure: 0 },
+        backup: { aws: 0.095, gcp: 0.080, azure: 0.10 },
+      },
+      mongodb: {
+        storage: { aws: 0.25, gcp: 0.24, azure: 0.23 },
+        iops: { aws: 0.20 / 1000, gcp: 0, azure: 0 },
+        backup: { aws: 0.20, gcp: 0.18, azure: 0.19 },
+      },
+    },
+    aws: {},
+    gcp: {},
+    azure: {},
   };
-
-  return <img src={logoMap[provider]} alt={provider.toUpperCase()} className="provider-logo-small" />;
-};
+}
 
 const CostSimulatorPage = () => {
   const navigate = useNavigate();
@@ -55,14 +137,15 @@ const CostSimulatorPage = () => {
   const [breakdown, setBreakdown] = useState({ 
     aws: {}, gcp: {}, azure: {} 
   });
-  const [pricing, setPricing] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [pricing, setPricing] = useState(() => getFallbackPricing());
+  const [loading, setLoading] = useState(false);
+  const [pricingRefreshing, setPricingRefreshing] = useState(true);
   const [lastUpdated, setLastUpdated] = useState(null);
   const { runPageRefresh, pageRefreshing } = usePageRefresh();
 
   const fetchPricing = useCallback(async ({ showLoadedToast = false } = {}) => {
     try {
-      setLoading(true);
+      setPricingRefreshing(true);
       const response = await apiClient.get('/pricing');
       const { aws, gcp, azure, last_updated } = response.data;
       setPricing({ aws, gcp, azure });
@@ -72,9 +155,12 @@ const CostSimulatorPage = () => {
       }
     } catch (error) {
       console.error('Error fetching pricing:', error);
-      toast.error('Failed to load pricing data');
+      if (showLoadedToast) {
+        toast.error('Failed to load pricing data — using estimates');
+      }
       setPricing(getFallbackPricing());
     } finally {
+      setPricingRefreshing(false);
       setLoading(false);
     }
   }, []);
@@ -82,92 +168,6 @@ const CostSimulatorPage = () => {
   useEffect(() => {
     fetchPricing({ showLoadedToast: true });
   }, [fetchPricing]);
-
-  // Fallback pricing if backend fails
-  const getFallbackPricing = () => ({
-    storage: {
-      standard: {
-        storage: { aws: 0.023, gcp: 0.020, azure: 0.018 },
-        requests: { aws: 0.0004/1000, gcp: 0.0005/1000, azure: 0.0004/1000 }, // per 1k requests
-        dataTransfer: { aws: 0.09, gcp: 0.12, azure: 0.087 } // per GB
-      },
-      infrequent: {
-        storage: { aws: 0.0125, gcp: 0.010, azure: 0.010 },
-        requests: { aws: 0.001/1000, gcp: 0.001/1000, azure: 0.001/1000 },
-        dataTransfer: { aws: 0.09, gcp: 0.12, azure: 0.087 }
-      },
-      archive: {
-        storage: { aws: 0.004, gcp: 0.0012, azure: 0.002 },
-        requests: { aws: 0.05/1000, gcp: 0.05/1000, azure: 0.02/1000 },
-        dataTransfer: { aws: 0.09, gcp: 0.12, azure: 0.087 }
-      }
-    },
-    compute: {
-      general: {
-        ondemand: {
-          cpu: { aws: 0.0416, gcp: 0.0475, azure: 0.040 },
-          memory: { aws: 0.0052, gcp: 0.0064, azure: 0.005 }
-        },
-        '1year': {
-          cpu: { aws: 0.0270, gcp: 0.0332, azure: 0.028 },
-          memory: { aws: 0.0034, gcp: 0.0045, azure: 0.0035 }
-        },
-        '3year': {
-          cpu: { aws: 0.0166, gcp: 0.0237, azure: 0.018 },
-          memory: { aws: 0.0021, gcp: 0.0032, azure: 0.0022 }
-        }
-      },
-      compute: { // Compute optimized
-        ondemand: {
-          cpu: { aws: 0.051, gcp: 0.0594, azure: 0.048 },
-          memory: { aws: 0.0034, gcp: 0.0042, azure: 0.0033 }
-        },
-        '1year': {
-          cpu: { aws: 0.0331, gcp: 0.0416, azure: 0.0336 },
-          memory: { aws: 0.0022, gcp: 0.0029, azure: 0.0023 }
-        },
-        '3year': {
-          cpu: { aws: 0.0204, gcp: 0.0297, azure: 0.0216 },
-          memory: { aws: 0.0014, gcp: 0.0021, azure: 0.0015 }
-        }
-      },
-      memory: { // Memory optimized
-        ondemand: {
-          cpu: { aws: 0.0532, gcp: 0.0641, azure: 0.051 },
-          memory: { aws: 0.0067, gcp: 0.0086, azure: 0.0064 }
-        },
-        '1year': {
-          cpu: { aws: 0.0346, gcp: 0.0449, azure: 0.0357 },
-          memory: { aws: 0.0044, gcp: 0.0060, azure: 0.0045 }
-        },
-        '3year': {
-          cpu: { aws: 0.0213, gcp: 0.0320, azure: 0.0229 },
-          memory: { aws: 0.0027, gcp: 0.0043, azure: 0.0029 }
-        }
-      },
-      dataTransfer: { aws: 0.09, gcp: 0.12, azure: 0.087 } // per GB egress
-    },
-    database: {
-      mysql: {
-        storage: { aws: 0.115, gcp: 0.170, azure: 0.125 }, // per GB/month
-        iops: { aws: 0.10/1000, gcp: 0, azure: 0 }, // AWS charges for IOPS, GCP/Azure included
-        backup: { aws: 0.095, gcp: 0.080, azure: 0.10 } // per GB/month
-      },
-      postgres: {
-        storage: { aws: 0.115, gcp: 0.170, azure: 0.125 },
-        iops: { aws: 0.10/1000, gcp: 0, azure: 0 },
-        backup: { aws: 0.095, gcp: 0.080, azure: 0.10 }
-      },
-      mongodb: {
-        storage: { aws: 0.25, gcp: 0.24, azure: 0.23 },
-        iops: { aws: 0.20/1000, gcp: 0, azure: 0 },
-        backup: { aws: 0.20, gcp: 0.18, azure: 0.19 }
-      }
-    },
-    aws: {},
-    gcp: {},
-    azure: {}
-  });
 
   // Calculate costs based on service type
   useEffect(() => {
@@ -223,18 +223,7 @@ const CostSimulatorPage = () => {
   }, [serviceType, storageSize, storageClass, storageRequests, dataTransfer, vmCpu, vmMemory, vmHours, vmType, commitment, dbSize, dbType, dbIops, pricing]);
 
   if (loading) {
-    return (
-      <div className="cost-simulator-container">
-        <div className="simulator-header">
-          <span className="page-kicker">Pricing Workbench</span>
-          <h1>
-            <span className="heading-icon"><IconDollarSign aria-hidden="true" /></span>
-            Cost Simulator
-          </h1>
-          <p>Loading pricing data...</p>
-        </div>
-      </div>
-    );
+    return null;
   }
 
   // Find cheapest provider

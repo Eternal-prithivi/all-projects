@@ -151,17 +151,29 @@
 
 ## Phase 7 — VM Cluster (**ASK** — approve before each cloud)
 
+**7×4 expansion checklist** (repeat per CSP × platform region: `asia`, `us`, `europe`, `africa`):
+
+| Done | Check | Pass when |
+|------|-------|-----------|
+| - [ ] | Pool shows 7 clusters × 4 slots | `/api/vm/pool` or request modal slot picker |
+| - [ ] | Topology ring + cluster tabs | 7 tabs; selected cluster shows 4 ring nodes |
+| - [ ] | Click unprovisioned slot | Config modal shows catalog spec (`NOT_PROVISIONED`) |
+| - [ ] | Request + release | VM terminates in cloud console on release |
+| - [ ] | Database / Network NLP | Workload with PostgreSQL → database; gateway → network |
+
 | Done | # | Step | Route | Cloud | Est. cost | Pass when |
 |------|---|------|-------|-------|-----------|-----------|
 | - [ ] | 7.0 | **Approval received** | — | GCP | ASK | You said yes before testing |
-| - [ ] | 7.1 | Workload analyze | `/dashboard/vmcluster` | GCP | $0–2 | Suggestion shown |
-| - [ ] | 7.2 | Request VM (General only) | `/dashboard/vmcluster` | GCP | $0–2 | VM assigned/created |
+| - [ ] | 7.1 | Workload analyze | `/dashboard/vmcluster` | GCP | $0–2 | Suggestion shown (any of 7 clusters) |
+| - [ ] | 7.2 | Request VM (any cluster) | `/dashboard/vmcluster` | GCP | $0–2 | VM assigned/created with tiered slot name |
 | - [ ] | 7.3 | Verify in GCP console | console | GCP | — | Real VM, IP not `N/A` |
 | - [ ] | 7.4 | Stop + cleanup | app + console | GCP | — | No running VMs |
 | - [ ] | 7.5 | **Approval received** | — | Azure | ASK | You said yes |
-| - [ ] | 7.6 | VM General — request, stop, cleanup | `/dashboard/vmcluster` | Azure | $0–2 | No running VMs |
+| - [ ] | 7.6 | VM — request, release, cleanup | `/dashboard/vmcluster` | Azure | $0–2 | No running VMs after release |
 | - [ ] | 7.7 | **Approval received** | — | AWS | ASK | You said yes |
-| - [ ] | 7.8 | VM General — request, stop, cleanup | `/dashboard/vmcluster` | AWS | $0–2 | No running VMs |
+| - [ ] | 7.8 | VM — request, release, cleanup | `/dashboard/vmcluster` | AWS | $0–2 | No running VMs after release |
+| - [ ] | 7.9 | Region pills | `/dashboard/vmcluster` | All | $0 | Asia/US/Europe/Africa updates pool `compute_target` |
+| - [ ] | 7.10 | Transfer modal | `/dashboard/vmcluster` | All | $0–2 | All 7 clusters + 4 slots listed |
 
 ---
 
@@ -188,6 +200,34 @@
 | - [ ] | 8.6 | static-site — plan only | `/dashboard/provision` | AWS | $0 | Plan succeeds |
 | - [ ] | 8.7 | static-site — apply + destroy | `/dashboard/provision` | AWS | Low | Resources gone |
 | - [ ] | 8.8 | backend-app — apply + destroy | `/dashboard/provision` | One | Medium | Destroyed same day |
+
+---
+
+## Phase 6.11 — Team cloud health (Phase 23)
+
+| Done | # | Action | Where | Pass when |
+|------|---|--------|-------|-----------|
+| - [ ] | 6.11a | Org summary metrics | `/dashboard/team` | Members, org spend, VMs, storage visible |
+| - [ ] | 6.11b | Admin sees per-member spend | Team page as owner | All member rows show spend/VMs |
+| - [ ] | 6.11c | Member privacy | Team page as member | Other members' spend hidden; own row + org total visible |
+| - [ ] | 6.11d | Invite with role + email | Team → Create invite | Link copied; email if SMTP configured |
+| - [ ] | 6.11e | Transfer ownership | Team → Make owner | Old owner becomes admin |
+| - [ ] | 6.11f | Org budget settings | Team settings (admin) | Budget bar updates on summary |
+| - [ ] | 6.11g | Provision approval gate | Provision plan as member | Over-threshold returns approval required |
+| - [ ] | 6.11h | Dashboard team card | Overview | Shows org monthly spend when in org |
+
+---
+
+## Phase 6.12 — Org billing & shared resources (Phase 24)
+
+| Done | # | Action | Where | Pass when |
+|------|---|--------|-------|-----------|
+| - [ ] | 6.12a | Org seats card | `/dashboard/team` | Plan, seats used/available, renew date; Manage billing link for admin |
+| - [ ] | 6.12b | Org billing checkout | `/dashboard/billing` as owner | Organization panel; seat stepper; Razorpay checkout (or mock in dev) |
+| - [ ] | 6.12c | Member inherits org plan | Billing or Overview as member | `/my-subscription` shows org plan; personal checkout blocked |
+| - [ ] | 6.12d | Seat guard on invite accept | Team with full seats | Accept invite returns 402; UI shows add seats message |
+| - [ ] | 6.12e | Admin sees all org VMs | VM Cluster as admin | Toggle “Show all team resources”; cards show org + creator |
+| - [ ] | 6.12f | Member sees own resources only | VM Cluster as member | Only own VMs; org label on cards |
 
 ---
 

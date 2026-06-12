@@ -136,9 +136,16 @@ async def get_gcp_costs(
     """
     Retrieves GCP Billing data.
     """
+    from app.byoc.capabilities import assert_byoc_feature_ready
+    from app.cloud.availability import CloudFeature, assert_provider_available
+
+    assert_byoc_feature_ready(user.username, "GCP", CloudFeature.COST)
+    assert_provider_available(user.username, "GCP", CloudFeature.COST)
     try:
         cost_data = get_gcp_billing_data(user.username, start_date=start_date, end_date=end_date)
         return _cost_provider_response("gcp", cost_data)
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch GCP costs: {e}")
 
@@ -151,9 +158,16 @@ async def get_azure_costs(
     """
     Retrieves Azure Cost data.
     """
+    from app.byoc.capabilities import assert_byoc_feature_ready
+    from app.cloud.availability import CloudFeature, assert_provider_available
+
+    assert_byoc_feature_ready(user.username, "Azure", CloudFeature.COST)
+    assert_provider_available(user.username, "Azure", CloudFeature.COST)
     try:
         cost_data = get_azure_billing_data(user.username, start_date=start_date, end_date=end_date)
         return _cost_provider_response("azure", cost_data)
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch Azure costs: {e}")
 

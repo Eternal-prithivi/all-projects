@@ -17,6 +17,8 @@ class ClusterType(str, Enum):
     MEMORY = "memory"
     PERFORMANCE = "performance"
     AI_ML = "ai_ml"
+    DATABASE = "database"
+    NETWORK = "network"
     
     @classmethod
     def _missing_(cls, value):
@@ -75,6 +77,14 @@ class VMRequestModel(BaseModel):
         ge=1,
         le=5,
         description="User priority (1=normal, 5=premium). Affects assignment order."
+    )
+    vm_preference: Optional[str] = Field(
+        None,
+        description="Optional pool slot name (e.g. general-vm-2, storage-aws-vm-1).",
+    )
+    platform_region_slug: Optional[str] = Field(
+        None,
+        description="Platform region pill: asia, us, europe, or africa (from platform catalog).",
     )
 
 
@@ -227,6 +237,55 @@ class ClusterCapacityResponse(BaseModel):
     total_users: int
     max_users_per_vm: int
     can_accept_new_users: bool
+
+
+class VmCostUsageExample(BaseModel):
+    id: str
+    label: str
+    hours: int
+    estimated_usd: float
+
+
+class VmCostLineItem(BaseModel):
+    name: str
+    monthly_usd: float
+    note: Optional[str] = None
+
+
+class VmCostEstimateResponse(BaseModel):
+    """Approximate pre-provision cost overview for a VM slot."""
+    csp: str
+    vm_name: Optional[str] = None
+    cluster_type: str
+    tier_label: Optional[str] = None
+    machine_type: str
+    disk_gb: int
+    disk_type: Optional[str] = None
+    currency: str = "USD"
+    is_approximate: bool = True
+    disclaimer: str
+    ephemeral_note: str
+    compute_monthly_usd: float
+    disk_monthly_usd: float
+    total_monthly_usd: float
+    hourly_usd: float
+    line_items: List[VmCostLineItem] = []
+    usage_examples: List[VmCostUsageExample] = []
+
+
+class VmCostRangeResponse(BaseModel):
+    """Cost range across all slots in a cluster."""
+    csp: str
+    cluster_type: str
+    currency: str = "USD"
+    is_approximate: bool = True
+    disclaimer: str
+    ephemeral_note: str
+    min_monthly_usd: float
+    max_monthly_usd: float
+    min_hourly_usd: float
+    max_hourly_usd: float
+    slots: List[VmCostEstimateResponse] = []
 
 
 # --- Database Models (for MongoDB) ---

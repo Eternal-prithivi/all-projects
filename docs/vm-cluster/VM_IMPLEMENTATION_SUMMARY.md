@@ -1,12 +1,11 @@
-# VM Cluster Management System - Implementation Complete ✅
+# VM Cluster Management System - Implementation Summary
 
 ## Overview
-Full-featured intelligent VM cluster management system built for your Cloud Resource Optimization Platform. Supports 4 GCP VMs with auto-scaling, predictive migration recommendations, and cost optimization.
+Intelligent VM cluster management with **7 clusters × 4 tiered slots**, multi-cloud (GCP/AWS/Azure), platform regions, ring topology UI, NLP workload classification, and ephemeral provision/release.
 
-**Implementation Date:** June 15, 2025  
-**Total Development Time:** ~2 hours  
-**Lines of Code:** ~1,850 lines (backend only)  
-**Status:** ✅ Ready for testing
+**Catalog source of truth:** `backend/app/vm/cluster_catalog.py`  
+**Feature flag:** `VM_EXTENDED_CLUSTERS_ENABLED` (default `true`)  
+**Legacy aliases:** `general-vm-1` → `general-micro-vm-1` (one release cycle)
 
 ---
 

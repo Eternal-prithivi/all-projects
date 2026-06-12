@@ -64,9 +64,11 @@ class Settings(BaseSettings):
     GCP_BILLING_DATASET_ID: str = ""
     GCP_BILLING_TABLE_ID: str = ""
 
-    # VM Cluster Configuration (for your demo)
-    PERFORMANCE_CLUSTER_MAX_VMS: int = 2
-    STORAGE_CLUSTER_MAX_VMS: int = 2
+    # VM Cluster Configuration
+    CLUSTER_MAX_VMS_DEFAULT: int = 4
+    PERFORMANCE_CLUSTER_MAX_VMS: int = 4  # legacy alias
+    STORAGE_CLUSTER_MAX_VMS: int = 4  # legacy alias
+    VM_EXTENDED_CLUSTERS_ENABLED: bool = True
 
     # Default machine types for the clusters (adjust as needed for demo/credits)
     PERFORMANCE_VM_MACHINE_TYPE: str = "e2-micro"
@@ -79,6 +81,9 @@ class Settings(BaseSettings):
     # VM adaptive agent (enterprise Step 4) — off by default for safe rollout
     VM_AUTO_MIGRATE_ENABLED: bool = False
     VM_AUTO_MIGRATE_MIN_SCORE: int = 85
+
+    # Terminate VMs (and disks) when the last user releases — no idle disk charges
+    VM_DELETE_ON_IDLE: bool = True
 
     # --- Demo Mode Configuration ---
     DEMO_MODE: bool = False  # Set to True to use mock data instead of real API calls (zero cost!)

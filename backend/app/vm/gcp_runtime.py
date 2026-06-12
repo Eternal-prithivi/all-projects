@@ -74,6 +74,13 @@ def gcp_project_id() -> str:
 
 
 def gcp_zone() -> str:
+    from app.vm.platform_region_context import get_platform_region_slug
+    from app.vm.platform_regions import resolve_vm_compute
+
+    slug = get_platform_region_slug()
+    if slug:
+        return resolve_vm_compute("GCP", slug)["gcp_zone"]
+
     username = _gcp_username.get()
     if username:
         ctx = _resolve_byoc_compute(username)

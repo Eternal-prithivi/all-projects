@@ -18,13 +18,27 @@ export const PATHS = {
   vmCluster: '/dashboard/vmcluster',
   storage: '/dashboard/storage',
   security: '/dashboard/security',
+  provision: '/dashboard/provision',
 };
 
 /** Features not yet shipped — referenced honestly in help copy */
 export const NOT_YET_AVAILABLE = {
   vmMigration: 'VM migration between cloud providers is not available in the UI yet.',
-  orgBilling: 'Organization billing is per Zenith account today; shared org billing is planned.',
+  orgBilling:
+    'When you join a team, your Zenith plan and seat are managed by the organization owner. Cloud provider costs remain on each member’s connected accounts.',
   apiKeysPage: 'API key management is planned; use dashboard features via the web UI today.',
+};
+
+/** Team page — what works today vs planned (honest UX) */
+export const TEAM_CAPABILITIES = {
+  today: [
+    'Seat-based org billing (one subscription, multiple seats)',
+    'Invite colleagues and manage roles',
+    'Org-wide cloud spend and resource totals',
+    'Shared resources with admin/member access rules',
+    'Team budget alerts and provision approvals',
+  ],
+  comingSoon: ['Automatic seat proration via Razorpay subscriptions API'],
 };
 
 export const SUPPORT_EMAIL =
@@ -34,8 +48,9 @@ export const SUPPORT_EMAIL =
 export const PRODUCT_PLANS = [
   {
     plan_id: 'free',
-    name: 'Free Tier',
+    name: 'Free',
     tier: 'Free',
+    description: 'Explore Zenith with demo dashboards and platform cloud',
     price_monthly: 0,
     price_yearly: 0,
     vm_limit: 2,
@@ -44,16 +59,19 @@ export const PRODUCT_PLANS = [
     cta: 'Get Started Free',
     ctaTo: '/register',
     features: [
-      '2 VMs (demo mode)',
-      '10 GB storage per VM',
-      'Basic monitoring',
-      'Community support',
+      '2 VMs (Performance + Storage clusters)',
+      '10 GB org storage quota',
+      'Demo cost dashboard & cached VM metrics',
+      'Storage uploads via platform cloud',
+      'Provision templates — deploy with platform keys',
+      'Community support (Help Center)',
     ],
   },
   {
     plan_id: 'basic',
     name: 'Basic',
     tier: 'Basic',
+    description: 'Real multi-cloud ops for solo builders',
     price_monthly: 499,
     price_yearly: 4990,
     vm_limit: 5,
@@ -62,17 +80,20 @@ export const PRODUCT_PLANS = [
     cta: 'Get Started',
     ctaTo: '/register',
     features: [
-      '5 VMs',
-      '50 GB storage per VM',
-      'Real-time monitoring',
+      '5 VMs + active provisioned stacks',
+      '50 GB org storage',
+      'Live AWS · GCP · Azure (platform keys)',
+      'Intelligent storage tiering',
+      'Infrastructure Build wizard (Terraform + SDK)',
+      'Cost & usage dashboard',
       'Email support (24h)',
-      'Real cloud resources (AWS, GCP, Azure)',
     ],
   },
   {
     plan_id: 'pro',
-    name: 'Professional',
-    tier: 'Professional',
+    name: 'Pro',
+    tier: 'Pro',
+    description: 'Teams with BYOC, governance, and AI insights',
     price_monthly: 1499,
     price_yearly: 14990,
     vm_limit: 15,
@@ -81,18 +102,21 @@ export const PRODUCT_PLANS = [
     cta: 'Get Started',
     ctaTo: '/register',
     features: [
-      '15 VMs',
-      '200 GB storage per VM',
-      'AI recommendations',
+      '15 VMs + active provisioned stacks',
+      '200 GB org storage',
+      'BYOC — your AWS · GCP · Azure accounts',
+      'Org billing with seat-based plans',
+      'Provision policies, audit log & approvals',
+      'AI storage & cost recommendations',
       'Priority support (4h)',
-      'Cost analytics',
-      'API access',
+      'REST API access',
     ],
   },
   {
     plan_id: 'enterprise',
     name: 'Enterprise',
     tier: 'Enterprise',
+    description: 'Org-wide governance, unlimited scale, dedicated onboarding',
     price_monthly: 4999,
     price_yearly: 49990,
     vm_limit: 999,
@@ -101,15 +125,60 @@ export const PRODUCT_PLANS = [
     cta: 'Contact Sales',
     ctaTo: '/contact',
     features: [
-      'Unlimited VMs',
-      '1 TB storage per VM',
-      'Predictive analytics',
-      '24/7 phone support',
-      'Dedicated account manager',
-      'SLA guarantee',
+      'Unlimited VMs & provisioned stacks',
+      '1 TB org storage quota',
+      'Everything in Pro + hybrid BYOC routing',
+      'Org resource ACL, reassign & budget approvals',
+      'Custom provision policies & audit export',
+      'Team spend rollups & recommendations',
+      'Dedicated onboarding — custom SLA on request',
     ],
   },
 ];
+
+/** Compact capability blocks for pricing cards (dashboard) */
+export function getPlanCapabilityBlocks(plan) {
+  const vm =
+    plan.vm_limit >= 999 ? 'Unlimited VMs' : `${plan.vm_limit} VMs + stacks`;
+  const storage =
+    plan.storage_gb >= 1000 ? '1 TB org storage' : `${plan.storage_gb} GB org storage`;
+
+  const byPlan = {
+    free: [
+      { title: 'Compute', detail: vm },
+      { title: 'Storage', detail: storage },
+      { title: 'Provisioning', detail: 'Templates · platform keys' },
+      { title: 'Insights', detail: 'Demo dashboard' },
+    ],
+    basic: [
+      { title: 'Compute', detail: vm },
+      { title: 'Storage', detail: storage },
+      { title: 'Provisioning', detail: 'Build wizard · Terraform + SDK' },
+      { title: 'Cloud', detail: 'AWS · GCP · Azure live' },
+    ],
+    pro: [
+      { title: 'Compute', detail: vm },
+      { title: 'BYOC & Teams', detail: 'Your clouds · seat billing' },
+      { title: 'Provisioning', detail: 'Policies · audit · approvals' },
+      { title: 'Intelligence', detail: 'AI recommendations · API' },
+    ],
+    enterprise: [
+      { title: 'Scale', detail: vm },
+      { title: 'Governance', detail: 'ACL · budgets · custom policies' },
+      { title: 'Provisioning', detail: 'Full audit export · hybrid routing' },
+      { title: 'Support', detail: 'Dedicated onboarding' },
+    ],
+  };
+
+  return (
+    byPlan[plan.plan_id] ?? [
+      { title: 'Compute', detail: vm },
+      { title: 'Storage', detail: storage },
+      { title: 'Includes', detail: plan.features?.[0] ?? '—' },
+      { title: 'Plus', detail: plan.features?.[1] ?? '—' },
+    ]
+  );
+}
 
 export function formatPlanPriceInr(amount) {
   if (!amount) return '₹0';
@@ -120,7 +189,7 @@ export function formatPlansSummaryForHelp() {
   return PRODUCT_PLANS.map((p) => {
     const vmLabel = p.vm_limit >= 999 ? 'Unlimited VMs' : `${p.vm_limit} VMs`;
     const storageLabel =
-      p.storage_gb >= 1000 ? '1 TB per VM' : `${p.storage_gb} GB per VM`;
+      p.storage_gb >= 1000 ? '1 TB org storage' : `${p.storage_gb} GB org storage`;
     const price =
       p.price_monthly === 0
         ? 'Free'
@@ -132,6 +201,7 @@ export function formatPlansSummaryForHelp() {
 /** Marketing grid for landing / public pricing */
 export const MARKETING_PRICING = PRODUCT_PLANS.map((p) => ({
   tier: p.tier,
+  description: p.description,
   amount:
     p.price_monthly === 0
       ? '0'
@@ -151,33 +221,40 @@ export function buildHelpFaqs() {
       id: 1,
       category: 'getting-started',
       question: 'How do I get started with Zenith?',
-      answer: `Create an account from the homepage, then open your dashboard at ${PATHS.dashboard}. Choose a plan on ${PATHS.pricing} or stay on the free tier. You can create VMs, upload files, and run cost analysis from the sidebar.`,
+      answer: `Create an account from the homepage, then open your dashboard at ${PATHS.dashboard}. Choose a plan on ${PATHS.pricing} or stay on the free tier. You can create VMs, upload files, provision infrastructure, and run cost analysis from the sidebar.`,
     },
     {
       id: 2,
       category: 'getting-started',
       question: 'What cloud providers does Zenith support?',
       answer:
-        'Zenith supports Amazon Web Services (AWS), Google Cloud Platform (GCP), and Microsoft Azure. Connect your clouds via BYOC (bring your own credentials) or use platform keys where configured.',
+        'Zenith supports Amazon Web Services (AWS), Google Cloud Platform (GCP), and Microsoft Azure. Connect your clouds via BYOC on Pro and Enterprise plans, or use platform keys where configured on Free and Basic.',
     },
     {
       id: 3,
       category: 'getting-started',
       question: 'Is there a free plan?',
-      answer: `Yes. The Free tier includes ${PRODUCT_PLANS[0].vm_limit} VMs, ${PRODUCT_PLANS[0].storage_gb} GB storage per VM, basic monitoring, and community support — no credit card required. Upgrade anytime from ${PATHS.billing}.`,
+      answer: `Yes. The Free tier includes ${PRODUCT_PLANS[0].vm_limit} VMs, ${PRODUCT_PLANS[0].storage_gb} GB org storage, demo cost dashboards, provision templates with platform keys, and community support — no credit card required. Upgrade anytime from ${PATHS.billing}.`,
     },
     {
       id: 4,
       category: 'getting-started',
       question: 'What are the system requirements?',
       answer:
-        'Zenith runs in any modern browser (Chrome, Firefox, Safari, Edge). No local install is required. REST APIs are available on paid plans for automation.',
+        'Zenith runs in any modern browser (Chrome, Firefox, Safari, Edge). No local install is required. REST APIs are available on Pro and Enterprise for automation.',
     },
     {
       id: 5,
       category: 'billing',
       question: 'What subscription plans are available?',
-      answer: `We offer: ${plansSummary}. All paid plans include multi-cloud management and cost tools. See ${PATHS.publicPricing} for the latest pricing.`,
+      answer: `We offer: ${plansSummary}. Paid plans unlock live billing data, provisioning, and (on Pro+) BYOC and team governance. See ${PATHS.publicPricing} for the latest pricing.`,
+    },
+    {
+      id: 28,
+      category: 'billing',
+      question: 'Why do I see a lock icon in the dashboard?',
+      answer:
+        'Zenith shows every destination in the sidebar, but Pro and Enterprise features (BYOC, provision policies, cost optimization, API keys, org seat billing) display a lock badge when your plan does not include them. Click a locked item to compare plans and upgrade from Billing or Pricing.',
     },
     {
       id: 6,
@@ -215,7 +292,7 @@ export function buildHelpFaqs() {
       category: 'vms',
       question: 'What VM types are available?',
       answer:
-        'Performance VMs suit CPU-intensive workloads; Storage VMs suit data-heavy workloads. Limits depend on your plan.',
+        'Performance VMs suit CPU-intensive workloads; Storage VMs suit data-heavy workloads. Active provisioned stacks count toward the same VM quota on your plan.',
     },
     {
       id: 12,
@@ -259,7 +336,7 @@ export function buildHelpFaqs() {
       id: 18,
       category: 'storage',
       question: 'What storage limits exist?',
-      answer: `Storage limits follow your plan (per VM): Free ${PRODUCT_PLANS[0].storage_gb} GB, Basic ${PRODUCT_PLANS[1].storage_gb} GB, Professional ${PRODUCT_PLANS[2].storage_gb} GB, Enterprise 1 TB. Check ${PATHS.billing} for your current limits.`,
+      answer: `Storage limits follow your plan (org-wide quota): Free ${PRODUCT_PLANS[0].storage_gb} GB, Basic ${PRODUCT_PLANS[1].storage_gb} GB, Pro ${PRODUCT_PLANS[2].storage_gb} GB, Enterprise 1 TB. Check ${PATHS.billing} for your current limits.`,
     },
     {
       id: 19,
@@ -309,6 +386,12 @@ export function buildHelpFaqs() {
       category: 'account',
       question: 'How do I view my activity history?',
       answer: `Recent security-related activity is available under ${PATHS.securitySettings}. Notifications history is on ${PATHS.dashboard}/notifications.`,
+    },
+    {
+      id: 27,
+      category: 'getting-started',
+      question: 'What is Infrastructure Provisioning?',
+      answer: `Open ${PATHS.provision} to deploy AWS, GCP, or Azure stacks from templates or a guided Build wizard. Free users can explore templates with platform keys; Basic and above get live Terraform and SDK engines. Pro and Enterprise add policy checks, audit logs, and org approval gates.`,
     },
   ];
 }

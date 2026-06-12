@@ -1,0 +1,21 @@
+.org-resource-meta {
+  margin: 0.35rem 0 0.5rem;
+  font-size: 0.8rem;
+  color: var(--text-muted, #8b949e);
+  line-height: 1.4;
+}
+
+.org-resource-filter {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+  font-size: 0.875rem;
+}
+
+.org-resource-filter label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  cursor: pointer;
+}

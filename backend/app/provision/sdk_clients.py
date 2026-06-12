@@ -9,7 +9,7 @@ from google.cloud import storage as gcp_storage
 from google.oauth2 import service_account
 
 
-def _gcp_credentials(cloud_env: dict[str, str]):
+def gcp_credentials(cloud_env: dict[str, str]):
     raw = cloud_env.get("GOOGLE_CREDENTIALS") or ""
     if not raw:
         raise ValueError("GOOGLE_CREDENTIALS missing from provision environment.")
@@ -17,6 +17,10 @@ def _gcp_credentials(cloud_env: dict[str, str]):
     project = cloud_env.get("GOOGLE_PROJECT") or info.get("project_id") or ""
     credentials = service_account.Credentials.from_service_account_info(info)
     return credentials, project
+
+
+def _gcp_credentials(cloud_env: dict[str, str]):
+    return gcp_credentials(cloud_env)
 
 
 def gcp_storage_client(cloud_env: dict[str, str]) -> Tuple[gcp_storage.Client, str]:

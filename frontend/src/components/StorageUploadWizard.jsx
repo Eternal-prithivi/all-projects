@@ -3,14 +3,10 @@ import BucketRegionSelector from "./BucketRegionSelector";
 import GcpBucketSelector from "./GcpBucketSelector";
 import AzureContainerSelector from "./AzureContainerSelector";
 import PlatformRegionPills from "./PlatformRegionPills";
+import CloudProviderLogo from "./cloud/CloudProviderLogo.jsx";
 
 function CspIcon({ csp }) {
-  const icons = {
-    AWS: "/images/aws.png",
-    GCP: "/images/google-cloud_logo.png",
-    Azure: "/images/Microsoft_Azure.png",
-  };
-  return <img src={icons[csp]} alt={`${csp} logo`} className="csp-icon" />;
+  return <CloudProviderLogo provider={csp} className="csp-icon" alt={`${csp} logo`} />;
 }
 import ZenithWizardFrame, { WizardNote } from "./wizard/ZenithWizardFrame";
 import StorageEnsembleBreakdown from "./wizard/StorageEnsembleBreakdown";

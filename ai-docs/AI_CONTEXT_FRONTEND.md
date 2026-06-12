@@ -65,17 +65,17 @@ For backend context → read `AI_CONTEXT_BACKEND.md`
 | `/dashboard/costs` | `CostAnalysisEnhancedPage.jsx` | Cost hub sub-nav (simulator, optimization, pricing — Billing in sidebar only) |
 | `/dashboard/simulator` | `CostSimulatorPage.jsx` | |
 | `/dashboard/optimization` | `CostOptimizationPage.jsx` | |
-| `/dashboard/billing` | `BillingPage.jsx` | |
+| `/dashboard/billing` | `BillingPage.jsx` | Personal + org billing panel (admin checkout/seats; member read-only when in org) |
 | `/dashboard/pricing` | `PricingPage.jsx` | |
-| `/dashboard/storage` | `StoragePage.jsx` | Uses `AuthContext` — tanjiro mock removed ✅ |
-| `/dashboard/vmcluster` | `VMClusterPage.jsx` | |
-| `/dashboard/provision` | `ProvisionPage.jsx` | Infrastructure — **Build** tab: intent-first wizard (`ProvisionDeployWizard`); Manage/Activity/Policies unchanged |
+| `/dashboard/storage` | `StoragePage.jsx` | Org resource labels; admin “show all team resources” toggle |
+| `/dashboard/vmcluster` | `VMClusterPage.jsx` | Org resource labels; admin resource toggle (`useOrgContext`, `OrgResourceMeta`) |
+| `/dashboard/provision` | `ProvisionPage.jsx` | Infrastructure — Manage tab shows org labels via `ProvisionManagePanel` |
 | `/dashboard/security` | `SecurityPage.jsx` | 2FA vault; tri-cloud sync; BYOC secure pickers (AWS/GCP/Azure via `SecurityVaultDestinationSummary`); trust docs: `docs/security/TRUST_AND_ENCRYPTION.md` |
 | `/dashboard/security-settings` | `SecuritySettingsPage.jsx` | |
 | `/dashboard/profile` | `ProfilePage.jsx` | |
 | `/dashboard/settings` | `SettingsPage.jsx` | Infrastructure provisioning engine (Boto3/Terraform); Preferences + Restart Tour |
 | `/dashboard/notifications` | `NotificationsPage.jsx` | Paginated history; All/Unread tabs; type filters |
-| `/dashboard/team` | `TeamPage.jsx` | Org create, invites (copy link, revoke), members; per-account billing callout |
+| `/dashboard/team` | `TeamPage.jsx` | Org roster, seats card, org resources, cloud health metrics, member spend (admin), org budget, team actions, approvals, migrate-personal |
 | `/dashboard/support` | `SupportPage.jsx` | New ticket form + list + thread (10s poll + WS) |
 | `/invite/:token` | `AcceptInvitePage.jsx` | Accept team invite |
 | `/auth/sso/callback` | `SsoCallbackPage.jsx` | OAuth redirect handler |

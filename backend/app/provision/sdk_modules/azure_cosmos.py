@@ -15,8 +15,10 @@ from azure.mgmt.cosmosdb.models import (
     SqlDatabaseResource,
 )
 
-from app.provision.sdk_clients import azure_cosmos_client
-from app.provision.sdk_modules.azure_resource_group import ensure_resource_group
+from app.provision.provision_config_options import AZURE_IDENTITY_PRESETS, normalize_azure_identity_preset
+from app.provision.sdk_clients import azure_cosmos_client, azure_credential_and_subscription
+from app.provision.sdk_modules.azure_rbac import assign_cosmos_role
+from app.provision.sdk_modules.azure_resource_group import azure_effective_location, ensure_resource_group
 from app.provision.sdk_modules.common import azure_tags
 from app.provision.sdk_modules.context import SdkDeployContext
 
@@ -41,7 +43,7 @@ def apply_cosmos(
     if not ok:
         return {"success": False, "steps": steps, "error": err}
     rg = ctx.azure_resource_group
-    location = config.get("azure_location") or "eastus"
+    location = azure_effective_location(config, ctx)
     db_name = config.get("cosmos_database_name") or "zenith-db"
     client, _, _ = azure_cosmos_client(cloud_env)
     try:
@@ -76,6 +78,26 @@ def apply_cosmos(
 
         ctx.cosmos_account_name = account
         ctx.cosmos_database_name = db_name
+
+        identity_preset = normalize_azure_identity_preset(config.get("azure_identity_preset"))
+        if identity_preset == "cosmos_data_contributor":
+            principal_id = (ctx.azure_vm_principal_id or "").strip()
+            preset_meta = AZURE_IDENTITY_PRESETS[identity_preset]
+            if principal_id:
+                credential, subscription_id = azure_credential_and_subscription(cloud_env)
+                assign_cosmos_role(
+                    credential,
+                    subscription_id,
+                    rg,
+                    account,
+                    preset_meta["role_id"],
+                    principal_id,
+                    steps,
+                    preset_meta["role_name"],
+                )
+            else:
+                steps.append("⚠ Cosmos RBAC skipped — enable Azure VM with managed identity first.")
+
         return {"success": True, "steps": steps, "error": None}
     except Exception as exc:
         return {"success": False, "steps": steps, "error": str(exc)}

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import api from '../../api';
+import api, { getApiErrorMessage } from '../../api';
 
 const ACTION_FILTERS = [
   { id: 'all', label: 'All' },
@@ -109,7 +109,7 @@ export default function ProvisionActivityPanel() {
         retention_days: res.data.retention_days ?? 90,
       });
     } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to load activity');
+      setError(getApiErrorMessage(err, 'Failed to load activity'));
     } finally {
       setLoading(false);
     }

@@ -30,6 +30,9 @@ export default function ProvisionIntentPanel({
         />
       </div>
       <WorkloadGuidancePanel
+        className="workload-guidance--provision"
+        title="Description quality"
+        idleHint="Describe your goal above — we'll score how clear your request is and highlight what's missing."
         analysis={analysis}
         isAnalyzing={isAnalyzing}
         followUpAnswers={followUpAnswers}
@@ -37,14 +40,33 @@ export default function ProvisionIntentPanel({
       />
       {analysis?.recommendation && (
         <div className="provision-intent-recommendation">
-          <strong>Suggested stack:</strong>{" "}
-          {analysis.recommendation.template.replace("-", " ")}{" "}
-          <span className="provision-intent-confidence">
-            ({analysis.recommendation.confidence}% confidence)
-          </span>
+          <div className="provision-intent-recommendation__header">
+            <strong>Suggested stack:</strong>{" "}
+            {analysis.recommendation.template.replace(/-/g, " ")}{" "}
+            <span className="provision-intent-confidence">
+              ({analysis.recommendation.confidence}% confidence)
+            </span>
+          </div>
+
+          {(analysis.recommendation.suggested_modules || []).length > 0 && (
+            <div className="provision-intent-modules">
+              <span className="provision-intent-modules__label">Suggested modules</span>
+              <ul className="provision-intent-modules__list">
+                {analysis.recommendation.suggested_modules.map((mod) => (
+                  <li key={mod.key} className="provision-intent-module">
+                    <span className="provision-intent-module__name">{mod.name}</span>
+                    {mod.reason && (
+                      <span className="provision-intent-module__reason">{mod.reason}</span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
           {analysis.auto_apply_eligible && (
             <p className="provision-intent-ready">
-              Template modules are pre-selected — continue to compare clouds.
+              Modules are pre-selected — continue to compare clouds or customize on the next step.
             </p>
           )}
           <ul className="provision-intent-reasons">

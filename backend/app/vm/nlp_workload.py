@@ -106,21 +106,30 @@ TECH_DICTIONARIES: Dict[str, List[str]] = {
 
 # Report cluster → signal weights when a category is detected
 CATEGORY_CLUSTER_WEIGHTS: Dict[str, Dict[str, float]] = {
-    "database": {"storage": 2.0, "memory": 1.0},
-    "framework": {"general": 1.5, "performance": 1.0},
+    "database": {"database": 3.0, "storage": 1.5, "memory": 1.0},
+    "framework": {"general": 1.5, "performance": 1.0, "network": 0.5},
     "ml_tool": {"ai_ml": 3.0, "performance": 1.5, "general": 1.0},
-    "container": {"general": 1.5, "performance": 1.0},
+    "container": {"general": 1.5, "performance": 1.0, "network": 1.0},
     "storage_system": {"storage": 3.0},
 }
 
 SYNONYM_MAP: Dict[str, List[str]] = {
-    "database": ["db", "datastore", "data store", "rdbms", "sql"],
+    "database": ["db", "datastore", "data store", "rdbms", "sql", "postgres", "mysql"],
     "storage": ["disk", "files", "object store", "backup"],
     "gpu": ["graphics", "cuda", "accelerator"],
     "web": ["website", "http", "api", "rest"],
+    "network": ["proxy", "gateway", "load balancer", "ingress", "cdn"],
 }
 
-REPORT_CLUSTERS = ("general", "storage", "memory", "performance", "ai_ml")
+REPORT_CLUSTERS = (
+    "general",
+    "storage",
+    "memory",
+    "performance",
+    "ai_ml",
+    "database",
+    "network",
+)
 
 
 @dataclass
@@ -280,16 +289,25 @@ def _score_report_clusters(
     if re.search(r"(redis|memcached|in-memory|ram|memory)", lower):
         if not any(t in negated for t in ("redis", "memory", "ram")):
             scores["memory"] += 2.0
+    if re.search(r"(postgres|mysql|mongodb|oltp|sql\s*server|database)", lower):
+        scores["database"] += 3.0
+    if re.search(r"(proxy|gateway|load\s*balancer|ingress|cdn|streaming)", lower):
+        scores["network"] += 3.0
 
     tokens = _expand_keywords(_tokenize(text))
     keyword_cluster_map = {
         "web": "general",
         "api": "general",
-        "database": "storage",
+        "database": "database",
+        "postgres": "database",
+        "mysql": "database",
         "storage": "storage",
         "backup": "storage",
         "gpu": "ai_ml",
         "cuda": "ai_ml",
+        "proxy": "network",
+        "gateway": "network",
+        "redis": "memory",
     }
     for token in tokens:
         if token in negated:
@@ -369,6 +387,8 @@ def _map_report_cluster_to_type(report_cluster: str) -> ClusterType:
         "memory": ClusterType.MEMORY,
         "performance": ClusterType.PERFORMANCE,
         "ai_ml": ClusterType.AI_ML,
+        "database": ClusterType.DATABASE,
+        "network": ClusterType.NETWORK,
     }
     return mapping.get(report_cluster, ClusterType.GENERAL)
 

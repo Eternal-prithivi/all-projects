@@ -64,83 +64,106 @@ class SubscriptionResponse(BaseModel):
     auto_renew: bool
     vm_limit: int
     storage_gb: int
+    managed_by_org: bool = False
+    org_id: Optional[str] = None
+    org_name: Optional[str] = None
+    seat_count: Optional[int] = None
+    seats_used: Optional[int] = None
+    can_manage_billing: Optional[bool] = None
+
+
+class NavEntitlementItem(BaseModel):
+    id: str
+    locked: bool
+    min_plan: Optional[str] = None
+
+
+class PlanEntitlementsResponse(BaseModel):
+    plan_id: str
+    plan_name: str
+    limits: Dict[str, Any]
+    features: Dict[str, bool]
+    nav: List[NavEntitlementItem]
 
 # --- Pricing Plans ---
 
 PLANS = {
     "free": PaymentPlan(
         plan_id="free",
-        name="Free Tier",
-        description="Perfect for testing and small projects",
+        name="Free",
+        description="Explore Zenith with demo dashboards and platform cloud",
         price_monthly=0,
         price_yearly=0,
         features=[
-            "2 VMs (1 performance + 1 storage)",
-            "10 GB storage per VM",
-            "Basic monitoring",
-            "Community support",
-            "Demo mode (mock data)"
+            "2 VMs (Performance + Storage clusters)",
+            "10 GB org storage quota",
+            "Demo cost dashboard & cached VM metrics",
+            "Storage uploads via platform cloud (when configured)",
+            "Provision templates — deploy with platform keys",
+            "Community support (Help Center)",
         ],
         vm_limit=2,
         storage_gb=10,
-        priority_support=False
+        priority_support=False,
     ),
     "basic": PaymentPlan(
         plan_id="basic",
         name="Basic",
-        description="Great for individuals and small teams",
+        description="Real multi-cloud ops for solo builders",
         price_monthly=499,  # ₹499/month
         price_yearly=4990,  # ₹4,990/year (2 months free)
         features=[
-            "5 VMs (3 performance + 2 storage)",
-            "50 GB storage per VM",
-            "Real-time monitoring",
+            "5 VMs + active provisioned stacks (shared quota)",
+            "50 GB org storage",
+            "Live AWS · GCP · Azure via platform keys",
+            "Intelligent storage tiering recommendations",
+            "Infrastructure Build wizard (Terraform + SDK)",
+            "Cost & usage dashboard with live billing data",
             "Email support (24h response)",
-            "Real cloud resources (AWS, GCP, Azure)"
         ],
         vm_limit=5,
         storage_gb=50,
-        priority_support=False
+        priority_support=False,
     ),
     "pro": PaymentPlan(
         plan_id="pro",
-        name="Professional",
-        description="For growing businesses",
+        name="Pro",
+        description="Teams with BYOC, governance, and AI insights",
         price_monthly=1499,  # ₹1,499/month
         price_yearly=14990,  # ₹14,990/year (2 months free)
         features=[
-            "15 VMs (10 performance + 5 storage)",
-            "200 GB storage per VM",
-            "Real-time monitoring + AI recommendations",
+            "15 VMs + active provisioned stacks",
+            "200 GB org storage",
+            "BYOC — connect your AWS · GCP · Azure accounts",
+            "Org billing with seat-based subscriptions",
+            "Provision policies, audit log & approval guardrails",
+            "AI storage & cost recommendations",
             "Priority email support (4h response)",
-            "Multi-cloud optimization",
-            "Cost analytics dashboard",
-            "API access"
+            "REST API access",
         ],
         vm_limit=15,
         storage_gb=200,
-        priority_support=True
+        priority_support=True,
     ),
     "enterprise": PaymentPlan(
         plan_id="enterprise",
         name="Enterprise",
-        description="Custom solutions for large organizations",
+        description="Org-wide governance, unlimited scale, dedicated onboarding",
         price_monthly=4999,  # ₹4,999/month
         price_yearly=49990,  # ₹49,990/year (2 months free)
         features=[
-            "Unlimited VMs",
-            "1 TB storage per VM",
-            "Real-time monitoring + AI + predictive analytics",
-            "24/7 phone + email support (1h response)",
-            "Dedicated account manager",
-            "Custom integrations",
-            "SLA guarantees",
-            "White-label options"
+            "Unlimited VMs & provisioned stacks",
+            "1 TB org storage quota",
+            "Everything in Pro + hybrid BYOC & platform routing",
+            "Org resource ACL, reassign & budget approvals",
+            "Custom provision policies & exportable audit log",
+            "Team spend rollups & optimization recommendations",
+            "Dedicated onboarding — contact sales for custom SLA",
         ],
         vm_limit=999,
         storage_gb=1000,
-        priority_support=True
-    )
+        priority_support=True,
+    ),
 }
 
 # --- Helper Functions ---
@@ -167,6 +190,22 @@ async def get_pricing_plans() -> List[PaymentPlan]:
     """
     return list(PLANS.values())
 
+
+@router.get(
+    "/entitlements",
+    response_model=PlanEntitlementsResponse,
+    summary="Get plan entitlements for current user",
+)
+async def get_plan_entitlements(
+    current_user: User = Depends(get_current_user),
+) -> PlanEntitlementsResponse:
+    """Feature flags, quotas, and nav lock metadata for dashboard gating."""
+    from app.payments.plan_entitlements import get_entitlements
+
+    payload = get_entitlements(current_user.username)
+    return PlanEntitlementsResponse(**payload)
+
+
 @router.get("/my-subscription", response_model=SubscriptionResponse, summary="Get My Subscription")
 async def get_my_subscription(
     current_user: User = Depends(get_current_user)
@@ -174,19 +213,27 @@ async def get_my_subscription(
     """
     Get current user's subscription details.
     """
-    subscription = get_user_subscription(current_user.username)
+    from app.payments.subscription_service import get_effective_subscription
+
+    subscription = get_effective_subscription(current_user.username)
     plan = PLANS[subscription["plan_id"]]
-    
+
     return SubscriptionResponse(
         subscription_id=subscription.get("subscription_id"),
         plan_id=subscription["plan_id"],
-        plan_name=plan.name,
+        plan_name=subscription.get("plan_name") or plan.name,
         status=subscription["status"],
         current_period_start=subscription.get("current_period_start"),
         current_period_end=subscription.get("current_period_end"),
         auto_renew=subscription.get("auto_renew", True),
-        vm_limit=plan.vm_limit,
-        storage_gb=plan.storage_gb
+        vm_limit=subscription.get("vm_limit") or plan.vm_limit,
+        storage_gb=subscription.get("storage_gb") or plan.storage_gb,
+        managed_by_org=bool(subscription.get("managed_by_org")),
+        org_id=subscription.get("org_id"),
+        org_name=subscription.get("org_name"),
+        seat_count=subscription.get("seat_count"),
+        seats_used=subscription.get("seats_used"),
+        can_manage_billing=subscription.get("can_manage_billing"),
     )
 
 @router.post("/create-order", summary="Create Razorpay Order")
@@ -198,10 +245,18 @@ async def create_razorpay_order(
     Create a Razorpay order for subscription payment.
     Returns order details to initiate payment on frontend.
     """
+    from app.payments.subscription_service import user_in_org_with_billing
+
+    if user_in_org_with_billing(current_user.username):
+        raise HTTPException(
+            status_code=400,
+            detail="Your plan is managed by your organization. Ask an admin to upgrade on Team or Billing.",
+        )
+
     try:
         if request.plan_id not in PLANS or request.plan_id == "free":
             raise HTTPException(status_code=400, detail="Invalid plan ID")
-        
+
         plan = PLANS[request.plan_id]
         
         # Calculate price based on billing cycle
@@ -255,6 +310,8 @@ async def create_razorpay_order(
             "billing_cycle": request.billing_cycle
         }
         
+    except HTTPException:
+        raise
     except razorpay.errors.BadRequestError as e:
         raise HTTPException(status_code=400, detail=f"Razorpay error: {str(e)}")
     except Exception as e:

@@ -11,6 +11,15 @@ from app.vm.azure_runtime import (
     azure_service_principal,
     azure_subscription_id,
 )
+from app.provision.provision_config_options import (
+    azure_image_reference,
+    normalize_azure_os,
+)
+from app.vm.cluster_catalog import (
+    cluster_create_spec,
+    cluster_types,
+    cluster_vms as catalog_cluster_vms,
+)
 from app.vm.models import ClusterType
 from app.vm.ssh_manager import generate_ssh_keypair
 
@@ -20,28 +29,18 @@ ZENITH_TAG = "zenith_managed"
 CLUSTER_TAG = "zenith_cluster"
 
 AZURE_CLUSTER_VMS: dict[ClusterType, list[str]] = {
-    ClusterType.GENERAL: ["general-azure-vm-1", "general-azure-vm-2"],
-    ClusterType.STORAGE: ["storage-azure-vm-1", "storage-azure-vm-2"],
-    ClusterType.MEMORY: ["memory-azure-vm-1", "memory-azure-vm-2"],
-    ClusterType.PERFORMANCE: ["performance-azure-vm-1", "performance-azure-vm-2"],
-    ClusterType.AI_ML: ["ai-ml-azure-vm-1", "ai-ml-azure-vm-2"],
+    ct: catalog_cluster_vms("Azure", ct) for ct in cluster_types()
 }
 
-_CLUSTER_SIZES: dict[str, str] = {
-    "general": "Standard_B1s",
-    "storage": "Standard_B2s",
-    "memory": "Standard_B2s",
-    "performance": "Standard_B2ms",
-    "ai_ml": "Standard_B2ms",
-}
+# Burstable B-series SKUs are often capacity-blocked; try these next.
+_SIZE_FALLBACKS: tuple[str, ...] = (
+    "Standard_D2s_v3",
+    "Standard_D2s_v5",
+    "Standard_B2ms",
+    "Standard_B1ms",
+)
 
-_CLUSTER_DISK_GB: dict[str, int] = {
-    "general": 8,
-    "storage": 20,
-    "memory": 16,
-    "performance": 30,
-    "ai_ml": 40,
-}
+_AZURE_MIN_OS_DISK_GB = 30
 
 
 def _clients():
@@ -111,14 +110,62 @@ def _tags_dict(vm) -> dict[str, str]:
     return dict(vm.tags or {})
 
 
-def _get_subnet_id(network_client, rg: str) -> str:
+def _location_key(location: str) -> str:
+    return (location or "").lower().replace(" ", "")
+
+
+def _subnet_in_location(network_client, rg: str, location: str) -> Optional[str]:
+    """Return a subnet id in the target Azure region, if one exists."""
+    target = _location_key(location)
     for vnet in network_client.virtual_networks.list(rg):
+        if _location_key(vnet.location or "") != target:
+            continue
         for subnet in network_client.subnets.list(rg, vnet.name):
-            return subnet.id
-    raise ValueError(
-        f"No subnet in resource group '{rg}'. "
-        "Create a VNet/subnet or run Zenith Azure Terraform provision first."
+            if subnet.id:
+                return subnet.id
+    return None
+
+
+def _ensure_subnet_id(network_client, rg: str, location: str) -> str:
+    """
+    Resolve a subnet in the VM's target region.
+
+    Many subscriptions block Basic SKU public IPs; we also auto-create a small
+    VNet/subnet per region when the platform RG only has networking in one region.
+    """
+    existing = _subnet_in_location(network_client, rg, location)
+    if existing:
+        return existing
+
+    loc_key = _location_key(location)
+    vnet_name = f"zenith-vnet-{loc_key}"
+    subnet_name = "zenith-subnet"
+    logger.info(
+        "Creating Azure VNet '%s' and subnet in %s (resource group %s)",
+        vnet_name,
+        location,
+        rg,
     )
+    network_client.virtual_networks.begin_create_or_update(
+        rg,
+        vnet_name,
+        {
+            "location": location,
+            "address_space": {"address_prefixes": ["10.42.0.0/16"]},
+        },
+    ).result()
+    subnet = network_client.subnets.begin_create_or_update(
+        rg,
+        vnet_name,
+        subnet_name,
+        {"address_prefix": "10.42.1.0/24"},
+    ).result()
+    if not subnet.id:
+        raise ValueError(
+            f"Failed to create subnet in {location}. "
+            "Check Azure permissions for Microsoft.Network/virtualNetworks/write."
+        )
+    return subnet.id
 
 
 def _vm_by_name(compute_client, rg: str, name: str):
@@ -131,12 +178,17 @@ def _vm_by_name(compute_client, rg: str, name: str):
 def _nic_with_public_ip(network_client, rg: str, location: str, prefix: str):
     pip_name = f"{prefix}-pip"
     nic_name = f"{prefix}-nic"
-    subnet_id = _get_subnet_id(network_client, rg)
+    subnet_id = _ensure_subnet_id(network_client, rg, location)
 
+    # Basic SKU public IPs are blocked in many regions (quota 0); use Standard.
     pip = network_client.public_ip_addresses.begin_create_or_update(
         rg,
         pip_name,
-        {"location": location, "public_ip_allocation_method": "Dynamic"},
+        {
+            "location": location,
+            "sku": {"name": "Standard"},
+            "public_ip_allocation_method": "Static",
+        },
     ).result()
 
     nic = network_client.network_interfaces.begin_create_or_update(
@@ -217,7 +269,7 @@ def get_vm_details(name: str, zone: Optional[str] = None) -> Dict[str, Any]:
     if not vm:
         return {
             "name": name,
-            "status": "UNKNOWN",
+            "status": "NOT_PROVISIONED",
             "machine_type": "unknown",
             "zone": location,
             "external_ip": "N/A",
@@ -245,8 +297,9 @@ def create_vm(
     source_image: str = "",
     disk_size_gb: int = 8,
     labels: Optional[Dict[str, str]] = None,
+    *,
+    disk_type: str = "",
 ) -> Dict[str, Any]:
-    del source_image  # Azure uses publisher/offer/sku below
     compute_client, network_client = _clients()
     rg = azure_resource_group()
     location = azure_location()
@@ -271,22 +324,21 @@ def create_vm(
     nic = _nic_with_public_ip(network_client, rg, location, name)
     _, public_key = generate_ssh_keypair()
     computer_name = name.replace("-", "")[:15] or "zenithvm"
+    os_disk_gb = max(int(disk_size_gb), _AZURE_MIN_OS_DISK_GB)
+    storage_type = disk_type or "Standard_LRS"
 
-    vm_params = {
+    image_ref = azure_image_reference(
+        normalize_azure_os((source_image or "").strip() or "debian_12")
+    )
+    base_params = {
         "location": location,
         "tags": tags,
-        "hardware_profile": {"vm_size": machine_type},
         "storage_profile": {
-            "image_reference": {
-                "publisher": "Debian",
-                "offer": "debian-11",
-                "sku": "11",
-                "version": "latest",
-            },
+            "image_reference": image_ref,
             "os_disk": {
                 "create_option": "FromImage",
-                "disk_size_gb": disk_size_gb,
-                "managed_disk": {"storage_account_type": "Standard_LRS"},
+                "disk_size_gb": os_disk_gb,
+                "managed_disk": {"storage_account_type": storage_type},
             },
         },
         "os_profile": {
@@ -309,17 +361,71 @@ def create_vm(
         },
     }
 
-    logger.info(
-        "Creating Azure VM '%s' size '%s' in %s/%s",
-        name,
-        machine_type,
-        rg,
-        location,
-    )
-    poller = compute_client.virtual_machines.begin_create_or_update(rg, name, vm_params)
-    poller.result()
-    details = get_vm_details(name, location)
-    return {"name": name, "status": "RUNNING", "details": details}
+    last_exc: Optional[Exception] = None
+    for size in _vm_sizes_to_try(machine_type):
+        vm_params = {**base_params, "hardware_profile": {"vm_size": size}}
+        logger.info(
+            "Creating Azure VM '%s' size '%s' in %s/%s",
+            name,
+            size,
+            rg,
+            location,
+        )
+        try:
+            poller = compute_client.virtual_machines.begin_create_or_update(
+                rg, name, vm_params
+            )
+            poller.result()
+            details = get_vm_details(name, location)
+            return {"name": name, "status": "RUNNING", "details": details}
+        except Exception as exc:
+            last_exc = exc
+            if _is_sku_unavailable(exc):
+                logger.warning(
+                    "Azure size %s unavailable in %s for %s; trying fallback",
+                    size,
+                    location,
+                    name,
+                )
+                continue
+            _cleanup_nic_resources(network_client, rg, name)
+            raise _azure_error("create VM", exc) from exc
+
+    _cleanup_nic_resources(network_client, rg, name)
+    raise _azure_error("create VM", last_exc or RuntimeError("No VM size available"))
+
+
+def _cleanup_nic_resources(network_client, rg: str, prefix: str) -> None:
+    for suffix, deleter in (
+        ("-nic", network_client.network_interfaces.begin_delete),
+        ("-pip", network_client.public_ip_addresses.begin_delete),
+    ):
+        try:
+            deleter(rg, f"{prefix}{suffix}").result()
+        except Exception:
+            pass
+
+
+def _azure_error(action: str, exc: Exception) -> ValueError:
+    message = getattr(exc, "message", None) or str(exc)
+    return ValueError(f"Azure failed to {action}: {message}")
+
+
+def _is_sku_unavailable(exc: Exception) -> bool:
+    code = getattr(exc, "error", None)
+    if code is not None:
+        inner = getattr(code, "code", None) or (code if isinstance(code, str) else "")
+        if str(inner) == "SkuNotAvailable":
+            return True
+    return "SkuNotAvailable" in str(exc)
+
+
+def _vm_sizes_to_try(machine_type: str) -> List[str]:
+    sizes: List[str] = []
+    for candidate in (machine_type, *_SIZE_FALLBACKS):
+        if candidate and candidate not in sizes:
+            sizes.append(candidate)
+    return sizes
 
 
 def start_vm(name: str) -> Dict[str, Any]:
@@ -352,26 +458,25 @@ def delete_vm(name: str) -> Dict[str, Any]:
     rg = azure_resource_group()
     vm = _vm_by_name(compute_client, rg, name)
     if not vm:
+        _cleanup_nic_resources(network_client, rg, name)
         return {"name": name, "status": "DELETED"}
-    compute_client.virtual_machines.begin_delete(rg, name).result()
-    for suffix in ("-nic", "-pip"):
-        resource = f"{name}{suffix}"
-        try:
-            if suffix == "-nic":
-                network_client.network_interfaces.begin_delete(rg, resource).result()
-            else:
-                network_client.public_ip_addresses.begin_delete(rg, resource).result()
-        except Exception:
-            pass
+    logger.info("Deleting Azure VM '%s' in resource group %s", name, rg)
+    poller = compute_client.virtual_machines.begin_delete(
+        rg,
+        name,
+        force_deletion=True,
+    )
+    poller.result()
+    _cleanup_nic_resources(network_client, rg, name)
     return {"name": name, "status": "DELETED"}
 
 
-def cluster_machine_type(cluster_type: ClusterType) -> str:
-    return _CLUSTER_SIZES.get(cluster_type.value, "Standard_B1s")
+def cluster_machine_type(cluster_type: ClusterType, slot_id: Optional[str] = None) -> str:
+    return cluster_create_spec("Azure", cluster_type, slot_id).machine_type
 
 
-def cluster_disk_gb(cluster_type: ClusterType) -> int:
-    return _CLUSTER_DISK_GB.get(cluster_type.value, 8)
+def cluster_disk_gb(cluster_type: ClusterType, slot_id: Optional[str] = None) -> int:
+    return cluster_create_spec("Azure", cluster_type, slot_id).disk_gb
 
 
 def azure_configured() -> bool:

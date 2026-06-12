@@ -1,6 +1,15 @@
-import React, { useCallback, useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
+import {
+  FaTimes,
+  FaQuestionCircle,
+  FaDollarSign,
+  FaWrench,
+  FaUser,
+  FaEllipsisH,
+  FaPaperPlane,
+} from 'react-icons/fa';
 import api from '../api';
 import PageHeader from '../components/ui/PageHeader.jsx';
 import { usePageRefresh } from '../hooks/usePageRefresh.js';
@@ -8,13 +17,17 @@ import SupportThreadPanel from '../components/support/SupportThreadPanel.jsx';
 import { useSupportThreadPoll } from '../hooks/useSupportThreadPoll.js';
 import { useSupportThreadWs } from '../hooks/useSupportThreadWs.js';
 import { formatDateTime, statusLabel } from '../utils/supportFormat.js';
+import { PATHS } from '../data/productFacts.js';
 import '../styles/support-tickets.css';
 
+const MESSAGE_MAX = 8000;
+
 const CATEGORIES = [
-  { value: 'general', label: 'General' },
-  { value: 'billing', label: 'Billing' },
-  { value: 'technical', label: 'Technical' },
-  { value: 'account', label: 'Account' },
+  { value: 'general', label: 'General', icon: FaQuestionCircle, hint: 'Platform questions' },
+  { value: 'billing', label: 'Billing', icon: FaDollarSign, hint: 'Plans & payments' },
+  { value: 'technical', label: 'Technical', icon: FaWrench, hint: 'Bugs & cloud issues' },
+  { value: 'account', label: 'Account', icon: FaUser, hint: 'Login & profile' },
+  { value: 'others', label: 'Others', icon: FaEllipsisH, hint: 'Anything else' },
 ];
 
 function SupportPage() {
@@ -27,7 +40,23 @@ function SupportPage() {
   const [showNewTicket, setShowNewTicket] = useState(searchParams.get('new') === '1');
   const [newTicket, setNewTicket] = useState({ category: 'general', subject: '', body: '' });
   const [creating, setCreating] = useState(false);
+  const messageRef = useRef(null);
   const { runPageRefresh, pageRefreshing } = usePageRefresh();
+
+  const closeNewTicket = useCallback(() => {
+    setShowNewTicket(false);
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.delete('new');
+      return next;
+    }, { replace: true });
+  }, [setSearchParams]);
+
+  useEffect(() => {
+    if (showNewTicket && messageRef.current) {
+      messageRef.current.focus();
+    }
+  }, [showNewTicket]);
 
   const fetchTickets = useCallback(async () => {
     setLoadingList(true);
@@ -119,7 +148,7 @@ function SupportPage() {
         body: newTicket.body.trim(),
       });
       const ref = res.data?.ticket?.reference_code;
-      setShowNewTicket(false);
+      closeNewTicket();
       setNewTicket({ category: 'general', subject: '', body: '' });
       await fetchTickets();
       if (ref) {
@@ -137,6 +166,8 @@ function SupportPage() {
 
   const ticket = thread?.ticket;
   const messages = thread?.messages || [];
+  const bodyLength = newTicket.body.length;
+  const canSubmit = newTicket.body.trim().length > 0 && !creating;
 
   return (
     <div className="support-dashboard-page">
@@ -151,6 +182,8 @@ function SupportPage() {
             onClick={() => {
               setShowNewTicket(true);
               setSearchParams({ new: '1' }, { replace: true });
+              setSelectedRef('');
+              setThread(null);
             }}
           >
             New ticket
@@ -175,47 +208,121 @@ function SupportPage() {
       />
 
       {showNewTicket && (
-        <form className="support-card support-new-ticket-form" onSubmit={handleCreateTicket}>
-          <h3>Create a support ticket</h3>
-          <label htmlFor="support-category">Category</label>
-          <select
-            id="support-category"
-            value={newTicket.category}
-            onChange={(e) => setNewTicket((f) => ({ ...f, category: e.target.value }))}
-          >
-            {CATEGORIES.map((c) => (
-              <option key={c.value} value={c.value}>
-                {c.label}
-              </option>
-            ))}
-          </select>
-          <label htmlFor="support-subject">Subject (optional)</label>
-          <input
-            id="support-subject"
-            type="text"
-            value={newTicket.subject}
-            onChange={(e) => setNewTicket((f) => ({ ...f, subject: e.target.value }))}
-            placeholder="Brief summary"
-            maxLength={120}
-          />
-          <label htmlFor="support-body">Message</label>
-          <textarea
-            id="support-body"
-            rows={5}
-            value={newTicket.body}
-            onChange={(e) => setNewTicket((f) => ({ ...f, body: e.target.value }))}
-            placeholder="Describe your issue…"
-            required
-          />
-          <div className="support-new-ticket-actions">
-            <button type="button" className="support-btn support-btn--ghost" onClick={() => setShowNewTicket(false)}>
-              Cancel
-            </button>
-            <button type="submit" className="support-btn" disabled={creating}>
-              {creating ? 'Creating…' : 'Submit ticket'}
-            </button>
-          </div>
-        </form>
+        <section className="support-new-ticket-panel zenith-page-enter" aria-labelledby="support-new-ticket-title">
+          <form className="support-new-ticket-form" onSubmit={handleCreateTicket}>
+            <header className="support-new-ticket-header">
+              <div>
+                <p className="support-new-ticket-kicker">New conversation</p>
+                <h2 id="support-new-ticket-title" className="support-new-ticket-title">
+                  Create a support ticket
+                </h2>
+                <p className="support-new-ticket-lead">
+                  We typically reply within one business day. You&apos;ll get a reference code and can follow up here.
+                </p>
+              </div>
+              <button
+                type="button"
+                className="support-new-ticket-close"
+                onClick={closeNewTicket}
+                aria-label="Close new ticket form"
+              >
+                <FaTimes aria-hidden />
+              </button>
+            </header>
+
+            <fieldset className="support-new-ticket-fieldset">
+              <legend className="support-new-ticket-legend">What do you need help with?</legend>
+              <div className="support-category-grid" role="radiogroup" aria-label="Ticket category">
+                {CATEGORIES.map(({ value, label, icon: Icon, hint }) => (
+                  <button
+                    key={value}
+                    type="button"
+                    role="radio"
+                    aria-checked={newTicket.category === value}
+                    className={`support-category-chip ${newTicket.category === value ? 'is-active' : ''}`}
+                    onClick={() => setNewTicket((f) => ({ ...f, category: value }))}
+                  >
+                    <span className="support-category-chip__icon" aria-hidden>
+                      <Icon />
+                    </span>
+                    <span className="support-category-chip__text">
+                      <span className="support-category-chip__label">{label}</span>
+                      <span className="support-category-chip__hint">{hint}</span>
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </fieldset>
+
+            <div className="support-new-ticket-row">
+              <div className="support-form-field support-form-field--grow">
+                <label htmlFor="support-subject">Subject</label>
+                <input
+                  id="support-subject"
+                  type="text"
+                  className="support-field-input"
+                  value={newTicket.subject}
+                  onChange={(e) => setNewTicket((f) => ({ ...f, subject: e.target.value }))}
+                  placeholder="e.g. Invoice question for March"
+                  maxLength={120}
+                  autoComplete="off"
+                />
+                <span className="support-field-hint">Optional — helps us route your ticket faster</span>
+              </div>
+            </div>
+
+            <div className="support-form-field">
+              <div className="support-form-field__label-row">
+                <label htmlFor="support-body">Message</label>
+                <span
+                  className={`support-char-count ${bodyLength > MESSAGE_MAX * 0.9 ? 'is-warn' : ''}`}
+                  aria-live="polite"
+                >
+                  {bodyLength.toLocaleString()} / {MESSAGE_MAX.toLocaleString()}
+                </span>
+              </div>
+              <textarea
+                id="support-body"
+                ref={messageRef}
+                className="support-field-textarea"
+                rows={6}
+                value={newTicket.body}
+                onChange={(e) =>
+                  setNewTicket((f) => ({
+                    ...f,
+                    body: e.target.value.slice(0, MESSAGE_MAX),
+                  }))
+                }
+                placeholder="Describe what happened, what you expected, and any error messages you saw…"
+                required
+                maxLength={MESSAGE_MAX}
+              />
+            </div>
+
+            <footer className="support-new-ticket-footer">
+              <p className="support-new-ticket-footer-note">
+                Billing questions? See{' '}
+                <Link to="/help?topic=billing" className="support-inline-link">
+                  billing help
+                </Link>{' '}
+                or check{' '}
+                <Link to={PATHS.billing} className="support-inline-link">
+                  your account billing
+                </Link>
+                .
+              </p>
+              <div className="support-new-ticket-actions">
+                <button type="button" className="support-btn support-btn--ghost" onClick={closeNewTicket}>
+                  Cancel
+                </button>
+                <button type="submit" className="support-btn support-btn--primary" disabled={!canSubmit}>
+                  <FaPaperPlane aria-hidden />
+                  {creating ? 'Submitting…' : 'Submit ticket'}
+                </button>
+              </div>
+            </footer>
+          </form>
+        </section>
       )}
 
       {loadingList ? (

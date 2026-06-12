@@ -33,6 +33,8 @@ import { usePageRefresh } from "../hooks/usePageRefresh.js";
 import { useCountUp } from "../hooks/useCountUp.js";
 import { DashboardSkeleton } from "../components/Skeletons.jsx";
 import { PATHS } from "../data/productFacts.js";
+import { usePlanEntitlementsContext } from "../context/PlanEntitlementsContext.jsx";
+import { Link } from "react-router-dom";
 import '../styles/dashboard-enhanced.css';
 
 const getGreeting = () => {
@@ -59,6 +61,7 @@ function platformStatusLabel(data) {
 
 function DashboardPage() {
   const { token, user } = useAuth();
+  const { isFeatureEnabled, limits: planLimits } = usePlanEntitlementsContext();
   const { formatCurrency, formatDateFriendly, currencySymbol } = usePreferences();
   const navigate = useNavigate();
   const notifications = useNotifications();
@@ -78,6 +81,7 @@ function DashboardPage() {
   const [platformStatus, setPlatformStatus] = useState(null);
   const [billingStatus, setBillingStatus] = useState(null);
   const [teamOrg, setTeamOrg] = useState(null);
+  const [teamSummary, setTeamSummary] = useState(null);
   const [attention, setAttention] = useState({ anomalies: 0, tickets: 0 });
 
   const greeting = useMemo(getGreeting, []);
@@ -88,11 +92,10 @@ function DashboardPage() {
   const animatedAlerts = useCountUp(stats?.security_alerts || 0, 800);
 
   const storageCapTb = useMemo(() => {
-    const vmLimit = subscription?.vm_limit || 2;
-    const storageGb = subscription?.storage_gb || 10;
-    const totalGb = vmLimit * storageGb;
-    return Math.max(totalGb / 1024, 0.01);
-  }, [subscription]);
+    const storageGb =
+      planLimits?.storage_gb ?? subscription?.storage_gb ?? 10;
+    return Math.max(storageGb / 1024, 0.01);
+  }, [subscription, planLimits]);
 
   const storagePercentage = useMemo(() => {
     if (!stats) return 0;
@@ -128,57 +131,61 @@ function DashboardPage() {
   const fetchDashboardData = useCallback(async () => {
     if (!token) return;
 
-    setIsLoading(true);
     setError(null);
 
     try {
-      const [statsData] = await Promise.all([
-        getDashboardStats(token),
-      ]);
-      setStats(statsData);
-      setCostByProvider(statsData.cost_by_provider || {});
-
-      if (statsData.vm_health) {
-        setVmHealth(statsData.vm_health);
-      }
-
       const parallel = await Promise.allSettled([
+        getDashboardStats(token),
         apiClient.get('/budgets/status'),
         apiClient.get('/dashboard/recent-activity?limit=6'),
         apiClient.get('/payments/my-subscription'),
         fetch(apiUrl('/platform/status')),
         apiClient.get('/cost/billing-status'),
         apiClient.get('/organizations/me'),
+        apiClient.get('/organizations/summary'),
         apiClient.get('/cost/anomalies/summary'),
         apiClient.get('/support/tickets'),
         loadCostTrend(),
       ]);
 
       if (parallel[0].status === 'fulfilled') {
-        setBudgets((parallel[0].value.data || []).slice(0, 3));
+        const statsData = parallel[0].value;
+        setStats(statsData);
+        setCostByProvider(statsData.cost_by_provider || {});
+        if (statsData.vm_health) {
+          setVmHealth(statsData.vm_health);
+        }
       }
       if (parallel[1].status === 'fulfilled') {
-        setRecentActivity(parallel[1].value.data || []);
+        setBudgets((parallel[1].value.data || []).slice(0, 3));
       }
       if (parallel[2].status === 'fulfilled') {
-        setSubscription(parallel[2].value.data);
+        setRecentActivity(parallel[2].value.data || []);
       }
-      if (parallel[3].status === 'fulfilled' && parallel[3].value.ok) {
-        setPlatformStatus(await parallel[3].value.json());
+      if (parallel[3].status === 'fulfilled') {
+        setSubscription(parallel[3].value.data);
       }
-      if (parallel[4].status === 'fulfilled') {
-        setBillingStatus(parallel[4].value.data);
+      if (parallel[4].status === 'fulfilled' && parallel[4].value.ok) {
+        setPlatformStatus(await parallel[4].value.json());
       }
       if (parallel[5].status === 'fulfilled') {
-        setTeamOrg(parallel[5].value.data);
+        setBillingStatus(parallel[5].value.data);
+      }
+      if (parallel[6].status === 'fulfilled') {
+        setTeamOrg(parallel[6].value.data);
+      }
+      if (parallel[7].status === 'fulfilled') {
+        setTeamSummary(parallel[7].value.data);
+      } else {
+        setTeamSummary(null);
       }
       const anomalyCount =
-        parallel[6].status === 'fulfilled'
-          ? parallel[6].value.data?.unacknowledged || 0
+        parallel[8].status === 'fulfilled'
+          ? parallel[8].value.data?.total_unacknowledged || 0
           : 0;
       const ticketCount =
-        parallel[7].status === 'fulfilled'
-          ? (parallel[7].value.data?.tickets || []).filter((t) => t.status === 'open').length
+        parallel[9].status === 'fulfilled'
+          ? (parallel[9].value.data?.tickets || []).filter((t) => t.status === 'open').length
           : 0;
       setAttention({
         anomalies: anomalyCount,
@@ -296,6 +303,15 @@ function DashboardPage() {
         />
       </div>
 
+      {!isFeatureEnabled('live_billing') && (
+        <div className="dashboard-demo-banner" role="status">
+          <span>
+            You are on the Free plan — cost charts use demo sample data. Upgrade for live billing across your clouds.
+          </span>
+          <Link to={PATHS.pricing}>View plans</Link>
+        </div>
+      )}
+
       {hasAttention && (
         <div className="dashboard-attention-strip" role="status">
           <span className="dashboard-attention-strip__label">Needs attention</span>
@@ -317,7 +333,7 @@ function DashboardPage() {
         </div>
       )}
 
-      {offlineProviders.length > 0 && !billingStatus?.demo_mode && (
+      {isFeatureEnabled('live_billing') && offlineProviders.length > 0 && !billingStatus?.demo_mode && (
         <div className="dashboard-setup-card bento-card" data-type="costs">
           <h3 className="card-title">Cloud billing setup</h3>
           <p className="card-subtitle">
@@ -457,7 +473,7 @@ function DashboardPage() {
           </button>
         </StatCard>
 
-        {budgets.length > 0 && (
+        {isFeatureEnabled('live_billing') && budgets.length > 0 && (
           <div className="bento-card size-sm" data-type="costs">
             <div className="stat-card-header">
               <div className="stat-icon"><IconBarChart /></div>
@@ -488,6 +504,9 @@ function DashboardPage() {
               <p className="card-value" style={{ fontSize: '1.1rem' }}>{teamOrg.organization.name}</p>
               <p className="card-subtitle">
                 {teamOrg.members?.length || 0} member{(teamOrg.members?.length || 0) !== 1 ? 's' : ''} · your role: {teamOrg.my_role}
+                {teamSummary?.org_totals?.monthly_spend_usd != null && (
+                  <> · org spend ${teamSummary.org_totals.monthly_spend_usd.toFixed(2)}/mo</>
+                )}
               </p>
             </div>
             <button type="button" className="view-details-btn" onClick={() => navigate(PATHS.team)}>

@@ -72,6 +72,9 @@ class ProvisionConfig(BaseModel):
     enable_firestore: bool = False
     machine_type: str = "e2-micro"
     service_account_id: str = "zenith-app-sa"
+    gce_os: str = "debian_12"
+    gce_startup_script: str = ""
+    gcp_sa_preset: str = "gcs_read_only"
     firestore_database_id: str = "(default)"
 
     # Azure
@@ -85,6 +88,9 @@ class ProvisionConfig(BaseModel):
     enable_azure_monitor: bool = False
     enable_cosmos: bool = False
     vm_size: str = "Standard_B1s"
+    azure_os: str = "ubuntu_22_04"
+    azure_startup_script: str = ""
+    azure_identity_preset: str = "storage_blob_read"
     cosmos_account_name: str = ""
     cosmos_database_name: str = "zenith-db"
 
@@ -105,6 +111,8 @@ class ProvisionConfig(BaseModel):
     instance_type: str = "t2.micro"
     instance_name: str = "main-instance"
     ami_id: str = ""
+    ec2_os: str = "amazon_linux_2"
+    ec2_user_data: str = ""
 
     # S3 config
     bucket_name: str = ""
@@ -118,6 +126,7 @@ class ProvisionConfig(BaseModel):
 
     # IAM config
     role_name: str = "app-role"
+    iam_role_preset: str = "s3_read_only"
 
     # CloudWatch config
     alarm_email: str = ""
@@ -167,6 +176,7 @@ class PolicyCheckResult(BaseModel):
 class IntentAnalyzeBody(BaseModel):
     workload_description: str = Field(..., min_length=1)
     follow_up_answers: Optional[dict[str, str]] = None
+    csp: Optional[str] = Field(default="AWS", description="Cloud for module suggestions (AWS/GCP/Azure)")
 
 
 class CompareCloudsBody(BaseModel):

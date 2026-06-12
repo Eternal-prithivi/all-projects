@@ -4,13 +4,24 @@
 // =============================================================================
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { FaQuestionCircle, FaUserShield } from 'react-icons/fa';
+import { FaLock, FaQuestionCircle, FaUserShield } from 'react-icons/fa';
 import { DASHBOARD_NAV_ITEMS } from '../../config/dashboardNavConfig.jsx';
+import { usePlanEntitlementsContext } from '../../context/PlanEntitlementsContext.jsx';
 import '../../styles/sidebar.css';
 import ZenithLogo from '../brand/ZenithLogo.jsx';
 
 function Sidebar({ user }) {
+  const { isNavLocked, openUpgradeDrawer } = usePlanEntitlementsContext();
   const userInitial = user && user.username ? user.username.charAt(0).toUpperCase() : '?';
+
+  const handleNavClick = (event, item) => {
+    const lockId = item.navLockId || item.navId;
+    if (!lockId || !item.lockNavBlock || !isNavLocked(lockId)) {
+      return;
+    }
+    event.preventDefault();
+    openUpgradeDrawer(lockId);
+  };
 
   return (
     <aside className="nav-rail nav-rail--desktop" role="navigation" aria-label="Main navigation">
@@ -20,20 +31,34 @@ function Sidebar({ user }) {
 
       <nav className="rail-nav" data-tour="sidebar-nav">
         <ul role="menu">
-          {DASHBOARD_NAV_ITEMS.map((item) => (
-            <li key={item.to} role="none">
-              <NavLink
-                to={item.to}
-                end={item.end}
-                role="menuitem"
-                aria-label={item.label}
-                className={({ isActive }) => `rail-link ${isActive ? 'active' : ''}`}
-              >
-                <span className="rail-link-icon">{item.icon}</span>
-                <span className="rail-link-label">{item.label}</span>
-              </NavLink>
-            </li>
-          ))}
+          {DASHBOARD_NAV_ITEMS.map((item) => {
+            const lockId = item.navLockId || item.navId;
+            const locked = lockId ? isNavLocked(lockId) : false;
+            const showLockBadge = locked && !item.lockNavBlock;
+
+            return (
+              <li key={item.to} role="none">
+                <NavLink
+                  to={item.to}
+                  end={item.end}
+                  role="menuitem"
+                  aria-label={item.label}
+                  className={({ isActive }) =>
+                    `rail-link ${isActive ? 'active' : ''} ${locked && item.lockNavBlock ? 'rail-link--locked' : ''}`
+                  }
+                  onClick={(e) => handleNavClick(e, item)}
+                >
+                  <span className="rail-link-icon">{item.icon}</span>
+                  <span className="rail-link-label">{item.label}</span>
+                  {showLockBadge && (
+                    <span className="rail-link-lock" title="Upgrade for full access">
+                      <FaLock aria-hidden />
+                    </span>
+                  )}
+                </NavLink>
+              </li>
+            );
+          })}
         </ul>
       </nav>
 

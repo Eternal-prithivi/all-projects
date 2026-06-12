@@ -14,7 +14,8 @@ async def get_cloud_availability(user: User = Depends(get_current_user)):
     """
     Drives CSP selectors across Storage, Security, VM, Provision, and Cost.
 
-    - **BYOC mode** (any cloud connected): only connected providers.
-    - **Platform mode** (no BYOC): all providers Zenith has configured in .env.
+    Hybrid union of BYOC-connected and platform-configured CSPs. When BYOC is
+    connected but credentials are incomplete (e.g. Azure storage-only), the CSP
+    appears under ``locked_providers`` for features that are not yet ready.
     """
     return build_availability_payload(user.username)

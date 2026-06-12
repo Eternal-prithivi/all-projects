@@ -6,12 +6,7 @@ import BucketRegionSelector from "../BucketRegionSelector";
 import GcpBucketSelector from "../GcpBucketSelector";
 import AzureContainerSelector from "../AzureContainerSelector";
 import "../../styles/security-page.css";
-
-const CSP_ICONS = {
-  AWS: "/images/aws.png",
-  GCP: "/images/google-cloud_logo.png",
-  Azure: "/images/Microsoft_Azure.png",
-};
+import CloudProviderLogo from "../cloud/CloudProviderLogo.jsx";
 
 function sourceLabel(source) {
   return source === "byoc" ? "Your account (BYOC)" : "Zenith platform";
@@ -37,8 +32,8 @@ function VaultDestinationCards({ showProviders, targets }) {
         return (
           <article key={csp} className="security-vault-summary-card">
             <div className="security-vault-summary-card-head">
-              <img
-                src={CSP_ICONS[csp]}
+              <CloudProviderLogo
+                provider={csp}
                 alt=""
                 width={22}
                 height={22}

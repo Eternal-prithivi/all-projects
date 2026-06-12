@@ -1,6 +1,6 @@
 # Cloud Credential Contract
 
-**Last updated:** 2026-06-03 (Phase 7)  
+**Last updated:** 2026-06-12 (BYOC capability model)  
 **Setup guide:** [../setup/CLOUD_CREDENTIAL_SETUP_GUIDE.md](../setup/CLOUD_CREDENTIAL_SETUP_GUIDE.md)  
 **Env template:** `backend/.env.example`
 
@@ -16,9 +16,39 @@ Provider strings in APIs should use canonical form **`AWS`**, **`GCP`**, **`Azur
 
 Example: AWS BYOC only → user can still upload to GCP/Azure using **Zenith platform** keys; AWS uploads use **their** BYOC.
 
-UI pages use this endpoint. Backend returns **403** if a CSP is neither connected nor platform-available.
+UI pages use this endpoint. Backend returns **403** if a CSP is neither connected nor platform-available. When BYOC is connected but credentials are incomplete for a feature, the CSP appears under `locked_providers` with `setup_gaps` (e.g. `azure_sp_missing`, `gcp_billing_export_missing`).
 
 `GET /byoc/storage-targets` returns per-provider bucket/container paths with `credential_source: byoc | platform`.
+
+### BYOC capability model (`app/byoc/capabilities.py`)
+
+Instant connect does **not** unlock every feature. Per `(username, csp)`:
+
+| CSP | storage / security | vm / provision | cost |
+|-----|-------------------|----------------|------|
+| **AWS** | access keys or assumed IAM role | same | same (Cost Explorer) |
+| **GCP** | service account JSON | same | SA + BigQuery billing dataset/table |
+| **Azure** | storage account + key | subscription + tenant + client_id + secret | same SP fields |
+
+APIs:
+
+- `GET /api/byoc/status` — `capabilities` per CSP + `unlocked_features`
+- `PATCH /api/byoc/azure/compute` — extend storage-only Azure with service principal
+- `PATCH /api/byoc/gcp/billing` — add billing export IDs post-connect
+- `GET /api/organizations/members/cloud-status` — team admin view (no secrets)
+
+Plan gate: **Pro, Enterprise** (via plan entitlements).
+
+### Tier 1 vs Tier 2 (optional at connect)
+
+| Tier | GCP | Azure |
+|------|-----|-------|
+| **Tier 1 (required)** | Service account + buckets | Storage account + containers |
+| **Tier 2 (recommended, skippable)** | BigQuery billing dataset + table | Service principal (sub, tenant, client, secret) |
+| **Works after Tier 1 only** | Storage, Security, VM, Provision | Storage, Security |
+| **Blocked until Tier 2** | Cost | VM, Provision, Cost |
+
+See [BYOC_OPTIONAL_SETUP.md](./BYOC_OPTIONAL_SETUP.md) for user-facing setup steps.
 
 ---
 

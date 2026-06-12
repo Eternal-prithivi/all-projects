@@ -85,6 +85,8 @@ subscriptions_collection = DB["subscriptions"]
 # Zenith's AWS Account ID — needed for IAM Role trust policy
 ZENITH_AWS_ACCOUNT_ID = "412628362844"
 
+BYOC_ELIGIBLE_PLANS = ("pro", "enterprise")
+
 # --- IAM Policy Templates ---
 IAM_POLICY_TEMPLATES = {
     "AWS": {
@@ -284,6 +286,19 @@ class AzureContainersDiscoverRequest(BaseModel):
     account_key: str = Field(..., min_length=1)
 
 
+class AzureComputeExtendRequest(BaseModel):
+    """Extend storage-only Azure BYOC with service principal for compute/cost."""
+    subscription_id: str = Field(..., min_length=1)
+    tenant_id: str = Field(..., min_length=1)
+    client_id: str = Field(..., min_length=1)
+    client_secret: str = Field(..., min_length=1)
+
+
+class GcpBillingPatchRequest(BaseModel):
+    billing_dataset_id: str = Field(..., min_length=1)
+    billing_table_id: str = Field(..., min_length=1)
+
+
 class BYOCCheckGcpBucketRequest(BaseModel):
     service_account_json: str
     bucket_name: str
@@ -477,21 +492,95 @@ def _save_azure_byoc_record(
 # --- Helper: Check plan eligibility ---
 
 def check_byoc_eligibility(username: str):
-    """Check if user's plan supports BYOC (Pro or Enterprise only)."""
+    """Check if user's plan supports BYOC (Pro and Enterprise)."""
+    from app.payments.plan_entitlements import require_feature
+
+    require_feature(username, "byoc")
     from app.payments.subscription_service import get_effective_plan_id
 
     plan = get_effective_plan_id(username)
-    
-    if plan not in ("pro", "enterprise"):
+
+    if plan not in BYOC_ELIGIBLE_PLANS:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail={
-                "message": "BYOC is available for Pro and Enterprise plans only.",
+                "message": "BYOC is available on Pro and Enterprise plans.",
                 "current_plan": plan,
-                "upgrade_required": True
-            }
+                "upgrade_required": True,
+            },
         )
     return plan
+
+
+def _merge_gcp_billing_tier2(credentials: dict, dataset_id: Optional[str], table_id: Optional[str]) -> dict:
+    """All-or-nothing: only persist billing export IDs when both are provided."""
+    ds = (dataset_id or "").strip()
+    tb = (table_id or "").strip()
+    if ds and tb:
+        credentials["billing_dataset_id"] = ds
+        credentials["billing_table_id"] = tb
+    elif ds or tb:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "code": "gcp_billing_export_incomplete",
+                "message": "Provide both billing dataset ID and table ID, or leave both blank to connect storage only.",
+                "action": "settings_byoc_gcp_billing",
+            },
+        )
+    return credentials
+
+
+def _merge_azure_sp_tier2(
+    credentials: dict,
+    subscription_id: Optional[str],
+    tenant_id: Optional[str],
+    client_id: Optional[str],
+    client_secret: Optional[str],
+) -> dict:
+    """All-or-nothing: only persist SP when all four fields are provided."""
+    fields = {
+        "subscription_id": (subscription_id or "").strip(),
+        "tenant_id": (tenant_id or "").strip(),
+        "client_id": (client_id or "").strip(),
+        "client_secret": (client_secret or "").strip(),
+    }
+    if all(fields.values()):
+        cost_ok, cost_msg = _verify_azure_cost_management(
+            fields["subscription_id"],
+            fields["tenant_id"],
+            fields["client_id"],
+            fields["client_secret"],
+        )
+        if not cost_ok:
+            raise HTTPException(status_code=400, detail=cost_msg)
+        credentials.update(fields)
+    elif any(fields.values()):
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "code": "azure_sp_incomplete",
+                "message": "Provide all service principal fields, or leave them blank to connect storage only.",
+                "action": "settings_byoc_azure_compute",
+            },
+        )
+    return credentials
+
+
+def _byoc_connect_extras(username: str, csp: str) -> dict:
+    """Capabilities payload for connect/status responses (no secrets)."""
+    from app.byoc.capabilities import build_byoc_capabilities_payload
+    from app.cloud.providers import normalize_provider_key
+
+    key = normalize_provider_key(csp)
+    entry = build_byoc_capabilities_payload(username).get(key, {})
+    gaps = entry.get("gaps") or []
+    return {
+        "capabilities": entry.get("features") or {},
+        "unlocked_features": entry.get("unlocked_features") or [],
+        "setup_gaps": gaps,
+        "next_steps": [g["message"] for g in gaps[:2]],
+    }
 
 
 # --- Helper: Test credentials ---
@@ -623,11 +712,21 @@ async def get_status(user: User = Depends(get_current_user)):
 
     plan = get_effective_plan_id(user.username)
 
+    from app.byoc.capabilities import build_byoc_capabilities_payload
+
     return {
-        "eligible": plan in ("pro", "enterprise"),
+        "eligible": plan in BYOC_ELIGIBLE_PLANS,
         "current_plan": plan,
-        "connections": status_data
+        "connections": status_data,
+        "capabilities": build_byoc_capabilities_payload(user.username),
     }
+
+
+@router.get("/setup-guides", summary="BYOC Tier 2 setup guides (GCP billing, Azure SP)")
+async def get_setup_guides(user: User = Depends(get_current_user)):
+    from app.cost.billing_config import build_byoc_setup_guides_payload
+
+    return build_byoc_setup_guides_payload()
 
 
 @router.get("/storage-targets", summary="Where Storage and Security files are stored")
@@ -1200,6 +1299,7 @@ async def connect_cloud(request: BYOCConnectRequest, user: User = Depends(get_cu
             "replica_region": replica_region,
             "secure_dual_write": request.secure_dual_write,
             "bucket_name": storage_bucket,
+            **_byoc_connect_extras(user.username, "AWS"),
         }
     
     elif csp == "GCP":
@@ -1254,10 +1354,11 @@ async def connect_cloud(request: BYOCConnectRequest, user: User = Depends(get_cu
             raise HTTPException(status_code=400, detail=test_result.message)
 
         credentials_to_encrypt = {"service_account_json": request.service_account_json}
-        if request.gcp_billing_dataset_id:
-            credentials_to_encrypt["billing_dataset_id"] = request.gcp_billing_dataset_id.strip()
-        if request.gcp_billing_table_id:
-            credentials_to_encrypt["billing_table_id"] = request.gcp_billing_table_id.strip()
+        credentials_to_encrypt = _merge_gcp_billing_tier2(
+            credentials_to_encrypt,
+            request.gcp_billing_dataset_id,
+            request.gcp_billing_table_id,
+        )
 
         _save_gcp_byoc_record(
             user,
@@ -1279,6 +1380,11 @@ async def connect_cloud(request: BYOCConnectRequest, user: User = Depends(get_cu
         connect_message = "GCP account connected. Storage and Security will use your buckets."
         if bucket_message and "Created" in bucket_message:
             connect_message = f"{connect_message} {bucket_message}"
+        extras = _byoc_connect_extras(user.username, "GCP")
+        if not extras["capabilities"].get("cost"):
+            extras["next_steps"].append(
+                "Add BigQuery billing export dataset and table IDs in Settings to unlock Cost."
+            )
         return {
             "success": True,
             "message": connect_message,
@@ -1290,6 +1396,7 @@ async def connect_cloud(request: BYOCConnectRequest, user: User = Depends(get_cu
             "gcp_replica_location": replica_location,
             "secure_dual_write": request.secure_dual_write,
             "bucket_name": storage_bucket,
+            **extras,
         }
 
     elif csp == "AZURE":
@@ -1349,14 +1456,13 @@ async def connect_cloud(request: BYOCConnectRequest, user: User = Depends(get_cu
             "account_name": request.account_name,
             "account_key": request.account_key,
         }
-        for field, key in (
-            (request.azure_subscription_id, "subscription_id"),
-            (request.azure_tenant_id, "tenant_id"),
-            (request.azure_client_id, "client_id"),
-            (request.azure_client_secret, "client_secret"),
-        ):
-            if field:
-                credentials_to_encrypt[key] = field.strip()
+        credentials_to_encrypt = _merge_azure_sp_tier2(
+            credentials_to_encrypt,
+            request.azure_subscription_id,
+            request.azure_tenant_id,
+            request.azure_client_id,
+            request.azure_client_secret,
+        )
 
         _save_azure_byoc_record(
             user,
@@ -1376,6 +1482,12 @@ async def connect_cloud(request: BYOCConnectRequest, user: User = Depends(get_cu
         connect_message = "Azure account connected. Storage and Security will use your containers."
         if container_message and "Created" in container_message:
             connect_message = f"{connect_message} {container_message}"
+        extras = _byoc_connect_extras(user.username, "Azure")
+        if not extras["capabilities"].get("provision"):
+            extras["next_steps"].insert(
+                0,
+                "Add service principal fields in Settings to unlock VMs, Provision, and Cost.",
+            )
         return {
             "success": True,
             "message": connect_message,
@@ -1385,6 +1497,7 @@ async def connect_cloud(request: BYOCConnectRequest, user: User = Depends(get_cu
             "replica_container_name": replica_container if request.secure_dual_write else None,
             "secure_dual_write": request.secure_dual_write,
             "bucket_name": storage_container,
+            **extras,
         }
 
     if not test_result.success:
@@ -1420,6 +1533,69 @@ async def connect_cloud(request: BYOCConnectRequest, user: User = Depends(get_cu
         "bucket_name": bucket_or_container,
         "connection_method": request.connection_method,
     }
+
+
+@router.patch("/azure/compute", summary="Extend Azure BYOC with service principal")
+async def extend_azure_compute(
+    body: AzureComputeExtendRequest,
+    user: User = Depends(get_current_user),
+):
+    """Merge SP fields into an existing Azure BYOC record (no storage reconnect)."""
+    check_byoc_eligibility(user.username)
+    record = byoc_collection.find_one(
+        {"username": user.username, "csp": "Azure", "is_active": True},
+    )
+    if not record:
+        raise HTTPException(status_code=404, detail="No active Azure BYOC connection.")
+
+    cost_ok, cost_msg = _verify_azure_cost_management(
+        body.subscription_id.strip(),
+        body.tenant_id.strip(),
+        body.client_id.strip(),
+        body.client_secret.strip(),
+    )
+    if not cost_ok:
+        raise HTTPException(status_code=400, detail=cost_msg)
+
+    updates = {
+        "subscription_id": body.subscription_id.strip(),
+        "tenant_id": body.tenant_id.strip(),
+        "client_id": body.client_id.strip(),
+        "client_secret": body.client_secret.strip(),
+    }
+    encrypted = merge_and_encrypt_credentials(
+        _existing_byoc_credentials(user.username, "Azure"),
+        updates,
+    )
+    byoc_collection.update_one(
+        {"_id": record["_id"]},
+        {"$set": {"credentials": encrypted, "updated_at": datetime.utcnow()}},
+    )
+    logger.info("BYOC: %s extended Azure compute credentials", user.username)
+    return {
+        "success": True,
+        "message": "Azure service principal saved. VMs, Provision, and Cost are unlocked when validation passes.",
+        "csp": "Azure",
+        "cost_management_verified": True,
+        **_byoc_connect_extras(user.username, "Azure"),
+    }
+
+
+@router.patch("/gcp/billing", summary="Add GCP billing export IDs post-connect")
+async def patch_gcp_billing(
+    body: GcpBillingPatchRequest,
+    user: User = Depends(get_current_user),
+):
+    """Save BigQuery billing export IDs on an existing GCP BYOC record."""
+    check_byoc_eligibility(user.username)
+    from app.cost.billing_setup import save_gcp_billing_setup
+
+    result = save_gcp_billing_setup(
+        user.username,
+        billing_dataset_id=body.billing_dataset_id,
+        billing_table_id=body.billing_table_id,
+    )
+    return {**result, **_byoc_connect_extras(user.username, "GCP")}
 
 
 @router.post("/test", summary="Test BYOC Credentials")

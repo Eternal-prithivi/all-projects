@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import api from '../../api';
+import api, { getApiErrorMessage } from '../../api';
 
 const EMPTY_FORM = {
   name: '',
@@ -37,7 +37,7 @@ export default function ProvisionPoliciesPanel() {
         override: res.data.override_count ?? 0,
       });
     } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to load policies');
+      setError(getApiErrorMessage(err, 'Failed to load policies'));
     } finally {
       setLoading(false);
     }
@@ -105,8 +105,7 @@ export default function ProvisionPoliciesPanel() {
       closeForm();
       await loadRules();
     } catch (err) {
-      const detail = err.response?.data?.detail;
-      setFormError(typeof detail === 'string' ? detail : 'Could not save policy');
+      setFormError(getApiErrorMessage(err, 'Could not save policy'));
     } finally {
       setSaving(false);
     }
@@ -119,7 +118,7 @@ export default function ProvisionPoliciesPanel() {
       });
       await loadRules();
     } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to update policy');
+      setError(getApiErrorMessage(err, 'Failed to update policy'));
     }
   };
 
@@ -128,7 +127,7 @@ export default function ProvisionPoliciesPanel() {
       await api.put(`/provision/policy-rules/builtin/${rule.name}`, { enabled: false });
       await loadRules();
     } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to disable policy');
+      setError(getApiErrorMessage(err, 'Failed to disable policy'));
     }
   };
 
@@ -137,7 +136,7 @@ export default function ProvisionPoliciesPanel() {
       await api.put(`/provision/policy-rules/builtin/${rule.name}`, { enabled: true });
       await loadRules();
     } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to enable policy');
+      setError(getApiErrorMessage(err, 'Failed to enable policy'));
     }
   };
 
@@ -147,7 +146,7 @@ export default function ProvisionPoliciesPanel() {
       await api.delete(`/provision/policy-rules/builtin/${rule.name}`);
       await loadRules();
     } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to reset policy');
+      setError(getApiErrorMessage(err, 'Failed to reset policy'));
     }
   };
 
@@ -157,7 +156,7 @@ export default function ProvisionPoliciesPanel() {
       await api.delete(`/provision/policy-rules/custom/${rule.id}`);
       await loadRules();
     } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to delete policy');
+      setError(getApiErrorMessage(err, 'Failed to delete policy'));
     }
   };
 

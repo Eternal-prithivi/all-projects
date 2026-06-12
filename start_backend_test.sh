@@ -36,4 +36,4 @@ echo "Press Ctrl+C to stop"
 echo "───────────────────────────────────────────────────────"
 echo ""
 
-exec "$UVICORN_BIN" app.main:app --reload --port "$BACKEND_PORT"
+exec "$UVICORN_BIN" app.main:app "${UVICORN_DEV_ARGS[@]}" --port "$BACKEND_PORT"

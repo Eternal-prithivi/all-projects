@@ -18,7 +18,8 @@ celery_app = Celery(
         "app.security.security_stale_tasks",  # Stale secure-file awareness
         "app.ml.tasks_feedback",  # Phase 8 feedback evaluation/retraining readiness
         "app.provision.tasks",  # Phase 11 Terraform drift detection
-    ] 
+        "app.organizations.tasks",  # Org budget alerts
+    ]
 )
 
 # --- NEW: This is the Celery Beat schedule ---
@@ -64,6 +65,11 @@ celery_app.conf.beat_schedule = {
     'check-budget-alerts-daily': {
         'task': 'check_budget_alerts',
         'schedule': crontab(hour=9, minute=0),  # Every day at 9 AM UTC
+    },
+
+    'check-org-budget-alerts-daily': {
+        'task': 'check_org_budget_alerts',
+        'schedule': crontab(hour=9, minute=15),  # Every day at 9:15 AM UTC
     },
 
     # Security alerts (email + SMS)

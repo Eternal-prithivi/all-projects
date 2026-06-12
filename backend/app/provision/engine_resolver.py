@@ -84,7 +84,7 @@ def resolve_provision_engine(
             status_code=503,
             detail=(
                 "Terraform CLI is required for this GCP/Azure configuration. "
-                "Install Terraform or use static-gcs / static-blob templates with Boto3/SDK in Settings."
+                "Install Terraform or use storage-only templates with Fast path (Cloud SDK) in Settings."
             ),
         )
 
@@ -94,7 +94,7 @@ def resolve_provision_engine(
                 status_code=503,
                 detail=(
                     "Terraform CLI is not installed on this server. "
-                    "Use Boto3 in Settings (recommended on Render free tier) or deploy the Docker image."
+                    "Use Fast path (Cloud SDK) in Settings (recommended on Render free tier) or deploy the Docker image."
                 ),
             )
         return "terraform"
@@ -105,7 +105,7 @@ def resolve_provision_engine(
         raise HTTPException(
             status_code=400,
             detail=(
-                f"Boto3 cannot provision: {names}. "
+                f"AWS fast path cannot provision: {names}. "
                 "Switch to Terraform in Settings or disable those modules."
             ),
         )

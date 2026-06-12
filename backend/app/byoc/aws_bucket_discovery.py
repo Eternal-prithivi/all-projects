@@ -348,6 +348,9 @@ def get_buckets_for_user(
             if not filtered and buckets:
                 filtered = buckets
         supported = supported_aws_region_codes() if catalog_is_multi_region() else []
+        from app.provision.storage_bridge import merge_provisioned_storage_buckets
+
+        filtered = merge_provisioned_storage_buckets(username, "AWS", filtered)
         return {
             "mode": "platform",
             "buckets": filtered,
@@ -390,6 +393,9 @@ def get_buckets_for_user(
         )
     filtered = region_filtered if region_filtered or not region else filtered
 
+    from app.provision.storage_bridge import merge_provisioned_storage_buckets
+
+    filtered = merge_provisioned_storage_buckets(username, "AWS", filtered)
     return {
         "mode": "byoc",
         "buckets": filtered,

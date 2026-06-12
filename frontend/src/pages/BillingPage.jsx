@@ -42,6 +42,8 @@ function BillingPage() {
   const [loading, setLoading] = useState(() => !sessionStorage.getItem('cache_billing_sub'));
   const [processingPayment, setProcessingPayment] = useState(false);
   const [activeTab, setActiveTab] = useState('payments');
+  const [orgBilling, setOrgBilling] = useState(null);
+  const [orgSeatCount, setOrgSeatCount] = useState(5);
   const navigate = useNavigate();
   const { runPageRefresh, pageRefreshing } = usePageRefresh();
   const { error: notifyError, info: notifyInfo } = useNotifications();
@@ -62,14 +64,21 @@ function BillingPage() {
       if (!sessionStorage.getItem('cache_billing_sub')) {
         setLoading(true);
       }
-      const [subRes, historyRes, invoicesRes, plansRes] = await Promise.all([
+      const [subRes, historyRes, invoicesRes, plansRes, orgBillRes] = await Promise.all([
         apiClient.get('/payments/my-subscription'),
         apiClient.get('/payments/payment-history'),
         apiClient.get('/billing/invoices').catch(() => ({ data: { invoices: [] } })),
         apiClient.get('/payments/plans').catch(() => ({ data: [] })),
+        apiClient.get('/organizations/billing').catch(() => ({ data: null })),
       ]);
 
       setSubscription(subRes.data);
+      if (orgBillRes?.data) {
+        setOrgBilling(orgBillRes.data);
+        setOrgSeatCount(orgBillRes.data.seat_count || 5);
+      } else {
+        setOrgBilling(null);
+      }
       setPaymentHistory(historyRes.data);
       setInvoices(invoicesRes.data.invoices || []);
       setPlans(plansRes.data || []);
@@ -152,7 +161,55 @@ function BillingPage() {
     };
   }, [currentMonthCosts, subscription, plans]);
 
+  const handleOrgCheckout = async (planId) => {
+    if (!orgBilling?.can_manage_billing) return;
+    setProcessingPayment(true);
+    try {
+      const orderResponse = await apiClient.post('/organizations/billing/checkout', {
+        plan_id: planId,
+        billing_cycle: subscription?.billing_cycle || 'monthly',
+        seat_count: orgSeatCount,
+        cloud_costs_usd: 0,
+      });
+      const { order_id, amount, currency, key_id, plan_name } = orderResponse.data;
+      const options = {
+        key: key_id,
+        amount: amount * 100,
+        currency,
+        name: 'Zenith Cloud Platform',
+        description: `${plan_name} · ${orgSeatCount} seats`,
+        order_id,
+        handler: async function (response) {
+          try {
+            await apiClient.post('/organizations/billing/verify-payment', {
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature: response.razorpay_signature,
+            });
+            notifyInfo('Organization subscription activated.');
+            loadBillingData();
+          } catch (err) {
+            notifyError(err.response?.data?.detail || 'Org payment verification failed.');
+          } finally {
+            setProcessingPayment(false);
+          }
+        },
+        theme: { color: '#d4af37' },
+        modal: { ondismiss: () => setProcessingPayment(false) },
+      };
+      const razorpay = new window.Razorpay(options);
+      razorpay.open();
+    } catch (err) {
+      notifyError(err.response?.data?.detail || 'Could not start org checkout.');
+      setProcessingPayment(false);
+    }
+  };
+
   const handlePayNow = async () => {
+    if (subscription?.managed_by_org) {
+      notifyInfo('Your plan is managed by your organization.');
+      return;
+    }
     if (billBreakdown.totalINR === 0) {
       notifyInfo('No payment due at this time.');
       return;
@@ -298,6 +355,42 @@ function BillingPage() {
         }
         refreshing={pageRefreshing || loading}
       />
+
+      {orgBilling && (
+        <section className="zenith-glass-panel billing-panel" style={{ marginBottom: '1.25rem' }}>
+          <h2 className="billing-panel-title">Organization billing</h2>
+          <p className="billing-panel-subtitle">
+            {orgBilling.org_name} · {orgBilling.seats_used} / {orgBilling.seat_count} seats ·{' '}
+            {orgBilling.plan_name || orgBilling.plan_id}
+          </p>
+          {orgBilling.can_manage_billing ? (
+            <div className="billing-org-admin">
+              <label htmlFor="org-seat-count">Seats to purchase</label>
+              <input
+                id="org-seat-count"
+                type="number"
+                min={orgBilling.seats_used || 1}
+                max={500}
+                value={orgSeatCount}
+                onChange={(e) => setOrgSeatCount(Number(e.target.value) || 1)}
+                className="billing-input"
+              />
+              <button
+                type="button"
+                className="billing-btn billing-btn--primary"
+                disabled={processingPayment}
+                onClick={() => handleOrgCheckout(subscription?.plan_id === 'free' ? 'basic' : subscription.plan_id)}
+              >
+                {processingPayment ? 'Processing…' : 'Checkout for organization'}
+              </button>
+            </div>
+          ) : (
+            <p className="billing-panel-subtitle">
+              Your seat is managed by the organization admin. Contact them to change plan or add seats.
+            </p>
+          )}
+        </section>
+      )}
 
       {/* Summary metrics */}
       <div className="billing-metrics stagger-children">

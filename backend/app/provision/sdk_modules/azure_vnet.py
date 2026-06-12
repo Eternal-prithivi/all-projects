@@ -7,7 +7,7 @@ from typing import Any
 from azure.core.exceptions import ResourceNotFoundError
 
 from app.provision.sdk_clients import azure_network_client
-from app.provision.sdk_modules.azure_resource_group import ensure_resource_group
+from app.provision.sdk_modules.azure_resource_group import azure_effective_location, ensure_resource_group
 from app.provision.sdk_modules.context import SdkDeployContext
 
 VNET_NAME = "zenith-vnet"
@@ -29,7 +29,7 @@ def apply_vnet(
     if not ok:
         return {"success": False, "steps": steps, "error": err}
     rg = ctx.azure_resource_group
-    location = config.get("azure_location") or "eastus"
+    location = azure_effective_location(config, ctx)
     network_client, _, _ = azure_network_client(cloud_env)
     try:
         try:

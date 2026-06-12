@@ -39,3 +39,21 @@ def test_merge_follow_up_answers():
     )
     assert "Database" in merged
     assert "500GB" in merged or "1TB" in merged
+
+
+def test_follow_up_questions_skip_answered_slots():
+    readiness = assess_workload_readiness("I need a s3 bucket for file storage")
+    questions = build_follow_up_questions(
+        readiness["missing_signals"],
+        {"data_scale": "Under 50GB data"},
+    )
+    assert all(q["id"] != "data_scale" for q in questions)
+    assert any(q["id"] == "environment" for q in questions)
+
+
+def test_rich_description_asks_no_follow_ups():
+    readiness = assess_workload_readiness(
+        "Production Node.js API on Docker with 500GB data and high CPU"
+    )
+    questions = build_follow_up_questions(readiness["missing_signals"])
+    assert questions == []

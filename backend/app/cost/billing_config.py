@@ -22,6 +22,23 @@ AZURE_SETUP_STEPS = [
     "Or save Cost Management fields on your Azure BYOC connection (storage keys alone are not enough)",
 ]
 
+BYOC_SETUP_GUIDE_PAYLOAD = {
+    "gcp_billing": {
+        "csp": "GCP",
+        "title": "GCP BigQuery billing export (recommended)",
+        "works_without": ["Storage", "Security", "VMs", "Provision"],
+        "blocked_without": ["Cost"],
+        "steps": GCP_SETUP_STEPS,
+    },
+    "azure_compute": {
+        "csp": "Azure",
+        "title": "Azure service principal (recommended)",
+        "works_without": ["Storage", "Security"],
+        "blocked_without": ["VMs", "Provision", "Cost"],
+        "steps": AZURE_SETUP_STEPS,
+    },
+}
+
 
 def resolve_gcp_billing_ids(username: str) -> Dict[str, str]:
     gcp = resolve_gcp_credentials(username)
@@ -95,6 +112,10 @@ def azure_setup_status(username: str) -> Dict[str, Any]:
         "setup_steps": AZURE_SETUP_STEPS,
         "can_update_via_api": bool(byoc.get("connected")),
     }
+
+
+def build_byoc_setup_guides_payload() -> Dict[str, Any]:
+    return {"guides": BYOC_SETUP_GUIDE_PAYLOAD}
 
 
 def missing_gcp_config_payload() -> Dict[str, Any]:

@@ -24,6 +24,9 @@ PYTHON_BIN="${VENV_DIR}/bin/python"
 UVICORN_BIN="${VENV_DIR}/bin/uvicorn"
 CELERY_BIN="${VENV_DIR}/bin/celery"
 
+# Watch app/ only — avoids .venv pip installs triggering endless reload loops.
+UVICORN_DEV_ARGS=(--reload --reload-dir app)
+
 FRONTEND_PORT="${FRONTEND_PORT:-5173}"
 BACKEND_PORT="${BACKEND_PORT:-8000}"
 

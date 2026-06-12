@@ -75,7 +75,11 @@ def _platform_azure_response(username: str) -> Dict[str, Any]:
     )
 
     azure = resolve_azure_credentials(username)
-    containers = get_platform_buckets_for_csp("Azure", surface="storage")
+    from app.provision.storage_bridge import merge_provisioned_storage_buckets
+
+    containers = merge_provisioned_storage_buckets(
+        username, "Azure", get_platform_buckets_for_csp("Azure", surface="storage")
+    )
     default_container = (azure.get("container_name") or "").strip()
     for c in containers:
         if c.get("is_default"):
@@ -167,8 +171,12 @@ def list_azure_containers_for_user(
         result["mode"] = "byoc"
         result["account_name"] = account
         result["default_container"] = default_container or None
-        result["containers"] = _filter_azure_containers_for_surface(
-            containers, surface, layout
+        from app.provision.storage_bridge import merge_provisioned_storage_buckets
+
+        result["containers"] = merge_provisioned_storage_buckets(
+            username,
+            "Azure",
+            _filter_azure_containers_for_surface(containers, surface, layout),
         )
         result["surface"] = surface
         result["count"] = len(result["containers"])

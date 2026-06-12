@@ -8,7 +8,9 @@ Celery background tasks for VM management.
 
 from app.celery_worker import celery_app
 from app.vm.metrics_collector import VMMetricsCollector
-from app.vm.manager import CLUSTER_VMS, release_vm_assignment, get_cluster_health
+from app.vm.cluster_catalog import cluster_types
+from app.vm import vm_provider
+from app.vm.manager import release_vm_assignment, get_cluster_health
 from app.vm.models import ClusterType
 from app.database.mongo_client import get_database
 from app.utils.logger import setup_logger
@@ -33,8 +35,8 @@ def collect_vm_metrics_task():
     
     all_vms = {
         vm_name: cluster_type
-        for cluster_type, vm_names in CLUSTER_VMS.items()
-        for vm_name in vm_names
+        for cluster_type in cluster_types()
+        for vm_name in vm_provider.cluster_vms("GCP", cluster_type)
     }
     
     collected_count = 0
@@ -96,35 +98,48 @@ def auto_release_inactive_vms_task():
     })
     
     released_count = 0
-    stopped_vms = []
-    
+    reclaimed_vms = []
+
     for assignment in inactive_assignments:
         user_id = assignment["user_id"]
         vm_name = assignment["vm_name"]
-        
+
         try:
-            # Release assignment
             result = asyncio.run(release_vm_assignment(user_id))
-            
+
             if result["success"]:
                 released_count += 1
-                
-                if result["vm_stopped"]:
-                    stopped_vms.append(vm_name)
-                    logger.info(f"Released {user_id} from {vm_name} (VM stopped - no remaining users)")
+
+                if result.get("vm_deleted"):
+                    reclaimed_vms.append(vm_name)
+                    logger.info(
+                        f"Released {user_id} from {vm_name} (VM terminated — no remaining users)"
+                    )
+                elif result.get("vm_stopped"):
+                    reclaimed_vms.append(vm_name)
+                    logger.info(
+                        f"Released {user_id} from {vm_name} (VM stopped — no remaining users)"
+                    )
                 else:
-                    logger.info(f"Released {user_id} from {vm_name} (VM still running - {result['remaining_users']} users remain)")
-            
+                    logger.info(
+                        f"Released {user_id} from {vm_name} "
+                        f"(VM still running — {result['remaining_users']} users remain)"
+                    )
+
         except Exception as e:
             logger.error(f"Failed to release {user_id} from {vm_name}: {e}")
-    
-    logger.info(f"Auto-release complete: {released_count} assignments released, {len(stopped_vms)} VMs stopped")
-    
+
+    logger.info(
+        f"Auto-release complete: {released_count} assignments released, "
+        f"{len(reclaimed_vms)} VMs reclaimed"
+    )
+
     return {
         "success": True,
         "released_assignments": released_count,
-        "stopped_vms": stopped_vms,
-        "timestamp": datetime.utcnow().isoformat()
+        "stopped_vms": reclaimed_vms,
+        "reclaimed_vms": reclaimed_vms,
+        "timestamp": datetime.utcnow().isoformat(),
     }
 
 
@@ -141,7 +156,7 @@ def cluster_health_check_task():
     agent_result = run_adaptive_control_cycle()
 
     legacy_alerts = list(agent_result.get("alerts") or [])
-    for cluster_type in CLUSTER_VMS:
+    for cluster_type in cluster_types():
         try:
             health = asyncio.run(get_cluster_health(cluster_type))
             if health["total_active_users"] > health["total_vms"] * 4:

@@ -63,5 +63,17 @@ def setup_logger(name: str, level: int = logging.INFO) -> logging.Logger:
     
     return logger
 
+def configure_third_party_loggers() -> None:
+    """Reduce noisy SDK HTTP trace logs in the dev console."""
+    for name in (
+        "azure.core.pipeline.policies.http_logging_policy",
+        "azure.identity",
+        "urllib3.connectionpool",
+        "google.auth.transport.requests",
+    ):
+        logging.getLogger(name).setLevel(logging.WARNING)
+
+
 # Create a default logger for the application
 logger = setup_logger("zenith")
+configure_third_party_loggers()

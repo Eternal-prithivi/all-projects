@@ -32,7 +32,20 @@ def build_review_summary(config: dict[str, Any]) -> dict[str, Any]:
             or "small VM"
         )
         disk = config.get("disk_size_gb", 30)
-        bullets.append(f"1 virtual server ({inst}) with about {disk} GB disk.")
+        if config.get("enable_ec2"):
+            os_label = config.get("ec2_os", "amazon_linux_2").replace("_", " ")
+        elif config.get("enable_gce"):
+            os_label = config.get("gce_os", "debian_12").replace("_", " ")
+        else:
+            os_label = config.get("azure_os", "ubuntu_22_04").replace("_", " ")
+        bullets.append(f"1 virtual server ({inst}, {os_label}) with about {disk} GB disk.")
+        startup = (
+            (config.get("ec2_user_data") or "")
+            or (config.get("gce_startup_script") or "")
+            or (config.get("azure_startup_script") or "")
+        ).strip()
+        if startup:
+            bullets.append("Bootstrap script runs on first boot.")
 
     if config.get("enable_vpc") or config.get("enable_gcp_network") or config.get("enable_vnet"):
         bullets.append("Private network (VPC/VNet) for isolation.")
@@ -46,8 +59,23 @@ def build_review_summary(config: dict[str, Any]) -> dict[str, Any]:
     if config.get("enable_cloudwatch") or config.get("enable_gcp_monitoring") or config.get("enable_azure_monitor"):
         bullets.append("Monitoring alerts for operational visibility.")
 
-    if config.get("enable_iam") or config.get("enable_gcp_service_account"):
-        bullets.append("Dedicated identity / service account for least-privilege access.")
+    if config.get("enable_iam"):
+        from app.provision.provision_config_options import plan_iam_preset_summary
+
+        preset = plan_iam_preset_summary(config.get("iam_role_preset", "s3_read_only"))
+        bullets.append(f"EC2 IAM role attached at launch ({preset}).")
+    elif config.get("enable_gcp_service_account"):
+        from app.provision.provision_config_options import plan_gcp_sa_preset_summary
+
+        preset = plan_gcp_sa_preset_summary(config.get("gcp_sa_preset", "gcs_read_only"))
+        bullets.append(f"GCE service account with {preset} permissions.")
+    elif config.get("enable_azure_vm"):
+        from app.provision.provision_config_options import plan_azure_identity_preset_summary
+
+        preset = plan_azure_identity_preset_summary(
+            config.get("azure_identity_preset", "storage_blob_read")
+        )
+        bullets.append(f"Azure VM managed identity ({preset}).")
 
     region = (
         config.get("aws_region")

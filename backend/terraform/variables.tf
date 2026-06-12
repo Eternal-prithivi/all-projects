@@ -101,6 +101,18 @@ variable "ami_id" {
   default     = ""
 }
 
+variable "ec2_os" {
+  description = "OS image preset when ami_id is empty (wizard: amazon_linux_2, ubuntu_22_04, ...)."
+  type        = string
+  default     = "amazon_linux_2"
+}
+
+variable "ec2_user_data" {
+  description = "Optional cloud-init / shell script for first boot."
+  type        = string
+  default     = ""
+}
+
 variable "instance_name" {
   description = "Name tag for the EC2 instance."
   type        = string
@@ -125,6 +137,12 @@ variable "role_name" {
   description = "Name for the IAM role."
   type        = string
   default     = "app-role"
+}
+
+variable "iam_role_preset" {
+  description = "IAM permission preset (wizard; full presets on Cloud SDK fast path)."
+  type        = string
+  default     = "s3_read_only"
 }
 
 # --- CloudWatch ---

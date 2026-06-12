@@ -15,7 +15,8 @@ from app.database.mongo_client import get_database
 from app.notifications import service as notification_service
 from app.utils.config import settings
 from app.utils.logger import setup_logger
-from app.vm.manager import CLUSTER_VMS, migrate_user
+from app.vm import vm_provider
+from app.vm.cluster_catalog import cluster_types
 from app.vm.migration_recommender import MigrationRecommender
 from app.vm.models import ClusterType, VMMetricsResponse, VMStatus
 
@@ -109,9 +110,9 @@ def run_adaptive_control_cycle() -> Dict[str, Any]:
     migrations_applied = 0
     recommendations_total = 0
 
-    clusters = [ClusterType.GENERAL, ClusterType.STORAGE]
+    clusters = list(cluster_types())
     for cluster_type in clusters:
-        vm_names = CLUSTER_VMS.get(cluster_type, [])
+        vm_names = vm_provider.cluster_vms("GCP", cluster_type)
         vm_metrics: List[VMMetricsResponse] = []
         assignments = _active_assignments(db, cluster_type)
 

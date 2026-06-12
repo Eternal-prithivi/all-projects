@@ -1104,6 +1104,22 @@ html.theme-light .security-2fa-badge--off {
   color: var(--warning, #d97706);
 }
 
+.security-archived-badge--locked {
+  background: color-mix(in srgb, var(--danger, #dc2626) 12%, transparent);
+  color: var(--danger, #dc2626);
+}
+
+.archive-password-modal .form-group {
+  margin: 0.75rem 0;
+  text-align: left;
+}
+
+.archive-password-modal .form-group label {
+  display: block;
+  font-size: 0.85rem;
+  margin-bottom: 0.35rem;
+}
+
 .security-file-row--archived .security-file-name {
   color: var(--text-secondary);
 }

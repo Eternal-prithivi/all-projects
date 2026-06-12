@@ -23,6 +23,7 @@ def resources_from_boto3_context(config: dict[str, Any], ctx: dict[str, str]) ->
             "type": "bucket",
             "name": ctx["bucket_name"],
             "id": ctx["bucket_name"],
+            "region": config.get("aws_region"),
             "csp": csp,
         })
     if ctx.get("dynamodb_table"):
@@ -51,14 +52,27 @@ def resources_from_sdk_context(config: dict[str, Any], ctx: dict[str, Any]) -> L
             "ip": vm_ip,
             "csp": csp,
         })
-    bucket = ctx.get("gcs_bucket") or ctx.get("azure_storage_account") or ctx.get("bucket_name")
-    if bucket or config.get("enable_gcs") or config.get("enable_azure_storage"):
-        out.append({
-            "type": "bucket",
-            "name": bucket or config.get("bucket_name") or config.get("storage_account_name", "storage"),
-            "id": bucket or "",
-            "csp": csp,
-        })
+    if config.get("enable_gcs") or ctx.get("gcs_bucket"):
+        gcs_name = ctx.get("gcs_bucket") or config.get("bucket_name") or ""
+        if gcs_name:
+            out.append({
+                "type": "bucket",
+                "name": gcs_name,
+                "id": gcs_name,
+                "region": config.get("gcp_region"),
+                "csp": csp,
+            })
+    if config.get("enable_azure_storage") or ctx.get("azure_container"):
+        container = ctx.get("azure_container") or config.get("container_name") or ""
+        account = ctx.get("azure_storage_account") or config.get("storage_account_name") or ""
+        if container:
+            out.append({
+                "type": "bucket",
+                "name": container,
+                "id": account or container,
+                "account_name": account,
+                "csp": csp,
+            })
     db = ctx.get("firestore_database_id") or ctx.get("cosmos_database_name")
     if db or config.get("enable_firestore") or config.get("enable_cosmos"):
         out.append({

@@ -47,11 +47,11 @@ AZURE_MODULE_FLAGS: dict[str, str] = {
     "cosmos": "enable_cosmos",
 }
 
-GCP_APPLY_ORDER = ("gcp_network", "gce", "gcp_service_account", "gcp_monitoring", "gcs", "firestore")
-GCP_DESTROY_ORDER = ("firestore", "gcs", "gcp_monitoring", "gcp_service_account", "gce", "gcp_network")
+GCP_APPLY_ORDER = ("gcp_network", "gcs", "gcp_service_account", "gce", "gcp_monitoring", "firestore")
+GCP_DESTROY_ORDER = ("firestore", "gcp_monitoring", "gce", "gcp_service_account", "gcs", "gcp_network")
 
-AZURE_APPLY_ORDER = ("vnet", "azure_vm", "azure_monitor", "azure_storage", "cosmos")
-AZURE_DESTROY_ORDER = ("cosmos", "azure_storage", "azure_monitor", "azure_vm", "vnet")
+AZURE_APPLY_ORDER = ("vnet", "azure_storage", "azure_vm", "azure_monitor", "cosmos")
+AZURE_DESTROY_ORDER = ("cosmos", "azure_monitor", "azure_vm", "azure_storage", "vnet")
 
 _GCP_PLAN: dict[str, Callable] = {
     "gcp_network": gcp_network.plan_gcp_network,
@@ -180,6 +180,20 @@ def apply_sdk(
     flags = _module_flags(csp)
     ctx = SdkDeployContext.from_dict(existing_ctx)
     steps: list[str] = []
+
+    if csp == "Azure":
+        from app.provision.sdk_modules.azure_providers import ensure_azure_resource_providers
+
+        provider_result = ensure_azure_resource_providers(config, cloud_env)
+        steps.extend(provider_result.get("steps") or [])
+        if not provider_result.get("success"):
+            return {
+                "success": False,
+                "output": "\n".join(steps),
+                "error": provider_result.get("error"),
+                "sdk_context": ctx.to_dict(),
+            }
+
     for mod in order:
         if not config.get(flags[mod]):
             continue

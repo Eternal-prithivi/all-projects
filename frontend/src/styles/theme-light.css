@@ -645,6 +645,38 @@ html[data-theme="light"] .provision-panel {
   border-color: var(--border-default);
 }
 
+html[data-theme="light"] .provision-intent-panel .workload-guidance {
+  background: var(--bg-card);
+  border-color: var(--border-default);
+  box-shadow: var(--shadow-card);
+}
+
+html[data-theme="light"] .provision-intent-panel .guidance-readiness {
+  background: var(--bg-elevated);
+  border-color: var(--border-subtle);
+}
+
+html[data-theme="light"] .provision-intent-panel .guidance-section {
+  background: var(--bg-elevated);
+  border-color: var(--border-subtle);
+}
+
+html[data-theme="light"] .provision-intent-panel .signal-chip--ok {
+  background: rgba(22, 163, 74, 0.1);
+  color: var(--success);
+}
+
+html[data-theme="light"] .provision-intent-panel .signal-chip--missing {
+  background: rgba(220, 38, 38, 0.06);
+  color: var(--danger);
+}
+
+html[data-theme="light"] .provision-intent-panel .guidance-select {
+  background: var(--bg-card);
+  border-color: var(--border-default);
+  color: var(--text-primary);
+}
+
 /* ============================================
    HOME PAGE (public)
    ============================================ */

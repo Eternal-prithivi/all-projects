@@ -111,6 +111,29 @@ class MongoDB:
             self._create_index_if_missing("provision_deployments", [("user_id", 1), ("created_at", -1)])
             self._create_index_if_missing("provision_deployments", [("user_id", 1), ("status", 1)])
             self._create_index_if_missing("provision_deployments", [("deployment_name", 1)], unique=True)
+
+            self._create_index_if_missing("organization_members", [("username", 1)], unique=True)
+            self._create_index_if_missing("organization_members", [("org_id", 1)])
+            self._create_index_if_missing("organization_invites", [("token", 1)], unique=True)
+            self._create_index_if_missing("organization_invites", [("org_id", 1), ("email", 1)])
+            self._create_index_if_missing(
+                "dashboard_cost_snapshots", [("username", 1), ("date", 1)]
+            )
+            self._create_index_if_missing(
+                "organization_approval_requests", [("org_id", 1), ("status", 1)]
+            )
+            self._create_index_if_missing(
+                "organization_action_items", [("org_id", 1), ("status", 1)]
+            )
+            self._create_index_if_missing("organization_subscriptions", [("org_id", 1)], unique=True)
+
+            self._create_index_if_missing("vm_assignments", [("org_id", 1)])
+            self._create_index_if_missing("vm_assignments", [("org_id", 1), ("created_by", 1)])
+            self._create_index_if_missing("provision_deployments", [("org_id", 1)])
+            self._create_index_if_missing("provision_deployments", [("org_id", 1), ("created_by", 1)])
+            self._create_index_if_missing("files", [("org_id", 1)])
+            self._create_index_if_missing("files", [("org_id", 1), ("created_by", 1)])
+            self._create_index_if_missing("payment_orders", [("org_id", 1)])
         except Exception as e:
             logger.warning("Failed to ensure MongoDB indexes: %s", e)
 

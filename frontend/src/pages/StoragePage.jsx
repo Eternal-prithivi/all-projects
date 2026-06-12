@@ -14,6 +14,7 @@
 //   - Remove access tracking in download (feeds access_frequency_score for ML tiering)
 // =============================================================================
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useNotifications } from "../hooks/useNotifications";
 import { TableSkeleton } from "../components/Skeletons.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
@@ -40,6 +41,7 @@ import CloudProviderToolbar, {
   filterFilesByCloudProvider,
 } from "../components/CloudProviderSelect.jsx";
 import CloudAvailabilityBanner from "../components/CloudAvailabilityBanner.jsx";
+import CredentialSourceBadge from "../components/cloud/CredentialSourceBadge.jsx";
 import {
   useCloudAvailability,
   buildCloudProviderOptions,
@@ -53,6 +55,9 @@ import { usePreferences } from "../context/PreferencesContext.jsx";
 import StorageIntelligenceBar from "../components/storage/StorageIntelligenceBar.jsx";
 import StorageFileInsight from "../components/storage/StorageFileInsight.jsx";
 import { fetchStorageIntelligenceSummary } from "../api";
+import { useOrgContext } from "../hooks/useOrgContext.js";
+import OrgResourceMeta from "../components/OrgResourceMeta.jsx";
+import CloudProviderLogo from "../components/cloud/CloudProviderLogo.jsx";
 
 // --- API FUNCTIONS (Missing from api.js) ---
 import { apiClient } from "../api";
@@ -97,15 +102,9 @@ const initiateArchiveRestore = async (filename, csp, tier, days, _token) => {
 };
 
 
-// A helper component for rendering CSP logos
-const CspIcon = ({ csp }) => {
-  const icons = {
-    AWS: "/images/aws.png",
-    GCP: "/images/google-cloud_logo.png",
-    Azure: "/images/Microsoft_Azure.png",
-  };
-  return <img src={icons[csp]} alt={`${csp} logo`} className="csp-icon" />;
-};
+const CspIcon = ({ csp }) => (
+  <CloudProviderLogo provider={csp} className="csp-icon" alt={`${csp} logo`} />
+);
 
 const formatPercent = (value) => `${Math.round((Number(value) || 0) * 100)}%`;
 
@@ -121,7 +120,9 @@ const formatExpertName = (expert) => {
 // --- MAIN STORAGE PAGE COMPONENT ---
 
 function StoragePage() {
-  const { token } = useAuth();
+  const { token, user } = useAuth();
+  const { orgName, isAdmin } = useOrgContext();
+  const [showOnlyMine, setShowOnlyMine] = useState(false);
   const {
     error: notifyError,
     success: notifySuccess,
@@ -132,7 +133,7 @@ function StoragePage() {
     updateInfo,
     executeWithNotification,
   } = useNotifications();
-  const { loading: availLoading, getFeature, credentialMode } = useCloudAvailability();
+  const { loading: availLoading, getFeature, credentialMode, getCredentialSource } = useCloudAvailability();
   const storageProviders = getFeature("storage").providers || [];
   const storageToolbarOptions = useMemo(
     () => buildCloudProviderOptions(storageProviders),
@@ -143,6 +144,7 @@ function StoragePage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSyncing, setIsSyncing] = useState(false);
   const [catalogReloadToken, setCatalogReloadToken] = useState(0);
+  const [searchParams, setSearchParams] = useSearchParams();
   const { runPageRefresh, pageRefreshing } = usePageRefresh();
   const [cloudProvider, setCloudProvider] = useState("ALL");
   const [isUploading, setIsUploading] = useState(false);
@@ -233,6 +235,71 @@ function StoragePage() {
   const handleAwsBucketsLoaded = useCallback((list) => {
     setAwsBucketCount(list?.length ?? null);
   }, []);
+
+  useEffect(() => {
+    if (!token) return undefined;
+    const fromProvision = searchParams.get("from") === "provision";
+    const deploymentId = searchParams.get("deployment");
+    if (!fromProvision || !deploymentId) return undefined;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data } = await apiClient.get(`/provision/deployments/${deploymentId}/handoff`);
+        if (cancelled) return;
+        const csp = data.csp || "AWS";
+        const bucket = data.storage_prefill
+          || (data.created_resources || []).find((r) => r.type === "bucket");
+        if (!bucket?.name) return;
+
+        setManualCspSelection(csp);
+        if (csp === "AWS") {
+          handleBucketSelect(bucket.name, bucket.region || undefined);
+          try {
+            sessionStorage.setItem("zenith.storage.bucket", bucket.name);
+          } catch {
+            /* ignore */
+          }
+        } else if (csp === "GCP") {
+          handleGcpBucketSelect(bucket.name);
+          try {
+            sessionStorage.setItem("zenith.storage.gcp.bucket", bucket.name);
+          } catch {
+            /* ignore */
+          }
+        } else if (csp === "Azure") {
+          handleAzureContainerSelect(bucket.name);
+          try {
+            sessionStorage.setItem("zenith.storage.azure.container", bucket.name);
+          } catch {
+            /* ignore */
+          }
+        }
+        setCatalogReloadToken((t) => t + 1);
+        notifyInfo(`Ready to use your provisioned storage: ${bucket.name}`);
+      } catch {
+        /* handoff optional */
+      } finally {
+        if (!cancelled) {
+          const next = new URLSearchParams(searchParams);
+          next.delete("from");
+          next.delete("deployment");
+          setSearchParams(next, { replace: true });
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    token,
+    searchParams,
+    setSearchParams,
+    handleBucketSelect,
+    handleGcpBucketSelect,
+    handleAzureContainerSelect,
+    notifyInfo,
+  ]);
 
   const handlePlatformRegionSelect = useCallback(
     (slug) => {
@@ -465,10 +532,12 @@ function StoragePage() {
     );
   }, [token, fetchFiles, runPageRefresh]);
 
-  const displayedFiles = useMemo(
-    () => filterFilesByCloudProvider(files, cloudProvider),
-    [files, cloudProvider]
-  );
+  const displayedFiles = useMemo(() => {
+    const byCloud = filterFilesByCloudProvider(files, cloudProvider);
+    if (!isAdmin || !showOnlyMine) return byCloud;
+    const me = user?.username;
+    return byCloud.filter((f) => (f.created_by || f.owner_username) === me);
+  }, [files, cloudProvider, isAdmin, showOnlyMine, user?.username]);
 
   const activeRegionLabel = useMemo(
     () => platformRegions.find((r) => r.slug === platformRegionSlug)?.label,
@@ -914,16 +983,35 @@ function StoragePage() {
 
       <div className="list-section zenith-surface">
         <div className="list-header">
-          <h3 className="list-title">{listTitle}</h3>
-          <CloudProviderToolbar
-            provider={cloudProvider}
-            onProviderChange={setCloudProvider}
-            onAction={handleSyncWithBucket}
-            actionLabel={syncActionLabel}
-            actionBusy={isSyncing}
-            selectAriaLabel="Filter and sync by cloud provider"
-            providerOptions={storageToolbarOptions}
-          />
+          <div>
+            <h3 className="list-title">{listTitle}</h3>
+            {isAdmin && orgName && (
+              <div className="org-resource-filter">
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={!showOnlyMine}
+                    onChange={(e) => setShowOnlyMine(!e.target.checked)}
+                  />
+                  Show all team resources
+                </label>
+              </div>
+            )}
+          </div>
+          <div className="storage-cloud-toolbar-row">
+            <CloudProviderToolbar
+              provider={cloudProvider}
+              onProviderChange={setCloudProvider}
+              onAction={handleSyncWithBucket}
+              actionLabel={syncActionLabel}
+              actionBusy={isSyncing}
+              selectAriaLabel="Filter and sync by cloud provider"
+              providerOptions={storageToolbarOptions}
+            />
+            {cloudProvider && cloudProvider !== 'ALL' && (
+              <CredentialSourceBadge source={getCredentialSource(cloudProvider, 'storage')} />
+            )}
+          </div>
         </div>
         {isLoading ? (
           <TableSkeleton rows={5} columns={5} />
@@ -967,7 +1055,14 @@ function StoragePage() {
             <tbody>
               {displayedFiles.map((file) => (
                   <tr key={`${file.csp || ""}-${file.cloud_bucket || ""}-${file.region || ""}-${file.filename}`}>
-                    <td>{file.filename}</td>
+                    <td>
+                      <div>{file.filename}</div>
+                      <OrgResourceMeta
+                        orgName={file.org_id ? orgName : null}
+                        createdBy={file.created_by || file.owner_username}
+                        currentUsername={user?.username}
+                      />
+                    </td>
                     <td>{(file.size_bytes / 1024).toFixed(2)}</td>
                     <td className="date-col">
                       {new Date(file.upload_date).toLocaleString()}

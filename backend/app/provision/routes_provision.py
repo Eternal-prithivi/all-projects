@@ -227,11 +227,34 @@ async def provisioning_status(user: dict = Depends(get_current_user)):
         },
         "environment": environment,
         "hosting_hint": (
-            "Boto3 (AWS) and cloud SDK (GCP GCS / Azure Blob) are recommended on Render free tier. "
+            "Cloud SDK fast path (AWS, GCP, Azure) is recommended on Render free tier. "
             "Terraform works on localhost and Render Docker when the CLI is installed."
             if environment == "production"
-            else "Fast paths work without Terraform; use Terraform for full module sets."
+            else "Fast path works on all clouds without Terraform; use Terraform for full module sets."
         ),
+    }
+
+
+@router.get("/config-options")
+async def provision_config_options(user: dict = Depends(get_current_user)):
+    """Wizard dropdown metadata — VM OS images and identity presets per cloud."""
+    from app.provision.provision_config_options import (
+        list_azure_identity_presets,
+        list_azure_os_images,
+        list_ec2_os_images,
+        list_gce_os_images,
+        list_gcp_sa_presets,
+        list_iam_role_presets,
+    )
+
+    _ = user
+    return {
+        "iam_role_presets": list_iam_role_presets(),
+        "ec2_os_images": list_ec2_os_images(),
+        "gcp_sa_presets": list_gcp_sa_presets(),
+        "gce_os_images": list_gce_os_images(),
+        "azure_identity_presets": list_azure_identity_presets(),
+        "azure_os_images": list_azure_os_images(),
     }
 
 
@@ -280,6 +303,9 @@ async def upsert_builtin_policy_override(
     user: dict = Depends(get_current_user),
 ):
     """Customize or disable a platform governance rule for this user."""
+    from app.payments.plan_entitlements import require_feature
+
+    require_feature(user.username, "provision_policies")
     try:
         rule = upsert_override(
             user.username,
@@ -307,6 +333,9 @@ async def reset_builtin_policy_override(
     user: dict = Depends(get_current_user),
 ):
     """Revert a platform rule to its default for this user."""
+    from app.payments.plan_entitlements import require_feature
+
+    require_feature(user.username, "provision_policies")
     if not delete_override(user.username, builtin_name):
         raise HTTPException(status_code=404, detail="No override found for this policy")
     log_provision_action(
@@ -325,6 +354,9 @@ async def create_custom_policy(
     user: dict = Depends(get_current_user),
 ):
     """Add a user-defined governance rule evaluated on plan/deploy."""
+    from app.payments.plan_entitlements import require_feature
+
+    require_feature(user.username, "provision_policies")
     try:
         rule = create_custom_rule(
             user.username,
@@ -352,6 +384,9 @@ async def update_custom_policy(
     user: dict = Depends(get_current_user),
 ):
     """Update or enable/disable a custom governance rule."""
+    from app.payments.plan_entitlements import require_feature
+
+    require_feature(user.username, "provision_policies")
     try:
         rule = update_custom_rule(
             user.username,
@@ -380,6 +415,9 @@ async def remove_custom_policy(
     user: dict = Depends(get_current_user),
 ):
     """Delete a custom governance rule."""
+    from app.payments.plan_entitlements import require_feature
+
+    require_feature(user.username, "provision_policies")
     if not delete_custom_rule(user.username, rule_id):
         raise HTTPException(status_code=404, detail="Policy not found")
     log_provision_action(
@@ -428,6 +466,7 @@ async def analyze_intent(
     return analyze_provision_intent(
         body.workload_description,
         body.follow_up_answers,
+        csp=body.csp or "AWS",
     )
 
 
@@ -478,6 +517,9 @@ async def run_plan(
 
     config_dict = config.model_dump()
     config_dict["csp"] = normalize_provider(config_dict.get("csp") or "AWS")
+    from app.byoc.capabilities import assert_byoc_feature_ready
+
+    assert_byoc_feature_ready(user.username, config_dict["csp"], CloudFeature.PROVISION)
     assert_provider_available(user.username, config_dict["csp"], CloudFeature.PROVISION)
     _prepare_provision_config(config_dict)
     csp = config_dict["csp"]
@@ -501,6 +543,29 @@ async def run_plan(
 
     policy_result = full_policy_check(config_dict, include_opa=False, username=user.username)
     cost_result = estimate_cost(config_dict, use_infracost=False)
+
+    from app.organizations import approvals as org_approvals
+
+    approval_gate = org_approvals.maybe_gate_provision(
+        user.username,
+        cost_result,
+        {"template": config_dict.get("template"), "csp": csp, "config": config_dict},
+    )
+    if approval_gate:
+        from fastapi.responses import JSONResponse
+
+        return JSONResponse(
+            status_code=202,
+            content={
+                "success": False,
+                "stage": "approval_required",
+                "policy_check": policy_result.model_dump(),
+                "cost_estimate": cost_result.model_dump()
+                if hasattr(cost_result, "model_dump")
+                else cost_result,
+                **approval_gate,
+            },
+        )
 
     deployment_id = f"{user.username}-{int(time.time())}"
     plan_t0 = time.monotonic()
@@ -724,6 +789,13 @@ async def run_apply(
         raise HTTPException(status_code=400, detail="Cannot apply — policy check has blocking violations.")
 
     config_dict = deployment.get("config", {}) or {}
+    from app.byoc.capabilities import assert_byoc_feature_ready
+    from app.cloud.availability import CloudFeature, assert_provider_available
+    from app.cloud.providers import normalize_provider
+
+    csp = normalize_provider(config_dict.get("csp") or "AWS")
+    assert_byoc_feature_ready(user.username, csp, CloudFeature.PROVISION)
+    assert_provider_available(user.username, csp, CloudFeature.PROVISION)
     cloud_env, cred_err = _resolve_provision_env(user, config_dict)
     if cred_err:
         raise HTTPException(status_code=400, detail=cred_err)
@@ -984,8 +1056,10 @@ async def list_deployments(user: dict = Depends(get_current_user)):
     List deployments split into recent (non-archived, max RECENT_DEPLOYMENTS_LIMIT)
     and history (archived). Excess active rows are auto-archived on each list/save.
     """
+    from app.organizations.resource_acl import list_filter_for_user
+
     collection = _get_deployments_collection()
-    user_filter = {"user_id": user.username}
+    user_filter = list_filter_for_user(user.username, user_field="user_id")
 
     await asyncio.to_thread(_auto_archive_excess_deployments, user.username)
 
@@ -1115,12 +1189,15 @@ async def deployment_handoff(
     has_vm = any(r.get("type") == "vm" for r in created) or config.get("enable_ec2") or config.get("enable_gce") or config.get("enable_azure_vm")
     has_storage = any(r.get("type") == "bucket" for r in created) or config.get("enable_s3") or config.get("enable_gcs") or config.get("enable_azure_storage")
 
+    storage_bucket = next((r for r in created if r.get("type") == "bucket"), None)
+
     return {
         "deployment_id": deployment_id,
         "deployment_display_name": config.get("deployment_display_name") or deployment_id,
         "csp": deployment.get("csp") or config.get("csp", "AWS"),
         "status": deployment.get("status"),
         "created_resources": created,
+        "storage_prefill": storage_bucket,
         "estimated_monthly": cost.get("total_monthly_cost", "0.00"),
         "workload_description": config.get("workload_description"),
         "handoff_links": {
@@ -1212,7 +1289,7 @@ async def check_drift(
                 status_code=400,
                 detail=(
                     "This deployment has no Terraform workspace. "
-                    "Use the SDK/Boto3 fast path in Settings or redeploy with Terraform."
+                    "Use Fast path (Cloud SDK) in Settings or redeploy with Terraform."
                 ),
             )
         drift_report = detect_drift(workspace, cloud_env=cloud_env)
@@ -1469,8 +1546,15 @@ def _save_deployment(
 
     enabled = enabled_module_keys(config)
 
+    from app.organizations.limits import maybe_assert_org_quotas
+    from app.organizations.resource_acl import org_tags_for_create
+
+    maybe_assert_org_quotas(user_id)
+
     doc = {
         "user_id": user_id,
+        "created_by": user_id,
+        **org_tags_for_create(user_id),
         "deployment_name": deployment_id,
         "csp": config.get("csp", "AWS"),
         "template": config.get("template"),

@@ -1,9 +1,11 @@
 import React, { useEffect, useRef } from 'react';
 import { NavLink } from 'react-router-dom';
-import { FaQuestionCircle, FaUserShield } from 'react-icons/fa';
+import { FaLock, FaQuestionCircle, FaUserShield } from 'react-icons/fa';
+import { usePlanEntitlementsContext } from '../../context/PlanEntitlementsContext.jsx';
 
 function MobileNavMoreSheet({ isOpen, onClose, items, user }) {
   const closeRef = useRef(null);
+  const { isNavLocked, openUpgradeDrawer } = usePlanEntitlementsContext();
 
   useEffect(() => {
     if (!isOpen) return undefined;
@@ -63,6 +65,29 @@ function MobileNavMoreSheet({ isOpen, onClose, items, user }) {
               icon = <span className="mobile-nav-sheet__avatar">{item.userInitial ?? userInitial}</span>;
             }
 
+            const lockId = item.navLockId || item.navId;
+            const locked = lockId ? isNavLocked(lockId) : false;
+
+            if (locked && item.lockNavBlock) {
+              return (
+                <li key={key} role="none">
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="mobile-nav-sheet__link mobile-nav-sheet__link--locked"
+                    onClick={() => {
+                      openUpgradeDrawer(lockId);
+                      onClose();
+                    }}
+                  >
+                    {icon ? <span className="mobile-bottom-nav__icon">{icon}</span> : null}
+                    <span>{item.label}</span>
+                    <FaLock className="rail-link-lock" aria-hidden />
+                  </button>
+                </li>
+              );
+            }
+
             return (
               <li key={key} role="none">
                 <NavLink
@@ -76,6 +101,7 @@ function MobileNavMoreSheet({ isOpen, onClose, items, user }) {
                 >
                   {icon ? <span className="mobile-bottom-nav__icon">{icon}</span> : null}
                   <span>{item.label}</span>
+                  {locked && <FaLock className="rail-link-lock" aria-hidden />}
                 </NavLink>
               </li>
             );

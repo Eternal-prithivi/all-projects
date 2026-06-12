@@ -26,6 +26,13 @@ def reset_aws_username(token: contextvars.Token) -> None:
 
 
 def aws_region() -> str:
+    from app.vm.platform_region_context import get_platform_region_slug
+    from app.vm.platform_regions import resolve_vm_compute
+
+    slug = get_platform_region_slug()
+    if slug:
+        return resolve_vm_compute("AWS", slug)["aws_region"]
+
     username = _aws_username.get()
     if username:
         aws = resolve_aws_credentials(username)

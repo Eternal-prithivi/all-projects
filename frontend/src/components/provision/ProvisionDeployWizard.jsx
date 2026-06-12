@@ -1,12 +1,24 @@
 // ProvisionDeployWizard.jsx — intent-first stack provisioning (uses BYOC from Settings)
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { FaDatabase, FaGlobe, FaServer } from 'react-icons/fa';
-import api from '../../api';
+import api, { getApiErrorMessage } from '../../api';
 import { getApiBaseUrl, getApiRoot } from '../../config/apiBase.js';
 import ProvisionIntentPanel from './ProvisionIntentPanel.jsx';
+import ProvisionCatalogPicker from './ProvisionCatalogPicker.jsx';
 import TriCloudComparePanel from './TriCloudComparePanel.jsx';
 import PlainEnglishReview from './PlainEnglishReview.jsx';
 import ProvisionSuccessPanel from './ProvisionSuccessPanel.jsx';
+import { getEffectiveEngineLabel } from '../../utils/provisionEngine.js';
+import {
+  AZURE_IDENTITY_PRESETS,
+  AZURE_OS_IMAGES,
+  EC2_OS_IMAGES,
+  EC2_USER_DATA_PLACEHOLDER,
+  GCE_OS_IMAGES,
+  GCP_SA_PRESETS,
+  IAM_ROLE_PRESETS,
+  VM_STARTUP_SCRIPT_PLACEHOLDER,
+} from '../../data/provisionOptions.js';
 
 /** API catalog uses icon keys; map to react-icons for consistent 48×48 tiles. */
 const TEMPLATE_ICON_MAP = {
@@ -26,42 +38,6 @@ function TemplateCardIcon({ icon }) {
   return <FaGlobe className="template-card-icon-svg" aria-hidden />;
 }
 
-const TEMPLATES = [
-  {
-    key: 'static-site',
-    name: 'Static Website',
-    description: 'Host a static HTML/CSS/JS website on S3. Private, encrypted, free tier eligible.',
-    icon: 'globe',
-    cost: '$0.00/month',
-    services: { enable_s3: true },
-  },
-  {
-    key: 'backend-app',
-    name: 'Backend Application',
-    description: 'EC2 instance with VPC networking, IAM role, and CloudWatch monitoring.',
-    icon: 'server',
-    cost: '$0.00/month',
-    services: { enable_vpc: true, enable_ec2: true, enable_iam: true, enable_cloudwatch: true },
-  },
-  {
-    key: 'serverless-db',
-    name: 'Serverless Database',
-    description: 'DynamoDB table with provisioned capacity within AWS always-free limits.',
-    icon: 'database',
-    cost: '$0.00/month',
-    services: { enable_dynamodb: true },
-  },
-];
-
-const MODULES = [
-  { key: 'vpc', name: 'VPC', desc: 'Virtual Private Cloud with public/private subnets', flag: 'enable_vpc' },
-  { key: 'ec2', name: 'EC2', desc: 'Elastic Compute Cloud instance', flag: 'enable_ec2', requires: ['vpc'] },
-  { key: 's3', name: 'S3', desc: 'Simple Storage Service bucket', flag: 'enable_s3' },
-  { key: 'iam', name: 'IAM', desc: 'Identity & Access Management role', flag: 'enable_iam' },
-  { key: 'cloudwatch', name: 'CloudWatch', desc: 'Monitoring & alerting', flag: 'enable_cloudwatch', requires: ['ec2'] },
-  { key: 'dynamodb', name: 'DynamoDB', desc: 'NoSQL database table', flag: 'enable_dynamodb' },
-];
-
 const STEP_LABELS = ['Intent', 'Cloud', 'Configure', 'Review', 'Build'];
 
 /** Initial POST returns quickly; poll status for terraform output. */
@@ -79,17 +55,6 @@ function isNetworkFailure(err) {
 }
 
 function formatProvisionError(err, fallback, { duringPoll = false } = {}) {
-  const data = err.response?.data;
-  if (data && typeof data === 'object') {
-    if (data.error) return String(data.error);
-    if (data.detail) {
-      if (typeof data.detail === 'string') return data.detail;
-      if (Array.isArray(data.detail)) {
-        return data.detail.map((d) => d.msg || JSON.stringify(d)).join('; ');
-      }
-    }
-    if (data.message) return String(data.message);
-  }
   if (err.code === 'ECONNABORTED') {
     return 'Request timed out. Terraform may still be running — wait a minute, check Render logs, or try again.';
   }
@@ -108,6 +73,8 @@ function formatProvisionError(err, fallback, { duringPoll = false } = {}) {
       'Vercel: VITE_API_URL=https://zenith-backend-707i.onrender.com (no /api), then redeploy frontend.'
     );
   }
+  const parsed = getApiErrorMessage(err, '');
+  if (parsed) return parsed;
   if (err.response?.status) {
     return `${fallback} (HTTP ${err.response.status})`;
   }
@@ -174,25 +141,22 @@ export default function ProvisionDeployWizard({
   availableProviders = ['AWS', 'GCP', 'Azure'],
   defaultProvider = 'AWS',
   onDeployed,
+  onEngineChange: _onEngineChange,
 }) {
-  const [csp, setCsp] = useState(
-    availableProviders.includes(defaultProvider) ? defaultProvider : availableProviders[0] || 'AWS'
-  );
-  const engineLabel =
-    csp === 'AWS'
-      ? userProvisionEngine === 'terraform'
-        ? 'Terraform'
-        : 'Boto3'
-      : userProvisionEngine === 'terraform'
-        ? 'Terraform'
-        : 'Cloud SDK';
-  const [templates, setTemplates] = useState(TEMPLATES);
-  const [modules, setModules] = useState(MODULES);
+  const initialCsp = availableProviders.includes(defaultProvider)
+    ? defaultProvider
+    : availableProviders[0] || 'AWS';
+  const [csp, setCsp] = useState(initialCsp);
+  const engineLabel = getEffectiveEngineLabel(userProvisionEngine);
+  const [buildPath, setBuildPath] = useState('intent');
+  const [templates, setTemplates] = useState([]);
+  const [modules, setModules] = useState([]);
+  const [catalogLoading, setCatalogLoading] = useState(true);
   const [step, setStep] = useState(0);
   const [selectedTemplate, setSelectedTemplate] = useState(null);
 
   const [config, setConfig] = useState({
-    csp: 'AWS',
+    csp: initialCsp,
     template: null,
     aws_region: 'ap-south-1',
     gcp_region: 'us-central1',
@@ -229,8 +193,17 @@ export default function ProvisionDeployWizard({
     instance_type: 't2.micro',
     instance_name: '',
     ami_id: '',
+    ec2_os: 'amazon_linux_2',
+    ec2_user_data: '',
+    gce_os: 'debian_12',
+    gce_startup_script: '',
+    gcp_sa_preset: 'gcs_read_only',
+    azure_os: 'ubuntu_22_04',
+    azure_startup_script: '',
+    azure_identity_preset: 'storage_blob_read',
     bucket_name: '',
     role_name: 'app-role',
+    iam_role_preset: 's3_read_only',
     alarm_email: '',
     budget_limit: '1',
     budget_email: '',
@@ -270,6 +243,7 @@ export default function ProvisionDeployWizard({
 
   useEffect(() => {
     let cancelled = false;
+    setCatalogLoading(true);
     (async () => {
       try {
         const [tRes, mRes] = await Promise.all([
@@ -285,12 +259,33 @@ export default function ProvisionDeployWizard({
           setTemplates([]);
           setModules([]);
         }
+      } finally {
+        if (!cancelled) setCatalogLoading(false);
       }
     })();
     return () => {
       cancelled = true;
     };
   }, [csp]);
+
+  useEffect(() => {
+    setConfig((prev) => (prev.csp === csp ? prev : { ...prev, csp }));
+  }, [csp]);
+
+  const describeEnabledModules = useCallback(() => {
+    const names = modules.filter((m) => config[m.flag]).map((m) => m.name);
+    return names.length ? `Direct build: ${names.join(', ')}` : '';
+  }, [modules, config]);
+
+  const buildProvisionPayload = useCallback(() => {
+    const desc = workloadDescription.trim() || describeEnabledModules();
+    return {
+      ...config,
+      csp,
+      workload_description: desc,
+      intent_recommendation: intentAnalysis?.recommendation,
+    };
+  }, [config, csp, workloadDescription, describeEnabledModules, intentAnalysis]);
 
   useEffect(() => {
     if (!availableProviders.includes(csp) && availableProviders.length > 0) {
@@ -303,6 +298,13 @@ export default function ProvisionDeployWizard({
     setCsp(next);
     setSelectedTemplate(null);
     setStep(0);
+    setConfig((prev) => ({ ...prev, csp: next, template: null, ...EMPTY_FLAGS }));
+  };
+
+  const handleCatalogCspChange = (next) => {
+    if (next === csp) return;
+    setCsp(next);
+    setSelectedTemplate(null);
     setConfig((prev) => ({ ...prev, csp: next, template: null, ...EMPTY_FLAGS }));
   };
 
@@ -331,6 +333,7 @@ export default function ProvisionDeployWizard({
   };
 
   const toggleModule = (flag) => {
+    setBuildPath('catalog');
     setSelectedTemplate(null); // Custom mode
     setConfig(prev => {
       const next = { ...prev, template: 'custom', [flag]: !prev[flag] };
@@ -389,6 +392,31 @@ export default function ProvisionDeployWizard({
     }
   }, [templates, csp]);
 
+  const applyRecommendation = useCallback(async (rec, trimmedDesc) => {
+    const moduleFlags = rec.module_flags || {};
+    const hasModuleFlags = Object.values(moduleFlags).some(Boolean);
+
+    if (hasModuleFlags) {
+      const tmplKey = rec.template || 'custom';
+      setSelectedTemplate(tmplKey === 'custom' ? null : tmplKey);
+      setConfig((prev) => ({
+        ...prev,
+        ...EMPTY_FLAGS,
+        ...Object.fromEntries(
+          Object.entries(moduleFlags).map(([flag, on]) => [flag, Boolean(on)]),
+        ),
+        template: tmplKey,
+        size_profile: rec.size_profile || prev.size_profile || 'micro',
+        workload_description: trimmedDesc ?? prev.workload_description,
+      }));
+      return;
+    }
+
+    if (rec.template) {
+      await applyTemplateByKey(rec.template, rec.size_profile || 'micro', trimmedDesc);
+    }
+  }, [applyTemplateByKey]);
+
   const runIntentAnalysis = useCallback(async () => {
     const trimmed = workloadDescription.trim();
     if (trimmed.length < 3) {
@@ -400,23 +428,25 @@ export default function ProvisionDeployWizard({
       const res = await api.post('/provision/analyze-intent', {
         workload_description: trimmed,
         follow_up_answers: Object.keys(followUpAnswers).length ? followUpAnswers : null,
+        csp,
       });
       setIntentAnalysis(res.data);
-      if (res.data?.recommendation?.template) {
-        await applyTemplateByKey(
-          res.data.recommendation.template,
-          res.data.recommendation.size_profile || 'micro',
-          trimmed,
-        );
+      const rec = res.data?.recommendation;
+      if (rec) {
+        await applyRecommendation(rec, trimmed);
       }
     } catch (err) {
       console.error('Intent analysis failed', err);
     } finally {
       setIsAnalyzingIntent(false);
     }
-  }, [workloadDescription, followUpAnswers, applyTemplateByKey]);
+  }, [workloadDescription, followUpAnswers, csp, applyRecommendation]);
 
   useEffect(() => {
+    if (buildPath !== 'intent') {
+      if (intentDebounceRef.current) clearTimeout(intentDebounceRef.current);
+      return undefined;
+    }
     if (intentDebounceRef.current) clearTimeout(intentDebounceRef.current);
     if (workloadDescription.trim().length < 3) {
       setIntentAnalysis(null);
@@ -426,7 +456,7 @@ export default function ProvisionDeployWizard({
     return () => {
       if (intentDebounceRef.current) clearTimeout(intentDebounceRef.current);
     };
-  }, [workloadDescription, followUpAnswers, runIntentAnalysis]);
+  }, [workloadDescription, followUpAnswers, runIntentAnalysis, buildPath]);
 
   const loadCloudCompare = useCallback(async () => {
     const template = selectedTemplate || intentAnalysis?.recommendation?.template || 'backend-app';
@@ -456,6 +486,7 @@ export default function ProvisionDeployWizard({
   }, [step, loadCloudCompare]);
 
   const applyCompareSelection = async (row) => {
+    const cloudChanged = row.csp !== csp;
     setCsp(row.csp);
     const tmplKey = row.template || selectedTemplate;
     try {
@@ -464,7 +495,16 @@ export default function ProvisionDeployWizard({
       setTemplates(list);
       const tmpl = list.find((t) => t.key === tmplKey);
       if (tmpl) selectTemplate(tmpl);
-      else {
+      else if (cloudChanged) {
+        setSelectedTemplate(null);
+        setConfig((prev) => ({
+          ...prev,
+          csp: row.csp,
+          template: 'custom',
+          ...EMPTY_FLAGS,
+          size_profile: prev.size_profile || 'micro',
+        }));
+      } else {
         setSelectedTemplate(tmplKey);
         setConfig((prev) => ({ ...prev, csp: row.csp, template: tmplKey }));
       }
@@ -472,7 +512,8 @@ export default function ProvisionDeployWizard({
       setConfig((prev) => ({
         ...prev,
         csp: row.csp,
-        template: tmplKey,
+        template: cloudChanged ? 'custom' : tmplKey,
+        ...(cloudChanged ? EMPTY_FLAGS : {}),
         size_profile: prev.size_profile || 'micro',
       }));
     }
@@ -509,7 +550,8 @@ export default function ProvisionDeployWizard({
         );
         return;
       }
-      const res = await api.post('/provision/plan', config, {
+      const planPayload = buildProvisionPayload();
+      const res = await api.post('/provision/plan', planPayload, {
         timeout: PLAN_START_TIMEOUT_MS,
       });
       setPolicyResult(res.data.policy_check);
@@ -519,7 +561,8 @@ export default function ProvisionDeployWizard({
 
       // Background plan — poll until done (avoids Render 502 on long terraform)
       if (res.data.status === 'running' && res.data.deployment_id) {
-        setPlanOutput(`Starting ${planEngine === 'terraform' ? 'Terraform' : 'Boto3'} plan on the server…\n`);
+        const planLabel = getEffectiveEngineLabel(planEngine === 'terraform' ? 'terraform' : 'boto3');
+        setPlanOutput(`Starting ${planLabel} plan on the server…\n`);
         for (let attempt = 0; attempt < PLAN_POLL_MAX_ATTEMPTS; attempt += 1) {
           await sleep(PLAN_POLL_INTERVAL_MS);
           let st;
@@ -594,7 +637,7 @@ export default function ProvisionDeployWizard({
     if (!deploymentId || !planReady) return;
     setLoading(true);
     setError(null);
-    setPlanOutput((prev) => `${prev}\n\nApplying changes in AWS (this can take several minutes)…\n`);
+    setPlanOutput((prev) => `${prev}\n\nApplying changes on ${csp} (this can take several minutes)…\n`);
     try {
       const res = await api.post(`/provision/apply/${deploymentId}`, {
         timeout: 10 * 60 * 1000,
@@ -618,21 +661,26 @@ export default function ProvisionDeployWizard({
         setPlanOutput(prev => prev + '\n\n❌ Apply failed: ' + (res.data.error || 'unknown error'));
       }
     } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to apply');
+      setError(getApiErrorMessage(err, 'Failed to apply'));
     } finally {
       setLoading(false);
     }
   };
 
   const nextStep = () => {
-    if (step === 0 && workloadDescription.trim().length < 3) {
-      setError('Please describe what you want to build.');
-      return;
-    }
     if (step === 0) {
+      if (buildPath === 'catalog' && !hasAnyModule) {
+        setError('Select at least one module (e.g. S3) to continue.');
+        return;
+      }
+      if (buildPath === 'intent' && workloadDescription.trim().length < 3) {
+        setError('Please describe what you want to build, or switch to Pick modules directly.');
+        return;
+      }
       setConfig((prev) => ({
         ...prev,
-        workload_description: workloadDescription.trim(),
+        csp,
+        workload_description: workloadDescription.trim() || describeEnabledModules(),
         intent_recommendation: intentAnalysis?.recommendation,
       }));
     }
@@ -670,7 +718,7 @@ export default function ProvisionDeployWizard({
       a.remove();
       window.URL.revokeObjectURL(url);
     } catch (err) {
-      setError(err.response?.data?.detail || 'Terraform export not available for this deployment');
+      setError(getApiErrorMessage(err, 'Terraform export not available for this deployment'));
     }
   };
 
@@ -682,7 +730,7 @@ export default function ProvisionDeployWizard({
       setLoading(true);
       setReviewSummaryLoading(true);
       setError(null);
-      const payload = { ...config, csp, workload_description: workloadDescription.trim() };
+      const payload = buildProvisionPayload();
       try {
         const [policyRes, costRes, summaryRes] = await Promise.all([
           api.post('/provision/policy-check', payload),
@@ -695,7 +743,7 @@ export default function ProvisionDeployWizard({
         setReviewSummary(summaryRes.data);
       } catch (err) {
         if (!cancelled) {
-          setError(err.response?.data?.detail || 'Failed to run review');
+          setError(getApiErrorMessage(err, 'Failed to run review'));
         }
       } finally {
         if (!cancelled) {
@@ -714,7 +762,9 @@ export default function ProvisionDeployWizard({
     }
   }, [planOutput]);
 
-  const canProceedStep0 = workloadDescription.trim().length >= 3;
+  const canProceedStep0 = buildPath === 'catalog'
+    ? hasAnyModule
+    : workloadDescription.trim().length >= 3;
   const canProceedStep1 = hasAnyModule && Boolean(csp);
 
   return (
@@ -736,9 +786,8 @@ export default function ProvisionDeployWizard({
       <div className="section-header">
         <h3>Build a new stack</h3>
         <p>
-          Describe what you need — we help you choose and build once. Provider: <strong>{csp}</strong> · Engine:{' '}
-          <strong>{engineLabel}</strong>
-          {csp === 'AWS' && ' (change in Settings → Infrastructure provisioning)'}.
+          Cloud: <strong>{csp}</strong> · Engine: <strong>{engineLabel}</strong>.
+          {' '}Use the toggle above the tabs to switch between Fast path (Cloud SDK) and Terraform.
         </p>
       </div>
 
@@ -760,17 +809,51 @@ export default function ProvisionDeployWizard({
         </div>
       )}
 
-      {/* Step 0: Intent */}
+      {/* Step 0: Intent or direct module pick */}
       {step === 0 && (
         <div>
-          <ProvisionIntentPanel
-            workloadDescription={workloadDescription}
-            onWorkloadChange={setWorkloadDescription}
-            analysis={intentAnalysis}
-            isAnalyzing={isAnalyzingIntent}
-            followUpAnswers={followUpAnswers}
-            onFollowUpChange={handleFollowUpChange}
-          />
+          <div className="provision-build-path-tabs" role="tablist" aria-label="How to start building">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={buildPath === 'intent'}
+              className={`provision-build-path-tab ${buildPath === 'intent' ? 'active' : ''}`}
+              onClick={() => { setBuildPath('intent'); setError(null); }}
+            >
+              Describe your goal
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={buildPath === 'catalog'}
+              className={`provision-build-path-tab ${buildPath === 'catalog' ? 'active' : ''}`}
+              onClick={() => { setBuildPath('catalog'); setError(null); }}
+            >
+              Pick modules directly
+            </button>
+          </div>
+
+          {buildPath === 'intent' ? (
+            <ProvisionIntentPanel
+              workloadDescription={workloadDescription}
+              onWorkloadChange={setWorkloadDescription}
+              analysis={intentAnalysis}
+              isAnalyzing={isAnalyzingIntent}
+              followUpAnswers={followUpAnswers}
+              onFollowUpChange={handleFollowUpChange}
+            />
+          ) : (
+            <ProvisionCatalogPicker
+              modules={modules}
+              config={config}
+              csp={csp}
+              loading={catalogLoading}
+              availableProviders={availableProviders}
+              onCspChange={handleCatalogCspChange}
+              onToggleModule={toggleModule}
+            />
+          )}
+
           <div className="provision-actions">
             <button className="btn-provision primary" disabled={!canProceedStep0} onClick={nextStep} type="button">
               Next: Compare clouds →
@@ -874,7 +957,7 @@ export default function ProvisionDeployWizard({
             )}
             {csp === 'AWS' && (
             <div className="config-field">
-              <label>AWS Region</label>
+              <label>Region (AWS)</label>
               <select className="zenith-select" value={config.aws_region} onChange={e => updateConfig('aws_region', e.target.value)}>
                 <option value="ap-south-1">Asia Pacific (Mumbai)</option>
                 <option value="us-east-1">US East (N. Virginia)</option>
@@ -888,7 +971,7 @@ export default function ProvisionDeployWizard({
             {csp === 'GCP' && (
               <>
                 <div className="config-field">
-                  <label>GCP Region</label>
+                  <label>Region (GCP)</label>
                   <select className="zenith-select" value={config.gcp_region} onChange={e => updateConfig('gcp_region', e.target.value)}>
                     <option value="us-central1">us-central1</option>
                     <option value="us-east1">us-east1</option>
@@ -909,6 +992,22 @@ export default function ProvisionDeployWizard({
                 {config.enable_gce && (
                   <>
                     <div className="config-field">
+                      <label htmlFor="provision-gce-os">Operating system</label>
+                      <select
+                        id="provision-gce-os"
+                        className="zenith-select"
+                        value={config.gce_os}
+                        onChange={(e) => updateConfig('gce_os', e.target.value)}
+                      >
+                        {GCE_OS_IMAGES.map((os) => (
+                          <option key={os.id} value={os.id}>{os.label}</option>
+                        ))}
+                      </select>
+                      <p className="config-field-hint">
+                        {GCE_OS_IMAGES.find((o) => o.id === config.gce_os)?.description}
+                      </p>
+                    </div>
+                    <div className="config-field">
                       <label>Machine Type</label>
                       <select className="zenith-select" value={config.machine_type} onChange={e => updateConfig('machine_type', e.target.value)}>
                         <option value="e2-micro">e2-micro (Free tier eligible)</option>
@@ -925,18 +1024,53 @@ export default function ProvisionDeployWizard({
                         placeholder="zenith-gce-app"
                       />
                     </div>
+                    <div className="config-field">
+                      <label htmlFor="provision-gce-startup">Bootstrap script (optional)</label>
+                      <textarea
+                        id="provision-gce-startup"
+                        className="provision-intent-textarea"
+                        rows={6}
+                        value={config.gce_startup_script}
+                        onChange={(e) => updateConfig('gce_startup_script', e.target.value)}
+                        placeholder={VM_STARTUP_SCRIPT_PLACEHOLDER}
+                      />
+                      <p className="config-field-hint">
+                        Shell script run once at first boot (GCE metadata startup-script).
+                      </p>
+                    </div>
                   </>
                 )}
                 {config.enable_gcp_service_account && (
-                  <div className="config-field">
-                    <label>Service Account ID</label>
-                    <input
-                      type="text"
-                      value={config.service_account_id}
-                      onChange={e => updateConfig('service_account_id', e.target.value)}
-                      placeholder="zenith-app-sa"
-                    />
-                  </div>
+                  <>
+                    <div className="config-field">
+                      <label htmlFor="provision-gcp-sa-preset">Service account permissions</label>
+                      <select
+                        id="provision-gcp-sa-preset"
+                        className="zenith-select"
+                        value={config.gcp_sa_preset}
+                        onChange={(e) => updateConfig('gcp_sa_preset', e.target.value)}
+                      >
+                        {GCP_SA_PRESETS.map((preset) => (
+                          <option key={preset.id} value={preset.id}>{preset.label}</option>
+                        ))}
+                      </select>
+                      <p className="config-field-hint">
+                        {GCP_SA_PRESETS.find((p) => p.id === config.gcp_sa_preset)?.description}
+                      </p>
+                    </div>
+                    <div className="config-field">
+                      <label>Service Account ID</label>
+                      <input
+                        type="text"
+                        value={config.service_account_id}
+                        onChange={e => updateConfig('service_account_id', e.target.value)}
+                        placeholder="zenith-app-sa"
+                      />
+                      <p className="config-field-hint">
+                        Attached to GCE at launch when both GCE and service account modules are enabled.
+                      </p>
+                    </div>
+                  </>
                 )}
                 {config.enable_gcp_monitoring && (
                   <div className="config-field">
@@ -966,9 +1100,11 @@ export default function ProvisionDeployWizard({
             {csp === 'Azure' && (
               <>
                 <div className="config-field">
-                  <label>Azure Region</label>
+                  <label>Region (Azure)</label>
                   <select className="zenith-select" value={config.azure_location} onChange={e => updateConfig('azure_location', e.target.value)}>
                     <option value="eastus">East US</option>
+                    <option value="westus2">West US 2</option>
+                    <option value="centralus">Central US</option>
                     <option value="westeurope">West Europe</option>
                     <option value="southeastasia">Southeast Asia</option>
                   </select>
@@ -980,6 +1116,11 @@ export default function ProvisionDeployWizard({
                     value={config.resource_group_name}
                     onChange={e => updateConfig('resource_group_name', e.target.value)}
                   />
+                  <p className="config-field-hint">
+                    If this name already exists in another region, Zenith uses{' '}
+                    {config.resource_group_name || 'zenith-rg'}-{config.azure_location || 'region'}{' '}
+                    automatically.
+                  </p>
                 </div>
                 {config.enable_azure_storage && (
                   <>
@@ -1005,11 +1146,48 @@ export default function ProvisionDeployWizard({
                 {config.enable_azure_vm && (
                   <>
                     <div className="config-field">
+                      <label htmlFor="provision-azure-os">Operating system</label>
+                      <select
+                        id="provision-azure-os"
+                        className="zenith-select"
+                        value={config.azure_os}
+                        onChange={(e) => updateConfig('azure_os', e.target.value)}
+                      >
+                        {AZURE_OS_IMAGES.map((os) => (
+                          <option key={os.id} value={os.id}>{os.label}</option>
+                        ))}
+                      </select>
+                      <p className="config-field-hint">
+                        {AZURE_OS_IMAGES.find((o) => o.id === config.azure_os)?.description}
+                      </p>
+                    </div>
+                    <div className="config-field">
+                      <label htmlFor="provision-azure-identity-preset">Managed identity permissions</label>
+                      <select
+                        id="provision-azure-identity-preset"
+                        className="zenith-select"
+                        value={config.azure_identity_preset}
+                        onChange={(e) => updateConfig('azure_identity_preset', e.target.value)}
+                      >
+                        {AZURE_IDENTITY_PRESETS.map((preset) => (
+                          <option key={preset.id} value={preset.id}>{preset.label}</option>
+                        ))}
+                      </select>
+                      <p className="config-field-hint">
+                        {AZURE_IDENTITY_PRESETS.find((p) => p.id === config.azure_identity_preset)?.description}
+                      </p>
+                    </div>
+                    <div className="config-field">
                       <label>VM Size</label>
                       <select className="zenith-select" value={config.vm_size} onChange={e => updateConfig('vm_size', e.target.value)}>
                         <option value="Standard_B1s">Standard_B1s (Free tier eligible)</option>
+                        <option value="Standard_B1ms">Standard_B1ms (Burstable)</option>
                         <option value="Standard_B2s">Standard_B2s</option>
+                        <option value="Standard_B2ms">Standard_B2ms</option>
                       </select>
+                      <p className="config-field-hint">
+                        If a size is out of capacity in your region, Zenith tries similar sizes automatically.
+                      </p>
                     </div>
                     <div className="config-field">
                       <label>VM Name</label>
@@ -1019,6 +1197,20 @@ export default function ProvisionDeployWizard({
                         onChange={e => updateConfig('instance_name', e.target.value)}
                         placeholder="zenith-linux-vm"
                       />
+                    </div>
+                    <div className="config-field">
+                      <label htmlFor="provision-azure-startup">Bootstrap script (optional)</label>
+                      <textarea
+                        id="provision-azure-startup"
+                        className="provision-intent-textarea"
+                        rows={6}
+                        value={config.azure_startup_script}
+                        onChange={(e) => updateConfig('azure_startup_script', e.target.value)}
+                        placeholder={VM_STARTUP_SCRIPT_PLACEHOLDER}
+                      />
+                      <p className="config-field-hint">
+                        Shell script run once at first boot (cloud-init via custom_data).
+                      </p>
                     </div>
                   </>
                 )}
@@ -1061,6 +1253,22 @@ export default function ProvisionDeployWizard({
             {config.enable_ec2 && (
               <>
                 <div className="config-field">
+                  <label htmlFor="provision-ec2-os">Operating system</label>
+                  <select
+                    id="provision-ec2-os"
+                    className="zenith-select"
+                    value={config.ec2_os}
+                    onChange={(e) => updateConfig('ec2_os', e.target.value)}
+                  >
+                    {EC2_OS_IMAGES.map((os) => (
+                      <option key={os.id} value={os.id}>{os.label}</option>
+                    ))}
+                  </select>
+                  <p className="config-field-hint">
+                    {EC2_OS_IMAGES.find((o) => o.id === config.ec2_os)?.description}
+                  </p>
+                </div>
+                <div className="config-field">
                   <label>Instance Type</label>
                   <select className="zenith-select" value={config.instance_type} onChange={e => updateConfig('instance_type', e.target.value)}>
                     <option value="t2.micro">t2.micro (Free Tier)</option>
@@ -1079,6 +1287,31 @@ export default function ProvisionDeployWizard({
                     onChange={e => updateConfig('instance_name', e.target.value)}
                     placeholder="zenith-app-server"
                   />
+                </div>
+                <div className="config-field">
+                  <label htmlFor="provision-ec2-user-data">Bootstrap script (optional)</label>
+                  <textarea
+                    id="provision-ec2-user-data"
+                    className="provision-intent-textarea"
+                    rows={6}
+                    value={config.ec2_user_data}
+                    onChange={(e) => updateConfig('ec2_user_data', e.target.value)}
+                    placeholder={EC2_USER_DATA_PLACEHOLDER}
+                  />
+                  <p className="config-field-hint">
+                    Shell script run once at first boot (cloud-init). Leave empty for a plain OS install.
+                  </p>
+                </div>
+                <div className="config-field">
+                  <label htmlFor="provision-ami-override">Custom AMI ID (optional)</label>
+                  <input
+                    id="provision-ami-override"
+                    type="text"
+                    value={config.ami_id}
+                    onChange={(e) => updateConfig('ami_id', e.target.value)}
+                    placeholder="ami-0abcdef1234567890"
+                  />
+                  <p className="config-field-hint">Overrides the OS selector when set.</p>
                 </div>
               </>
             )}
@@ -1105,15 +1338,37 @@ export default function ProvisionDeployWizard({
             )}
 
             {config.enable_iam && (
-              <div className="config-field">
-                <label>IAM Role Name</label>
-                <input
-                  type="text"
-                  value={config.role_name}
-                  onChange={e => updateConfig('role_name', e.target.value)}
-                  placeholder="zenith-app-role"
-                />
-              </div>
+              <>
+                <div className="config-field">
+                  <label htmlFor="provision-iam-preset">Role permissions</label>
+                  <select
+                    id="provision-iam-preset"
+                    className="zenith-select"
+                    value={config.iam_role_preset}
+                    onChange={(e) => updateConfig('iam_role_preset', e.target.value)}
+                  >
+                    {IAM_ROLE_PRESETS.map((preset) => (
+                      <option key={preset.id} value={preset.id}>{preset.label}</option>
+                    ))}
+                  </select>
+                  <p className="config-field-hint">
+                    {IAM_ROLE_PRESETS.find((p) => p.id === config.iam_role_preset)?.description}
+                  </p>
+                </div>
+                <div className="config-field">
+                  <label htmlFor="provision-iam-role-name">IAM role name</label>
+                  <input
+                    id="provision-iam-role-name"
+                    type="text"
+                    value={config.role_name}
+                    onChange={e => updateConfig('role_name', e.target.value)}
+                    placeholder="zenith-app-role"
+                  />
+                  <p className="config-field-hint">
+                    Attached to EC2 at launch — not a console user; no access keys are created.
+                  </p>
+                </div>
+              </>
             )}
 
             {config.enable_dynamodb && (

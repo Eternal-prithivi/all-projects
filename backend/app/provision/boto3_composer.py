@@ -44,7 +44,7 @@ MODULE_FLAGS: dict[str, str] = {
     "billing": "enable_billing",
 }
 
-APPLY_ORDER = ("vpc", "ec2", "iam", "cloudwatch", "s3", "dynamodb", "billing")
+APPLY_ORDER = ("vpc", "iam", "ec2", "cloudwatch", "s3", "dynamodb", "billing")
 DESTROY_ORDER = ("billing", "dynamodb", "s3", "cloudwatch", "iam", "ec2", "vpc")
 
 _PLAN_HANDLERS = {

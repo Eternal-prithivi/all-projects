@@ -47,9 +47,13 @@ def test_available_providers_hybrid_union(byoc_connected, platform_ok, feature, 
     def fake_platform(provider, feat):
         return platform_ok.get(provider, False)
 
+    def fake_features(username, csp):
+        return {f.value: True for f in CloudFeature}
+
     with patch("app.cloud.availability.get_byoc_status", side_effect=fake_byoc):
         with patch("app.cloud.availability._platform_configured", side_effect=fake_platform):
-            assert available_providers("alice", feature) == expected
+            with patch("app.byoc.capabilities.byoc_features_ready", side_effect=fake_features):
+                assert available_providers("alice", feature) == expected
 
 
 def test_hybrid_mode_label():
@@ -81,13 +85,17 @@ def test_security_uses_hybrid_union_like_storage():
     def fake_platform(provider, feat):
         return provider in ("GCP", "Azure")
 
+    def fake_features(username, csp):
+        return {f.value: True for f in CloudFeature}
+
     with patch("app.cloud.availability.get_byoc_status", side_effect=fake_byoc):
         with patch("app.cloud.availability._platform_configured", side_effect=fake_platform):
-            assert available_providers("alice", CloudFeature.SECURITY) == [
-                "AWS",
-                "GCP",
-                "Azure",
-            ]
+            with patch("app.byoc.capabilities.byoc_features_ready", side_effect=fake_features):
+                assert available_providers("alice", CloudFeature.SECURITY) == [
+                    "AWS",
+                    "GCP",
+                    "Azure",
+                ]
 
 
 def test_platform_gcp_listed_without_service_account_file():
@@ -122,11 +130,16 @@ def test_build_payload_hybrid():
     def fake_byoc(username):
         return {"aws": {"connected": True}, "gcp": {"connected": False}, "azure": {"connected": False}}
 
+    def fake_features(username, csp):
+        return {f.value: True for f in CloudFeature}
+
     with patch("app.cloud.availability.get_byoc_status", side_effect=fake_byoc):
         with patch(
             "app.cloud.availability._platform_configured",
             side_effect=lambda p, f: p in ("GCP", "Azure"),
         ):
-            payload = build_availability_payload("bob")
+            with patch("app.byoc.capabilities.byoc_features_ready", side_effect=fake_features):
+                payload = build_availability_payload("bob")
     assert payload["credential_mode"] == "hybrid"
     assert "GCP" in payload["features"]["storage"]["providers"]
+    assert "byoc_capabilities" in payload

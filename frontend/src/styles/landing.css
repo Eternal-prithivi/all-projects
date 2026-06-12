@@ -834,6 +834,14 @@
   margin-bottom: 0.5rem;
 }
 
+.landing-pricing__tagline {
+  font-size: 0.88rem;
+  line-height: 1.45;
+  color: rgba(255, 255, 255, 0.55);
+  margin: 0 0 1rem;
+  min-height: 2.6em;
+}
+
 .landing-pricing__price {
   display: flex;
   align-items: baseline;

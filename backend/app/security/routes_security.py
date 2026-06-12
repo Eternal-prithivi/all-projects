@@ -68,6 +68,11 @@ from app.security.security_intelligence import (
 )
 from app.security.security_policy import get_user_security_preferences, resolve_upload_encryption_defaults
 from app.security.security_service import apply_vault_action, notify_encryption_pending
+from app.security.archive_password import (
+    ArchivePasswordError,
+    archive_password_required,
+    require_archived_file_access,
+)
 from app.storage.lifecycle_signals import build_download_access_update
 
 # The prefix is removed here as it is handled in main.py
@@ -88,13 +93,20 @@ def get_secure_files_collection() -> Collection:
     return mongodb_client.get_collection("secure_files")
 
 
-def _require_active_vault_file(file_doc: dict) -> None:
-    """Archived files must be restored before download or delete."""
-    if (file_doc.get("vault_status") or "active") == "archived":
+def _require_vault_file_access(
+    file_doc: dict,
+    archive_password: Optional[str] = None,
+) -> None:
+    """Active files are open; archived files need the archive password."""
+    if (file_doc.get("vault_status") or "active") != "archived":
+        return
+    try:
+        require_archived_file_access(file_doc, archive_password)
+    except ArchivePasswordError as exc:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="File is archived in the replica vault. Restore it before downloading or deleting.",
-        )
+            detail=str(exc),
+        ) from exc
 
 
 def _resolve_secure_bucket_sync(
@@ -505,7 +517,8 @@ class EncryptionChoiceRequest(BaseModel):
 
 class DecryptionRequest(BaseModel):
     filename: str
-    password: str  # User's password for decryption
+    password: str
+    archive_password: Optional[str] = None  # User's password for decryption
 
 
 class SecurityCostPreviewRequest(BaseModel):
@@ -519,6 +532,7 @@ class VaultActionRequest(BaseModel):
     filename: str
     action: str
     snooze_days: int = 30
+    archive_password: Optional[str] = None
 
 
 def _track_secure_download(files_db: Collection, file_doc: dict) -> None:
@@ -553,6 +567,7 @@ def _serialize_secure_file(file: dict, username: str) -> dict:
         "s3_key": file.get("s3_key"),
         "replication_enabled": file.get("replication_enabled", False),
         "vault_status": file.get("vault_status") or "active",
+        "archive_password_protected": archive_password_required(file),
         "last_accessed_at": file.get("last_accessed_at"),
         "ml_scan_score": file.get("ml_scan_score"),
         "insight": insight,
@@ -916,6 +931,7 @@ async def security_vault_action(
         body.filename,
         body.action,
         snooze_days=body.snooze_days,
+        archive_password=body.archive_password,
     )
     if not result.get("ok"):
         raise HTTPException(status_code=400, detail=result.get("detail", "Action failed"))
@@ -1016,13 +1032,15 @@ async def generate_secure_download_url(
     user: UserInDB = Depends(require_2fa),
     files_db: Collection = Depends(get_secure_files_collection),
     bucket: Optional[str] = Query(None),
+    archive_password: Optional[str] = Query(None),
 ):
     """
     Generates a pre-signed URL for securely downloading a file.
     For client-side encrypted files, returns metadata indicating password is needed.
+    Archived files require the archive password.
     """
     file_doc = find_secure_file(files_db, user.username, filename, bucket)
-    _require_active_vault_file(file_doc)
+    _require_vault_file_access(file_doc, archive_password)
     file_csp = file_doc.get("csp") or "AWS"
     storage = resolve_secure_storage(user.username, file_csp)
     object_key = file_doc.get("s3_key") or storage.object_key(user.username, filename)
@@ -1066,10 +1084,11 @@ async def download_client_encrypted_ciphertext(
     user: UserInDB = Depends(require_2fa),
     files_db: Collection = Depends(get_secure_files_collection),
     bucket: Optional[str] = Query(None),
+    archive_password: Optional[str] = Query(None),
 ):
     """Return raw ciphertext for browser-side decryption (zero-knowledge)."""
     file_doc = find_secure_file(files_db, user.username, filename, bucket)
-    _require_active_vault_file(file_doc)
+    _require_vault_file_access(file_doc, archive_password)
     file_csp = file_doc.get("csp") or "AWS"
     storage = resolve_secure_storage(user.username, file_csp)
     object_key = file_doc.get("s3_key") or storage.object_key(user.username, filename)
@@ -1110,7 +1129,7 @@ async def decrypt_and_download(
     Decrypts a client-side encrypted file with user's password and returns the file directly.
     """
     file_doc = find_secure_file(files_db, user.username, request.filename, bucket)
-    _require_active_vault_file(file_doc)
+    _require_vault_file_access(file_doc, request.archive_password)
     file_csp = file_doc.get("csp") or "AWS"
     storage = resolve_secure_storage(user.username, file_csp)
     object_key = file_doc.get("s3_key") or storage.object_key(
@@ -1170,12 +1189,14 @@ async def delete_secure_file(
     user: UserInDB = Depends(require_2fa),
     files_db: Collection = Depends(get_secure_files_collection),
     bucket: Optional[str] = Query(None),
+    archive_password: Optional[str] = Query(None),
 ):
     """
     Deletes a file from primary and replica secure vault (AWS, GCP, Azure) and MongoDB.
+    Archived files require the archive password.
     """
     file_doc = find_secure_file(files_db, user.username, filename, bucket)
-    _require_active_vault_file(file_doc)
+    _require_vault_file_access(file_doc, archive_password)
     file_csp = file_doc.get("csp") or "AWS"
     storage = resolve_secure_storage(user.username, file_csp)
     object_key = file_doc.get("s3_key") or storage.object_key(user.username, filename)

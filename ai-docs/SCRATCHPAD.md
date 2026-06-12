@@ -1,29 +1,24 @@
 # SCRATCHPAD.md
 
-## ✅ Last Known Good State
+## 🔄 Current Resume State
 
-**Status:** COMPLETE (2026-06-11)
+**Status:** IN PROGRESS (awaiting next provision issue from user)
 
-**Phase 22 — SaaS pages polish (zero/low-cost)** shipped.
+**Done this session (2026-06-12):** Fixed React crash when FastAPI returns validation `detail` arrays — `getApiErrorMessage` + all provision panels.
 
-**Key paths:**
-- Copy SSOT: `frontend/src/data/productFacts.js`, `frontend/src/config/billingConstants.js`
-- Backend: `dashboard/cost_snapshots.py`, `GET /api/dashboard/cost-trend`, `POST /api/support/tickets`, `DELETE /api/organizations/invites/{email}`
-- Pages: `DashboardPage`, `HelpCenterPage`, `BillingPage`, `SupportPage`, `TeamPage`, `CostAnalysisEnhancedPage`
-- Tests: `test_dashboard_cost_trend.py`, org revoke + support create in integration tests
-- Manual QA: `docs/testing/manual_testing.md` rows 6.4–6.10
+**Verify:** `npm test -- src/utils/apiError.test.js`; provision API smoke (status/deployments/audit-log/policies → 200); build passes.
 
-**Prior (Phase 20):** Trust docs + BYOC encryption hardening.
-
-**Quality gates:** `pytest tests/integration/test_dashboard_cost_trend.py tests/integration/test_organizations_api.py tests/integration/test_support_api.py -q`; `cd frontend && npm run build`
+**Next:** User may report additional provision page issues.
 
 ---
 
-## Step list (completed)
+## ✅ Last Known Good State
 
-- [x] productFacts + Help/marketing pricing rewrite
-- [x] Billing FX constant + API plan names
-- [x] Overview honesty + cost-trend Mongo snapshots
-- [x] Cost Analysis cleanup + CostHubNav dedup
-- [x] Team revoke/copy + Support in-app tickets + Admin polish
-- [x] manual_testing.md + ai-docs context updates
+**Provision error handling fix** (2026-06-12)
+
+- `frontend/src/api.js` — `getApiErrorMessage` handles Pydantic `{type,loc,msg}` arrays
+- Provision panels: Manage, Activity, Policies, DeployWizard use shared formatter
+- Test: `frontend/src/utils/apiError.test.js`
+- E2E smoke: `frontend/e2e/specs/provision-smoke.spec.ts` (needs `npx playwright install`)
+
+**Prior:** Phase 24 org billing — COMPLETE (2026-06-11)

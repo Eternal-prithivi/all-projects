@@ -98,13 +98,15 @@ def platform_cost_configured(provider: CloudProvider) -> bool:
     if provider == "AWS":
         return platform_storage_configured("AWS")
     if provider == "GCP":
-        return platform_storage_configured("GCP")
+        return platform_storage_configured("GCP") and bool(
+            settings.GCP_BILLING_DATASET_ID and settings.GCP_BILLING_TABLE_ID
+        )
     return bool(
         settings.AZURE_SUBSCRIPTION_ID
         and settings.AZURE_TENANT_ID
         and settings.AZURE_CLIENT_ID
         and settings.AZURE_CLIENT_SECRET
-    ) or platform_storage_configured("Azure")
+    )
 
 
 def _platform_configured(provider: CloudProvider, feature: CloudFeature) -> bool:
@@ -120,7 +122,30 @@ def _platform_configured(provider: CloudProvider, feature: CloudFeature) -> bool
 
 
 def _provider_available(username: str, provider: CloudProvider, feature: CloudFeature) -> bool:
-    return _byoc_connected(username, provider) or _platform_configured(provider, feature)
+    if _byoc_connected(username, provider):
+        from app.byoc.capabilities import byoc_features_ready
+
+        return byoc_features_ready(username, provider).get(feature.value, False)
+    return _platform_configured(provider, feature)
+
+
+def locked_byoc_providers(username: str, feature: CloudFeature) -> List[Dict[str, Any]]:
+    """BYOC-connected CSPs that are not ready for this feature."""
+    from app.byoc.capabilities import byoc_features_ready, byoc_setup_gaps
+
+    locked: List[Dict[str, Any]] = []
+    for provider in _ALL:
+        if not _byoc_connected(username, provider):
+            continue
+        if byoc_features_ready(username, provider).get(feature.value, False):
+            continue
+        gaps = byoc_setup_gaps(username, provider)
+        locked.append({
+            "csp": provider,
+            "gaps": [g["code"] for g in gaps],
+            "setup_gaps": gaps,
+        })
+    return locked
 
 
 def available_providers(username: str, feature: CloudFeature) -> List[CloudProvider]:
@@ -138,7 +163,10 @@ def provider_not_available_exception(
     provider: CloudProvider,
     feature: CloudFeature,
 ) -> HTTPException:
+    from app.byoc.capabilities import byoc_setup_gaps
+
     allowed = available_providers(username, feature)
+    setup_gaps = byoc_setup_gaps(username, provider) if _byoc_connected(username, provider) else []
     return HTTPException(
         status_code=403,
         detail={
@@ -151,6 +179,7 @@ def provider_not_available_exception(
             "feature": feature.value,
             "credential_mode": resolve_credential_mode(username),
             "available_providers": allowed,
+            "setup_gaps": setup_gaps,
         },
     )
 
@@ -182,9 +211,12 @@ def resolve_credential_mode(username: str) -> str:
 
 def build_availability_payload(username: str) -> Dict[str, Any]:
     """API response for GET /api/cloud/availability."""
+    from app.byoc.capabilities import build_byoc_capabilities_payload
+
     connected = [p for p in _ALL if _byoc_connected(username, p)]
     mode = resolve_credential_mode(username)
     sources = {p: credential_source(username, p) for p in _ALL}
+    byoc_capabilities = build_byoc_capabilities_payload(username)
 
     features: Dict[str, Any] = {}
     for feat in CloudFeature:
@@ -196,12 +228,14 @@ def build_availability_payload(username: str) -> Dict[str, Any]:
             "credential_sources": {
                 p: sources[p] for p in providers if p in sources
             },
+            "locked_providers": locked_byoc_providers(username, feat),
         }
 
     return {
         "credential_mode": mode,
         "byoc_connected": connected,
         "credential_sources": sources,
+        "byoc_capabilities": byoc_capabilities,
         "features": features,
         "summary": {
             "any_provider": any(

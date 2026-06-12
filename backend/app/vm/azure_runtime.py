@@ -54,6 +54,13 @@ def azure_resource_group() -> str:
 
 
 def azure_location() -> str:
+    from app.vm.platform_region_context import get_platform_region_slug
+    from app.vm.platform_regions import resolve_vm_compute
+
+    slug = get_platform_region_slug()
+    if slug:
+        return resolve_vm_compute("Azure", slug)["azure_location"]
+
     creds = _azure_creds()
     return (
         (creds.get("location") or "").strip()

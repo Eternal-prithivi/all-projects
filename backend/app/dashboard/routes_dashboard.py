@@ -197,6 +197,9 @@ async def refresh_dashboard_costs(user: dict = Depends(get_current_user)):
     Refresh monthly spend for every cost provider available to this user (hybrid).
     Total = sum of AWS + GCP + Azure where each is available (BYOC and/or platform).
     """
+    from app.payments.plan_entitlements import require_feature
+
+    require_feature(user.username, "live_billing")
     try:
         payload = refresh_user_costs(user.username, force=True)
         from app.config.demo_mode import is_demo_mode

@@ -106,3 +106,81 @@ def get_cost_trend(username: str, *, days: int = 7) -> Dict[str, Any]:
         "has_data": has_data,
         "demo_mode": demo,
     }
+
+
+def get_org_cost_trend(usernames: List[str], *, days: int = 7) -> Dict[str, Any]:
+    """Sum daily snapshots across org members — Mongo read only."""
+    days = max(1, min(days, 30))
+    if not usernames:
+        return {
+            "points": [],
+            "trend_pct": None,
+            "trend_direction": None,
+            "has_data": False,
+            "demo_mode": is_demo_mode(),
+        }
+
+    end = datetime.utcnow().date()
+    start = end - timedelta(days=days - 1)
+    start_str = start.isoformat()
+    end_str = end.isoformat()
+
+    col = _collection()
+    rows = list(
+        col.aggregate(
+            [
+                {
+                    "$match": {
+                        "username": {"$in": usernames},
+                        "date": {"$gte": start_str, "$lte": end_str},
+                    }
+                },
+                {"$group": {"_id": "$date", "total_usd": {"$sum": "$total_usd"}}},
+                {"$sort": {"_id": 1}},
+            ]
+        )
+    )
+    by_date = {r["_id"]: float(r.get("total_usd", 0)) for r in rows}
+    docs = list(
+        col.find(
+            {"username": {"$in": usernames}, "date": {"$gte": start_str, "$lte": end_str}},
+            {"demo_mode": 1},
+        )
+    )
+
+    points: List[Dict[str, Any]] = []
+    cursor = start
+    while cursor <= end:
+        key = cursor.isoformat()
+        points.append(
+            {
+                "date": key,
+                "label": cursor.strftime("%a"),
+                "value": round(by_date.get(key, 0.0), 2),
+            }
+        )
+        cursor += timedelta(days=1)
+
+    trend_pct = None
+    trend_direction = None
+    if len(points) >= 2:
+        first_half = sum(p["value"] for p in points[: len(points) // 2])
+        second_half = sum(p["value"] for p in points[len(points) // 2 :])
+        if first_half > 0:
+            change = ((second_half - first_half) / first_half) * 100
+            trend_pct = round(abs(change), 1)
+            trend_direction = "up" if change >= 0 else "down"
+        elif second_half > 0:
+            trend_pct = 100.0
+            trend_direction = "up"
+
+    has_data = any(p["value"] > 0 for p in points)
+    demo = any(d.get("demo_mode") for d in docs) or is_demo_mode()
+
+    return {
+        "points": points,
+        "trend_pct": trend_pct,
+        "trend_direction": trend_direction,
+        "has_data": has_data,
+        "demo_mode": demo,
+    }

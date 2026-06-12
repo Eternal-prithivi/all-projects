@@ -276,6 +276,31 @@
     background var(--duration-fast) var(--ease-out);
 }
 
+.billing-org-admin {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.75rem 1rem;
+  margin-top: 1rem;
+}
+
+.billing-org-admin label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.billing-input {
+  min-width: 6rem;
+  padding: 0.5rem 0.65rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+}
+
 .billing-btn--primary {
   background: linear-gradient(135deg, var(--gold-dark), var(--gold-primary));
   color: var(--bg-base);

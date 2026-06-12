@@ -18,19 +18,31 @@
 // =============================================================================
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useNotifications } from "../hooks/useNotifications";
+import { getApiErrorMessage } from "../api.js";
 import { useAuth } from "../context/AuthContext.jsx";
+import { useOrgContext } from "../hooks/useOrgContext.js";
+import OrgResourceMeta from "../components/OrgResourceMeta.jsx";
 import LoadingSpinner from "../components/LoadingSpinner.jsx";
 import EmptyState from "../components/EmptyState.jsx";
 import PageHeader from "../components/ui/PageHeader.jsx";
 import { usePageRefresh } from "../hooks/usePageRefresh.js";
 import { VMClusterSkeleton } from "../components/Skeletons.jsx";
 import WorkloadGuidancePanel from "../components/vm/WorkloadGuidancePanel.jsx";
+import ClusterSelector from "../components/vm/ClusterSelector.jsx";
+import ClusterTopologyRing from "../components/vm/ClusterTopologyRing.jsx";
+import ClusterHealthCard from "../components/vm/ClusterHealthCard.jsx";
+import VmConfigModal from "../components/vm/VmConfigModal.jsx";
+import VmCostPreview from "../components/vm/VmCostPreview.jsx";
+import {
+  VM_CLUSTER_FALLBACK,
+  VM_CLUSTER_SLUGS,
+  formatClusterLabel,
+} from "../constants/vmClusters.js";
 import ZenithModal from "../components/ui/ZenithModal.jsx";
 import {
   IconArrowRightLeft,
   IconClipboardList,
   IconDownload,
-  IconHardDrive,
   IconPlus,
   IconServer,
   IconTrash,
@@ -39,11 +51,16 @@ import CloudProviderToolbar, {
   filterFilesByCloudProvider,
 } from "../components/CloudProviderSelect.jsx";
 import CloudAvailabilityBanner from "../components/CloudAvailabilityBanner.jsx";
+import CloudCapabilityBanner from "../components/cloud/CloudCapabilityBanner.jsx";
+import CredentialSourceBadge from "../components/cloud/CredentialSourceBadge.jsx";
+import PlatformRegionPills from "../components/PlatformRegionPills.jsx";
+import { usePreferences } from "../context/PreferencesContext.jsx";
 import {
   useCloudAvailability,
   buildCloudProviderOptions,
   coerceCloudProvider,
 } from "../hooks/useCloudAvailability.js";
+import { usePlatformStorageRegions } from "../hooks/usePlatformStorageRegions.js";
 import "../styles/vmcluster.css";
 
 // API Functions
@@ -113,17 +130,68 @@ const getClusterHealth = (clusterType, token, csp = "GCP") =>
     { headers: { Authorization: `Bearer ${token}` } }
   ).then(handleApiResponse);
 
+const getVmClusters = (token, csp = "GCP") =>
+  fetch(`${API_BASE_URL}/clusters?csp=${encodeURIComponent(csp)}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  }).then(handleApiResponse);
+
+const getVmConfig = (vmName, token, csp = "GCP", platformRegionSlug = null) => {
+  const params = new URLSearchParams({ csp });
+  if (platformRegionSlug) {
+    params.set("platform_region_slug", platformRegionSlug);
+  }
+  return fetch(
+    `${API_BASE_URL}/config/${encodeURIComponent(vmName)}?${params.toString()}`,
+    { headers: { Authorization: `Bearer ${token}` } }
+  ).then(handleApiResponse);
+};
+
 const getRecommendations = (token, minScore = 50) =>
   fetch(`${API_BASE_URL}/admin/recommendations?min_score=${minScore}`, {
     headers: { Authorization: `Bearer ${token}` },
   }).then(handleApiResponse);
 
+const getVmCostEstimate = (token, { csp, vmName, clusterType, rangeOnly }) => {
+  const params = new URLSearchParams({ csp: csp || "GCP" });
+  if (vmName) params.set("vm_name", vmName);
+  if (clusterType) params.set("cluster_type", clusterType);
+  if (rangeOnly) params.set("range_only", "true");
+  return fetch(`${API_BASE_URL}/cost-estimate?${params.toString()}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  }).then(handleApiResponse);
+};
+
 function VMClusterPage() {
-  const { token } = useAuth();
+  const { token, user } = useAuth();
+  const { orgName, isAdmin } = useOrgContext();
+  const { platformRegionSlug: accountPlatformRegion } = usePreferences();
+  const [sessionRegionOverride, setSessionRegionOverride] = useState(() => {
+    try {
+      return sessionStorage.getItem("zenith.vm.platform_region_override") || null;
+    } catch {
+      return null;
+    }
+  });
+  const {
+    platformMultiRegion,
+    platformRegions,
+    defaultPlatformSlug,
+  } = usePlatformStorageRegions({ enabled: Boolean(token) });
+  const accountDefaultRegion =
+    accountPlatformRegion || defaultPlatformSlug || platformRegions[0]?.slug || null;
+  const platformRegionSlug = sessionRegionOverride || accountDefaultRegion;
+  const [showOnlyMine, setShowOnlyMine] = useState(false);
   const notifications = useNotifications();
   const { executeWithNotification, showLoading, updateSuccess, updateError } = notifications;
   const { runPageRefresh, pageRefreshing } = usePageRefresh();
-  const { loading: availLoading, getFeature, credentialMode } = useCloudAvailability();
+  const {
+    loading: availLoading,
+    data: availData,
+    getFeature,
+    credentialMode,
+    getLockedProviders,
+    getCredentialSource,
+  } = useCloudAvailability();
   const vmProviders = getFeature("vm").providers || [];
   const vmToolbarOptions = useMemo(
     () => buildCloudProviderOptions(vmProviders),
@@ -138,13 +206,16 @@ function VMClusterPage() {
     try { return JSON.parse(sessionStorage.getItem('cache_vm_assignments')) || []; } catch { return []; }
   });
   // Only show loading skeleton if we have NO cached data
-  const [isLoading, setIsLoading] = useState(() => !sessionStorage.getItem('cache_vm_clusterGeneral'));
-  const [generalClusterHealth, setGeneralClusterHealth] = useState(() => {
-    try { return JSON.parse(sessionStorage.getItem('cache_vm_clusterGeneral')) || null; } catch { return null; }
+  const [isLoading, setIsLoading] = useState(() => !sessionStorage.getItem("cache_vm_clusters"));
+  const [clusterHealthMap, setClusterHealthMap] = useState(() => {
+    try {
+      return JSON.parse(sessionStorage.getItem("cache_vm_clusters")) || {};
+    } catch {
+      return {};
+    }
   });
-  const [storageClusterHealth, setStorageClusterHealth] = useState(() => {
-    try { return JSON.parse(sessionStorage.getItem('cache_vm_clusterStorage')) || null; } catch { return null; }
-  });
+  const [clusterCatalog, setClusterCatalog] = useState(VM_CLUSTER_FALLBACK);
+  const [selectedCluster, setSelectedCluster] = useState("general");
   const [recommendations, setRecommendations] = useState(() => {
     try { return JSON.parse(sessionStorage.getItem('cache_vm_recs')) || []; } catch { return []; }
   });
@@ -158,14 +229,21 @@ function VMClusterPage() {
   const [isAnalyzingWorkload, setIsAnalyzingWorkload] = useState(false);
   const analyzeDebounceRef = useRef(null);
   const [clusterPreference, setClusterPreference] = useState("");
+  const [vmPreference, setVmPreference] = useState("");
+  const [vmPool, setVmPool] = useState(null);
+  const [poolLoading, setPoolLoading] = useState(false);
   const [priorityLevel, setPriorityLevel] = useState(1);
   const [isRequesting, setIsRequesting] = useState(false);
+  const [costEstimate, setCostEstimate] = useState(null);
+  const [costRange, setCostRange] = useState(null);
+  const [costLoading, setCostLoading] = useState(false);
   // Metrics mode toggle
   const [useRealMetrics, setUseRealMetrics] = useState(false);
 
   // Transfer VM Modal
   const [showTransferModal, setShowTransferModal] = useState(false);
   const [transferCluster, setTransferCluster] = useState("");
+  const [transferSlot, setTransferSlot] = useState("");
   const [isTransferring, setIsTransferring] = useState(false);
 
   // VM Config Modal
@@ -199,44 +277,65 @@ function VMClusterPage() {
 
   const displayedAssignments = useMemo(() => {
     const withCsp = allAssignments.map((a) => ({ ...a, csp: a.csp || "GCP" }));
-    return filterFilesByCloudProvider(withCsp, cloudProvider);
-  }, [allAssignments, cloudProvider]);
+    const byCloud = filterFilesByCloudProvider(withCsp, cloudProvider);
+    if (!isAdmin || !showOnlyMine) return byCloud;
+    const me = user?.username;
+    return byCloud.filter(
+      (a) => (a.created_by || a.user_id) === me
+    );
+  }, [allAssignments, cloudProvider, isAdmin, showOnlyMine, user?.username]);
+
+  const healthFetchInFlight = useRef(false);
 
   const fetchClusterHealth = useCallback(async () => {
-    if (!token) return;
+    if (!token || healthFetchInFlight.current) return;
+    healthFetchInFlight.current = true;
     try {
       const providers =
         cloudProvider === "ALL" ? vmProviders : [activeCsp];
-      let general = null;
-      let storage = null;
-      for (const csp of providers) {
-        try {
-          const [g, s] = await Promise.all([
-            getClusterHealth("general", token, csp),
-            getClusterHealth("storage", token, csp),
-          ]);
-          if (!general || (g.running_vms || 0) > (general.running_vms || 0)) {
-            general = { ...g, csp };
-          }
-          if (!storage || (s.running_vms || 0) > (storage.running_vms || 0)) {
-            storage = { ...s, csp };
-          }
-        } catch (err) {
-          if (cloudProvider !== "ALL") throw err;
-        }
-      }
-      if (general) {
-        setGeneralClusterHealth(general);
-        sessionStorage.setItem("cache_vm_clusterGeneral", JSON.stringify(general));
-      }
-      if (storage) {
-        setStorageClusterHealth(storage);
-        sessionStorage.setItem("cache_vm_clusterStorage", JSON.stringify(storage));
-      }
+
+      await Promise.all(
+        providers.map(async (csp) => {
+          const results = await Promise.allSettled(
+            VM_CLUSTER_SLUGS.map((slug) => getClusterHealth(slug, token, csp))
+          );
+          setClusterHealthMap((prev) => {
+            const nextMap = { ...prev };
+            results.forEach((result, index) => {
+              if (result.status !== "fulfilled") return;
+              const slug = VM_CLUSTER_SLUGS[index];
+              const payload = result.value;
+              const existing = nextMap[slug];
+              if (
+                !existing ||
+                (payload.running_vms || 0) > (existing.running_vms || 0)
+              ) {
+                nextMap[slug] = { ...payload, csp };
+              }
+            });
+            sessionStorage.setItem("cache_vm_clusters", JSON.stringify(nextMap));
+            return nextMap;
+          });
+        })
+      );
     } catch (error) {
       console.error("Error fetching cluster health:", error);
+    } finally {
+      healthFetchInFlight.current = false;
     }
   }, [token, cloudProvider, activeCsp, vmProviders]);
+
+  const fetchClusterCatalog = useCallback(async () => {
+    if (!token) return;
+    try {
+      const data = await getVmClusters(token, activeCsp);
+      if (data?.clusters?.length) {
+        setClusterCatalog(data.clusters);
+      }
+    } catch (error) {
+      console.error("Error fetching cluster catalog:", error);
+    }
+  }, [token, activeCsp]);
 
   useEffect(() => {
     const next = coerceCloudProvider(cloudProvider, vmProviders);
@@ -283,33 +382,54 @@ function VMClusterPage() {
     }
   }, [token, allAssignments, useRealMetrics, activeCsp]);
 
-  // Single useEffect for initial load and polling
+  // Initial load, CSP changes, and 5-minute polling
   useEffect(() => {
     if (!token) return;
+    let cancelled = false;
 
     const loadData = async () => {
-      // Only show skeleton if we have no cached data
-      if (!sessionStorage.getItem('cache_vm_clusterGeneral')) {
+      if (!sessionStorage.getItem("cache_vm_clusters")) {
         setIsLoading(true);
       }
-      await Promise.all([
-        fetchAssignment(),
-        fetchClusterHealth(),
-        fetchRecommendations(),
-      ]);
-      setIsLoading(false);
+      await Promise.all([fetchAssignment(), fetchClusterCatalog()]);
+      if (!cancelled) setIsLoading(false);
+      if (!cancelled) {
+        fetchClusterHealth();
+        fetchRecommendations();
+      }
     };
-    
+
     loadData();
 
-    // Poll cluster health every 5 minutes (reduced frequency)
     const clusterInterval = setInterval(() => {
       fetchClusterHealth();
       fetchRecommendations();
     }, 300000);
 
-    return () => clearInterval(clusterInterval);
-  }, [token, fetchAssignment, fetchClusterHealth, fetchRecommendations]);
+    return () => {
+      cancelled = true;
+      clearInterval(clusterInterval);
+    };
+  }, [
+    token,
+    activeCsp,
+    cloudProvider,
+    fetchAssignment,
+    fetchClusterCatalog,
+    fetchClusterHealth,
+    fetchRecommendations,
+  ]);
+
+  const selectedClusterMeta = useMemo(
+    () =>
+      clusterCatalog.find((c) => c.cluster_type === selectedCluster) || {
+        cluster_type: selectedCluster,
+        label: formatClusterLabel(selectedCluster),
+      },
+    [clusterCatalog, selectedCluster]
+  );
+
+  const selectedClusterHealth = clusterHealthMap[selectedCluster] || null;
 
   // Separate polling for VM metrics only when assigned
   useEffect(() => {
@@ -321,14 +441,72 @@ function VMClusterPage() {
     return () => clearInterval(metricsInterval);
   }, [token, allAssignments, fetchVMMetrics]);
 
+  const resolvedClusterKey = useMemo(() => {
+    if (clusterPreference) return clusterPreference.toLowerCase();
+    const rec = workloadAnalysis?.recommended_cluster;
+    if (rec) return String(rec).toLowerCase();
+    return "general";
+  }, [clusterPreference, workloadAnalysis]);
+
+  const poolSlots = useMemo(() => {
+    return vmPool?.clusters?.[resolvedClusterKey]?.slots ?? [];
+  }, [vmPool, resolvedClusterKey]);
+
+  const resolvedClusterLabel = useMemo(() => {
+    return (
+      clusterCatalog.find((c) => c.cluster_type === resolvedClusterKey)?.label ||
+      formatClusterLabel(resolvedClusterKey)
+    );
+  }, [resolvedClusterKey, clusterCatalog]);
+
+  const runningVmTotal = useMemo(
+    () =>
+      Object.values(clusterHealthMap).reduce(
+        (sum, h) => sum + (h?.running_vms || 0),
+        0
+      ),
+    [clusterHealthMap]
+  );
+
+  const transferPoolSlots = useMemo(() => {
+    if (!transferCluster) return [];
+    return vmPool?.clusters?.[transferCluster.toLowerCase()]?.slots ?? [];
+  }, [vmPool, transferCluster]);
+
   const resetRequestModalState = useCallback(() => {
     setWorkloadDescription("");
     setFollowUpAnswers({});
     setWorkloadAnalysis(null);
     setIsAnalyzingWorkload(false);
     setClusterPreference("");
+    setVmPreference("");
     setPriorityLevel(1);
+    setCostEstimate(null);
+    setCostRange(null);
+    setCostLoading(false);
   }, []);
+
+  const handlePlatformRegionSelect = useCallback(
+    (slug) => {
+      if (slug === accountDefaultRegion) {
+        setSessionRegionOverride(null);
+        try {
+          sessionStorage.removeItem("zenith.vm.platform_region_override");
+        } catch {
+          /* ignore */
+        }
+        return;
+      }
+      setSessionRegionOverride(slug);
+      try {
+        sessionStorage.setItem("zenith.vm.platform_region_override", slug);
+      } catch {
+        /* ignore */
+      }
+      setVmPreference("");
+    },
+    [accountDefaultRegion]
+  );
 
   const closeRequestModal = useCallback(() => {
     setShowRequestModal(false);
@@ -382,6 +560,131 @@ function VMClusterPage() {
     };
   }, [showRequestModal, workloadDescription, followUpAnswers, runWorkloadAnalysis]);
 
+  useEffect(() => {
+    if (!showRequestModal || !token) return undefined;
+    let cancelled = false;
+    setPoolLoading(true);
+    const regionQuery = platformRegionSlug
+      ? `&platform_region_slug=${encodeURIComponent(platformRegionSlug)}`
+      : "";
+    fetch(
+      `${API_BASE_URL}/pool?csp=${encodeURIComponent(activeCsp)}${regionQuery}`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    )
+      .then(handleApiResponse)
+      .then((data) => {
+        if (!cancelled) setVmPool(data);
+      })
+      .catch(() => {
+        if (!cancelled) setVmPool(null);
+      })
+      .finally(() => {
+        if (!cancelled) setPoolLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [showRequestModal, token, activeCsp, platformRegionSlug]);
+
+  useEffect(() => {
+    if (!showTransferModal || !token) return undefined;
+    let cancelled = false;
+    const regionQuery = platformRegionSlug
+      ? `&platform_region_slug=${encodeURIComponent(platformRegionSlug)}`
+      : "";
+    fetch(
+      `${API_BASE_URL}/pool?csp=${encodeURIComponent(activeCsp)}${regionQuery}`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    )
+      .then(handleApiResponse)
+      .then((data) => {
+        if (!cancelled) setVmPool(data);
+      })
+      .catch(() => {
+        if (!cancelled) setVmPool(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [showTransferModal, token, activeCsp, platformRegionSlug]);
+
+  useEffect(() => {
+    if (!vmPreference) return;
+    const stillValid = poolSlots.some((s) => s.vm_name === vmPreference);
+    if (!stillValid) setVmPreference("");
+  }, [poolSlots, vmPreference]);
+
+  useEffect(() => {
+    if (!showRequestModal || !token) {
+      setCostEstimate(null);
+      setCostRange(null);
+      return undefined;
+    }
+
+    let cancelled = false;
+    setCostLoading(true);
+
+    const fetchCost = async () => {
+      try {
+        if (vmPreference) {
+          const data = await getVmCostEstimate(token, {
+            csp: activeCsp,
+            vmName: vmPreference,
+          });
+          if (!cancelled) {
+            setCostEstimate(data);
+            setCostRange(null);
+          }
+        } else {
+          const data = await getVmCostEstimate(token, {
+            csp: activeCsp,
+            clusterType: resolvedClusterKey,
+            rangeOnly: true,
+          });
+          if (!cancelled) {
+            setCostRange(data);
+            setCostEstimate(null);
+          }
+        }
+      } catch {
+        if (!cancelled) {
+          setCostEstimate(null);
+          setCostRange(null);
+        }
+      } finally {
+        if (!cancelled) setCostLoading(false);
+      }
+    };
+
+    fetchCost();
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    showRequestModal,
+    token,
+    activeCsp,
+    vmPreference,
+    resolvedClusterKey,
+  ]);
+
+  const formatSlotLabel = (slot) => {
+    const base =
+      slot.display_name ||
+      (slot.tier_label ? `${slot.tier_label} — ${slot.vm_name}` : slot.vm_name);
+    const status = (slot.status || "unknown").toLowerCase();
+    if (status === "running") {
+      const users = slot.active_users || 0;
+      return users > 0
+        ? `${base} — running (${users} user${users === 1 ? "" : "s"})`
+        : `${base} — running`;
+    }
+    if (status === "not_provisioned" || status === "unknown") {
+      return `${base} — provision on request`;
+    }
+    return `${base} — ${status}`;
+  };
+
   const handleFollowUpChange = (questionId, value) => {
     setFollowUpAnswers((prev) => {
       const next = { ...prev };
@@ -409,6 +712,8 @@ function VMClusterPage() {
             workload_description: workloadDescription,
             follow_up_answers: Object.keys(followUpAnswers).length ? followUpAnswers : null,
             cluster_preference: clusterPreference || null,
+            vm_preference: vmPreference || null,
+            platform_region_slug: platformRegionSlug || null,
             priority_level: priorityLevel,
           };
           const assignment = await requestVMAssignment(data, token);
@@ -420,7 +725,8 @@ function VMClusterPage() {
         {
           loadingMessage: `Provisioning VM on ${activeCsp}…`,
           getSuccessMessage: (res) => `VM assigned: ${res.vm_name}`,
-          getErrorMessage: (error) => error.message || "Failed to request VM",
+          getErrorMessage: (error) =>
+            getApiErrorMessage(error, "Failed to request VM"),
         }
       );
     } catch {
@@ -456,7 +762,8 @@ function VMClusterPage() {
         }
       );
     } catch {
-      /* toast already shown */
+      /* toast already shown — refresh so stale released assignments disappear */
+      await fetchAssignment();
     }
   };
 
@@ -474,11 +781,14 @@ function VMClusterPage() {
             {
               csp: activeCsp,
               target_cluster: transferCluster,
+              target_vm_name: transferSlot || null,
               reason: "User-initiated migration",
             },
             token
           );
           setShowTransferModal(false);
+          setTransferCluster("");
+          setTransferSlot("");
           await Promise.all([fetchAssignment(), fetchClusterHealth()]);
         },
         {
@@ -569,16 +879,12 @@ ${instructions.troubleshooting.map((item) => `
 
   const handleVMClick = async (vmName) => {
     try {
-      // Fetch comprehensive VM configuration
-      const response = await fetch(`${API_BASE_URL}/config/${vmName}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      
-      if (!response.ok) {
-        throw new Error('Failed to fetch VM configuration');
-      }
-      
-      const config = await response.json();
+      const config = await getVmConfig(
+        vmName,
+        token,
+        activeCsp,
+        platformRegionSlug
+      );
       setSelectedVMConfig(config);
       setShowConfigModal(true);
     } catch (error) {
@@ -593,7 +899,7 @@ ${instructions.troubleshooting.map((item) => `
     return "var(--success)";
   };
 
-  if (isLoading || availLoading) {
+  if (isLoading || (availLoading && !availData)) {
     return <VMClusterSkeleton />;
   }
 
@@ -630,171 +936,149 @@ ${instructions.troubleshooting.map((item) => `
 
   return (
     <div className="vm-container">
-      <div className="vm-page-header-wrap">
-        <PageHeader
-          kicker="Compute"
-          title="VM Cluster Management"
-          subtitle="Intelligent workload assignment with auto-scaling and migration"
-          onRefresh={handlePageRefresh}
-          refreshing={pageRefreshing}
-        />
-        <div className="vm-page-header-live live-indicator" aria-live="polite">
-          <span className="live-dot" />
-          <span className="live-text">Live</span>
-        </div>
-      </div>
-
-      <CloudProviderToolbar
-        provider={cloudProvider}
-        onProviderChange={setCloudProvider}
-        selectAriaLabel="VM cloud provider"
-        className="vm-cloud-toolbar"
-        providerOptions={vmToolbarOptions}
+      <PageHeader
+        kicker="Compute"
+        title="Virtual machines"
+        subtitle="Provision ephemeral workloads across multi-cloud cluster pools with intelligent placement and lifecycle controls."
+        onRefresh={handlePageRefresh}
+        refreshing={pageRefreshing}
+        className="vm-page-header"
+        actions={
+          <>
+            <div className="vm-page-header-live live-indicator" aria-live="polite">
+              <span className="live-dot" />
+              <span className="live-text">Live telemetry</span>
+            </div>
+            <button
+              className="btn-confirm vm-header-cta"
+              type="button"
+              onClick={() => setShowRequestModal(true)}
+            >
+              <IconPlus aria-hidden="true" />
+              Provision instance
+            </button>
+          </>
+        }
       />
 
-      {/* VM Process Flow */}
-      <div className="vm-process-info">
-        <div className="process-step">
-          <div className="process-icon workload">
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
-              <line x1="8" y1="21" x2="16" y2="21"/>
-              <line x1="12" y1="17" x2="12" y2="21"/>
-            </svg>
-          </div>
-          <div className="process-text">
-            <strong>Workload Analysis</strong>
-            <span>AI determines optimal cluster & VM specs</span>
-          </div>
-        </div>
+      <CloudCapabilityBanner
+        feature="vm"
+        lockedProviders={getLockedProviders('vm')}
+        className="vm-capability-banner"
+      />
 
-        <div className="process-step">
-          <div className="process-icon assign">
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <circle cx="12" cy="12" r="10"/>
-              <polyline points="12 6 12 12 16 14"/>
-            </svg>
-          </div>
-          <div className="process-text">
-            <strong>Smart Assignment</strong>
-            <span>Least-loaded VM with capacity optimization</span>
-          </div>
-        </div>
-
-        <div className="process-step">
-          <div className="process-icon monitor">
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
-            </svg>
-          </div>
-          <div className="process-text">
-            <strong>Real-Time Monitoring</strong>
-            <span>CPU, memory, users tracked live via GCP</span>
-          </div>
-        </div>
-
-        <div className="process-step">
-          <div className="process-icon scale">
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <polyline points="16 3 21 3 21 8"/>
-              <line x1="4" y1="20" x2="21" y2="3"/>
-              <polyline points="21 16 21 21 16 21"/>
-              <line x1="15" y1="15" x2="21" y2="21"/>
-              <line x1="4" y1="4" x2="9" y2="9"/>
-            </svg>
-          </div>
-          <div className="process-text">
-            <strong>Auto Migration</strong>
-            <span>Seamless transfers between clusters</span>
-          </div>
-        </div>
+      <div className="vm-cloud-toolbar-row">
+        <CloudProviderToolbar
+          provider={cloudProvider}
+          onProviderChange={setCloudProvider}
+          selectAriaLabel="VM cloud provider"
+          className="vm-cloud-toolbar"
+          providerOptions={vmToolbarOptions}
+        />
+        <CredentialSourceBadge source={getCredentialSource(cloudProvider, 'vm')} />
       </div>
 
-      {/* Cluster Topology - First Section */}
-      <div className="cluster-topology-section">
-        <h4>Cluster Topology</h4>
-        <div className="topology-container">
-          {/* General Cluster Visualization */}
-          <div className="cluster-visual">
-            <div className="cluster-label">General Cluster</div>
-            <div className="vms-visual-group">
-              {generalClusterHealth?.vms.map((vm, index) => (
-                <div key={vm.vm_name} className="vm-visual-wrapper">
-                  <div 
-                    className={`vm-server ${vm.status.toLowerCase()}`}
-                    onClick={() => handleVMClick(vm.vm_name, 'GENERAL')}
-                    style={{ cursor: 'pointer' }}
-                  >
-                    <div className="server-icon">
-                      <svg viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M4 1h16a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1zm1 2v2h2V3H5zm3 0v2h2V3H8zm-4 6h16a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-4a1 1 0 0 1 1-1zm1 2v2h2v-2H5zm3 0v2h2v-2H8zm-4 6h16a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-4a1 1 0 0 1 1-1zm1 2v2h2v-2H5zm3 0v2h2v-2H8z"/>
-                      </svg>
-                    </div>
-                    <div className="vm-name-label">{vm.vm_name}</div>
-                    <div className="vm-status-indicator">{vm.status}</div>
-                  </div>
-                  {index < generalClusterHealth.vms.length - 1 && (
-                    <div className={`connection-wire ${generalClusterHealth.running_vms > 0 ? 'active' : 'inactive'}`}></div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Storage Cluster Visualization */}
-          <div className="cluster-visual">
-            <div className="cluster-label">Storage Cluster</div>
-            <div className="vms-visual-group">
-              {storageClusterHealth?.vms.map((vm, index) => (
-                <div key={vm.vm_name} className="vm-visual-wrapper">
-                  <div 
-                    className={`vm-server ${vm.status.toLowerCase()}`}
-                    onClick={() => handleVMClick(vm.vm_name, 'STORAGE')}
-                    style={{ cursor: 'pointer' }}
-                  >
-                    <div className="server-icon">
-                      <svg viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M4 1h16a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1zm1 2v2h2V3H5zm3 0v2h2V3H8zm-4 6h16a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-4a1 1 0 0 1 1-1zm1 2v2h2v-2H5zm3 0v2h2v-2H8zm-4 6h16a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-4a1 1 0 0 1 1-1zm1 2v2h2v-2H5zm3 0v2h2v-2H8z"/>
-                      </svg>
-                    </div>
-                    <div className="vm-name-label">{vm.vm_name}</div>
-                    <div className="vm-status-indicator">{vm.status}</div>
-                  </div>
-                  {index < storageClusterHealth.vms.length - 1 && (
-                    <div className={`connection-wire ${storageClusterHealth.running_vms > 0 ? 'active' : 'inactive'}`}></div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
+      <div className="vm-summary-strip" aria-label="Compute overview">
+        <div className="vm-kpi">
+          <span className="vm-kpi__label">Active instances</span>
+          <span className="vm-kpi__value">{displayedAssignments.length}</span>
         </div>
+        <div className="vm-kpi">
+          <span className="vm-kpi__label">Running pool slots</span>
+          <span className="vm-kpi__value">{runningVmTotal}</span>
+        </div>
+        <div className="vm-kpi">
+          <span className="vm-kpi__label">Cluster pools</span>
+          <span className="vm-kpi__value">{clusterCatalog.length || VM_CLUSTER_SLUGS.length}</span>
+        </div>
+        <div className="vm-kpi">
+          <span className="vm-kpi__label">Cloud provider</span>
+          <span className="vm-kpi__value vm-kpi__value--text">{activeCsp}</span>
+        </div>
+        {platformRegionSlug && (
+          <div className="vm-kpi">
+            <span className="vm-kpi__label">Region</span>
+            <span className="vm-kpi__value vm-kpi__value--text">
+              {platformRegions.find((r) => r.slug === platformRegionSlug)?.label ||
+                platformRegionSlug}
+            </span>
+          </div>
+        )}
       </div>
+
+      <section className="vm-panel vm-panel--topology">
+        <header className="vm-panel__header">
+          <div>
+            <h2 className="vm-panel__title">Cluster topology</h2>
+            <p className="vm-panel__desc">
+              Inspect four-tier slots per cluster. Connections highlight when the pool has running instances.
+            </p>
+          </div>
+        </header>
+        <ClusterSelector
+          clusters={clusterCatalog}
+          selectedCluster={selectedCluster}
+          onSelect={setSelectedCluster}
+          className="vm-panel__tabs"
+        />
+        <div className="topology-container topology-container--ring">
+          <ClusterTopologyRing
+            clusterLabel={selectedClusterMeta.label}
+            vms={selectedClusterHealth?.vms || []}
+            runningVms={selectedClusterHealth?.running_vms || 0}
+            slotTiers={selectedClusterMeta.slots || []}
+            onVmClick={handleVMClick}
+          />
+        </div>
+      </section>
 
       {/* Current Assignment Card */}
       {allAssignments.length > 0 ? (
-        <div className="assignments-section">
-          <div className="section-header">
-            <h3>Your Active VM Assignments ({allAssignments.length})</h3>
-            <button
-              className="btn-request"
-              type="button"
-              onClick={() => setShowRequestModal(true)}
-              title="Request another VM"
-              aria-label="Request another virtual machine"
-            >
-              <IconPlus aria-hidden="true" />
-              Request Another VM
-            </button>
-          </div>
-          
+        <section className="vm-panel">
+          <header className="vm-panel__header vm-panel__header--split">
+            <div>
+              <h2 className="vm-panel__title">Active instances</h2>
+              <p className="vm-panel__desc">
+                {displayedAssignments.length} provisioned workload{displayedAssignments.length === 1 ? "" : "s"} on {activeCsp}
+              </p>
+            </div>
+            <div className="vm-panel__actions">
+              {isAdmin && orgName && (
+                <label className="vm-filter-toggle">
+                  <input
+                    type="checkbox"
+                    checked={!showOnlyMine}
+                    onChange={(e) => setShowOnlyMine(!e.target.checked)}
+                  />
+                  Show all team resources
+                </label>
+              )}
+              <button
+                className="btn-confirm vm-header-cta vm-header-cta--secondary"
+                type="button"
+                onClick={() => setShowRequestModal(true)}
+              >
+                <IconPlus aria-hidden="true" />
+                Add instance
+              </button>
+            </div>
+          </header>
+
           <div className="assignments-grid">
-            {displayedAssignments.map((assignment, index) => (
-              <div key={assignment.assignment_id} className="assignment-card">
+            {displayedAssignments.map((assignment) => (
+              <article key={assignment.assignment_id} className="assignment-card">
                 <div className="assignment-header">
-                  <h4>VM Assignment #{index + 1}</h4>
+                  <div className="assignment-header__main">
+                    <h3 className="assignment-card__title">{assignment.vm_name}</h3>
+                    <OrgResourceMeta
+                      orgName={assignment.org_id ? orgName : null}
+                      createdBy={assignment.created_by || assignment.user_id}
+                      currentUsername={user?.username}
+                    />
+                  </div>
                   <div className="assignment-actions">
                     <button
-                      className="btn-transfer"
+                      className="vm-btn vm-btn--ghost"
                       type="button"
                       onClick={() => {
                         setCurrentAssignment(assignment);
@@ -806,8 +1090,8 @@ ${instructions.troubleshooting.map((item) => `
                       <IconArrowRightLeft aria-hidden="true" />
                       Migrate
                     </button>
-                    <button 
-                      className="btn-release" 
+                    <button
+                      className="vm-btn vm-btn--danger"
                       type="button"
                       onClick={() => handleReleaseVM(assignment.assignment_id, assignment.vm_name)}
                       title="Release this VM"
@@ -818,21 +1102,26 @@ ${instructions.troubleshooting.map((item) => `
                     </button>
                   </div>
                 </div>
-                <div className="assignment-details">
+                <div className="assignment-details assignment-details--grid">
                   <div className="detail-row">
-                    <span className="label">VM Name:</span>
-                    <span className="value vm-name">{assignment.vm_name}</span>
-                  </div>
-                  <div className="detail-row">
-                    <span className="label">IP Address:</span>
+                    <span className="label">IP address</span>
                     <span className="value">{assignment.vm_ip}</span>
                   </div>
                   <div className="detail-row">
-                    <span className="label">Cluster:</span>
-                    <span className={`cluster-badge ${assignment.cluster_type.toLowerCase()}`}>
+                    <span className="label">Cluster</span>
+                    <span className={`cluster-chip cluster-chip--${assignment.cluster_type.toLowerCase()}`}>
                       {assignment.cluster_type}
                     </span>
                   </div>
+                  {assignment.platform_region_slug && (
+                    <div className="detail-row">
+                      <span className="label">Region:</span>
+                      <span className="value">
+                        {platformRegions.find((r) => r.slug === assignment.platform_region_slug)
+                          ?.label || assignment.platform_region_slug}
+                      </span>
+                    </div>
+                  )}
                   <div className="detail-row">
                     <span className="label">SSH Command:</span>
                     <code className="ssh-command">
@@ -879,8 +1168,8 @@ ${instructions.troubleshooting.map((item) => `
                 {vmMetrics[assignment.vm_name] && (
                   <div className="vm-metrics">
                     <div className="section-header-with-toggle">
-                      <h4>Real-Time Metrics</h4>
-                      {index === 0 && (
+                      <h4 className="vm-metrics__title">Utilization</h4>
+                      {displayedAssignments[0]?.assignment_id === assignment.assignment_id && (
                         <div className="metrics-toggle">
                           <label className="toggle-label">
                             <input
@@ -933,129 +1222,49 @@ ${instructions.troubleshooting.map((item) => `
                     </div>
                   </div>
                 )}
-              </div>
+              </article>
             ))}
           </div>
-        </div>
+        </section>
       ) : (
-        <EmptyState
-          icon={<IconServer aria-hidden="true" />}
-          title="No Active VM Assignment"
-          message="Request a VM to get started with your workload. Choose from General or Storage clusters based on your needs."
-          actionLabel="Request VM"
-          onAction={() => setShowRequestModal(true)}
-        />
+        <section className="vm-panel vm-panel--empty">
+          <EmptyState
+            icon={<IconServer aria-hidden="true" />}
+            title="No active instances"
+            message="Provision a workload to get started. Zenith assigns the optimal cluster and tier based on your description."
+            actionLabel="Provision instance"
+            onAction={() => setShowRequestModal(true)}
+          />
+        </section>
       )}
 
-      {/* Cluster Health Dashboard */}
-      <div className="cluster-health-section">
-        <h3>Cluster Health Dashboard</h3>
-
-        <div className="clusters-grid">
-          {/* General Cluster */}
-          {generalClusterHealth && (
-            <div className="cluster-card">
-              <div className="cluster-header">
-                <h4>General Cluster</h4>
-                <span className="cluster-status running">
-                  {generalClusterHealth.running_vms}/{generalClusterHealth.total_vms} Running
-                </span>
-              </div>
-              <div className="cluster-stats">
-                <div className="stat-item">
-                  <span className="stat-label">Active Users:</span>
-                  <span className="stat-value">
-                    {generalClusterHealth.total_active_users}
-                  </span>
-                </div>
-                <div className="stat-item">
-                  <span className="stat-label">Avg CPU:</span>
-                  <span
-                    className="stat-value"
-                    style={{
-                      color: getCPUColor(
-                        generalClusterHealth.average_cpu_usage
-                      ),
-                    }}
-                  >
-                    {generalClusterHealth.average_cpu_usage.toFixed(1)}%
-                  </span>
-                </div>
-              </div>
-              <div className="vm-list">
-                {generalClusterHealth.vms.map((vm) => (
-                  <div key={vm.vm_name} className="vm-item">
-                    <div className="vm-item-header">
-                      <span className="vm-item-name">{vm.vm_name}</span>
-                      <span className={`vm-status ${vm.status.toLowerCase()}`}>
-                        {vm.status}
-                      </span>
-                    </div>
-                    <div className="vm-item-stats">
-                      <span>CPU: {vm.cpu_usage.toFixed(1)}%</span>
-                      <span>Users: {vm.active_users}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Storage Cluster */}
-          {storageClusterHealth && (
-            <div className="cluster-card">
-              <div className="cluster-header">
-                <h4>Storage Cluster</h4>
-                <span className="cluster-status running">
-                  {storageClusterHealth.running_vms}/{storageClusterHealth.total_vms} Running
-                </span>
-              </div>
-              <div className="cluster-stats">
-                <div className="stat-item">
-                  <span className="stat-label">Active Users:</span>
-                  <span className="stat-value">
-                    {storageClusterHealth.total_active_users}
-                  </span>
-                </div>
-                <div className="stat-item">
-                  <span className="stat-label">Avg CPU:</span>
-                  <span
-                    className="stat-value"
-                    style={{
-                      color: getCPUColor(
-                        storageClusterHealth.average_cpu_usage
-                      ),
-                    }}
-                  >
-                    {storageClusterHealth.average_cpu_usage.toFixed(1)}%
-                  </span>
-                </div>
-              </div>
-              <div className="vm-list">
-                {storageClusterHealth.vms.map((vm) => (
-                  <div key={vm.vm_name} className="vm-item">
-                    <div className="vm-item-header">
-                      <span className="vm-item-name">{vm.vm_name}</span>
-                      <span className={`vm-status ${vm.status.toLowerCase()}`}>
-                        {vm.status}
-                      </span>
-                    </div>
-                    <div className="vm-item-stats">
-                      <span>CPU: {vm.cpu_usage.toFixed(1)}%</span>
-                      <span>Users: {vm.active_users}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
+      <section className="vm-panel">
+        <header className="vm-panel__header">
+          <div>
+            <h2 className="vm-panel__title">Pool health</h2>
+            <p className="vm-panel__desc">
+              Telemetry for the <strong>{selectedClusterMeta.label}</strong> cluster on {activeCsp}.
+            </p>
+          </div>
+        </header>
+        <ClusterHealthCard
+          health={selectedClusterHealth}
+          clusterLabel={selectedClusterMeta.label}
+          getCPUColor={getCPUColor}
+        />
+      </section>
 
       {/* AI Recommendations */}
       {recommendations.length > 0 && (
-        <div className="recommendations-section">
-          <h3>AI Migration Recommendations</h3>
+        <section className="vm-panel">
+          <header className="vm-panel__header">
+            <div>
+              <h2 className="vm-panel__title">Migration recommendations</h2>
+              <p className="vm-panel__desc">
+                Suggested moves based on utilization patterns and cluster capacity.
+              </p>
+            </div>
+          </header>
           <div className="recommendations-list">
             {recommendations.map((rec) => (
               <div key={rec.recommendation_id} className="recommendation-card">
@@ -1101,14 +1310,14 @@ ${instructions.troubleshooting.map((item) => `
               </div>
             ))}
           </div>
-        </div>
+        </section>
       )}
 
       <ZenithModal
         open={showRequestModal}
         onClose={closeRequestModal}
-        title="Request VM Assignment"
-        subtitle="Describe your workload. Zenith analyzes your prompt and suggests a cluster before provisioning."
+        title="Request VM"
+        subtitle="Describe your workload, pick a cluster and optional slot — Zenith provisions only while you need it."
         titleId="vm-request-modal-title"
         wide
         footer={
@@ -1122,7 +1331,7 @@ ${instructions.troubleshooting.map((item) => `
               onClick={handleRequestVM}
               disabled={isRequesting || !workloadDescription.trim()}
             >
-              {isRequesting ? "Requesting…" : "Request VM"}
+              {isRequesting ? "Provisioning…" : "Provision VM"}
             </button>
           </>
         }
@@ -1134,50 +1343,145 @@ ${instructions.troubleshooting.map((item) => `
             handleRequestVM();
           }}
         >
-          <div className="form-group">
-            <label htmlFor="vm-workload-description">Workload description</label>
-            <textarea
-              id="vm-workload-description"
-              value={workloadDescription}
-              onChange={(e) => setWorkloadDescription(e.target.value)}
-              placeholder="e.g. PostgreSQL database ~500GB, nightly backups, 50 concurrent users"
-              rows={4}
+          {vmPool?.ephemeral !== false && (
+            <p className="vm-request-ephemeral-note" role="note">
+              <strong>On-demand VMs:</strong> Instances are terminated when you release them
+              (no idle disk charges). A fresh VM is created on your next request.
+            </p>
+          )}
+
+          <section className="vm-request-section" aria-labelledby="vm-request-workload-heading">
+            <h3 id="vm-request-workload-heading" className="vm-request-section__title">
+              <span className="vm-request-section__step">1</span>
+              Workload
+            </h3>
+            <div className="form-group">
+              <label htmlFor="vm-workload-description">What will you run?</label>
+              <textarea
+                id="vm-workload-description"
+                value={workloadDescription}
+                onChange={(e) => setWorkloadDescription(e.target.value)}
+                placeholder="e.g. PostgreSQL database ~500GB, nightly backups, 50 concurrent users"
+                rows={3}
+              />
+            </div>
+            <WorkloadGuidancePanel
+              analysis={workloadAnalysis}
+              isAnalyzing={isAnalyzingWorkload}
+              followUpAnswers={followUpAnswers}
+              onFollowUpChange={handleFollowUpChange}
+              idleHint="Describe your workload — we'll score readiness and suggest a cluster."
             />
-          </div>
-          <WorkloadGuidancePanel
-            analysis={workloadAnalysis}
-            isAnalyzing={isAnalyzingWorkload}
-            followUpAnswers={followUpAnswers}
-            onFollowUpChange={handleFollowUpChange}
-          />
-          <div className="vm-request-form__row">
-            <div className="form-group">
-              <label htmlFor="vm-cluster-preference">Cluster preference (optional)</label>
-              <select
-                id="vm-cluster-preference"
-                className="zenith-select"
-                value={clusterPreference}
-                onChange={(e) => setClusterPreference(e.target.value)}
-              >
-                <option value="">Auto-recommend</option>
-                <option value="GENERAL">General cluster</option>
-                <option value="STORAGE">Storage cluster</option>
-              </select>
+          </section>
+
+          <section className="vm-request-section" aria-labelledby="vm-request-placement-heading">
+            <h3 id="vm-request-placement-heading" className="vm-request-section__title">
+              <span className="vm-request-section__step">2</span>
+              Placement
+            </h3>
+            {platformMultiRegion && platformRegions.length > 1 && (
+              <div className="vm-request-region-block">
+                <PlatformRegionPills
+                  regions={platformRegions}
+                  selectedSlug={platformRegionSlug}
+                  onSelect={handlePlatformRegionSelect}
+                  id="vm-request-region"
+                  rowLabel="Region"
+                />
+                {vmPool?.compute_target && (
+                  <p className="vm-request-field-hint vm-request-region-target">
+                    VMs on <strong>{activeCsp}</strong> deploy to{" "}
+                    <strong>{vmPool.compute_target}</strong>
+                    {vmPool.platform_region_label
+                      ? ` (${vmPool.platform_region_label})`
+                      : ""}
+                    .
+                  </p>
+                )}
+              </div>
+            )}
+            <div className="vm-request-form__row vm-request-form__row--triple">
+              <div className="form-group">
+                <label htmlFor="vm-cluster-preference">Cluster</label>
+                <select
+                  id="vm-cluster-preference"
+                  className="zenith-select"
+                  value={clusterPreference}
+                  onChange={(e) => {
+                    setClusterPreference(e.target.value);
+                    setVmPreference("");
+                  }}
+                >
+                  <option value="">
+                    {workloadAnalysis?.recommended_cluster
+                      ? `Auto — ${workloadAnalysis.recommended_cluster} recommended`
+                      : "Auto-recommend"}
+                  </option>
+                  {clusterCatalog.map((cluster) => (
+                    <option key={cluster.cluster_type} value={cluster.cluster_type.toUpperCase()}>
+                      {cluster.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="form-group">
+                <label htmlFor="vm-slot-preference">VM slot (optional)</label>
+                <select
+                  id="vm-slot-preference"
+                  className="zenith-select"
+                  value={vmPreference}
+                  onChange={(e) => setVmPreference(e.target.value)}
+                  disabled={poolLoading || poolSlots.length === 0}
+                >
+                  <option value="">
+                    {poolLoading
+                      ? "Loading slots…"
+                      : "Auto — least loaded / provision"}
+                  </option>
+                  {poolSlots.map((slot) => (
+                    <option key={slot.vm_name} value={slot.vm_name}>
+                      {formatSlotLabel(slot)}
+                    </option>
+                  ))}
+                </select>
+                <span className="vm-request-field-hint">
+                  Pick a named slot in the {resolvedClusterLabel} pool on {activeCsp}
+                  {platformRegionSlug
+                    ? ` (${platformRegions.find((r) => r.slug === platformRegionSlug)?.label || platformRegionSlug})`
+                    : ""}
+                  .
+                </span>
+              </div>
+              <div className="form-group">
+                <label htmlFor="vm-priority-level">Priority</label>
+                <select
+                  id="vm-priority-level"
+                  className="zenith-select"
+                  value={priorityLevel}
+                  onChange={(e) => setPriorityLevel(Number(e.target.value))}
+                >
+                  <option value={1}>High</option>
+                  <option value={2}>Normal</option>
+                  <option value={3}>Low</option>
+                </select>
+              </div>
             </div>
-            <div className="form-group">
-              <label htmlFor="vm-priority-level">Priority</label>
-              <select
-                id="vm-priority-level"
-                className="zenith-select"
-                value={priorityLevel}
-                onChange={(e) => setPriorityLevel(Number(e.target.value))}
-              >
-                <option value={1}>High</option>
-                <option value={2}>Normal</option>
-                <option value={3}>Low</option>
-              </select>
-            </div>
-          </div>
+          </section>
+
+          <section
+            className="vm-request-section vm-request-cost-section"
+            aria-labelledby="vm-request-cost-heading"
+          >
+            <h3 id="vm-request-cost-heading" className="vm-request-section__title">
+              <span className="vm-request-section__step">3</span>
+              Cost overview
+            </h3>
+            <VmCostPreview
+              estimate={costEstimate}
+              range={costRange}
+              loading={costLoading}
+            />
+          </section>
         </form>
       </ZenithModal>
 
@@ -1214,186 +1518,53 @@ ${instructions.troubleshooting.map((item) => `
               id="vm-transfer-cluster"
               className="zenith-select"
               value={transferCluster}
-              onChange={(e) => setTransferCluster(e.target.value)}
+              onChange={(e) => {
+                setTransferCluster(e.target.value);
+                setTransferSlot("");
+              }}
             >
               <option value="">Select cluster</option>
-              <option value="GENERAL">General cluster</option>
-              <option value="STORAGE">Storage cluster</option>
+              {clusterCatalog.map((cluster) => (
+                <option key={cluster.cluster_type} value={cluster.cluster_type.toUpperCase()}>
+                  {cluster.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="form-group">
+            <label htmlFor="vm-transfer-slot">Target slot (optional)</label>
+            <select
+              id="vm-transfer-slot"
+              className="zenith-select"
+              value={transferSlot}
+              onChange={(e) => setTransferSlot(e.target.value)}
+              disabled={!transferCluster || transferPoolSlots.length === 0}
+            >
+              <option value="">Auto — least loaded in cluster</option>
+              {transferPoolSlots.map((slot) => (
+                <option key={slot.vm_name} value={slot.vm_name}>
+                  {formatSlotLabel(slot)}
+                </option>
+              ))}
             </select>
           </div>
           <p className="modal-note">
-            Your workload will be transferred to the least-loaded VM in the target cluster.
-            The source VM will be stopped if no other users remain.
+            Your workload will be transferred to the{" "}
+            {transferSlot ? "selected slot" : "least-loaded VM"} in the target cluster on{" "}
+            {activeCsp}
+            {platformRegionSlug
+              ? ` (${platformRegions.find((r) => r.slug === platformRegionSlug)?.label || platformRegionSlug})`
+              : ""}
+            . The source VM will be stopped if no other users remain.
           </p>
         </div>
       </ZenithModal>
 
-      <ZenithModal
+      <VmConfigModal
         open={showConfigModal && Boolean(selectedVMConfig)}
+        config={selectedVMConfig}
         onClose={() => setShowConfigModal(false)}
-        title={selectedVMConfig ? `VM configuration: ${selectedVMConfig.vm_name}` : "VM configuration"}
-        titleId="vm-config-modal-title"
-        large
-        footer={
-          <button className="btn-cancel" type="button" onClick={() => setShowConfigModal(false)}>
-            Close
-          </button>
-        }
-      >
-        {selectedVMConfig && (
-            <div className="vm-config-details">
-              
-              {/* Basic Information */}
-              <div className="config-section">
-                <h4>Basic Information</h4>
-                <div className="config-grid">
-                  <div className="config-item">
-                    <span className="config-label">VM Name:</span>
-                    <span className="config-value">{selectedVMConfig.vm_name}</span>
-                  </div>
-                  <div className="config-item">
-                    <span className="config-label">Status:</span>
-                    <span className={`cluster-badge ${selectedVMConfig.status?.toLowerCase()}`}>
-                      {selectedVMConfig.status}
-                    </span>
-                  </div>
-                  <div className="config-item">
-                    <span className="config-label">Cluster Type:</span>
-                    <span className={`cluster-badge ${selectedVMConfig.cluster_type?.toLowerCase()}`}>
-                      {selectedVMConfig.cluster_type}
-                    </span>
-                  </div>
-                  <div className="config-item">
-                    <span className="config-label">Zone:</span>
-                    <span className="config-value">{selectedVMConfig.zone}</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Compute Resources */}
-              <div className="config-section">
-                <h4>Compute Resources</h4>
-                <div className="config-grid">
-                  <div className="config-item">
-                    <span className="config-label">Machine Type:</span>
-                    <span className="config-value">{selectedVMConfig.machine_type}</span>
-                  </div>
-                  <div className="config-item">
-                    <span className="config-label">CPU Cores:</span>
-                    <span className="config-value">{selectedVMConfig.cpu_cores} vCPUs</span>
-                  </div>
-                  <div className="config-item">
-                    <span className="config-label">Memory:</span>
-                    <span className="config-value">{selectedVMConfig.memory_gb} GB</span>
-                  </div>
-                  <div className="config-item">
-                    <span className="config-label">Active Users:</span>
-                    <span className="config-value">{selectedVMConfig.active_users}</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Storage Configuration */}
-              <div className="config-section">
-                <h4>Storage Configuration</h4>
-                <div className="config-grid">
-                  <div className="config-item">
-                    <span className="config-label">Total Disk:</span>
-                    <span className="config-value">{selectedVMConfig.total_disk_gb} GB</span>
-                  </div>
-                  <div className="config-item">
-                    <span className="config-label">Number of Disks:</span>
-                    <span className="config-value">{selectedVMConfig.disks?.length || 0}</span>
-                  </div>
-                </div>
-                {selectedVMConfig.disks?.map((disk, index) => (
-                  <div key={index} className="disk-detail">
-                    <span className="disk-icon"><IconHardDrive aria-hidden="true" /></span>
-                    <span className="disk-name">{disk.name}</span>
-                    <span className="disk-size">{disk.size_gb} GB</span>
-                    {disk.boot && <span className="boot-badge">BOOT</span>}
-                  </div>
-                ))}
-              </div>
-
-              {/* Network Configuration */}
-              <div className="config-section">
-                <h4>Network Configuration</h4>
-                {selectedVMConfig.networks?.map((network, index) => (
-                  <div key={index} className="network-detail">
-                    <div className="config-grid">
-                      <div className="config-item">
-                        <span className="config-label">Network:</span>
-                        <span className="config-value">{network.network}</span>
-                      </div>
-                      <div className="config-item">
-                        <span className="config-label">Internal IP:</span>
-                        <span className="config-value">{network.internal_ip || 'N/A'}</span>
-                      </div>
-                      <div className="config-item">
-                        <span className="config-label">External IP:</span>
-                        <span className="config-value">{network.external_ip || 'None'}</span>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              {/* Current Performance Metrics */}
-              {selectedVMConfig.current_metrics && (
-                <div className="config-section">
-                  <h4>Current Performance Metrics</h4>
-                  <div className="config-grid">
-                    <div className="config-item">
-                      <span className="config-label">CPU Usage:</span>
-                      <span className="config-value" style={{ color: getCPUColor(selectedVMConfig.current_metrics.cpu_usage) }}>
-                        {selectedVMConfig.current_metrics.cpu_usage.toFixed(1)}%
-                      </span>
-                    </div>
-                    <div className="config-item">
-                      <span className="config-label">Memory Usage:</span>
-                      <span className="config-value">
-                        {selectedVMConfig.current_metrics.memory_usage.toFixed(1)}%
-                      </span>
-                    </div>
-                    <div className="config-item">
-                      <span className="config-label">Disk Used:</span>
-                      <span className="config-value">
-                        {selectedVMConfig.current_metrics.disk_usage_gb?.toFixed(2) || '0.00'} GB
-                      </span>
-                    </div>
-                    <div className="config-item">
-                      <span className="config-label">Network In:</span>
-                      <span className="config-value">
-                        {selectedVMConfig.current_metrics.network_in_mb?.toFixed(2) || '0.00'} MB
-                      </span>
-                    </div>
-                    <div className="config-item">
-                      <span className="config-label">Network Out:</span>
-                      <span className="config-value">
-                        {selectedVMConfig.current_metrics.network_out_mb?.toFixed(2) || '0.00'} MB
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Creation Info */}
-              <div className="config-section">
-                <h4>Additional Information</h4>
-                <div className="config-grid">
-                  <div className="config-item">
-                    <span className="config-label">Created:</span>
-                    <span className="config-value">
-                      {selectedVMConfig.created ? new Date(selectedVMConfig.created).toLocaleString() : 'N/A'}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-            </div>
-        )}
-      </ZenithModal>
+      />
     </div>
   );
 }

@@ -79,7 +79,11 @@ def _platform_gcp_response(username: str) -> Dict[str, Any]:
     )
 
     gcp = resolve_gcp_credentials(username)
-    buckets = get_platform_buckets_for_csp("GCP", surface="storage")
+    from app.provision.storage_bridge import merge_provisioned_storage_buckets
+
+    buckets = merge_provisioned_storage_buckets(
+        username, "GCP", get_platform_buckets_for_csp("GCP", surface="storage")
+    )
     default_bucket = default_platform_slug()
     default_name = (gcp.get("bucket_name") or "").strip()
     for b in buckets:
@@ -168,7 +172,13 @@ def list_gcp_buckets_for_user(
             default_bucket = layout.get("secure_bucket_name") or default_bucket
         marked = _mark_default_gcp_bucket(result.get("buckets") or [], default_bucket)
         result["default_bucket"] = default_bucket or None
-        result["buckets"] = _filter_gcp_buckets_for_surface(marked, surface, layout)
+        from app.provision.storage_bridge import merge_provisioned_storage_buckets
+
+        result["buckets"] = merge_provisioned_storage_buckets(
+            username,
+            "GCP",
+            _filter_gcp_buckets_for_surface(marked, surface, layout),
+        )
         result["surface"] = surface
         _meter_gcp_list_buckets(username)
         return result
