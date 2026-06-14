@@ -1,0 +1,62 @@
+{
+  "name": "zenith-desktop",
+  "version": "0.1.0",
+  "description": "Zenith Cloud Platform — Electron shell loading the live web app",
+  "private": true,
+  "main": "electron/main.js",
+  "author": "Zenith",
+  "license": "UNLICENSED",
+  "scripts": {
+    "dev": "electron .",
+    "build": "electron-builder",
+    "build:mac": "electron-builder --mac",
+    "build:win": "electron-builder --win",
+    "build:linux": "electron-builder --linux"
+  },
+  "devDependencies": {
+    "electron": "^35.0.0",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "me.rajverse.zenith",
+    "productName": "Zenith",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "electron/**/*",
+      "package.json"
+    ],
+    "mac": {
+      "category": "public.app-category.productivity",
+      "target": [
+        "dmg"
+      ],
+      "icon": "build/icon.png"
+    },
+    "dmg": {
+      "title": "Zenith ${version}"
+    },
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "icon": "build/icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "installerIcon": "build/icon.png",
+      "uninstallerIcon": "build/icon.png"
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "category": "Office",
+      "icon": "build"
+    }
+  }
+}

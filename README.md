@@ -313,6 +313,16 @@ frontend/src/
 4. Login with your credentials
 5. Explore the dashboard!
 
+### Desktop app (Electron)
+
+Optional native shell that loads the live site (same as the browser):
+
+```bash
+cd desktop && npm install && npm run dev
+```
+
+See [desktop/README.md](desktop/README.md) for build targets (DMG, EXE, AppImage/deb) and release tags.
+
 ## 📁 Project Structure
 
 ```
