@@ -21,6 +21,7 @@ function Footer() {
             <div className="footer-link-column">
               <h4>Product</h4>
               <Link to="/features">Features</Link>
+              <Link to="/download">Download</Link>
               <Link to="/pricing">Pricing</Link>
               <Link to="/docs">Documentation</Link>
               <Link to="/dashboard">Dashboard</Link>

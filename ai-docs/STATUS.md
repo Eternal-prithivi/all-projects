@@ -1,23 +1,22 @@
 # STATUS.md — Live Project Snapshot
 
-**Last Updated:** 2026-06-14 (Phase 25 PRE)
+**Last Updated:** 2026-06-14 (Phase 29 download page)
 
 ---
 
 ## Identity
 
-| Phase | **25** Mobile foundation · **IN PROGRESS** |
-| Prior | Phase 24 Shared org billing · COMPLETE |
+| Phase | **29** Desktop download page + CI · **COMPLETE** |
+| Prior | Phase 25–27 Mobile · Phase 28 Electron shell · COMPLETE |
 
 ---
 
 ## 🔴 Active Task
 
-**Phase 25 — Mobile foundation** — `IN PROGRESS` (started 2026-06-14)
+**Phase 30 — Desktop signing prep (optional)** — `IN PROGRESS` (started 2026-06-14)
 
-- **Scope:** Breakpoint consistency, modal/drawer/wizard CSS gaps, plan drawer mobile, UI_UX_AUDIT mobile checklist
-- **Do NOT touch:** Card-table rollout (Phase 26), Electron/desktop (Phase 28+)
-- **Done when:** iPhone 390px smoke on Overview/Storage/Billing/Settings — no page overflow; modals full-width; plan drawer usable
+- **Scope:** INSTALL.md, trust copy, signing guide — no paid certs required yet
+- **Done when:** Docs explain signing path; Trust Center links download
 
 ---
 
@@ -25,18 +24,17 @@
 
 | Check | Status |
 |-------|--------|
-| Backend pytest | not required Phase 25 |
-| Frontend build | verify after Phase 25 |
-| E2E playbook | `docs/testing/manual_testing.md` |
-| Render deploy branch | `stage` → auto-deploy |
+| Frontend build | pass (Phase 29) |
+| Desktop CI | `desktop-release.yml` on `desktop-v*.*.*` tags |
+| E2E | mobile-shell includes `/download` |
 
 ---
 
-## Phase 24 summary (prior)
+## Phase 29 summary
 
-- **Org billing:** seat-based Razorpay checkout per org; `get_effective_subscription()` resolver; members inherit org plan
-- **ACL:** `resource_acl.py` — org_id + created_by on VM, storage, provision
-- **UI:** Team seats card, Billing org panel, VM/Storage/Provision org labels
+- `/download` page, `releases.json`, nav/footer/sitemap
+- `desktop-release.yml` matrix → GitHub Releases
+- `detectPlatform.js`, `DESKTOP_DOWNLOAD_FAQ` in productFacts
 
 ---
 

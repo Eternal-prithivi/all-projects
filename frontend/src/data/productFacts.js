@@ -19,6 +19,7 @@ export const PATHS = {
   storage: '/dashboard/storage',
   security: '/dashboard/security',
   provision: '/dashboard/provision',
+  download: '/download',
 };
 
 /** Features not yet shipped — referenced honestly in help copy */
@@ -241,7 +242,7 @@ export function buildHelpFaqs() {
       category: 'getting-started',
       question: 'What are the system requirements?',
       answer:
-        'Zenith runs in any modern browser (Chrome, Firefox, Safari, Edge). No local install is required. REST APIs are available on Pro and Enterprise for automation.',
+        'Use Zenith in any modern browser (Chrome, Firefox, Safari, Edge) or install the free desktop app for macOS, Windows, or Linux from /download. An internet connection is required. REST APIs are available on Pro and Enterprise for automation.',
     },
     {
       id: 5,
@@ -395,6 +396,34 @@ export function buildHelpFaqs() {
     },
   ];
 }
+
+/** Desktop download page FAQ */
+export const DESKTOP_DOWNLOAD_FAQ = [
+  {
+    id: 'desktop-1',
+    question: 'Does the desktop app work offline?',
+    answer:
+      'No. The desktop app is a native window around the same Zenith website. You need an internet connection to sign in and manage your clouds.',
+  },
+  {
+    id: 'desktop-2',
+    question: 'Why does my OS warn about an unknown publisher?',
+    answer:
+      'Beta builds are not code-signed yet. macOS Gatekeeper and Windows SmartScreen may show a warning. Follow the install steps on this page, or use Zenith in your browser with no install.',
+  },
+  {
+    id: 'desktop-3',
+    question: 'Is the desktop app different from the browser version?',
+    answer:
+      'No — it loads the same Zenith experience as Chrome or Edge. Updates ship when we deploy the website; reinstall only when we publish a new desktop shell version.',
+  },
+  {
+    id: 'desktop-4',
+    question: 'Where are releases hosted?',
+    answer:
+      'Installers are published on GitHub Releases when we push a desktop-v*.*.* tag. This page reads version metadata from releases.json.',
+  },
+];
 
 export function getPlanById(planId) {
   return PRODUCT_PLANS.find((p) => p.plan_id === planId);

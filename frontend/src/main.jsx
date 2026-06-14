@@ -93,6 +93,7 @@ const SsoCallbackPage = lazyWithRetry(() => import("./pages/SsoCallbackPage.jsx"
 const SupportTicketPage = lazyWithRetry(() => import("./pages/SupportTicketPage.jsx"));
 const SupportPage = lazyWithRetry(() => import("./pages/SupportPage.jsx"));
 const AdminSupportPage = lazyWithRetry(() => import("./pages/admin/AdminSupportPage.jsx"));
+const DownloadPage = lazyWithRetry(() => import("./pages/DownloadPage.jsx"));
 
 const router = createBrowserRouter([
   {
@@ -122,6 +123,7 @@ const router = createBrowserRouter([
       { path: "/status", element: <Suspense fallback={<LazyLoadFallback />}><StatusPage /></Suspense> },
       { path: "/verify-email", element: <Suspense fallback={<LazyLoadFallback />}><VerifyEmailPage /></Suspense> },
       { path: "/pricing", element: <Suspense fallback={<LazyLoadFallback />}><PublicPricingPage /></Suspense> },
+      { path: "/download", element: <Suspense fallback={<LazyLoadFallback />}><DownloadPage /></Suspense> },
       { path: "/docs", element: <Suspense fallback={<LazyLoadFallback />}><DocsHubPage /></Suspense> },
       { path: "/session-expired", element: <Suspense fallback={<LazyLoadFallback />}><SessionExpiredPage /></Suspense> },
       { path: "/billing/success", element: <Suspense fallback={<LazyLoadFallback />}><BillingSuccessPage /></Suspense> },

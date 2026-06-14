@@ -23,6 +23,14 @@ test.describe('Mobile shell', () => {
     await expect(page.getByRole('link', { name: /^contact$/i })).toBeVisible();
   });
 
+  test('download page shows platform options', async ({ page }) => {
+    await page.goto('/download');
+    await expect(page.getByRole('heading', { name: /zenith for desktop/i })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /choose your platform/i })).toBeVisible();
+    await expect(page.getByText(/macOS/i).first()).toBeVisible();
+    await expect(page.getByText(/Windows/i).first()).toBeVisible();
+  });
+
   test('dashboard shows bottom navigation when logged in', async ({ page, request }) => {
     test.skip(!(await isBackendAvailable(request)), 'Backend not available');
 

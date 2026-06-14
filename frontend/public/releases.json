@@ -1,0 +1,31 @@
+{
+  "version": "0.1.0",
+  "publishedAt": "2026-06-14",
+  "beta": true,
+  "releaseTag": "desktop-v0.1.0",
+  "githubRepo": "Eternal-prithiviraj/all-projects",
+  "platforms": {
+    "mac": {
+      "label": "macOS",
+      "extension": "dmg",
+      "artifactName": "Zenith-0.1.0.dmg",
+      "minOs": "macOS 11 (Big Sur) or later",
+      "sha256": ""
+    },
+    "win": {
+      "label": "Windows",
+      "extension": "exe",
+      "artifactName": "Zenith Setup 0.1.0.exe",
+      "minOs": "Windows 10 or later (64-bit)",
+      "sha256": ""
+    },
+    "linux": {
+      "label": "Linux",
+      "extension": "AppImage",
+      "artifactName": "Zenith-0.1.0.AppImage",
+      "altArtifactName": "zenith-desktop_0.1.0_amd64.deb",
+      "minOs": "Ubuntu 20.04+ or equivalent (64-bit)",
+      "sha256": ""
+    }
+  }
+}

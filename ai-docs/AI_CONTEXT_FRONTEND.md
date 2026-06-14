@@ -47,6 +47,7 @@ For backend context → read `AI_CONTEXT_BACKEND.md`
 | `/status` | `StatusPage.jsx` — polls `GET /api/platform/status` |
 | `/verify-email` | `VerifyEmailPage.jsx` — `POST /api/auth/verify-email?token=` |
 | `/pricing` | `PublicPricingPage.jsx` — re-exports `data/marketingPricing.js` → `productFacts.js` |
+| `/download` | `DownloadPage.jsx` — desktop installers; reads `public/releases.json` |
 | `/docs` | `DocsHubPage.jsx` — links to Swagger + Help |
 | `/session-expired` | `SessionExpiredPage.jsx` |
 | `/billing/success`, `/billing/cancel` | `BillingSuccessPage.jsx`, `BillingCancelPage.jsx` |

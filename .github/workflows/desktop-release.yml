@@ -1,0 +1,161 @@
+name: Desktop Release
+
+on:
+  push:
+    tags:
+      - 'desktop-v*.*.*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-mac:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+      - name: Install and build macOS
+        working-directory: desktop
+        run: |
+          npm ci
+          npm run build:mac
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mac-artifacts
+          path: desktop/dist/*
+
+  build-win:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+      - name: Install and build Windows
+        working-directory: desktop
+        run: |
+          npm ci
+          npm run build:win
+      - uses: actions/upload-artifact@v4
+        with:
+          name: win-artifacts
+          path: desktop/dist/*
+
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+      - name: Install Linux build deps
+        run: sudo apt-get update && sudo apt-get install -y libfuse2
+      - name: Install and build Linux
+        working-directory: desktop
+        run: |
+          npm ci
+          npm run build:linux
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-artifacts
+          path: desktop/dist/*
+
+  release:
+    needs: [build-mac, build-win, build-linux]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-artifacts
+          merge-multiple: true
+
+      - name: Generate checksums
+        run: |
+          cd release-artifacts
+          sha256sum * > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: Zenith Desktop ${{ github.ref_name }}
+          body: |
+            ## Zenith Desktop (unsigned beta)
+
+            Installers load **https://rajverse.me** — same as the browser.
+
+            See [install instructions](https://rajverse.me/download) for macOS Gatekeeper and Windows SmartScreen.
+
+            Checksums are in `SHA256SUMS.txt`.
+          files: release-artifacts/*
+          draft: false
+          prerelease: true
+
+      - name: Extract version from tag
+        id: ver
+        run: echo "version=${GITHUB_REF_NAME#desktop-v}" >> "$GITHUB_OUTPUT"
+
+      - name: Update releases.json
+        run: |
+          VERSION="${{ steps.ver.outputs.version }}"
+          TAG="${{ github.ref_name }}"
+          REPO="${{ github.repository }}"
+          PUBLISHED="$(date -u +%Y-%m-%d)"
+          MAC_SHA=$(grep -i '\.dmg' release-artifacts/SHA256SUMS.txt | awk '{print $1}' || echo "")
+          WIN_SHA=$(grep -i '\.exe' release-artifacts/SHA256SUMS.txt | awk '{print $1}' || echo "")
+          LINUX_SHA=$(grep -i 'AppImage' release-artifacts/SHA256SUMS.txt | awk '{print $1}' || echo "")
+          cat > frontend/public/releases.json <<EOF
+          {
+            "version": "${VERSION}",
+            "publishedAt": "${PUBLISHED}",
+            "beta": true,
+            "releaseTag": "${TAG}",
+            "githubRepo": "${REPO}",
+            "platforms": {
+              "mac": {
+                "label": "macOS",
+                "extension": "dmg",
+                "artifactName": "Zenith-${VERSION}.dmg",
+                "minOs": "macOS 11 (Big Sur) or later",
+                "sha256": "${MAC_SHA}"
+              },
+              "win": {
+                "label": "Windows",
+                "extension": "exe",
+                "artifactName": "Zenith Setup ${VERSION}.exe",
+                "minOs": "Windows 10 or later (64-bit)",
+                "sha256": "${WIN_SHA}"
+              },
+              "linux": {
+                "label": "Linux",
+                "extension": "AppImage",
+                "artifactName": "Zenith-${VERSION}.AppImage",
+                "altArtifactName": "zenith-desktop_${VERSION}_amd64.deb",
+                "minOs": "Ubuntu 20.04+ or equivalent (64-bit)",
+                "sha256": "${LINUX_SHA}"
+              }
+            }
+          }
+          EOF
+
+      - name: Commit releases.json
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add frontend/public/releases.json
+          git diff --cached --quiet && echo "No releases.json changes" && exit 0
+          git commit -m "chore(desktop): update releases.json for ${{ github.ref_name }}"
+          git push origin HEAD:stage
