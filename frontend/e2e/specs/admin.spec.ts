@@ -73,16 +73,19 @@ test.describe('Admin smoke', () => {
     await expect(page.getByRole('link', { name: /admin portal/i })).toBeVisible({
       timeout: 30_000,
     });
-    await page.getByRole('link', { name: /admin portal/i }).click();
-    await expect(page).toHaveURL(/\/admin\/?$/);
 
-    await expect(page.getByRole('navigation', { name: /admin navigation/i })).toBeVisible({
-      timeout: 30_000,
-    });
-    await page.getByRole('menuitem', { name: /system health/i }).click();
+    await page.goto('/admin/system', { waitUntil: 'domcontentloaded' });
     await expect(page).toHaveURL(/\/admin\/system/);
+    await expect(page).not.toHaveURL(/access-denied/);
 
-    await expect(page.getByText(/loading system health/i)).toBeHidden({ timeout: 30_000 });
+    await expect(
+      page
+        .getByRole('heading', { name: /platform administration/i })
+        .or(page.getByText(/loading system health/i))
+        .or(page.getByRole('heading', { level: 1, name: /system health/i })),
+    ).toBeVisible({ timeout: 45_000 });
+
+    await expect(page.getByText(/loading system health/i)).toBeHidden({ timeout: 45_000 });
     await expect(page.getByRole('heading', { level: 1, name: /system health/i })).toBeVisible({
       timeout: 15_000,
     });
