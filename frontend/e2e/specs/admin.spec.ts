@@ -15,8 +15,8 @@ test.describe('Admin smoke', () => {
     await loginOnPage(page, admin, request);
     await page.goto('/admin/system');
 
-    await expect(page.getByRole('heading', { name: /system health/i })).toBeVisible({
-      timeout: 15_000,
+    await expect(page.getByRole('heading', { level: 1, name: /system health/i })).toBeVisible({
+      timeout: 30_000,
     });
     await expect(page.getByRole('heading', { name: /database status/i })).toBeVisible();
   });

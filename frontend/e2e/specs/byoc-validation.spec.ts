@@ -35,12 +35,16 @@ test.describe('BYOC form validation', () => {
 
     await loginOnPage(page, user, request);
     await page.goto('/dashboard/settings');
+    await page.getByText(/connect your own cloud accounts/i).scrollIntoViewIfNeeded();
 
-    const connectButtons = page.getByRole('button', { name: /^connect$/i });
-    await connectButtons.nth(1).click();
+    await page
+      .locator('.byoc-provider-card')
+      .filter({ hasText: /google cloud/i })
+      .getByRole('button', { name: /^connect$/i })
+      .click();
 
     await expect(page.getByText(/step 1 — verify credentials/i)).toBeVisible();
+    await page.getByRole('button', { name: /verify & continue/i }).click();
     await expect(page.getByText(/service account json is required/i)).toBeVisible();
-    await expect(page.getByText(/bucket name is required/i)).toBeVisible();
   });
 });

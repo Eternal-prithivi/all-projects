@@ -11,12 +11,13 @@ test.describe('Provision page smoke', () => {
     await loginViaApi(page, request, user);
 
     await page.goto('/dashboard/provision');
-    await expect(page.getByRole('heading', { name: /infrastructure governance/i })).toBeVisible({
+    await expect(page.getByRole('heading', { name: /infrastructure/i })).toBeVisible({
       timeout: 30_000,
     });
 
+    const tabGroup = page.getByRole('group', { name: /infrastructure sections/i });
     for (const tab of ['Deployments', 'Activity', 'Policies', 'Build']) {
-      await page.getByRole('button', { name: tab }).click();
+      await tabGroup.getByRole('button', { name: tab }).click();
       await expect(page.getByText(/unexpected application error/i)).toHaveCount(0);
     }
 

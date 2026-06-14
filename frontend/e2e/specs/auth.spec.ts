@@ -18,7 +18,7 @@ test.describe('Auth smoke', () => {
     await loginOnPage(page, user);
 
     await expect(page).toHaveURL(/\/dashboard/);
-    await expect(page.getByRole('heading', { level: 2 })).toContainText(user.username);
-    await expect(page.getByText(/cloud overview/i)).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1 })).toContainText(user.username);
+    await expect(page.getByText(/operational overview/i)).toBeVisible();
   });
 });
