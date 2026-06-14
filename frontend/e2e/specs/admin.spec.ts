@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { adminCredentials, isBackendAvailable, loginAdminOnPage } from '../helpers';
+import { adminCredentials, apiRoot, isBackendAvailable, loginOnPage } from '../helpers';
 
 const SYSTEM_HEALTH_FIXTURE = {
   database: { healthy: true, size_mb: 0.5, collections: 4 },
@@ -21,7 +21,7 @@ const EMPTY_NOTIFICATIONS = {
 
 test.describe('Admin smoke', () => {
   test('admin can open system health page', async ({ page, request }) => {
-    test.setTimeout(60_000);
+    test.setTimeout(90_000);
 
     if (!(await isBackendAvailable(request))) {
       test.skip(true, 'Backend not running');
@@ -32,7 +32,23 @@ test.describe('Admin smoke', () => {
       test.skip(true, 'Admin credentials not configured');
     }
 
+    const tokenRes = await request.post(`${apiRoot()}/api/auth/token`, {
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      data: `username=${encodeURIComponent(admin.username)}&password=${encodeURIComponent(admin.password)}`,
+    });
+    expect(tokenRes.ok()).toBeTruthy();
+    const { access_token: adminToken } = (await tokenRes.json()) as { access_token: string };
+
+    const healthRes = await request.get(`${apiRoot()}/api/admin/system-health`, {
+      headers: { Authorization: `Bearer ${adminToken}` },
+    });
+    expect(healthRes.ok()).toBeTruthy();
+
     await page.route(/\/api\/admin\/system-health/, async (route) => {
+      if (route.request().method() !== 'GET') {
+        await route.continue();
+        return;
+      }
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -47,15 +63,24 @@ test.describe('Admin smoke', () => {
       });
     });
 
-    await loginAdminOnPage(page, request, admin);
+    await loginOnPage(page, admin, request);
+    await expect
+      .poll(async () =>
+        page.evaluate(() => JSON.parse(sessionStorage.getItem('cachedUser') || '{}')?.role),
+      )
+      .toBe('admin');
 
-    await page.goto('/admin/system', { waitUntil: 'domcontentloaded' });
-    await expect(page).toHaveURL(/\/admin\/system/);
-    await expect(page).not.toHaveURL(/access-denied/);
-
-    await expect(page.getByRole('heading', { name: /platform administration/i })).toBeVisible({
+    await expect(page.getByRole('link', { name: /admin portal/i })).toBeVisible({
       timeout: 30_000,
     });
+    await page.getByRole('link', { name: /admin portal/i }).click();
+    await expect(page).toHaveURL(/\/admin\/?$/);
+
+    await page
+      .getByRole('navigation', { name: /admin navigation/i })
+      .getByRole('link', { name: /system health/i })
+      .click();
+    await expect(page).toHaveURL(/\/admin\/system/);
 
     await expect(page.getByText(/loading system health/i)).toBeHidden({ timeout: 30_000 });
     await expect(page.getByRole('heading', { level: 1, name: /system health/i })).toBeVisible({
