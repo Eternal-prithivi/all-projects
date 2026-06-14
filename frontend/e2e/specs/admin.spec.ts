@@ -13,6 +13,7 @@ test.describe('Admin smoke', () => {
     }
 
     await loginOnPage(page, admin, request);
+    await page.waitForResponse((r) => r.url().includes('/api/users/me') && r.ok(), { timeout: 30_000 });
     await page.goto('/admin/system');
 
     await expect(page.getByRole('heading', { level: 1, name: /system health/i })).toBeVisible({

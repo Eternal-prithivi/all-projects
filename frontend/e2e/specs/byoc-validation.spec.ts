@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { isBackendAvailable, loginOnPage, registerTestUser } from '../helpers';
+import { isBackendAvailable, loginOnPage, mockProEntitlements, registerTestUser } from '../helpers';
 
 test.describe('BYOC form validation', () => {
   test('shows GCP validation errors when required fields empty', async ({ page, request }) => {
@@ -9,6 +9,7 @@ test.describe('BYOC form validation', () => {
 
     const user = await registerTestUser(request);
 
+    await mockProEntitlements(page);
     await page.route('**/api/byoc/status', async (route) => {
       await route.fulfill({
         status: 200,
@@ -35,7 +36,7 @@ test.describe('BYOC form validation', () => {
 
     await loginOnPage(page, user, request);
     await page.goto('/dashboard/settings');
-    await page.getByText(/connect your own cloud accounts/i).scrollIntoViewIfNeeded();
+    await page.locator('#byoc-section').scrollIntoViewIfNeeded();
 
     await page
       .locator('.byoc-provider-card')

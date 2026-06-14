@@ -4,6 +4,7 @@ import { ToastContainer } from 'react-toastify';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import { ConfirmProvider } from '../../context/ConfirmContext.jsx';
+import { NotificationProvider } from '../../context/NotificationContext.jsx';
 import SupportWsBridge from '../support/SupportWsBridge.jsx';
 import AdminSidebar from './AdminSidebar';
 import AdminMobileBottomNav from './AdminMobileBottomNav';

@@ -197,7 +197,15 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          cp frontend/public/releases.json /tmp/releases.json
+          git fetch origin stage
+          git checkout stage
+          git pull --rebase origin stage
+          cp /tmp/releases.json frontend/public/releases.json
           git add frontend/public/releases.json
-          git diff --cached --quiet && echo "No releases.json changes" && exit 0
+          if git diff --cached --quiet; then
+            echo "No releases.json changes"
+            exit 0
+          fi
           git commit -m "chore(desktop): update releases.json for ${{ github.ref_name }}"
-          git push origin HEAD:stage
+          git push origin stage

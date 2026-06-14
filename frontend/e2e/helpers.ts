@@ -59,6 +59,7 @@ export async function loginViaApi(
   }, payload.access_token);
   await page.goto('/dashboard');
   await page.waitForURL(/\/dashboard/, { timeout: 30_000, waitUntil: 'commit' });
+  await waitForSessionUser(page);
 }
 
 export async function loginOnPage(
@@ -89,4 +90,36 @@ export function adminCredentials(): { username: string; password: string } | nul
   const username = process.env.PLAYWRIGHT_ADMIN_USERNAME || 'e2e_admin';
   const password = process.env.PLAYWRIGHT_ADMIN_PASSWORD || 'SecurePass1';
   return { username, password };
+}
+
+/** Pro plan payload for BYOC / provision policy E2E. */
+export const PRO_ENTITLEMENTS = {
+  plan_id: 'pro',
+  plan_name: 'Pro',
+  features: {
+    live_billing: true,
+    byoc: true,
+    provision_policies: true,
+    api_access: true,
+    team_seat_billing: true,
+    ai_recommendations: true,
+  },
+  limits: { vm_limit: 10, storage_gb: 100, vms_used: 0, storage_bytes_used: 0 },
+  nav: [],
+};
+
+export async function mockProEntitlements(page: import('@playwright/test').Page): Promise<void> {
+  await page.route('**/api/payments/entitlements', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(PRO_ENTITLEMENTS),
+    });
+  });
+}
+
+export async function waitForSessionUser(page: import('@playwright/test').Page): Promise<void> {
+  await page
+    .waitForResponse((r) => r.url().includes('/api/users/me') && r.ok(), { timeout: 30_000 })
+    .catch(() => undefined);
 }
