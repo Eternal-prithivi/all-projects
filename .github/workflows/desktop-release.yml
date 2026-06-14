@@ -63,7 +63,11 @@ jobs:
           cache: npm
           cache-dependency-path: desktop/package-lock.json
       - name: Install Linux build deps
-        run: sudo apt-get update && sudo apt-get install -y libfuse2
+        run: |
+          # GitHub-hosted runners sometimes hit 403 on Microsoft apt mirrors; libfuse2 is on Ubuntu main.
+          sudo rm -f /etc/apt/sources.list.d/microsoft-prod.list /etc/apt/sources.list.d/azure-cli.list || true
+          sudo apt-get update
+          sudo apt-get install -y libfuse2
       - name: Install and build Linux
         working-directory: desktop
         run: |
