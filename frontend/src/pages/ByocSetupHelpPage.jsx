@@ -1,13 +1,15 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import PageHeader from '../components/ui/PageHeader.jsx';
+import PageContainer from '../components/ui/PageContainer.jsx';
+import Panel from '../components/ui/Panel.jsx';
 import ByocSetupGuidePanel from '../components/byoc/ByocSetupGuidePanel.jsx';
 import { BYOC_CAPABILITY_MATRIX, formatFeatureList } from '../data/byocCapabilityMatrix';
 import '../styles/settings.css';
 
 export default function ByocSetupHelpPage() {
   return (
-    <div className="settings-page byoc-help-page">
+    <PageContainer variant="config" className="settings-page byoc-help-page">
       <PageHeader
         kicker="Help"
         title="BYOC optional setup"
@@ -15,7 +17,7 @@ export default function ByocSetupHelpPage() {
       />
 
       <div className="settings-content">
-        <div className="settings-card">
+        <Panel title="Two-tier BYOC model" className="settings-card">
           <p>
             Zenith uses a <strong>two-tier</strong> BYOC model. Tier 1 (storage keys) unlocks file storage immediately.
             Tier 2 is recommended for additional dashboard areas and can be completed anytime in{' '}
@@ -39,22 +41,20 @@ export default function ByocSetupHelpPage() {
               ))}
             </tbody>
           </table>
-        </div>
+        </Panel>
 
-        <div className="settings-card">
-          <h3>Google Cloud — billing export</h3>
+        <Panel title="Google Cloud — billing export" className="settings-card">
           <ByocSetupGuidePanel tier="gcp_billing" defaultOpen />
-        </div>
+        </Panel>
 
-        <div className="settings-card">
-          <h3>Microsoft Azure — service principal</h3>
+        <Panel title="Microsoft Azure — service principal" className="settings-card">
           <ByocSetupGuidePanel tier="azure_compute" defaultOpen />
-        </div>
+        </Panel>
 
         <p>
           <Link to="/dashboard/settings" className="btn-secondary">Back to Settings</Link>
         </p>
       </div>
-    </div>
+    </PageContainer>
   );
 }

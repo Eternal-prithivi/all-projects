@@ -10,6 +10,7 @@ import {
   getProvisionEngine,
   getRemediateConfirmMessage,
 } from '../../utils/provisionEngine.js';
+import { useConfirm } from '../../context/ConfirmContext.jsx';
 
 const getStatusClass = (status) => {
   if (status === 'deployed') return 'deployed';
@@ -90,6 +91,7 @@ function DeploymentRow({
 
 export default function ProvisionManagePanel({ onDeploymentsChange }) {
   const { user } = useAuth();
+  const { confirm } = useConfirm();
   const { orgName, isAdmin } = useOrgContext();
   const [showOnlyMine, setShowOnlyMine] = useState(false);
   const [recent, setRecent] = useState([]);
@@ -169,10 +171,15 @@ export default function ProvisionManagePanel({ onDeploymentsChange }) {
   const archiveDeployment = async (e, dep) => {
     e.stopPropagation();
     const isLive = dep.status === 'deployed';
-    const msg = isLive
-      ? 'Archive this deployment? Live cloud resources are NOT removed — open it and use Destroy first if you want to tear down infrastructure.'
-      : 'Remove this from recent deployments? It will move to history.';
-    if (!window.confirm(msg)) return;
+    const ok = await confirm({
+      title: isLive ? 'Archive deployment' : 'Remove from recent',
+      message: isLive
+        ? 'Archive this deployment? Live cloud resources are not removed — open it and use Destroy first if you want to tear down infrastructure.'
+        : 'Remove this from recent deployments? It will move to history.',
+      confirmLabel: isLive ? 'Archive' : 'Remove',
+      variant: 'danger',
+    });
+    if (!ok) return;
 
     setLoadingAction('delete');
     setError(null);
@@ -192,9 +199,13 @@ export default function ProvisionManagePanel({ onDeploymentsChange }) {
 
   const permanentlyRemove = async (e, dep) => {
     e.stopPropagation();
-    if (!window.confirm('Permanently delete this record from history? This cannot be undone.')) {
-      return;
-    }
+    const ok = await confirm({
+      title: 'Delete history record',
+      message: 'Permanently delete this record from history? This cannot be undone.',
+      confirmLabel: 'Delete record',
+      variant: 'danger',
+    });
+    if (!ok) return;
 
     setLoadingAction('delete');
     setError(null);
@@ -237,7 +248,15 @@ export default function ProvisionManagePanel({ onDeploymentsChange }) {
     const dep = findDeployment(depId) || detail;
     const engine = getProvisionEngine(dep);
     setActionEngine(engine);
-    if (!checkOnly && !window.confirm(getRemediateConfirmMessage(engine, deploymentCsp(dep)))) return;
+    if (!checkOnly) {
+      const ok = await confirm({
+        title: 'Apply remediation',
+        message: getRemediateConfirmMessage(engine, deploymentCsp(dep)),
+        confirmLabel: 'Apply remediation',
+        variant: 'danger',
+      });
+      if (!ok) return;
+    }
     setLoadingAction(checkOnly ? 'remediate-preview' : 'remediate-apply');
     setError(null);
     try {
@@ -253,7 +272,13 @@ export default function ProvisionManagePanel({ onDeploymentsChange }) {
   };
 
   const runDestroy = async (depId) => {
-    if (!window.confirm('Destroy this deployment? This cannot be undone.')) return;
+    const ok = await confirm({
+      title: 'Destroy deployment',
+      message: 'Destroy this deployment and tear down cloud resources? This cannot be undone.',
+      confirmLabel: 'Destroy',
+      variant: 'danger',
+    });
+    if (!ok) return;
     setLoadingAction('destroy');
     setError(null);
     try {

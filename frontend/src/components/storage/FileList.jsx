@@ -1,7 +1,8 @@
 import React from 'react';
+import { toast } from 'react-toastify';
 import { useAuth } from '../../context/AuthContext.jsx';
+import { useConfirm } from '../../context/ConfirmContext.jsx';
 import { getDownloadUrl, deleteFile } from '../../api.js';
-// This is the corrected import path
 import { IconDownload, IconTrash, IconHardDrive } from '../dashboard/Icons.jsx';
 import EmptyState from '../EmptyState.jsx';
 import '../../styles/file-list.css';
@@ -17,24 +18,32 @@ function formatBytes(bytes, decimals = 2) {
 
 function FileList({ files, onFileDeleted }) {
   const { token } = useAuth();
+  const { confirm } = useConfirm();
 
   const handleDownload = async (filename) => {
     try {
       const data = await getDownloadUrl(filename, token);
       window.open(data.download_url, '_blank');
     } catch {
-      alert('Could not get download link.');
+      toast.error('Could not get download link.');
     }
   };
 
   const handleDelete = async (filename) => {
-    if (window.confirm(`Are you sure you want to delete ${filename}?`)) {
-      try {
-        await deleteFile(filename, token);
-        onFileDeleted();
-      } catch {
-        alert('Could not delete file.');
-      }
+    const ok = await confirm({
+      title: 'Delete file',
+      message: `Delete ${filename}? This cannot be undone.`,
+      confirmLabel: 'Delete file',
+      variant: 'danger',
+    });
+    if (!ok) return;
+
+    try {
+      await deleteFile(filename, token);
+      onFileDeleted();
+      toast.success('File deleted.');
+    } catch {
+      toast.error('Could not delete file.');
     }
   };
 
@@ -49,7 +58,8 @@ function FileList({ files, onFileDeleted }) {
   }
 
   return (
-    <table className="file-table">
+    <div className="table-responsive-scroll">
+    <table className="file-table data-card-table">
       <thead>
         <tr>
           <th>Filename</th>
@@ -62,15 +72,15 @@ function FileList({ files, onFileDeleted }) {
       <tbody>
         {files.map((file) => (
           <tr key={file.key}>
-            <td>{file.filename}</td>
-            <td>{formatBytes(file.size_bytes)}</td>
-            <td>{new Date(file.last_modified).toLocaleString()}</td>
-            <td>{file.storage_class}</td>
-            <td className="actions-cell">
-              <button onClick={() => handleDownload(file.filename)} className="action-btn">
+            <td data-label="Filename">{file.filename}</td>
+            <td data-label="Size">{formatBytes(file.size_bytes)}</td>
+            <td data-label="Last Modified">{new Date(file.last_modified).toLocaleString()}</td>
+            <td data-label="Storage Class">{file.storage_class}</td>
+            <td className="actions-cell" data-label="Actions">
+              <button type="button" onClick={() => handleDownload(file.filename)} className="action-btn">
                 <IconDownload />
               </button>
-              <button onClick={() => handleDelete(file.filename)} className="action-btn delete-btn">
+              <button type="button" onClick={() => handleDelete(file.filename)} className="action-btn delete-btn">
                 <IconTrash />
               </button>
             </td>
@@ -78,6 +88,7 @@ function FileList({ files, onFileDeleted }) {
         ))}
       </tbody>
     </table>
+    </div>
   );
 }
 

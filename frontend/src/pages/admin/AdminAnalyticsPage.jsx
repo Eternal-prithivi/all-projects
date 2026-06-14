@@ -90,7 +90,7 @@ const AdminAnalyticsPage = () => {
       <div className="analytics-section">
         <h2><FaDollarSign /> Revenue Trends (Last 6 Months)</h2>
         <div className="chart-container">
-          <table className="admin-table">
+          <table className="admin-table data-card-table">
             <thead>
               <tr>
                 <th>Month</th>
@@ -100,8 +100,8 @@ const AdminAnalyticsPage = () => {
             <tbody>
               {analytics.revenue_trends.map((item, idx) => (
                 <tr key={idx}>
-                  <td>{item.month}</td>
-                  <td>₹{item.revenue.toLocaleString()}</td>
+                  <td data-label="Month">{item.month}</td>
+                  <td data-label="Revenue (₹)">₹{item.revenue.toLocaleString()}</td>
                 </tr>
               ))}
             </tbody>
@@ -113,7 +113,7 @@ const AdminAnalyticsPage = () => {
       <div className="analytics-section">
         <h2><FaUsers /> User Growth (Last 6 Months)</h2>
         <div className="chart-container">
-          <table className="admin-table">
+          <table className="admin-table data-card-table">
             <thead>
               <tr>
                 <th>Month</th>
@@ -123,8 +123,8 @@ const AdminAnalyticsPage = () => {
             <tbody>
               {analytics.user_growth.map((item, idx) => (
                 <tr key={idx}>
-                  <td>{item.month}</td>
-                  <td>{item.new_users}</td>
+                  <td data-label="Month">{item.month}</td>
+                  <td data-label="New Users">{item.new_users}</td>
                 </tr>
               ))}
             </tbody>
@@ -136,7 +136,7 @@ const AdminAnalyticsPage = () => {
       <div className="analytics-section">
         <h2><FaServer /> VM Usage (Last 6 Months)</h2>
         <div className="chart-container">
-          <table className="admin-table">
+          <table className="admin-table data-card-table">
             <thead>
               <tr>
                 <th>Month</th>
@@ -146,8 +146,8 @@ const AdminAnalyticsPage = () => {
             <tbody>
               {analytics.vm_usage.map((item, idx) => (
                 <tr key={idx}>
-                  <td>{item.month}</td>
-                  <td>{item.vms_created}</td>
+                  <td data-label="Month">{item.month}</td>
+                  <td data-label="VMs Created">{item.vms_created}</td>
                 </tr>
               ))}
             </tbody>
@@ -172,7 +172,7 @@ const AdminAnalyticsPage = () => {
       <div className="analytics-section">
         <h2><FaDollarSign /> Top 10 Spenders</h2>
         <div className="chart-container">
-          <table className="admin-table">
+          <table className="admin-table data-card-table">
             <thead>
               <tr>
                 <th>Rank</th>
@@ -183,9 +183,9 @@ const AdminAnalyticsPage = () => {
             <tbody>
               {analytics.top_spenders.map((spender, idx) => (
                 <tr key={idx}>
-                  <td>#{idx + 1}</td>
-                  <td>{spender._id}</td>
-                  <td>₹{spender.total_spent.toLocaleString()}</td>
+                  <td data-label="Rank">#{idx + 1}</td>
+                  <td data-label="Username">{spender._id}</td>
+                  <td data-label="Total Spent (₹)">₹{spender.total_spent.toLocaleString()}</td>
                 </tr>
               ))}
             </tbody>

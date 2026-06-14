@@ -3,7 +3,7 @@ import { Outlet, useNavigate } from 'react-router-dom';
 import { ToastContainer } from 'react-toastify';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
-import { NotificationProvider } from '../../context/NotificationContext.jsx';
+import { ConfirmProvider } from '../../context/ConfirmContext.jsx';
 import SupportWsBridge from '../support/SupportWsBridge.jsx';
 import AdminSidebar from './AdminSidebar';
 import AdminMobileBottomNav from './AdminMobileBottomNav';
@@ -65,6 +65,7 @@ const AdminLayout = () => {
 
   return (
     <NotificationProvider>
+      <ConfirmProvider>
       <SupportWsBridge />
       <div className="admin-layout">
         <AdminSidebar user={user} />
@@ -102,6 +103,7 @@ const AdminLayout = () => {
           style={{ zIndex: 99999 }}
         />
       </div>
+      </ConfirmProvider>
     </NotificationProvider>
   );
 };

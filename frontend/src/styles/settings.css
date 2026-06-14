@@ -4,11 +4,6 @@
 
 @import './byoc-shared.css';
 
-.settings-page {
-  max-width: 1000px;
-  margin: 0 auto;
-}
-
 .settings-header {
   margin-bottom: 2rem;
 }

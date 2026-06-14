@@ -577,6 +577,14 @@ select.intent-archival {
   table.data-card-table tbody tr:hover {
     background: var(--bg-card);
   }
+
+  table.data-card-table tbody td.actions-cell {
+    justify-content: flex-end;
+  }
+
+  table.data-card-table tbody td.actions-cell::before {
+    align-self: center;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

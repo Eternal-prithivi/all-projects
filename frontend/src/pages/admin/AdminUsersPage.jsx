@@ -8,6 +8,7 @@ import {
 import { exportToCSV, prepareUsersForExport, exportUsersToPDF } from '../../utils/exportUtils';
 import PageHeader from '../../components/ui/PageHeader.jsx';
 import { usePageRefresh } from '../../hooks/usePageRefresh.js';
+import { useConfirm } from '../../context/ConfirmContext.jsx';
 
 const AdminUsersPage = () => {
   const [users, setUsers] = useState([]);
@@ -15,6 +16,7 @@ const AdminUsersPage = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [pagination, setPagination] = useState({ skip: 0, limit: 20, total: 0 });
   const { runPageRefresh, pageRefreshing } = usePageRefresh();
+  const { confirm } = useConfirm();
 
   const fetchUsers = useCallback(async () => {
     setLoading(true);
@@ -38,9 +40,13 @@ const AdminUsersPage = () => {
   };
 
   const handleStatusUpdate = async (username, newStatus) => {
-    if (!window.confirm(`Are you sure you want to ${newStatus} user: ${username}?`)) {
-      return;
-    }
+    const ok = await confirm({
+      title: `${newStatus === 'active' ? 'Activate' : 'Suspend'} user`,
+      message: `Are you sure you want to ${newStatus} user ${username}?`,
+      confirmLabel: newStatus === 'active' ? 'Activate' : 'Suspend',
+      variant: 'danger',
+    });
+    if (!ok) return;
 
     try {
       await api.put(`/admin/users/${username}/status?status=${newStatus}`);
@@ -132,7 +138,7 @@ const AdminUsersPage = () => {
             </div>
           ) : (
             <div className="table-container">
-              <table className="admin-table">
+              <table className="admin-table data-card-table">
                 <thead>
                   <tr>
                     <th>User</th>
@@ -148,7 +154,7 @@ const AdminUsersPage = () => {
                 <tbody>
                   {users.map((user) => (
                     <tr key={user.username}>
-                      <td>
+                      <td data-label="User">
                         <div className="user-cell">
                           <div className="user-avatar-small">
                             {user.username.charAt(0).toUpperCase()}
@@ -159,22 +165,22 @@ const AdminUsersPage = () => {
                           </div>
                         </div>
                       </td>
-                      <td>{user.email}</td>
-                      <td>
+                      <td data-label="Email">{user.email}</td>
+                      <td data-label="Plan">
                         <span className={`plan-badge ${user.subscription_plan}`}>
                           {user.subscription_plan}
                         </span>
                       </td>
-                      <td>{user.active_vms}</td>
-                      <td>{user.storage_used_gb.toFixed(2)} GB</td>
-                      <td>₹{user.total_spent.toLocaleString()}</td>
-                      <td>
+                      <td data-label="VMs">{user.active_vms}</td>
+                      <td data-label="Storage">{user.storage_used_gb.toFixed(2)} GB</td>
+                      <td data-label="Spent">₹{user.total_spent.toLocaleString()}</td>
+                      <td data-label="Status">
                         <span className={`status-badge ${user.status}`}>
                           {getStatusIcon(user.status)}
                           {user.status}
                         </span>
                       </td>
-                      <td>
+                      <td data-label="Actions">
                         <div className="action-buttons">
                           {user.status !== 'active' && (
                             <button 

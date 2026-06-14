@@ -11,13 +11,15 @@ import {
   FaHdd,
 } from 'react-icons/fa';
 import { apiClient } from '../api';
-import LoadingSpinner from '../components/LoadingSpinner.jsx';
+import { SettingsPageSkeleton } from '../components/Skeletons.jsx';
 import PageHeader from '../components/ui/PageHeader.jsx';
+import PageContainer from '../components/ui/PageContainer.jsx';
 import SparklineChart from '../components/dashboard/SparklineChart.jsx';
 import { usePageRefresh } from '../hooks/usePageRefresh.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { NOT_YET_AVAILABLE, PATHS, TEAM_CAPABILITIES } from '../data/productFacts.js';
 import { usePlanEntitlementsContext } from '../context/PlanEntitlementsContext.jsx';
+import { useConfirm } from '../context/ConfirmContext.jsx';
 import PlanUpgradeGate from '../components/billing/PlanUpgradeGate.jsx';
 import { NAV_ID_LABELS, MIN_PLAN_LABELS } from '../config/planNavConfig.js';
 import '../styles/settings.css';
@@ -28,6 +30,7 @@ const ONBOARDING_KEY = 'zenith_team_onboarding_dismissed';
 
 export default function TeamPage() {
   const { user } = useAuth();
+  const { confirm } = useConfirm();
   const { isFeatureEnabled, planName, getNavMeta } = usePlanEntitlementsContext();
   const [data, setData] = useState(null);
   const [summary, setSummary] = useState(null);
@@ -164,7 +167,13 @@ export default function TeamPage() {
   };
 
   const removeMember = async (username) => {
-    if (!window.confirm(`Remove ${username} from the team?`)) return;
+    const ok = await confirm({
+      title: 'Remove team member',
+      message: `Remove ${username} from the organization? They will lose access immediately.`,
+      confirmLabel: 'Remove member',
+      variant: 'danger',
+    });
+    if (!ok) return;
     setMessage('');
     try {
       await apiClient.delete(`/organizations/members/${username}`);
@@ -185,7 +194,13 @@ export default function TeamPage() {
   };
 
   const revokeInvite = async (email) => {
-    if (!window.confirm(`Revoke invite for ${email}?`)) return;
+    const ok = await confirm({
+      title: 'Revoke invite',
+      message: `Revoke the pending invite for ${email}?`,
+      confirmLabel: 'Revoke invite',
+      variant: 'danger',
+    });
+    if (!ok) return;
     setMessage('');
     try {
       await apiClient.delete(`/organizations/invites/${encodeURIComponent(email)}`);
@@ -197,7 +212,13 @@ export default function TeamPage() {
   };
 
   const leaveOrg = async () => {
-    if (!window.confirm('Leave this organization?')) return;
+    const ok = await confirm({
+      title: 'Leave organization',
+      message: 'Leave this organization? You may need a new invite to rejoin.',
+      confirmLabel: 'Leave organization',
+      variant: 'danger',
+    });
+    if (!ok) return;
     setMessage('');
     try {
       await apiClient.post('/organizations/leave');
@@ -219,7 +240,13 @@ export default function TeamPage() {
   };
 
   const migratePersonalBilling = async () => {
-    if (!window.confirm('Move your personal subscription to this organization? This cannot be undone.')) return;
+    const ok = await confirm({
+      title: 'Migrate subscription',
+      message: 'Move your personal subscription to this organization? This cannot be undone.',
+      confirmLabel: 'Migrate subscription',
+      variant: 'danger',
+    });
+    if (!ok) return;
     setMessage('');
     try {
       await apiClient.post('/organizations/billing/migrate-personal');
@@ -231,7 +258,13 @@ export default function TeamPage() {
   };
 
   const transferOwnership = async (username) => {
-    if (!window.confirm(`Transfer ownership to ${username}? You will become an admin.`)) return;
+    const ok = await confirm({
+      title: 'Transfer ownership',
+      message: `Transfer organization ownership to ${username}? You will become an admin.`,
+      confirmLabel: 'Transfer ownership',
+      variant: 'danger',
+    });
+    if (!ok) return;
     setMessage('');
     try {
       await apiClient.post('/organizations/transfer-ownership', {
@@ -278,7 +311,16 @@ export default function TeamPage() {
   }, [summary]);
 
   if (loading) {
-    return <LoadingSpinner size="large" text="Loading team..." />;
+    return (
+      <PageContainer variant="config" className="team-page settings-page">
+        <PageHeader
+          kicker="Enterprise"
+          title="Team & organization"
+          subtitle="Manage members, team cloud health, and governance"
+        />
+        <SettingsPageSkeleton />
+      </PageContainer>
+    );
   }
 
   const org = data?.organization;
@@ -288,7 +330,7 @@ export default function TeamPage() {
   const totals = summary?.org_totals;
 
   return (
-    <div className="team-page settings-page zenith-page-enter">
+    <PageContainer variant="config" className="team-page settings-page">
       <PageHeader
         kicker="Enterprise"
         title="Team & organization"
@@ -735,13 +777,13 @@ export default function TeamPage() {
                     : '—';
                   return (
                     <div key={m.username} className="team-member-table__row">
-                      <span>
+                      <span data-label="Member">
                         {m.username}
                         {m.username === user?.username && (
                           <span className="team-you-badge">you</span>
                         )}
                       </span>
-                      <span>
+                      <span data-label="Role">
                         {isOwner && m.role !== 'owner' && m.username !== user?.username ? (
                           <select
                             className="team-role-select"
@@ -756,29 +798,29 @@ export default function TeamPage() {
                         )}
                       </span>
                       {memberCloudStatus.length > 0 && (
-                        <span className="team-cloud-cell" title="Each member manages BYOC in their own Settings">
+                        <span className="team-cloud-cell" data-label="Cloud" title="Each member manages BYOC in their own Settings">
                           {cloudLabel}
                         </span>
                       )}
                       {summary && (
-                        <span>{showStats ? m.vm_count ?? '—' : '—'}</span>
+                        <span data-label="VMs">{showStats ? m.vm_count ?? '—' : '—'}</span>
                       )}
                       {summary && (
-                        <span>{showStats ? `${m.storage_gb ?? 0} GB` : '—'}</span>
+                        <span data-label="Storage">{showStats ? `${m.storage_gb ?? 0} GB` : '—'}</span>
                       )}
                       {summary && (
-                        <span>
+                        <span data-label="Spend/mo">
                           {showStats
                             ? `$${(m.monthly_spend_usd ?? 0).toFixed(2)}`
                             : '—'}
                         </span>
                       )}
-                      <span>
+                      <span data-label="Joined">
                         {m.joined_at
                           ? new Date(m.joined_at).toLocaleDateString()
                           : '—'}
                       </span>
-                      <span className="team-member-actions">
+                      <span className="team-member-actions" data-label="Actions">
                         {isOwner &&
                           m.role !== 'owner' &&
                           m.username !== user?.username && (
@@ -818,6 +860,6 @@ export default function TeamPage() {
           </>
         )}
       </div>
-    </div>
+    </PageContainer>
   );
 }

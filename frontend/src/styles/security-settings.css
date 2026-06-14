@@ -1,8 +1,6 @@
 /* Security Settings — matches Zenith dashboard / settings design tokens */
 
 .security-settings-page {
-  max-width: 1000px;
-  margin: 0 auto;
   padding: 0 0 2rem;
 }
 

@@ -10,9 +10,7 @@
 
 /* ── Page Container ── */
 .provision-page {
-  padding: 2rem;
-  max-width: 1200px;
-  margin: 0 auto;
+  padding-block: 0.5rem;
   animation: provisionFadeIn 0.4s ease-out;
 }
 

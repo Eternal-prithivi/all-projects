@@ -16,6 +16,7 @@ import { useAuth } from '../context/AuthContext';
 import { useNotifications } from "../hooks/useNotifications";
 import { apiClient } from '../api';
 import LoadingSpinner from '../components/LoadingSpinner';
+import { ProfileSkeleton } from '../components/Skeletons.jsx';
 import {
   IconClock,
   IconDollarSign,
@@ -29,6 +30,7 @@ import {
 } from '../utils/formValidation';
 import '../styles/profile.css';
 import PageHeader from '../components/ui/PageHeader.jsx';
+import PageContainer from '../components/ui/PageContainer.jsx';
 import { usePageRefresh } from '../hooks/usePageRefresh.js';
 
 const ProfilePage = () => {
@@ -237,11 +239,20 @@ const ProfilePage = () => {
   };
 
   if (isLoading) {
-    return <LoadingSpinner size="large" text="Loading profile..." />;
+    return (
+      <PageContainer variant="config" className="profile-page">
+        <PageHeader
+          kicker="Account"
+          title="Profile"
+          subtitle="Manage your account information and preferences"
+        />
+        <ProfileSkeleton />
+      </PageContainer>
+    );
   }
 
   return (
-    <div className="profile-page">
+    <PageContainer variant="config" className="profile-page">
       <PageHeader
         kicker="Account"
         title="Profile"
@@ -626,7 +637,7 @@ const ProfilePage = () => {
           </div>
         </div>
       )}
-    </div>
+    </PageContainer>
   );
 };
 

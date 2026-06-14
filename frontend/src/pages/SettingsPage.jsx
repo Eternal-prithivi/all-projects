@@ -20,6 +20,8 @@ import { useTheme } from "../context/ThemeContext";
 import { usePreferences } from "../context/PreferencesContext";
 import { apiClient } from '../api';
 import LoadingSpinner from '../components/LoadingSpinner';
+import { SettingsPageSkeleton } from '../components/Skeletons.jsx';
+import { useConfirm } from '../context/ConfirmContext.jsx';
 import { usePlanEntitlementsContext } from '../context/PlanEntitlementsContext.jsx';
 import PlanUpgradeGate from '../components/billing/PlanUpgradeGate.jsx';
 import { NAV_ID_LABELS, MIN_PLAN_LABELS } from '../config/planNavConfig.js';
@@ -37,12 +39,17 @@ import ByocSetupGuidePanel from '../components/byoc/ByocSetupGuidePanel.jsx';
 import ByocConnectSummaryModal from '../components/byoc/ByocConnectSummaryModal.jsx';
 import '../styles/settings.css';
 import PageHeader from '../components/ui/PageHeader.jsx';
+import PageContainer from '../components/ui/PageContainer.jsx';
+import Panel from '../components/ui/Panel.jsx';
+import KpiStrip, { KpiTile } from '../components/ui/KpiStrip.jsx';
+import StatusBadge from '../components/ui/StatusBadge.jsx';
 import { usePageRefresh } from '../hooks/usePageRefresh.js';
 import PlatformRegionPills from '../components/PlatformRegionPills.jsx';
 import CloudProviderLogo from '../components/cloud/CloudProviderLogo.jsx';
 
 const SettingsPage = () => {
   const notifications = useNotifications();
+  const { confirm } = useConfirm();
   const { executeWithNotification, showLoading, updateSuccess, updateError } = notifications;
   const { runPageRefresh, pageRefreshing } = usePageRefresh();
   const { theme, setTheme } = useTheme();
@@ -91,6 +98,11 @@ const SettingsPage = () => {
   const [azureExtending, setAzureExtending] = useState(false);
   const [gcpExtending, setGcpExtending] = useState(false);
   const [connectSummary, setConnectSummary] = useState(null);
+
+  const connectedCloudCount = useMemo(() => {
+    if (!byocStatus) return 0;
+    return ['aws', 'gcp', 'azure'].filter((key) => byocStatus[key]?.connected).length;
+  }, [byocStatus]);
   const [byocCurrentPlan, setByocCurrentPlan] = useState('free');
   const [subscription, setSubscription] = useState(null);
   const [byocActiveCSP, setByocActiveCSP] = useState(null); // Which CSP form is open
@@ -682,7 +694,13 @@ const SettingsPage = () => {
   };
 
   const handleByocDisconnect = async (csp) => {
-    if (!window.confirm(`Disconnect your ${csp} account? Operations will revert to Zenith's managed infrastructure.`)) return;
+    const ok = await confirm({
+      title: `Disconnect ${csp}`,
+      message: `Disconnect your ${csp} account? Operations will revert to Zenith's managed infrastructure.`,
+      confirmLabel: 'Disconnect',
+      variant: 'danger',
+    });
+    if (!ok) return;
     try {
       await apiClient.delete(`/byoc/disconnect/${csp}`);
       fetchByocStatus();
@@ -1174,17 +1192,17 @@ const SettingsPage = () => {
                         className={`method-btn ${byocMethod === 'access_keys' ? 'active' : ''}`}
                         onClick={() => { setByocMethod('access_keys'); resetAwsConnectFlow(); }}
                       >
-                        <span className="method-icon">🔑</span>
+                        <span className="method-icon" aria-hidden>Key</span>
                         <span className="method-label">Quick Setup</span>
-                        <span className="method-risk risk-medium">⚠️ Medium Risk</span>
+                        <StatusBadge tone="warning">Medium risk</StatusBadge>
                       </button>
                       <button
                         className={`method-btn ${byocMethod === 'iam_role' ? 'active' : ''}`}
                         onClick={() => { setByocMethod('iam_role'); resetAwsConnectFlow(); }}
                       >
-                        <span className="method-icon">🛡️</span>
+                        <span className="method-icon" aria-hidden>Shield</span>
                         <span className="method-label">Secure Setup (Recommended)</span>
-                        <span className="method-risk risk-low">✅ Low Risk</span>
+                        <StatusBadge tone="success">Low risk</StatusBadge>
                       </button>
                     </div>
 
@@ -1192,12 +1210,12 @@ const SettingsPage = () => {
                     <div className={`byoc-risk-warning ${byocMethod === 'access_keys' ? 'risk-medium' : 'risk-low'}`}>
                       {byocMethod === 'access_keys' ? (
                         <>
-                          <strong>⚠️ Medium Risk — Quick Setup</strong>
+                          <strong>Medium risk — Quick Setup</strong>
                           <p>You'll paste your existing cloud keys directly. If these are root or admin keys, a breach could expose your entire {csp} account. Only use this if you understand the risk.</p>
                         </>
                       ) : (
                         <>
-                          <strong>✅ Low Risk — Secure Setup</strong>
+                          <strong>Low risk — Secure Setup</strong>
                           <p>First, create a new user in your {csp} console with only storage permissions using our policy template below. Then paste that new user's keys here. Even if breached, the attacker can only access one bucket — nothing else.</p>
                           {policyTemplates && (
                             <button className="btn-show-policy" onClick={() => setShowPolicy(!showPolicy)}>
@@ -1220,7 +1238,7 @@ const SettingsPage = () => {
                                   </pre>
                                   <button className="btn-copy-policy" onClick={() => {
                                     navigator.clipboard.writeText(JSON.stringify(policyTemplates[csp].policy_json, null, 2));
-                                  }}>📋 Copy Policy</button>
+                                  }}>Copy policy</button>
                                 </>
                               )}
                             </div>
@@ -1548,7 +1566,10 @@ const SettingsPage = () => {
                     {/* Test Result */}
                     {byocTestResult && (
                       <div className={`byoc-test-result ${byocTestResult.success ? 'success' : 'error'}`}>
-                        {byocTestResult.success ? '✅' : '❌'} {byocTestResult.message}
+                        <StatusBadge tone={byocTestResult.success ? 'success' : 'danger'}>
+                          {byocTestResult.success ? 'Passed' : 'Failed'}
+                        </StatusBadge>{' '}
+                        {byocTestResult.message}
                       </div>
                     )}
 
@@ -1634,7 +1655,7 @@ const SettingsPage = () => {
                     </div>
 
                     <p className="byoc-encryption-note">
-                      🔒 Your credentials are encrypted with AES-256-GCM before storage. They are never logged or exposed in API responses.
+                      Your credentials are encrypted with AES-256-GCM before storage. They are never logged or exposed in API responses.
                     </p>
                   </div>
                 )}
@@ -1647,11 +1668,20 @@ const SettingsPage = () => {
   };
 
   if (isLoading) {
-    return <LoadingSpinner size="large" text="Loading settings..." />;
+    return (
+      <PageContainer variant="config" className="settings-page">
+        <PageHeader
+          kicker="Workspace"
+          title="Settings"
+          subtitle="Manage your application preferences and configurations"
+        />
+        <SettingsPageSkeleton />
+      </PageContainer>
+    );
   }
 
   return (
-    <div className="settings-page">
+    <PageContainer variant="config" className="settings-page">
       <PageHeader
         kicker="Workspace"
         title="Settings"
@@ -1672,6 +1702,13 @@ const SettingsPage = () => {
         refreshing={pageRefreshing}
       />
 
+      <KpiStrip className="settings-summary-strip">
+        <KpiTile label="Plan" value={planName || byocCurrentPlan || 'Free'} />
+        <KpiTile label="Connected clouds" value={connectedCloudCount} hint="BYOC accounts linked" />
+        <KpiTile label="API keys" value={apiKeys.length} hint="Active credentials" />
+        <KpiTile label="Theme" value={theme} hint={preferences.timezone || 'UTC'} />
+      </KpiStrip>
+
       {connectSummary && (
         <ByocConnectSummaryModal
           data={connectSummary}
@@ -1685,13 +1722,7 @@ const SettingsPage = () => {
         {renderByocSection()}
 
         {/* Notifications Settings */}
-        <div className="settings-card">
-          <h3>
-            <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor">
-              <path d="M8 16a2 2 0 0 0 2-2H6a2 2 0 0 0 2 2zM8 1.918l-.797.161A4.002 4.002 0 0 0 4 6c0 .628-.134 2.197-.459 3.742-.16.767-.376 1.566-.663 2.258h10.244c-.287-.692-.502-1.49-.663-2.258C12.134 8.197 12 6.628 12 6a4.002 4.002 0 0 0-3.203-3.92L8 1.917zM14.22 12c.223.447.481.801.78 1H1c.299-.199.557-.553.78-1C2.68 10.2 3 6.88 3 6c0-2.42 1.72-4.44 4.005-4.901a1 1 0 1 1 1.99 0A5.002 5.002 0 0 1 13 6c0 .88.32 4.2 1.22 6z"/>
-            </svg>
-            Notifications
-          </h3>
+        <Panel title="Notifications" className="settings-card">
           <div className="settings-group">
             {Object.entries(notificationSettings).map(([key, value]) => {
               const config = notificationConfig[key];
@@ -1717,7 +1748,7 @@ const SettingsPage = () => {
               );
             })}
           </div>
-        </div>
+        </Panel>
 
         {/* Secure vault defaults */}
         <div className="settings-card">
@@ -2078,7 +2109,7 @@ const SettingsPage = () => {
           )}
         </div>
       </div>
-    </div>
+    </PageContainer>
   );
 };
 

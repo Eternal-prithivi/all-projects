@@ -28,7 +28,8 @@ import {
 } from "../components/dashboard/Icons.jsx";
 import { useNavigate } from 'react-router-dom';
 import { useNotifications } from "../hooks/useNotifications.js";
-import PageRefreshButton from "../components/ui/PageRefreshButton.jsx";
+import PageHeader from "../components/ui/PageHeader.jsx";
+import PageContainer from "../components/ui/PageContainer.jsx";
 import { usePageRefresh } from "../hooks/usePageRefresh.js";
 import { useCountUp } from "../hooks/useCountUp.js";
 import { DashboardSkeleton } from "../components/Skeletons.jsx";
@@ -279,29 +280,20 @@ function DashboardPage() {
     stats.security_alerts > 0 || attention.anomalies > 0 || attention.tickets > 0;
 
   return (
-    <div className="dashboard-overview zenith-page-enter">
-      <div className="mc-greeting">
-        <div className="mc-greeting-text">
-          <span className="mc-kicker">
-            <span className="mc-kicker-dot"></span>
-            {greeting.tone}
-          </span>
-          <h2>
-            {greeting.text}, {user.username}
-          </h2>
-          <p className="greeting-date">{formattedDate} — Here&apos;s your cloud overview</p>
-        </div>
-        <PageRefreshButton
-          onClick={() =>
-            runPageRefresh(fetchDashboardData, {
-              loadingMessage: 'Refreshing dashboard…',
-              successMessage: 'Dashboard refreshed.',
-              errorMessage: 'Failed to refresh dashboard.',
-            })
-          }
-          busy={pageRefreshing || isLoading}
-        />
-      </div>
+    <PageContainer className="dashboard-overview">
+      <PageHeader
+        kicker={greeting.tone}
+        title={`${greeting.text}, ${user.username}`}
+        subtitle={`${formattedDate} — Operational overview across compute, storage, cost, and security.`}
+        onRefresh={() =>
+          runPageRefresh(fetchDashboardData, {
+            loadingMessage: 'Refreshing dashboard…',
+            successMessage: 'Dashboard refreshed.',
+            errorMessage: 'Failed to refresh dashboard.',
+          })
+        }
+        refreshing={pageRefreshing || isLoading}
+      />
 
       {!isFeatureEnabled('live_billing') && (
         <div className="dashboard-demo-banner" role="status">
@@ -570,7 +562,7 @@ function DashboardPage() {
           </button>
         </div>
       </div>
-    </div>
+    </PageContainer>
   );
 }
 

@@ -1,0 +1,445 @@
+/* Enterprise UI primitives — shared across dashboard pages */
+
+/* ── Page container (two-tier width) ── */
+:root {
+  --dashboard-gutter-x: clamp(1.25rem, 2.5vw, 2rem);
+  --dashboard-gutter-y: clamp(0.75rem, 1.5vw, 1.25rem);
+  /* Legacy alias — prefer gutter-x / gutter-y */
+  --dashboard-gutter: var(--dashboard-gutter-x);
+  --page-max-width-config: 1120px;
+}
+
+.enterprise-page {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 0;
+}
+
+.enterprise-page--config {
+  max-width: var(--page-max-width-config);
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* @deprecated — ops pages are fluid; kept for backward compatibility */
+.enterprise-page--wide {
+  max-width: none;
+}
+
+/* ── Buttons ── */
+.zenith-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.625rem 1.125rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1.2;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: background var(--duration-fast) var(--ease-out),
+    border-color var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.zenith-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.zenith-btn--primary {
+  background: var(--gold-primary);
+  color: var(--bg-base);
+  border-color: var(--gold-primary);
+}
+
+.zenith-btn--primary:hover:not(:disabled) {
+  background: var(--gold-dark);
+  border-color: var(--gold-dark);
+}
+
+.zenith-btn--secondary {
+  background: transparent;
+  color: var(--text-secondary);
+  border-color: var(--border-default);
+}
+
+.zenith-btn--secondary:hover:not(:disabled) {
+  color: var(--text-primary);
+  border-color: var(--border-strong);
+  background: var(--surface-hover);
+}
+
+.zenith-btn--danger {
+  background: rgba(239, 68, 68, 0.12);
+  color: var(--danger);
+  border-color: rgba(239, 68, 68, 0.35);
+}
+
+.zenith-btn--danger:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.2);
+  border-color: rgba(239, 68, 68, 0.5);
+}
+
+.zenith-btn--ghost {
+  background: transparent;
+  color: var(--text-secondary);
+  border-color: transparent;
+}
+
+.zenith-btn--ghost:hover:not(:disabled) {
+  color: var(--text-primary);
+  background: var(--surface-hover);
+}
+
+.zenith-btn--sm {
+  padding: 0.45rem 0.85rem;
+  font-size: 0.8125rem;
+}
+
+.zenith-btn--lg {
+  padding: 0.75rem 1.35rem;
+  font-size: 0.9375rem;
+}
+
+/* Legacy aliases — migrate pages off page-specific button classes */
+.btn-save,
+.btn-confirm {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.625rem 1.125rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  background: var(--gold-primary);
+  color: var(--bg-base);
+  transition: background var(--duration-fast) var(--ease-out);
+}
+
+.btn-save:hover:not(:disabled),
+.btn-confirm:hover:not(:disabled) {
+  background: var(--gold-dark);
+  transform: none;
+  box-shadow: none;
+}
+
+.btn-save:disabled,
+.btn-confirm:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.btn-cancel {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.625rem 1.125rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  background: transparent;
+  color: var(--text-secondary);
+  border: 1px solid var(--border-default);
+  transition: background var(--duration-fast) var(--ease-out),
+    border-color var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out);
+}
+
+.btn-cancel:hover:not(:disabled) {
+  color: var(--text-primary);
+  border-color: var(--border-strong);
+  background: var(--surface-hover);
+}
+
+/* ── Panels ── */
+.enterprise-panel {
+  background: var(--bg-card);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  padding: var(--space-lg);
+  margin-bottom: var(--space-md);
+  box-shadow: var(--shadow-card);
+}
+
+.enterprise-panel:hover {
+  border-color: var(--border-strong);
+}
+
+.enterprise-panel__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-md);
+}
+
+.enterprise-panel__header-text {
+  min-width: 0;
+  flex: 1;
+}
+
+.enterprise-panel__title {
+  margin: 0 0 0.35rem;
+  font-size: 1.0625rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  line-height: 1.35;
+}
+
+.enterprise-panel__desc {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  max-width: 48rem;
+}
+
+.enterprise-panel__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+/* Map legacy page-card to enterprise panel styling */
+.page-card,
+.settings-card,
+.vm-panel {
+  border-color: var(--border-default);
+}
+
+.page-card:hover,
+.settings-card:hover {
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-card);
+  transform: none;
+}
+
+/* ── KPI strip ── */
+.enterprise-kpi-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: var(--space-sm);
+  margin-bottom: var(--space-lg);
+}
+
+.enterprise-kpi {
+  padding: var(--space-md);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+}
+
+.enterprise-kpi__label {
+  display: block;
+  margin-bottom: 0.35rem;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.enterprise-kpi__value {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1.2;
+}
+
+.enterprise-kpi__hint {
+  margin-top: 0.25rem;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+/* ── Segmented control ── */
+.enterprise-segmented {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  padding: 0.25rem;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+}
+
+.enterprise-segmented__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 0.9rem;
+  border: none;
+  border-radius: calc(var(--radius-md) - 2px);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--duration-fast), color var(--duration-fast);
+}
+
+.enterprise-segmented__btn:hover {
+  color: var(--text-primary);
+  background: var(--surface-hover);
+}
+
+.enterprise-segmented__btn[aria-pressed="true"],
+.enterprise-segmented__btn.is-active {
+  background: var(--bg-card);
+  color: var(--text-primary);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+}
+
+/* ── Status badge ── */
+.enterprise-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.2rem 0.55rem;
+  border-radius: var(--radius-full);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  border: 1px solid transparent;
+}
+
+.enterprise-status--success {
+  color: var(--success);
+  background: rgba(34, 197, 94, 0.12);
+  border-color: rgba(34, 197, 94, 0.25);
+}
+
+.enterprise-status--warning {
+  color: var(--warning);
+  background: rgba(245, 158, 11, 0.12);
+  border-color: rgba(245, 158, 11, 0.25);
+}
+
+.enterprise-status--danger {
+  color: var(--danger);
+  background: rgba(239, 68, 68, 0.12);
+  border-color: rgba(239, 68, 68, 0.25);
+}
+
+.enterprise-status--neutral {
+  color: var(--text-secondary);
+  background: var(--surface-hover);
+  border-color: var(--border-default);
+}
+
+.enterprise-status--info {
+  color: var(--info);
+  background: rgba(59, 130, 246, 0.12);
+  border-color: rgba(59, 130, 246, 0.25);
+}
+
+/* ── Settings page shell skeleton ── */
+.enterprise-page-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+
+.enterprise-page-skeleton__header .skeleton-page-title {
+  width: min(320px, 70%);
+  height: 2rem;
+  margin-bottom: 0.75rem;
+}
+
+.enterprise-page-skeleton__panels {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+/* Restrain operational card hover lift */
+.stat-card:hover,
+.bento-card:hover {
+  transform: none;
+  box-shadow: var(--shadow-card);
+}
+
+.enterprise-segmented__btn[aria-disabled="true"] {
+  opacity: 0.65;
+  cursor: pointer;
+}
+
+.enterprise-segmented__badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.25rem;
+  padding: 0 0.35rem;
+  border-radius: var(--radius-full);
+  background: var(--gold-glow);
+  color: var(--gold-light);
+  font-size: 0.6875rem;
+  font-weight: 700;
+}
+
+.enterprise-segmented__lock {
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.enterprise-segmented__btn--locked .enterprise-segmented__lock::before {
+  content: '· ';
+}
+
+.provision-tabs--enterprise {
+  display: flex;
+  width: 100%;
+  margin-bottom: var(--space-lg);
+}
+
+.provision-engine-segmented {
+  flex: 1;
+  max-width: 520px;
+}
+
+.pricing-toggle--enterprise {
+  margin: 0 auto var(--space-xl);
+  justify-content: center;
+}
+
+.settings-summary-strip {
+  margin-bottom: var(--space-lg);
+}
+
+.encryption-form-error {
+  margin: 0 0 var(--space-md);
+  color: var(--danger);
+  font-size: 0.875rem;
+}
+
+@media (max-width: 768px) {
+  .enterprise-kpi-strip {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .enterprise-segmented {
+    width: 100%;
+  }
+
+  .enterprise-segmented__btn {
+    flex: 1;
+    justify-content: center;
+  }
+}

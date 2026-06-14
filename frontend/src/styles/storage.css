@@ -8,7 +8,7 @@
   --primary-blue: var(--info);
   --warning-yellow: var(--warning);
 
-  padding: 2rem;
+  padding-block: 0.5rem;
   color: var(--text-primary);
   font-family: "Inter", sans-serif;
 }
@@ -1058,7 +1058,7 @@
 
 @media (max-width: 768px) {
   .storage-container {
-    padding: 1rem;
+    padding-block: 0.5rem;
   }
 
   .bucket-card-actions,

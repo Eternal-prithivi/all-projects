@@ -48,7 +48,10 @@ import SecurityIntelligenceBar from "../components/security/SecurityIntelligence
 import SecurityFileInsight from "../components/security/SecurityFileInsight.jsx";
 import "../styles/security-page.css";
 import LoadingSpinner from "../components/LoadingSpinner.jsx";
+import { SettingsPageSkeleton } from "../components/Skeletons.jsx";
 import PageHeader from "../components/ui/PageHeader.jsx";
+import PageContainer from "../components/ui/PageContainer.jsx";
+import Panel from "../components/ui/Panel.jsx";
 import { usePageRefresh } from "../hooks/usePageRefresh.js";
 import { minLoadingDelay } from "../utils/minLoadingDelay.js";
 import SecurityVaultDestinationSummary from "../components/security/SecurityVaultDestinationSummary.jsx";
@@ -938,7 +941,16 @@ function SecurityPage() {
   }, [twoFAOverlayOpen]);
 
   if (loading) {
-    return <LoadingSpinner size="large" text="Loading security..." />;
+    return (
+      <div className="security-page zenith-page-enter">
+        <PageHeader
+          kicker="Secure vault"
+          title="Security Center"
+          subtitle="Scan, encrypt, and manage sensitive files with SSE-S3 or browser-side encryption."
+        />
+        <SettingsPageSkeleton />
+      </div>
+    );
   }
 
   const closeDisablePanel = () => {
@@ -961,7 +973,7 @@ function SecurityPage() {
   );
 
   return (
-    <div className="security-page page-container zenith-page-enter">
+    <PageContainer className="security-page page-container zenith-page-enter">
         <TwoFADialog
           open={showSetupPanel}
           onClose={cancelTwoFASetup}
@@ -1087,13 +1099,11 @@ function SecurityPage() {
           </div>
         </div>
 
-        <div className="page-card zenith-surface zenith-surface--accent-security">
-          <h3 className="page-title">Secure File Upload</h3>
-          <p className="page-description">
-            Files are scanned for sensitive data. You choose encryption (cloud-managed,
-            browser, or skip), optional regional replication, and the target cloud
-            (AWS, Google Cloud, or Azure).
-          </p>
+        <Panel
+          title="Secure File Upload"
+          description="Files are scanned for sensitive data. You choose encryption (cloud-managed, browser, or skip), optional regional replication, and the target cloud (AWS, Google Cloud, or Azure)."
+          className="page-card zenith-surface zenith-surface--accent-security"
+        >
           {!availLoading && securityProviders.length === 0 && (
             <CloudAvailabilityBanner
               featureLabel="secure vault"
@@ -1172,7 +1182,7 @@ function SecurityPage() {
               {file ? "Configure & upload →" : "Select a file first"}
             </button>
           </div>
-        </div>
+        </Panel>
 
         {canAccessSecureArea && (
           <SecurityIntelligenceBar summary={intelSummary} loading={intelLoading} />
@@ -1548,7 +1558,7 @@ function SecurityPage() {
           </div>
         )}
         </div>
-    </div>
+    </PageContainer>
   );
 }
 

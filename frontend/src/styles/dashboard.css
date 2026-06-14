@@ -47,7 +47,7 @@
    HEADER — Glassmorphism Command Bar
    ======================================== */
 .dashboard-header {
-  padding: 0.6rem 2rem;
+  padding: 0.6rem var(--dashboard-gutter-x);
   background: var(--bg-elevated);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
@@ -113,7 +113,7 @@
    BREADCRUMBS
    ======================================== */
 .dashboard-breadcrumbs-wrapper {
-  padding: 0 2rem;
+  padding: 0 var(--dashboard-gutter-x);
   background-color: var(--bg-surface);
   border-bottom: 1px solid var(--border-subtle);
 }
@@ -122,7 +122,7 @@
    CONTENT AREA
    ======================================== */
 .dashboard-content {
-  padding: 1.5rem 2rem;
+  padding: var(--dashboard-gutter-y) var(--dashboard-gutter-x);
   overflow-y: auto;
   flex: 1 1 auto;
   min-height: 0;
@@ -149,7 +149,7 @@
    ======================================== */
 @media (max-width: 1024px) {
   .dashboard-content {
-    padding: 1.25rem 1.5rem;
+    padding: 1rem 1.25rem;
   }
 }
 

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { apiClient } from '../api';
 import LoadingSpinner from '../components/LoadingSpinner';
+import { SettingsPageSkeleton } from '../components/Skeletons.jsx';
 import AuditLogPanel from '../components/security/AuditLogPanel';
 import {
   getValidationErrorMessage,
@@ -11,7 +12,9 @@ import {
 import '../styles/security-settings.css';
 import TwoFADialog from '../components/TwoFADialog.jsx';
 import PageHeader from '../components/ui/PageHeader.jsx';
+import PageContainer from '../components/ui/PageContainer.jsx';
 import { usePageRefresh } from '../hooks/usePageRefresh.js';
+import { useConfirm } from '../context/ConfirmContext.jsx';
 
 const formatRelativeTime = (timestamp) => {
   const date = new Date(timestamp);
@@ -35,6 +38,7 @@ const getAuditIcon = (category) => {
 
 const SecuritySettingsPage = () => {
   const navigate = useNavigate();
+  const { confirm } = useConfirm();
   const [isLoading, setIsLoading] = useState(true);
   const [isSavingPassword, setIsSavingPassword] = useState(false);
   const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
@@ -187,9 +191,13 @@ const SecuritySettingsPage = () => {
   }, [showDisable2FA]);
 
   const handleTerminateSession = async (sessionId) => {
-    if (!window.confirm('Revoke this sign-in? That device will need to log in again.')) {
-      return;
-    }
+    const ok = await confirm({
+      title: 'Revoke sign-in',
+      message: 'Revoke this sign-in? That device will need to log in again.',
+      confirmLabel: 'Revoke sign-in',
+      variant: 'danger',
+    });
+    if (!ok) return;
 
     try {
       await apiClient.delete(`/profile/sessions/${sessionId}`);
@@ -205,7 +213,16 @@ const SecuritySettingsPage = () => {
   const otherSessions = sessions.filter((s) => !s.current);
 
   if (isLoading) {
-    return <LoadingSpinner size="large" text="Loading security settings..." />;
+    return (
+      <PageContainer variant="config" className="security-settings-page">
+        <PageHeader
+          kicker="Account security"
+          title="Security Settings"
+          subtitle="Password, two-factor authentication, and sign-in overview"
+        />
+        <SettingsPageSkeleton />
+      </PageContainer>
+    );
   }
 
   const closeDisable2FA = () => {
@@ -214,7 +231,7 @@ const SecuritySettingsPage = () => {
   };
 
   return (
-    <div className="security-settings-page">
+    <PageContainer variant="config" className="security-settings-page">
       <TwoFADialog
         open={showDisable2FA}
         onClose={closeDisable2FA}
@@ -471,7 +488,7 @@ const SecuritySettingsPage = () => {
           </div>
         </div>
       )}
-    </div>
+    </PageContainer>
   );
 };
 

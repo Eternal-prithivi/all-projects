@@ -12,11 +12,9 @@
 }
 
 .vm-container {
-  padding: 1.75rem 2rem 2.5rem;
+  padding: 0.5rem 0 1.5rem;
   color: var(--text-primary);
   font-family: "Inter", system-ui, sans-serif;
-  max-width: 1280px;
-  margin: 0 auto;
 }
 
 /* ── Enterprise layout primitives ─────────────────────────────────────────── */
@@ -2555,4 +2553,43 @@
 
 .vm-request-cost-section {
   margin-top: var(--space-lg);
+}
+
+.vm-ssh-instructions code {
+  display: block;
+  margin: 0.35rem 0;
+  padding: 0.5rem 0.65rem;
+  background: var(--bg-input);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  font-size: 0.8125rem;
+  word-break: break-all;
+}
+
+.vm-ssh-steps {
+  margin: 1rem 0;
+  padding-left: 1.25rem;
+}
+
+.vm-ssh-steps li {
+  margin-bottom: 0.75rem;
+}
+
+.vm-ssh-steps li span {
+  display: block;
+  margin-top: 0.25rem;
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+}
+
+.vm-ssh-troubleshooting h4 {
+  margin: 0 0 0.5rem;
+  font-size: 0.9375rem;
+}
+
+.vm-ssh-troubleshooting ul {
+  margin: 0;
+  padding-left: 1.1rem;
+  color: var(--text-secondary);
+  font-size: 0.875rem;
 }

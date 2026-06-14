@@ -1,9 +1,7 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
 import {
   IconActivity,
   IconBarChart,
-  IconChevronLeft,
   IconClock,
   IconGlobe,
   IconHardDrive,
@@ -16,7 +14,9 @@ import {
   IconZap,
 } from '../components/dashboard/Icons.jsx';
 import '../styles/costoptimization.css';
-import PageRefreshButton from '../components/ui/PageRefreshButton.jsx';
+import PageHeader from '../components/ui/PageHeader.jsx';
+import PageContainer from '../components/ui/PageContainer.jsx';
+import CostHubNav from '../components/dashboard/CostHubNav.jsx';
 import { usePageRefresh } from '../hooks/usePageRefresh.js';
 
 const providerTips = [
@@ -88,36 +88,23 @@ const monitoringCards = [
 ];
 
 const CostOptimizationPage = () => {
-  const navigate = useNavigate();
   const { runPageRefresh, pageRefreshing } = usePageRefresh();
 
   return (
-    <div className="cost-optimization-container">
-      <div className="optimization-header">
-        <button className="back-button" type="button" onClick={() => navigate('/dashboard/costs')}>
-          <IconChevronLeft aria-hidden="true" />
-          Back to Cost Analysis
-        </button>
-        <div className="optimization-header-row">
-          <div>
-            <span className="page-kicker">Optimization Playbook</span>
-            <h1>
-              <span className="heading-icon"><IconLightbulb aria-hidden="true" /></span>
-              Cost Optimization Guide
-            </h1>
-            <p>Strategies to reduce cloud spending across AWS, GCP, and Azure.</p>
-          </div>
-          <PageRefreshButton
-            onClick={() =>
-              runPageRefresh(async () => {}, {
-                loadingMessage: 'Refreshing optimization guide…',
-                successMessage: 'Optimization guide refreshed.',
-              })
-            }
-            busy={pageRefreshing}
-          />
-        </div>
-      </div>
+    <PageContainer className="cost-optimization-container">
+      <PageHeader
+        kicker="Cost intelligence"
+        title="Cost Optimization"
+        subtitle="Playbooks and quick wins to reduce multi-cloud spend across AWS, GCP, and Azure."
+        onRefresh={() =>
+          runPageRefresh(async () => {}, {
+            loadingMessage: 'Refreshing optimization guide…',
+            successMessage: 'Optimization guide refreshed.',
+          })
+        }
+        refreshing={pageRefreshing}
+      />
+      <CostHubNav />
 
       <section className="tips-section" aria-labelledby="provider-savings-heading">
         <h2 id="provider-savings-heading">Provider-Specific Savings</h2>
@@ -193,7 +180,7 @@ const CostOptimizationPage = () => {
           ))}
         </div>
       </section>
-    </div>
+    </PageContainer>
   );
 };
 

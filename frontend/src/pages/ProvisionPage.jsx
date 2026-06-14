@@ -4,11 +4,13 @@
 // Tabs: Manage deployments | Activity | Policies | New stack (optional Terraform)
 // ROUTE: /dashboard/provision
 // =============================================================================
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../api';
 import '../styles/provision.css';
 import PageHeader from '../components/ui/PageHeader.jsx';
+import PageContainer from '../components/ui/PageContainer.jsx';
+import SegmentedControl from '../components/ui/SegmentedControl.jsx';
 import { usePageRefresh } from '../hooks/usePageRefresh.js';
 import CloudAvailabilityBanner from '../components/CloudAvailabilityBanner.jsx';
 import CloudCapabilityBanner from '../components/cloud/CloudCapabilityBanner.jsx';
@@ -56,6 +58,21 @@ export default function ProvisionPage() {
   const [engineSaving, setEngineSaving] = useState(false);
   const { runPageRefresh, pageRefreshing } = usePageRefresh();
   const defaultCloud = getFeature('provision').default || provisionProviders[0] || 'AWS';
+
+  const tabOptions = useMemo(
+    () =>
+      TABS.map((t) => ({
+        value: t.id,
+        label: t.label,
+        badge: t.id === 'manage' && deploymentCount > 0 ? String(deploymentCount) : undefined,
+        locked: t.id === 'policies' && isNavLocked('provision_policies'),
+        onLockedClick:
+          t.id === 'policies'
+            ? () => openUpgradeDrawer('provision_policies')
+            : undefined,
+      })),
+    [deploymentCount, isNavLocked, openUpgradeDrawer]
+  );
 
   const reloadProvisionStatus = async () => {
     const statusRes = await api.get('/provision/status').catch(() => ({ data: {} }));
@@ -141,7 +158,7 @@ export default function ProvisionPage() {
   }
 
   return (
-    <div className="provision-page">
+    <PageContainer className="provision-page">
       <PageHeader
         kicker="Infrastructure"
         title="Infrastructure governance"
@@ -186,31 +203,22 @@ export default function ProvisionPage() {
         </div>
         <div className="provision-status-bar__row provision-status-bar__engine">
           <span className="provision-status-bar__engine-label">Provision with</span>
-          <div className="provision-engine-toggle" role="group" aria-label="Provisioning engine">
-            <button
-              type="button"
-              className={`provision-engine-toggle__btn ${userProvisionEngine !== 'terraform' ? 'active' : ''}`}
-              disabled={engineSaving}
-              onClick={() => handleEngineChange('boto3')}
-            >
-              Fast path
-              <span className="provision-engine-toggle__hint">
-                {getEffectiveEngineLabel('boto3')}
-              </span>
-            </button>
-            <button
-              type="button"
-              className={`provision-engine-toggle__btn ${userProvisionEngine === 'terraform' ? 'active' : ''}`}
-              disabled={engineSaving || !terraformOk}
-              onClick={() => handleEngineChange('terraform')}
-              title={!terraformOk ? 'Terraform CLI is not installed on this server' : undefined}
-            >
-              Terraform
-              {!terraformOk && (
-                <span className="provision-engine-toggle__warn"> (unavailable)</span>
-              )}
-            </button>
-          </div>
+          <SegmentedControl
+            ariaLabel="Provisioning engine"
+            className="provision-engine-segmented"
+            options={[
+              { value: 'boto3', label: `Fast path · ${getEffectiveEngineLabel('boto3')}` },
+              {
+                value: 'terraform',
+                label: terraformOk ? 'Terraform' : 'Terraform unavailable',
+                locked: !terraformOk,
+              },
+            ]}
+            value={userProvisionEngine === 'terraform' ? 'terraform' : 'boto3'}
+            onChange={(next) => {
+              if (!engineSaving) handleEngineChange(next);
+            }}
+          />
           <span className="provision-status-bar__engine-note">
             Fast path uses each cloud&apos;s native SDK (AWS, GCP, Azure). Terraform provisions all modules when installed.
           </span>
@@ -220,30 +228,13 @@ export default function ProvisionPage() {
         )}
       </div>
 
-      <nav className="provision-tabs" aria-label="Infrastructure sections">
-        {TABS.map((t) => (
-          <button
-            key={t.id}
-            type="button"
-            className={`provision-tab ${tab === t.id ? 'active' : ''}`}
-            onClick={() => {
-              if (t.id === 'policies' && isNavLocked('provision_policies')) {
-                openUpgradeDrawer('provision_policies');
-                return;
-              }
-              setTab(t.id);
-            }}
-          >
-            {t.label}
-            {t.id === 'policies' && isNavLocked('provision_policies') && (
-              <span className="provision-tab-lock" aria-hidden>🔒</span>
-            )}
-            {t.id === 'manage' && deploymentCount > 0 && (
-              <span className="provision-tab-badge">{deploymentCount}</span>
-            )}
-          </button>
-        ))}
-      </nav>
+      <SegmentedControl
+        ariaLabel="Infrastructure sections"
+        className="provision-tabs provision-tabs--enterprise"
+        options={tabOptions}
+        value={tab}
+        onChange={setTab}
+      />
 
       {tab === 'manage' && (
         <ProvisionManagePanel
@@ -284,6 +275,6 @@ export default function ProvisionPage() {
           />
         </>
       )}
-    </div>
+    </PageContainer>
   );
 }

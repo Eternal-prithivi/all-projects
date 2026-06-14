@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import api, { getApiErrorMessage } from '../../api';
+import { useConfirm } from '../../context/ConfirmContext.jsx';
 
 const EMPTY_FORM = {
   name: '',
@@ -15,6 +16,7 @@ const CONDITION_HINTS = [
 ];
 
 export default function ProvisionPoliciesPanel() {
+  const { confirm } = useConfirm();
   const [rules, setRules] = useState([]);
   const [counts, setCounts] = useState({ builtin: 0, custom: 0, override: 0 });
   const [loading, setLoading] = useState(true);
@@ -141,7 +143,13 @@ export default function ProvisionPoliciesPanel() {
   };
 
   const handleResetBuiltin = async (rule) => {
-    if (!window.confirm(`Reset "${rule.name}" to platform default?`)) return;
+    const ok = await confirm({
+      title: 'Reset policy',
+      message: `Reset "${rule.name}" to the platform default? Your customizations will be removed.`,
+      confirmLabel: 'Reset policy',
+      variant: 'danger',
+    });
+    if (!ok) return;
     try {
       await api.delete(`/provision/policy-rules/builtin/${rule.name}`);
       await loadRules();
@@ -151,7 +159,13 @@ export default function ProvisionPoliciesPanel() {
   };
 
   const handleDeleteCustom = async (rule) => {
-    if (!window.confirm(`Delete custom policy "${rule.name}"?`)) return;
+    const ok = await confirm({
+      title: 'Delete custom policy',
+      message: `Delete custom policy "${rule.name}"? Deployments already evaluated are not changed.`,
+      confirmLabel: 'Delete policy',
+      variant: 'danger',
+    });
+    if (!ok) return;
     try {
       await api.delete(`/provision/policy-rules/custom/${rule.id}`);
       await loadRules();

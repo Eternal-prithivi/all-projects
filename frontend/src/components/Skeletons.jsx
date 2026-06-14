@@ -161,6 +161,24 @@ export const ListSkeleton = ({ items = 5 }) => (
 );
 
 /**
+ * Settings / config page skeleton — header + stacked panels
+ */
+export const SettingsPageSkeleton = () => (
+  <div className="enterprise-page-skeleton">
+    <div className="enterprise-page-skeleton__header">
+      <div className="skeleton skeleton-page-title" />
+      <div className="skeleton skeleton-text" />
+      <div className="skeleton skeleton-text skeleton-text-short" />
+    </div>
+    <div className="enterprise-page-skeleton__panels">
+      <CardSkeleton />
+      <CardSkeleton />
+      <CardSkeleton />
+    </div>
+  </div>
+);
+
+/**
  * Profile Skeleton - For profile page
  */
 export const ProfileSkeleton = () => (
@@ -189,5 +207,6 @@ export default {
   VMClusterSkeleton,
   PageSkeleton,
   ListSkeleton,
+  SettingsPageSkeleton,
   ProfileSkeleton,
 };

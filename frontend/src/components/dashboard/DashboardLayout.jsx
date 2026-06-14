@@ -30,6 +30,7 @@ import { useAppKeyboardShortcuts } from "../../hooks/useAppKeyboardShortcuts.js"
 import { DASHBOARD_GO_ROUTES } from "../../utils/keyboardShortcuts.js";
 import { PlanEntitlementsProvider } from "../../context/PlanEntitlementsContext.jsx";
 import { CloudAvailabilityProvider } from "../../context/CloudAvailabilityContext.jsx";
+import { ConfirmProvider } from "../../context/ConfirmContext.jsx";
 import "../../styles/plan-upgrade.css";
 import "../../styles/dashboard.css";
 import "../../styles/mobile-nav.css";
@@ -58,6 +59,7 @@ function DashboardLayout() {
     <NotificationProvider>
       <PlanEntitlementsProvider>
       <CloudAvailabilityProvider>
+      <ConfirmProvider>
       <SupportWsBridge notifyOnAgentReply />
       <div className="dashboard-page">
         {/* Skip to main content link for keyboard navigation */}
@@ -112,6 +114,7 @@ function DashboardLayout() {
           }}
         />
       </div>
+      </ConfirmProvider>
       </CloudAvailabilityProvider>
       </PlanEntitlementsProvider>
     </NotificationProvider>

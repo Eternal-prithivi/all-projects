@@ -8,6 +8,7 @@ import { apiClient } from '../api';
 import { useNavigate } from 'react-router-dom';
 import { PageSkeleton } from '../components/Skeletons.jsx';
 import PageHeader from '../components/ui/PageHeader.jsx';
+import PageContainer from '../components/ui/PageContainer.jsx';
 import { usePageRefresh } from '../hooks/usePageRefresh.js';
 import { useNotifications } from '../hooks/useNotifications.js';
 import { usePreferences } from '../context/PreferencesContext.jsx';
@@ -325,7 +326,7 @@ function BillingPage() {
   const isPaidPlan = subscription?.plan_id && subscription.plan_id !== 'free';
 
   return (
-    <div className="billing-page animate-fade-in-up">
+    <PageContainer className="billing-page animate-fade-in-up">
       <PageHeader
         className="billing-page-header"
         kicker="Account"
@@ -867,7 +868,7 @@ function BillingPage() {
           </div>
         )}
       </section>
-    </div>
+    </PageContainer>
   );
 }
 

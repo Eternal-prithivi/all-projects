@@ -9,6 +9,7 @@ import '../styles/auth.css';
 import '../styles/auth-polish.css';
 import { getApiRoot } from '../config/apiBase.js';
 import { wakeRenderBackend } from '../utils/renderKeepAlive.js';
+import { FaBolt, FaChartBar, FaLock } from 'react-icons/fa';
 import ZenithLogo from '../components/brand/ZenithLogo.jsx';
 
 function LoginPage() {
@@ -130,15 +131,15 @@ function LoginPage() {
           </p>
           <div className="brand-features">
             <div className="brand-feature">
-              <div className="feature-icon">📊</div>
+              <div className="feature-icon" aria-hidden><FaChartBar /></div>
               <span className="feature-text">Real-time cost analytics</span>
             </div>
             <div className="brand-feature">
-              <div className="feature-icon">🔒</div>
+              <div className="feature-icon" aria-hidden><FaLock /></div>
               <span className="feature-text">Enterprise-grade security</span>
             </div>
             <div className="brand-feature">
-              <div className="feature-icon">⚡</div>
+              <div className="feature-icon" aria-hidden><FaBolt /></div>
               <span className="feature-text">AI-powered optimization</span>
             </div>
           </div>

@@ -30,6 +30,8 @@ import {
 } from "../api";
 import "../styles/storage.css";
 import PageHeader from "../components/ui/PageHeader.jsx";
+import PageContainer from "../components/ui/PageContainer.jsx";
+import Panel from "../components/ui/Panel.jsx";
 import ByocStorageTargetBanner from "../components/ByocStorageTargetBanner.jsx";
 import StorageUploadWizard from "../components/StorageUploadWizard.jsx";
 import CloudDestinationPanel from "../components/CloudDestinationPanel.jsx";
@@ -818,7 +820,7 @@ function StoragePage() {
   }
 
   return (
-    <div className="storage-container zenith-page-enter">
+    <PageContainer className="storage-container zenith-page-enter">
       <PageHeader
         kicker="Object storage"
         title="Standard Storage"
@@ -828,13 +830,11 @@ function StoragePage() {
         refreshDisabled={isLoading || isSyncing}
       />
 
-      <div className="page-card zenith-surface">
-        <h3 className="page-title">Intelligent File Ingestion</h3>
-        <p className="page-description">
-          Upload files for ML-guided placement across AWS, Google Cloud, or Azure. Zenith analyzes
-          size, access intent, and lifecycle policy, then recommends the best tier and cloud for cost
-          and performance.
-        </p>
+      <Panel
+        title="Intelligent File Ingestion"
+        description="Upload files for ML-guided placement across AWS, Google Cloud, or Azure. Zenith analyzes size, access intent, and lifecycle policy, then recommends the best tier and cloud for cost and performance."
+        className="page-card zenith-surface"
+      >
 
         <div className="storage-process-info">
           <div className="process-step">
@@ -927,7 +927,7 @@ function StoragePage() {
             {isAnalyzing ? "Analyzing..." : "Analyze & Upload"}
           </button>
         </div>
-      </div>
+      </Panel>
 
       <StorageIntelligenceBar summary={intelSummary} loading={intelLoading} />
 
@@ -1247,7 +1247,7 @@ function StoragePage() {
           </div>
         </div>
       )}
-    </div>
+    </PageContainer>
   );
 }
 

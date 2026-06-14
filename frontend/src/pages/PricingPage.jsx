@@ -6,6 +6,7 @@ import { apiClient } from '../api';
 import { toast } from 'react-toastify';
 import { PageSkeleton } from '../components/Skeletons.jsx';
 import PageHeader from '../components/ui/PageHeader.jsx';
+import SegmentedControl from '../components/ui/SegmentedControl.jsx';
 import { usePageRefresh } from '../hooks/usePageRefresh.js';
 import { getPlanCapabilityBlocks } from '../data/productFacts.js';
 import '../styles/pricing.css';
@@ -148,20 +149,16 @@ const PricingPage = () => {
           refreshing={pageRefreshing || loading}
         />
 
-        <div className="pricing-toggle">
-          <button 
-            className={`toggle-btn ${billingCycle === 'monthly' ? 'active' : ''}`}
-            onClick={() => setBillingCycle('monthly')}
-          >
-            Monthly
-          </button>
-          <button 
-            className={`toggle-btn ${billingCycle === 'yearly' ? 'active' : ''}`}
-            onClick={() => setBillingCycle('yearly')}
-          >
-            Yearly (Save 17%)
-          </button>
-        </div>
+        <SegmentedControl
+          ariaLabel="Billing cycle"
+          className="pricing-toggle pricing-toggle--enterprise"
+          options={[
+            { value: 'monthly', label: 'Monthly' },
+            { value: 'yearly', label: 'Yearly (Save 17%)' },
+          ]}
+          value={billingCycle}
+          onChange={setBillingCycle}
+        />
 
         <div className="pricing-grid">
           {plans.map((plan) => {

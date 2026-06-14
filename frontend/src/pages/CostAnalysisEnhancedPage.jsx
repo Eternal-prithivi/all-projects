@@ -15,6 +15,7 @@ import { apiClient, getApiErrorMessage } from '../api.js';
 import { useNotifications } from "../hooks/useNotifications";
 import { usePreferences } from '../context/PreferencesContext.jsx';
 import PageHeader from '../components/ui/PageHeader.jsx';
+import PageContainer from '../components/ui/PageContainer.jsx';
 import { usePageRefresh } from '../hooks/usePageRefresh.js';
 import CostHubNav from '../components/dashboard/CostHubNav.jsx';
 import {
@@ -493,7 +494,7 @@ const CostAnalysisEnhancedPage = () => {
   };
 
   return (
-    <div className="cost-analysis-container">
+    <PageContainer className="cost-analysis-container">
       <PageHeader
         kicker="Cost intelligence"
         title="Cost Analysis"
@@ -978,7 +979,7 @@ const CostAnalysisEnhancedPage = () => {
         <div className="cost-breakdown">
           <h3>Cost by Service</h3>
           <div className="table-responsive-scroll">
-          <table className="cost-table">
+          <table className="cost-table data-card-table">
             <thead>
               <tr>
                 <th>Service</th>
@@ -989,9 +990,9 @@ const CostAnalysisEnhancedPage = () => {
             <tbody>
               {costByService.map((service, index) => (
                 <tr key={index}>
-                  <td>{service.name}</td>
-                  <td>${parseFloat(service.cost).toFixed(2)}</td>
-                  <td>{((parseFloat(service.cost) / totalCost) * 100).toFixed(1)}%</td>
+                  <td data-label="Service">{service.name}</td>
+                  <td data-label="Cost">${parseFloat(service.cost).toFixed(2)}</td>
+                  <td data-label="Percentage">{((parseFloat(service.cost) / totalCost) * 100).toFixed(1)}%</td>
                 </tr>
               ))}
             </tbody>
@@ -1019,7 +1020,7 @@ const CostAnalysisEnhancedPage = () => {
           </div>
         </div>
       )}
-    </div>
+    </PageContainer>
   );
 };
 

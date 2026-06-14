@@ -157,7 +157,7 @@ const AdminPaymentsPage = () => {
       {/* Payments Table */}
       <div className="admin-card">
         <div className="table-container">
-        <table className="admin-table">
+        <table className="admin-table data-card-table">
           <thead>
             <tr>
               <th>Status</th>
@@ -179,7 +179,7 @@ const AdminPaymentsPage = () => {
             ) : (
               payments.map((payment) => (
                 <tr key={payment.payment_id}>
-                  <td>
+                  <td data-label="Status">
                     <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
                       {getStatusIcon(payment.status)}
                       <span className={`status-badge status-${payment.status}`}>
@@ -187,18 +187,18 @@ const AdminPaymentsPage = () => {
                       </span>
                     </span>
                   </td>
-                  <td>{payment.username}</td>
-                  <td>
+                  <td data-label="Username">{payment.username}</td>
+                  <td data-label="Plan">
                     <span className="plan-badge">{payment.plan_id || 'N/A'}</span>
                   </td>
-                  <td>₹{payment.amount.toLocaleString()}</td>
-                  <td>{payment.billing_cycle || 'N/A'}</td>
-                  <td>
+                  <td data-label="Amount">₹{payment.amount.toLocaleString()}</td>
+                  <td data-label="Billing Cycle">{payment.billing_cycle || 'N/A'}</td>
+                  <td data-label="Payment ID">
                     <code style={{ fontSize: '0.85em', color: '#9e9e9e' }}>
                       {payment.razorpay_payment_id ? payment.razorpay_payment_id.substring(0, 20) + '...' : 'N/A'}
                     </code>
                   </td>
-                  <td>{payment.created_at ? new Date(payment.created_at).toLocaleDateString() : 'N/A'}</td>
+                  <td data-label="Date">{payment.created_at ? new Date(payment.created_at).toLocaleDateString() : 'N/A'}</td>
                 </tr>
               ))
             )}

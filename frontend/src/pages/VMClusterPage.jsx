@@ -25,6 +25,7 @@ import OrgResourceMeta from "../components/OrgResourceMeta.jsx";
 import LoadingSpinner from "../components/LoadingSpinner.jsx";
 import EmptyState from "../components/EmptyState.jsx";
 import PageHeader from "../components/ui/PageHeader.jsx";
+import PageContainer from "../components/ui/PageContainer.jsx";
 import { usePageRefresh } from "../hooks/usePageRefresh.js";
 import { VMClusterSkeleton } from "../components/Skeletons.jsx";
 import WorkloadGuidancePanel from "../components/vm/WorkloadGuidancePanel.jsx";
@@ -39,6 +40,7 @@ import {
   formatClusterLabel,
 } from "../constants/vmClusters.js";
 import ZenithModal from "../components/ui/ZenithModal.jsx";
+import { useConfirm } from "../context/ConfirmContext.jsx";
 import {
   IconArrowRightLeft,
   IconClipboardList,
@@ -182,6 +184,7 @@ function VMClusterPage() {
   const platformRegionSlug = sessionRegionOverride || accountDefaultRegion;
   const [showOnlyMine, setShowOnlyMine] = useState(false);
   const notifications = useNotifications();
+  const { confirm } = useConfirm();
   const { executeWithNotification, showLoading, updateSuccess, updateError } = notifications;
   const { runPageRefresh, pageRefreshing } = usePageRefresh();
   const {
@@ -248,6 +251,7 @@ function VMClusterPage() {
 
   // VM Config Modal
   const [showConfigModal, setShowConfigModal] = useState(false);
+  const [sshInstructions, setSshInstructions] = useState(null);
   const [selectedVMConfig, setSelectedVMConfig] = useState(null);
 
   // Fetch current assignment
@@ -737,11 +741,15 @@ function VMClusterPage() {
   };
 
   const handleReleaseVM = async (assignmentId = null, vmName = null) => {
-    const confirmMsg = vmName 
-      ? `Are you sure you want to release ${vmName}?`
-      : "Are you sure you want to release your VM?";
-    
-    if (!window.confirm(confirmMsg)) return;
+    const ok = await confirm({
+      title: 'Release virtual machine',
+      message: vmName
+        ? `Release ${vmName}? This stops billing for the instance and removes your assignment.`
+        : 'Release your assigned VM? This stops billing and removes your assignment.',
+      confirmLabel: 'Release VM',
+      variant: 'danger',
+    });
+    if (!ok) return;
 
     try {
       await executeWithNotification(
@@ -848,30 +856,7 @@ function VMClusterPage() {
       }
 
       const instructions = await response.json();
-      
-      // Show instructions in a modal (you can style this better)
-      const instructionsText = `
-SSH Connection Instructions
-
-VM: ${instructions.vm_name}
-IP: ${instructions.vm_ip}
-Username: ${instructions.ssh_username}
-
-Steps:
-${instructions.steps.map((step) => `
-${step.step}. ${step.title}
-   ${step.command || ""}
-   ${step.description}
-`).join("\n")}
-
-Troubleshooting:
-${instructions.troubleshooting.map((item) => `
-- ${item.issue}
-  ${item.solution}
-`).join("\n")}
-      `.trim();
-
-      alert(instructionsText); // Replace with a better modal in production
+      setSshInstructions(instructions);
     } catch (error) {
       notifications.error(error.message || "Failed to fetch instructions");
     }
@@ -905,14 +890,14 @@ ${instructions.troubleshooting.map((item) => `
 
   if (vmProviders.length === 0) {
     return (
-      <div className="vm-container">
+      <PageContainer className="vm-container">
         <PageHeader
           kicker="Compute"
           title="VM Cluster Management"
           subtitle="Connect AWS, Google Cloud, or Azure with VM credentials in server .env or BYOC"
         />
         <CloudAvailabilityBanner featureLabel="virtual machines" credentialMode={credentialMode} />
-      </div>
+      </PageContainer>
     );
   }
 
@@ -935,7 +920,7 @@ ${instructions.troubleshooting.map((item) => `
   };
 
   return (
-    <div className="vm-container">
+    <PageContainer className="vm-container">
       <PageHeader
         kicker="Compute"
         title="Virtual machines"
@@ -1560,12 +1545,53 @@ ${instructions.troubleshooting.map((item) => `
         </div>
       </ZenithModal>
 
+      <ZenithModal
+        open={Boolean(sshInstructions)}
+        onClose={() => setSshInstructions(null)}
+        title="SSH connection"
+        subtitle={sshInstructions ? `${sshInstructions.vm_name} · ${sshInstructions.vm_ip}` : ''}
+        footer={
+          <button type="button" className="btn-confirm" onClick={() => setSshInstructions(null)}>
+            Done
+          </button>
+        }
+      >
+        {sshInstructions ? (
+          <div className="vm-ssh-instructions">
+            <p>
+              <strong>Username:</strong> {sshInstructions.ssh_username}
+            </p>
+            <ol className="vm-ssh-steps">
+              {(sshInstructions.steps || []).map((step) => (
+                <li key={step.step}>
+                  <strong>{step.title}</strong>
+                  {step.command ? <code>{step.command}</code> : null}
+                  <span>{step.description}</span>
+                </li>
+              ))}
+            </ol>
+            {(sshInstructions.troubleshooting || []).length > 0 ? (
+              <div className="vm-ssh-troubleshooting">
+                <h4>Troubleshooting</h4>
+                <ul>
+                  {sshInstructions.troubleshooting.map((item) => (
+                    <li key={item.issue}>
+                      <strong>{item.issue}</strong> — {item.solution}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+      </ZenithModal>
+
       <VmConfigModal
         open={showConfigModal && Boolean(selectedVMConfig)}
         config={selectedVMConfig}
         onClose={() => setShowConfigModal(false)}
       />
-    </div>
+    </PageContainer>
   );
 }
 

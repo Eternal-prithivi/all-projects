@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { toast } from 'react-toastify';
 import '../styles/encryption-modal.css';
 
 const EncryptionChoiceModal = ({ file, onClose, onChoose }) => {
@@ -9,6 +10,7 @@ const EncryptionChoiceModal = ({ file, onClose, onChoose }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [passwordStrength, setPasswordStrength] = useState({ level: 0, message: '' });
   const [skipAcknowledged, setSkipAcknowledged] = useState(false);
+  const [formError, setFormError] = useState('');
 
   const checkPasswordStrength = (pwd) => {
     if (!pwd) {
@@ -67,31 +69,39 @@ const EncryptionChoiceModal = ({ file, onClose, onChoose }) => {
   };
 
   const handleSubmit = async () => {
+    setFormError('');
     if (!selectedMethod) {
-      alert('Please select an encryption method');
+      setFormError('Please select an encryption method.');
+      toast.error('Please select an encryption method.');
       return;
     }
 
     if (selectedMethod === 'none' && !skipAcknowledged) {
-      alert('Confirm you accept storing this file without Zenith encryption.');
+      setFormError('Confirm you accept storing this file without Zenith encryption.');
+      toast.error('Confirm you accept storing this file without Zenith encryption.');
       return;
     }
 
     if (selectedMethod === 'client-side') {
       if (!password) {
-        alert('Please enter a password');
+        setFormError('Please enter a password.');
+        toast.error('Please enter a password.');
         return;
       }
       if (password.length < 12) {
-        alert('Password must be at least 12 characters for strong encryption');
+        setFormError('Password must be at least 12 characters for strong encryption.');
+        toast.error('Password must be at least 12 characters for strong encryption.');
         return;
       }
       if (!passwordStrength.checks.uppercase || !passwordStrength.checks.number || !passwordStrength.checks.special) {
-        alert('Password must contain at least:\n• One uppercase letter (A-Z)\n• One number (0-9)\n• One special character (!@#$%^&*)');
+        const msg = 'Password must include an uppercase letter, a number, and a special character.';
+        setFormError(msg);
+        toast.error(msg);
         return;
       }
       if (password !== confirmPassword) {
-        alert('Passwords do not match');
+        setFormError('Passwords do not match.');
+        toast.error('Passwords do not match.');
         return;
       }
     }
@@ -276,6 +286,10 @@ const EncryptionChoiceModal = ({ file, onClose, onChoose }) => {
             </label>
           )}
         </div>
+
+        {formError ? (
+          <p className="encryption-form-error" role="alert">{formError}</p>
+        ) : null}
 
         <div className="encryption-modal-footer">
           <button className="btn-cancel" onClick={onClose}>Cancel</button>

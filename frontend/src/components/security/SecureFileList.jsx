@@ -1,5 +1,7 @@
 import React from "react";
+import { toast } from "react-toastify";
 import { useAuth } from "../../context/AuthContext.jsx";
+import { useConfirm } from "../../context/ConfirmContext.jsx";
 import { getSecureDownloadUrl, deleteSecureFile } from "../../api.js";
 import {
   IconDownload,
@@ -20,30 +22,33 @@ function formatBytes(bytes, decimals = 2) {
 }
 
 function SecureFileList({ files, onFileDeleted }) {
-  // Add onFileDeleted
   const { token } = useAuth();
+  const { confirm } = useConfirm();
 
   const handleDownload = async (filename) => {
     try {
       const data = await getSecureDownloadUrl(filename, token);
       window.open(data.download_url, "_blank");
     } catch {
-      alert("Could not get download link.");
+      toast.error("Could not get download link.");
     }
   };
 
   const handleDelete = async (filename) => {
-    if (
-      window.confirm(
-        `Are you sure you want to delete this secure file: ${filename}?`
-      )
-    ) {
-      try {
-        await deleteSecureFile(filename, token);
-        await onFileDeleted(); 
-      } catch (_error) {
-        alert(_error.detail || "Could not delete file. Please try again.");
-      }
+    const ok = await confirm({
+      title: "Delete secure file",
+      message: `Delete ${filename} from the vault? This cannot be undone.`,
+      confirmLabel: "Delete file",
+      variant: "danger",
+    });
+    if (!ok) return;
+
+    try {
+      await deleteSecureFile(filename, token);
+      await onFileDeleted();
+      toast.success("Secure file deleted.");
+    } catch (error) {
+      toast.error(error?.detail || "Could not delete file. Please try again.");
     }
   };
 
@@ -58,7 +63,8 @@ function SecureFileList({ files, onFileDeleted }) {
   }
 
   return (
-    <table className="file-table">
+    <div className="table-responsive-scroll">
+    <table className="file-table data-card-table">
       <thead>
         <tr>
           <th>Filename</th>
@@ -71,8 +77,8 @@ function SecureFileList({ files, onFileDeleted }) {
       <tbody>
         {files.map((file) => (
           <tr key={file.filename}>
-            <td>{file.filename}</td>
-            <td className="status-cell">
+            <td data-label="Filename">{file.filename}</td>
+            <td className="status-cell" data-label="Status">
               {file.is_encrypted ? (
                 <span className="encrypted-flag" title="Encrypted">
                   <IconLock /> Encrypted
@@ -88,16 +94,18 @@ function SecureFileList({ files, onFileDeleted }) {
                 <span>Normal</span>
               )}
             </td>
-            <td>{formatBytes(file.size_bytes)}</td>
-            <td>{new Date(file.upload_date).toLocaleString()}</td>
-            <td className="actions-cell">
+            <td data-label="Size">{formatBytes(file.size_bytes)}</td>
+            <td data-label="Upload Date">{new Date(file.upload_date).toLocaleString()}</td>
+            <td className="actions-cell" data-label="Actions">
               <button
+                type="button"
                 onClick={() => handleDownload(file.filename)}
                 className="action-btn"
               >
                 <IconDownload />
               </button>
               <button
+                type="button"
                 onClick={() => handleDelete(file.filename)}
                 className="action-btn delete-btn"
               >
@@ -108,6 +116,7 @@ function SecureFileList({ files, onFileDeleted }) {
         ))}
       </tbody>
     </table>
+    </div>
   );
 }
 

@@ -1,7 +1,7 @@
 /* Security vault — Zenith glass/gold (scoped under .security-page) */
 
 .security-page {
-  padding: var(--space-xl);
+  padding-block: 0.5rem;
   color: var(--text-primary);
   font-family: "Inter", "Outfit", sans-serif;
 }
@@ -675,7 +675,7 @@ html.theme-light .security-2fa-badge--off {
 
 @media (max-width: 768px) {
   .security-page {
-    padding: var(--space-md);
+    padding-block: var(--space-md);
   }
 
   .security-page .security-process-info {

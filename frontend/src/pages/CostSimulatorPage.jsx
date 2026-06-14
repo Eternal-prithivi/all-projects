@@ -10,20 +10,20 @@
 //   - Use the simulator output as billing data — it's a read-only projection tool
 //   - Remove the provider comparison table — it's the main value prop of this page
 // =============================================================================
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { apiClient } from '../api.js';
 import { toast } from 'react-toastify';
-import { useNavigate } from 'react-router-dom';
 import {
-  IconChevronLeft,
   IconDatabase,
-  IconDollarSign,
   IconHardDrive,
   IconServer,
   IconTarget,
 } from '../components/dashboard/Icons.jsx';
 import '../styles/costsimulator.css';
-import PageRefreshButton from '../components/ui/PageRefreshButton.jsx';
+import PageHeader from '../components/ui/PageHeader.jsx';
+import PageContainer from '../components/ui/PageContainer.jsx';
+import SegmentedControl from '../components/ui/SegmentedControl.jsx';
+import CostHubNav from '../components/dashboard/CostHubNav.jsx';
 import { usePageRefresh } from '../hooks/usePageRefresh.js';
 import CloudProviderLogo from '../components/cloud/CloudProviderLogo.jsx';
 
@@ -31,95 +31,122 @@ const ProviderLogo = ({ provider }) => (
   <CloudProviderLogo provider={provider} className="provider-logo-small" />
 );
 
-function getFallbackPricing() {
+function buildProviderPricing({
+  storageStandard,
+  storageInfrequent,
+  storageArchive,
+  computeGeneral,
+  computeOptimized,
+  computeMemory,
+  dataTransfer,
+  database,
+}) {
   return {
     storage: {
-      standard: {
-        storage: { aws: 0.023, gcp: 0.020, azure: 0.018 },
-        requests: { aws: 0.0004 / 1000, gcp: 0.0005 / 1000, azure: 0.0004 / 1000 },
-        dataTransfer: { aws: 0.09, gcp: 0.12, azure: 0.087 },
-      },
-      infrequent: {
-        storage: { aws: 0.0125, gcp: 0.010, azure: 0.010 },
-        requests: { aws: 0.001 / 1000, gcp: 0.001 / 1000, azure: 0.001 / 1000 },
-        dataTransfer: { aws: 0.09, gcp: 0.12, azure: 0.087 },
-      },
-      archive: {
-        storage: { aws: 0.004, gcp: 0.0012, azure: 0.002 },
-        requests: { aws: 0.05 / 1000, gcp: 0.05 / 1000, azure: 0.02 / 1000 },
-        dataTransfer: { aws: 0.09, gcp: 0.12, azure: 0.087 },
-      },
+      standard: storageStandard,
+      infrequent: storageInfrequent,
+      archive: storageArchive,
     },
     compute: {
-      general: {
-        ondemand: {
-          cpu: { aws: 0.0416, gcp: 0.0475, azure: 0.040 },
-          memory: { aws: 0.0052, gcp: 0.0064, azure: 0.005 },
-        },
-        '1year': {
-          cpu: { aws: 0.0270, gcp: 0.0332, azure: 0.028 },
-          memory: { aws: 0.0034, gcp: 0.0045, azure: 0.0035 },
-        },
-        '3year': {
-          cpu: { aws: 0.0166, gcp: 0.0237, azure: 0.018 },
-          memory: { aws: 0.0021, gcp: 0.0032, azure: 0.0022 },
-        },
-      },
-      compute: {
-        ondemand: {
-          cpu: { aws: 0.051, gcp: 0.0594, azure: 0.048 },
-          memory: { aws: 0.0034, gcp: 0.0042, azure: 0.0033 },
-        },
-        '1year': {
-          cpu: { aws: 0.0331, gcp: 0.0416, azure: 0.0336 },
-          memory: { aws: 0.0022, gcp: 0.0029, azure: 0.0023 },
-        },
-        '3year': {
-          cpu: { aws: 0.0204, gcp: 0.0297, azure: 0.0216 },
-          memory: { aws: 0.0014, gcp: 0.0021, azure: 0.0015 },
-        },
-      },
-      memory: {
-        ondemand: {
-          cpu: { aws: 0.0532, gcp: 0.0641, azure: 0.051 },
-          memory: { aws: 0.0067, gcp: 0.0086, azure: 0.0064 },
-        },
-        '1year': {
-          cpu: { aws: 0.0346, gcp: 0.0449, azure: 0.0357 },
-          memory: { aws: 0.0044, gcp: 0.0060, azure: 0.0045 },
-        },
-        '3year': {
-          cpu: { aws: 0.0213, gcp: 0.0320, azure: 0.0229 },
-          memory: { aws: 0.0027, gcp: 0.0043, azure: 0.0029 },
-        },
-      },
-      dataTransfer: { aws: 0.09, gcp: 0.12, azure: 0.087 },
+      general: computeGeneral,
+      compute: computeOptimized,
+      memory: computeMemory,
+      dataTransfer,
     },
-    database: {
-      mysql: {
-        storage: { aws: 0.115, gcp: 0.170, azure: 0.125 },
-        iops: { aws: 0.10 / 1000, gcp: 0, azure: 0 },
-        backup: { aws: 0.095, gcp: 0.080, azure: 0.10 },
-      },
-      postgres: {
-        storage: { aws: 0.115, gcp: 0.170, azure: 0.125 },
-        iops: { aws: 0.10 / 1000, gcp: 0, azure: 0 },
-        backup: { aws: 0.095, gcp: 0.080, azure: 0.10 },
-      },
-      mongodb: {
-        storage: { aws: 0.25, gcp: 0.24, azure: 0.23 },
-        iops: { aws: 0.20 / 1000, gcp: 0, azure: 0 },
-        backup: { aws: 0.20, gcp: 0.18, azure: 0.19 },
-      },
-    },
-    aws: {},
-    gcp: {},
-    azure: {},
+    database,
   };
 }
 
+function getFallbackPricing() {
+  return {
+    aws: buildProviderPricing({
+      storageStandard: { storage: 0.023, requests: 0.0004 / 1000, dataTransfer: 0.09 },
+      storageInfrequent: { storage: 0.0125, requests: 0.001 / 1000, dataTransfer: 0.09 },
+      storageArchive: { storage: 0.004, requests: 0.05 / 1000, dataTransfer: 0.09 },
+      computeGeneral: {
+        ondemand: { cpu: 0.0416, memory: 0.0052 },
+        '1year': { cpu: 0.0270, memory: 0.0034 },
+        '3year': { cpu: 0.0166, memory: 0.0021 },
+      },
+      computeOptimized: {
+        ondemand: { cpu: 0.051, memory: 0.0034 },
+        '1year': { cpu: 0.0331, memory: 0.0022 },
+        '3year': { cpu: 0.0204, memory: 0.0014 },
+      },
+      computeMemory: {
+        ondemand: { cpu: 0.0532, memory: 0.0067 },
+        '1year': { cpu: 0.0346, memory: 0.0044 },
+        '3year': { cpu: 0.0213, memory: 0.0027 },
+      },
+      dataTransfer: 0.09,
+      database: {
+        mysql: { storage: 0.115, iops: 0.10 / 1000, backup: 0.095 },
+        postgres: { storage: 0.115, iops: 0.10 / 1000, backup: 0.095 },
+        mongodb: { storage: 0.25, iops: 0.20 / 1000, backup: 0.20 },
+      },
+    }),
+    gcp: buildProviderPricing({
+      storageStandard: { storage: 0.020, requests: 0.0005 / 1000, dataTransfer: 0.12 },
+      storageInfrequent: { storage: 0.010, requests: 0.001 / 1000, dataTransfer: 0.12 },
+      storageArchive: { storage: 0.0012, requests: 0.05 / 1000, dataTransfer: 0.12 },
+      computeGeneral: {
+        ondemand: { cpu: 0.0475, memory: 0.0064 },
+        '1year': { cpu: 0.0332, memory: 0.0045 },
+        '3year': { cpu: 0.0237, memory: 0.0032 },
+      },
+      computeOptimized: {
+        ondemand: { cpu: 0.0594, memory: 0.0042 },
+        '1year': { cpu: 0.0416, memory: 0.0029 },
+        '3year': { cpu: 0.0297, memory: 0.0021 },
+      },
+      computeMemory: {
+        ondemand: { cpu: 0.0641, memory: 0.0086 },
+        '1year': { cpu: 0.0449, memory: 0.0060 },
+        '3year': { cpu: 0.0320, memory: 0.0043 },
+      },
+      dataTransfer: 0.12,
+      database: {
+        mysql: { storage: 0.170, iops: 0, backup: 0.080 },
+        postgres: { storage: 0.170, iops: 0, backup: 0.080 },
+        mongodb: { storage: 0.24, iops: 0, backup: 0.18 },
+      },
+    }),
+    azure: buildProviderPricing({
+      storageStandard: { storage: 0.018, requests: 0.0004 / 1000, dataTransfer: 0.087 },
+      storageInfrequent: { storage: 0.010, requests: 0.001 / 1000, dataTransfer: 0.087 },
+      storageArchive: { storage: 0.002, requests: 0.02 / 1000, dataTransfer: 0.087 },
+      computeGeneral: {
+        ondemand: { cpu: 0.040, memory: 0.005 },
+        '1year': { cpu: 0.028, memory: 0.0035 },
+        '3year': { cpu: 0.018, memory: 0.0022 },
+      },
+      computeOptimized: {
+        ondemand: { cpu: 0.048, memory: 0.0033 },
+        '1year': { cpu: 0.0336, memory: 0.0023 },
+        '3year': { cpu: 0.0216, memory: 0.0015 },
+      },
+      computeMemory: {
+        ondemand: { cpu: 0.051, memory: 0.0064 },
+        '1year': { cpu: 0.0357, memory: 0.0045 },
+        '3year': { cpu: 0.0229, memory: 0.0029 },
+      },
+      dataTransfer: 0.087,
+      database: {
+        mysql: { storage: 0.125, iops: 0, backup: 0.10 },
+        postgres: { storage: 0.125, iops: 0, backup: 0.10 },
+        mongodb: { storage: 0.23, iops: 0, backup: 0.19 },
+      },
+    }),
+  };
+}
+
+function isSimulatorPricingReady(pricing) {
+  return ['aws', 'gcp', 'azure'].every(
+    (provider) => pricing?.[provider]?.storage?.standard?.storage != null
+  );
+}
+
 const CostSimulatorPage = () => {
-  const navigate = useNavigate();
   const [serviceType, setServiceType] = useState('storage');
   const [storageSize, setStorageSize] = useState(100); // GB
   const [storageClass, setStorageClass] = useState('standard');
@@ -138,17 +165,29 @@ const CostSimulatorPage = () => {
     aws: {}, gcp: {}, azure: {} 
   });
   const [pricing, setPricing] = useState(() => getFallbackPricing());
-  const [loading, setLoading] = useState(false);
   const [pricingRefreshing, setPricingRefreshing] = useState(true);
   const [lastUpdated, setLastUpdated] = useState(null);
   const { runPageRefresh, pageRefreshing } = usePageRefresh();
+
+  const serviceOptions = useMemo(
+    () => [
+      { value: 'storage', label: 'Storage', icon: <IconHardDrive aria-hidden="true" /> },
+      { value: 'compute', label: 'Compute', icon: <IconServer aria-hidden="true" /> },
+      { value: 'database', label: 'Database', icon: <IconDatabase aria-hidden="true" /> },
+    ],
+    []
+  );
 
   const fetchPricing = useCallback(async ({ showLoadedToast = false } = {}) => {
     try {
       setPricingRefreshing(true);
       const response = await apiClient.get('/pricing');
       const { aws, gcp, azure, last_updated } = response.data;
-      setPricing({ aws, gcp, azure });
+      const nextPricing = { aws, gcp, azure };
+      if (!isSimulatorPricingReady(nextPricing)) {
+        throw new Error('Pricing API returned an unexpected shape');
+      }
+      setPricing(nextPricing);
       setLastUpdated(last_updated);
       if (showLoadedToast) {
         toast.success('Pricing data loaded successfully');
@@ -161,7 +200,6 @@ const CostSimulatorPage = () => {
       setPricing(getFallbackPricing());
     } finally {
       setPricingRefreshing(false);
-      setLoading(false);
     }
   }, []);
 
@@ -171,16 +209,18 @@ const CostSimulatorPage = () => {
 
   // Calculate costs based on service type
   useEffect(() => {
-    if (!pricing || !pricing.aws || !pricing.gcp || !pricing.azure) return; // Wait for pricing to load
+    if (!isSimulatorPricingReady(pricing)) return;
 
     let newCosts = { aws: 0, gcp: 0, azure: 0 };
     let newBreakdown = { aws: {}, gcp: {}, azure: {} };
 
     if (serviceType === 'storage') {
-      ['aws', 'gcp', 'azure'].forEach(provider => {
-        const storageCost = storageSize * pricing[provider].storage[storageClass].storage;
-        const requestCost = storageRequests * pricing[provider].storage[storageClass].requests;
-        const transferCost = dataTransfer * pricing[provider].storage[storageClass].dataTransfer;
+      ['aws', 'gcp', 'azure'].forEach((provider) => {
+        const tier = pricing[provider]?.storage?.[storageClass];
+        if (!tier) return;
+        const storageCost = storageSize * tier.storage;
+        const requestCost = storageRequests * tier.requests;
+        const transferCost = dataTransfer * tier.dataTransfer;
         
         newBreakdown[provider] = {
           storage: storageCost,
@@ -190,10 +230,13 @@ const CostSimulatorPage = () => {
         newCosts[provider] = storageCost + requestCost + transferCost;
       });
     } else if (serviceType === 'compute') {
-      ['aws', 'gcp', 'azure'].forEach(provider => {
-        const cpuCost = vmCpu * pricing[provider].compute[vmType][commitment].cpu * vmHours;
-        const memCost = vmMemory * pricing[provider].compute[vmType][commitment].memory * vmHours;
-        const transferCost = dataTransfer * pricing[provider].compute.dataTransfer;
+      ['aws', 'gcp', 'azure'].forEach((provider) => {
+        const vmRates = pricing[provider]?.compute?.[vmType]?.[commitment];
+        const transferRate = pricing[provider]?.compute?.dataTransfer;
+        if (!vmRates || transferRate == null) return;
+        const cpuCost = vmCpu * vmRates.cpu * vmHours;
+        const memCost = vmMemory * vmRates.memory * vmHours;
+        const transferCost = dataTransfer * transferRate;
         
         newBreakdown[provider] = {
           cpu: cpuCost,
@@ -204,10 +247,12 @@ const CostSimulatorPage = () => {
         newCosts[provider] = cpuCost + memCost + transferCost;
       });
     } else if (serviceType === 'database') {
-      ['aws', 'gcp', 'azure'].forEach(provider => {
-        const storageCost = dbSize * pricing[provider].database[dbType].storage;
-        const iopsCost = dbIops * pricing[provider].database[dbType].iops;
-        const backupCost = dbSize * 0.5 * pricing[provider].database[dbType].backup; // 50% backup size
+      ['aws', 'gcp', 'azure'].forEach((provider) => {
+        const dbRates = pricing[provider]?.database?.[dbType];
+        if (!dbRates) return;
+        const storageCost = dbSize * dbRates.storage;
+        const iopsCost = dbIops * dbRates.iops;
+        const backupCost = dbSize * 0.5 * dbRates.backup; // 50% backup size
         
         newBreakdown[provider] = {
           storage: storageCost,
@@ -222,82 +267,44 @@ const CostSimulatorPage = () => {
     setBreakdown(newBreakdown);
   }, [serviceType, storageSize, storageClass, storageRequests, dataTransfer, vmCpu, vmMemory, vmHours, vmType, commitment, dbSize, dbType, dbIops, pricing]);
 
-  if (loading) {
-    return null;
-  }
-
   // Find cheapest provider
   const cheapestProvider = Object.keys(costs).reduce((a, b) => 
     costs[a] < costs[b] ? a : b
   );
 
-  return (
-    <div className="cost-simulator-container">
-      <div className="simulator-header">
-        <button 
-          className="back-button"
-          type="button"
-          onClick={() => navigate('/dashboard/costs')}
-        >
-          <IconChevronLeft aria-hidden="true" />
-          Back to Cost Analysis
-        </button>
-        <div className="simulator-header-row">
-          <div>
-            <span className="page-kicker">Pricing Workbench</span>
-            <h1>
-              <span className="heading-icon"><IconDollarSign aria-hidden="true" /></span>
-              Cost Simulator
-            </h1>
-            <p>Compare cloud pricing across AWS, GCP, and Azure</p>
-            {lastUpdated && (
-              <small className="pricing-updated">
-                Pricing last updated: {new Date(lastUpdated).toLocaleDateString()}
-              </small>
-            )}
-          </div>
-          <PageRefreshButton
-            onClick={() =>
-              runPageRefresh(() => fetchPricing(), {
-                loadingMessage: 'Refreshing cost simulator…',
-                successMessage: 'Cost simulator refreshed.',
-                errorMessage: 'Failed to refresh cost simulator.',
-              })
-            }
-            busy={pageRefreshing || loading}
-          />
-        </div>
-      </div>
+  const pricingSubtitle = lastUpdated
+    ? `Compare cloud pricing across AWS, GCP, and Azure. Pricing last updated ${new Date(lastUpdated).toLocaleDateString()}.`
+    : 'Compare cloud pricing across AWS, GCP, and Azure with live catalog rates when available.';
 
-      {/* Service Type Selector */}
-      <div className="service-selector">
-        <button 
-          className={`service-btn ${serviceType === 'storage' ? 'active' : ''}`}
-          type="button"
-          aria-pressed={serviceType === 'storage'}
-          onClick={() => setServiceType('storage')}
-        >
-          <IconHardDrive aria-hidden="true" />
-          Storage
-        </button>
-        <button 
-          className={`service-btn ${serviceType === 'compute' ? 'active' : ''}`}
-          type="button"
-          aria-pressed={serviceType === 'compute'}
-          onClick={() => setServiceType('compute')}
-        >
-          <IconServer aria-hidden="true" />
-          Compute
-        </button>
-        <button 
-          className={`service-btn ${serviceType === 'database' ? 'active' : ''}`}
-          type="button"
-          aria-pressed={serviceType === 'database'}
-          onClick={() => setServiceType('database')}
-        >
-          <IconDatabase aria-hidden="true" />
-          Database
-        </button>
+  return (
+    <PageContainer className="cost-simulator-container">
+      <PageHeader
+        kicker="Cost intelligence"
+        title="Cost Simulator"
+        subtitle={pricingSubtitle}
+        onRefresh={() =>
+          runPageRefresh(() => fetchPricing({ showLoadedToast: true }), {
+            loadingMessage: 'Refreshing cost simulator…',
+            successMessage: 'Cost simulator refreshed.',
+            errorMessage: 'Failed to refresh cost simulator.',
+          })
+        }
+        refreshing={pageRefreshing || pricingRefreshing}
+      />
+      <CostHubNav />
+
+      <div className="service-selector service-selector--enterprise">
+        <SegmentedControl
+          ariaLabel="Workload type"
+          options={serviceOptions}
+          value={serviceType}
+          onChange={setServiceType}
+        />
+        {pricingRefreshing ? (
+          <span className="pricing-refresh-hint" aria-live="polite">
+            Refreshing rates…
+          </span>
+        ) : null}
       </div>
 
       {/* Configuration Panel */}
@@ -642,7 +649,7 @@ const CostSimulatorPage = () => {
           <li>Database prices are for managed services in single-AZ/zone configuration</li>
         </ul>
       </div>
-    </div>
+    </PageContainer>
   );
 };
 

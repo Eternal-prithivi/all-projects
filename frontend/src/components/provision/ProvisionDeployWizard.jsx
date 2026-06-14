@@ -32,9 +32,6 @@ function TemplateCardIcon({ icon }) {
   if (Icon) {
     return <Icon className="template-card-icon-svg" aria-hidden />;
   }
-  if (icon && typeof icon === 'string' && icon.length <= 4) {
-    return <span className="template-card-icon-emoji">{icon}</span>;
-  }
   return <FaGlobe className="template-card-icon-svg" aria-hidden />;
 }
 
@@ -643,7 +640,7 @@ export default function ProvisionDeployWizard({
         timeout: 10 * 60 * 1000,
       });
       if (res.data.success) {
-        setPlanOutput(prev => prev + '\n\n✅ Apply complete! ' + res.data.resources_count + ' resources created.');
+        setPlanOutput(prev => prev + `\n\nApply complete — ${res.data.resources_count} resources created.`);
         const depId = res.data.deployment_id || deploymentId;
         try {
           const handoffRes = await api.get(`/provision/deployments/${depId}/handoff`);
@@ -658,7 +655,7 @@ export default function ProvisionDeployWizard({
         setSuccessOpen(true);
       } else {
         setError(res.data.error || `${engineLabel} apply failed`);
-        setPlanOutput(prev => prev + '\n\n❌ Apply failed: ' + (res.data.error || 'unknown error'));
+        setPlanOutput(prev => prev + `\n\nApply failed: ${res.data.error || 'unknown error'}`);
       }
     } catch (err) {
       setError(getApiErrorMessage(err, 'Failed to apply'));
@@ -1490,7 +1487,7 @@ export default function ProvisionDeployWizard({
               )}
 
               {policyResult.can_deploy && (
-                <span className="policy-badge passed">✅ All security checks passed</span>
+                <span className="policy-badge passed">All security checks passed</span>
               )}
             </div>
           )}
@@ -1501,7 +1498,8 @@ export default function ProvisionDeployWizard({
               <h3 style={{ color: 'var(--text-primary, #fff)', marginBottom: '1rem', fontSize: '1.1rem' }}>
                 💰 Cost Estimate
               </h3>
-              <table className="cost-table">
+              <div className="table-responsive-scroll">
+              <table className="cost-table data-card-table">
                 <thead>
                   <tr>
                     <th>Resource</th>
@@ -1512,18 +1510,19 @@ export default function ProvisionDeployWizard({
                 <tbody>
                   {costEstimate.resources.map((r, i) => (
                     <tr key={i}>
-                      <td>{r.name}</td>
-                      <td>${r.monthly_cost}</td>
-                      <td className="cost-note">{r.note || ''}</td>
+                      <td data-label="Resource">{r.name}</td>
+                      <td data-label="Monthly Cost">${r.monthly_cost}</td>
+                      <td className="cost-note" data-label="Note">{r.note || ''}</td>
                     </tr>
                   ))}
                   <tr>
-                    <td><strong>Total</strong></td>
-                    <td className="cost-total">${costEstimate.total_monthly_cost}/month</td>
-                    <td className="cost-note">{costEstimate.currency}</td>
+                    <td data-label="Resource"><strong>Total</strong></td>
+                    <td className="cost-total" data-label="Monthly Cost">${costEstimate.total_monthly_cost}/month</td>
+                    <td className="cost-note" data-label="Note">{costEstimate.currency}</td>
                   </tr>
                 </tbody>
               </table>
+              </div>
             </div>
           )}
 

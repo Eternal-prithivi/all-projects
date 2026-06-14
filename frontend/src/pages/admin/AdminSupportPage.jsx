@@ -197,7 +197,7 @@ function AdminSupportPage() {
             <div className="support-empty">No tickets match your filters</div>
           ) : (
             <div className="card-body no-padding admin-support-table-wrap">
-              <table className="admin-table">
+              <table className="admin-table data-card-table">
                 <thead>
                   <tr>
                     <th>Reference</th>
@@ -214,19 +214,19 @@ function AdminSupportPage() {
                       className={selectedId === t.id ? 'selected-row' : ''}
                       style={{ cursor: 'pointer' }}
                     >
-                      <td>
+                      <td data-label="Reference">
                         <span className="support-ref">{t.reference_code}</span>
                       </td>
-                      <td>
+                      <td data-label="Requester">
                         <div>{t.requester_name}</div>
                         <div style={{ fontSize: '0.8rem', opacity: 0.7 }}>{t.requester_email}</div>
                       </td>
-                      <td>
+                      <td data-label="Status">
                         <span className={`support-status-pill support-status-pill--${t.status}`}>
                           {statusLabel(t.status)}
                         </span>
                       </td>
-                      <td>{formatDateTime(t.last_message_at)}</td>
+                      <td data-label="Updated">{formatDateTime(t.last_message_at)}</td>
                     </tr>
                   ))}
                 </tbody>
