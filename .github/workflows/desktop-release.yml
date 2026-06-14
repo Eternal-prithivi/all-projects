@@ -117,6 +117,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: stage
           fetch-depth: 0
 
       - name: Download all artifacts
@@ -199,11 +200,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          cp frontend/public/releases.json /tmp/releases.json
-          git fetch origin stage
-          git checkout stage
           git pull --rebase origin stage
-          cp /tmp/releases.json frontend/public/releases.json
           git add frontend/public/releases.json
           if git diff --cached --quiet; then
             echo "No releases.json changes"
