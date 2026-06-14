@@ -200,7 +200,10 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add frontend/public/releases.json
+          git stash push -- frontend/public/releases.json
           git pull --rebase origin stage
+          git stash pop
           git add frontend/public/releases.json
           if git diff --cached --quiet; then
             echo "No releases.json changes"
