@@ -32,7 +32,7 @@ def test_verify_azure_compute_credentials_success():
 
     with patch("azure.identity.ClientSecretCredential", return_value=MagicMock()):
         with patch(
-            "azure.mgmt.compute.ComputeManagementClient",
+            "azure.mgmt.resource.ResourceManagementClient",
             return_value=mock_client,
         ):
             ok, msg = _verify_azure_compute_credentials(

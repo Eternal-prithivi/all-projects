@@ -37,6 +37,11 @@ RUN mkdir -p /app/terraform-plugin-cache \
     && cd /app/terraform \
     && terraform init -backend=false -input=false -no-color
 
+RUN useradd --create-home --uid 10001 --shell /usr/sbin/nologin appuser \
+    && chown -R appuser:appuser /app
+
+USER appuser
+
 EXPOSE 8000
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \

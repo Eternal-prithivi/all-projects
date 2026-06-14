@@ -20,7 +20,11 @@ def test_cost_tri_cloud_routes_registered(client, auth_headers):
 
 
 @patch("app.cost.routes_cost.get_gcp_billing_data")
-def test_cost_gcp_route_returns_provider(mock_fetch, client, auth_headers):
+@patch("app.cloud.availability.assert_provider_available")
+@patch("app.byoc.capabilities.assert_byoc_feature_ready")
+def test_cost_gcp_route_returns_provider(
+    _mock_byoc_ready, _mock_provider, mock_fetch, client, auth_headers
+):
     mock_fetch.return_value = {"status": "missing_config", "message": "mock"}
     headers, _user = auth_headers()
     response = client.get(

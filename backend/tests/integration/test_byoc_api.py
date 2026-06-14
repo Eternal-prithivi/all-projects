@@ -245,6 +245,7 @@ def test_byoc_pro_plan_eligible(mock_test, client, auth_headers, pro_subscriptio
     assert "capabilities" in status
 
 
+@patch("app.byoc.routes_byoc._verify_azure_compute_credentials", return_value=(True, "Compute credentials validated."))
 @patch("app.byoc.routes_byoc._verify_azure_cost_management", return_value=(True, "OK"))
 @patch("app.byoc.routes_byoc.test_azure_credentials")
 @patch("app.byoc.routes_byoc.ensure_azure_containers_exist", return_value=(True, "ready"))
@@ -252,6 +253,7 @@ def test_byoc_azure_extend_compute(
     _mock_containers,
     mock_test,
     _mock_cost,
+    _mock_compute,
     client,
     auth_headers,
     pro_subscription,

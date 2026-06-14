@@ -19,6 +19,8 @@ def test_get_azure_billing_returns_demo_shape():
 
 def test_get_gcp_billing_missing_config_when_not_demo(monkeypatch):
     monkeypatch.setenv("DEMO_MODE", "false")
+    monkeypatch.setenv("GCP_BILLING_DATASET_ID", "")
+    monkeypatch.setenv("GCP_BILLING_TABLE_ID", "")
     from app.utils import config as config_mod
     from app.config import demo_mode as demo_mod
 

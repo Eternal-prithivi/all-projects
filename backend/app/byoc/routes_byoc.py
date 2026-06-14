@@ -815,14 +815,14 @@ def _verify_azure_compute_credentials(
         return False, "Service principal fields incomplete."
     try:
         from azure.identity import ClientSecretCredential
-        from azure.mgmt.compute import ComputeManagementClient
+        from azure.mgmt.resource import ResourceManagementClient
 
         credential = ClientSecretCredential(
             tenant_id=tenant_id,
             client_id=client_id,
             client_secret=client_secret,
         )
-        client = ComputeManagementClient(credential, subscription_id)
+        client = ResourceManagementClient(credential, subscription_id)
         next(client.resource_groups.list(), None)
         return True, "Compute credentials validated."
     except ImportError:
