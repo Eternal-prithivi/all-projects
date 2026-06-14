@@ -139,6 +139,7 @@ jobs:
       AZURE_STORAGE_ACCOUNT_NAME: testazure
       AZURE_STORAGE_ACCOUNT_KEY: testazurekey
       AZURE_CONTAINER_NAME: test-container
+      AZURE_SECURE_CONTAINER_NAME: test-secure-container
       AZURE_TENANT_ID: test-tenant
       AZURE_CLIENT_ID: test-client
       AZURE_CLIENT_SECRET: test-secret
