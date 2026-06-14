@@ -14,6 +14,7 @@ test.describe('Mobile shell', () => {
     const drawer = page.getByRole('dialog', { name: /site navigation/i });
     await expect(drawer).toBeVisible();
     await expect(drawer.getByRole('link', { name: /features/i })).toBeVisible();
+    await expect(drawer.getByRole('link', { name: /^download$/i })).toBeVisible();
   });
 
   test('features page shows marketing drawer', async ({ page }) => {
@@ -25,10 +26,9 @@ test.describe('Mobile shell', () => {
 
   test('download page shows platform options', async ({ page }) => {
     await page.goto('/download');
-    await expect(page.getByRole('heading', { name: /zenith for desktop/i })).toBeVisible();
-    await expect(page.getByRole('heading', { name: /choose your platform/i })).toBeVisible();
-    await expect(page.getByText(/macOS/i).first()).toBeVisible();
-    await expect(page.getByText(/Windows/i).first()).toBeVisible();
+    await expect(page.getByRole('heading', { name: /your cloud command center/i })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /download for your operating system/i })).toBeVisible();
+    await expect(page.getByRole('tab', { name: /macOS/i })).toBeVisible();
   });
 
   test('dashboard shows bottom navigation when logged in', async ({ page, request }) => {

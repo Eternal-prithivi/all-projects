@@ -233,7 +233,9 @@ function SupportPage() {
             <fieldset className="support-new-ticket-fieldset">
               <legend className="support-new-ticket-legend">What do you need help with?</legend>
               <div className="support-category-grid" role="radiogroup" aria-label="Ticket category">
-                {CATEGORIES.map(({ value, label, icon: Icon, hint }) => (
+                {CATEGORIES.map((category) => {
+                  const { value, label, icon: CategoryIcon, hint } = category;
+                  return (
                   <button
                     key={value}
                     type="button"
@@ -243,14 +245,15 @@ function SupportPage() {
                     onClick={() => setNewTicket((f) => ({ ...f, category: value }))}
                   >
                     <span className="support-category-chip__icon" aria-hidden>
-                      <Icon />
+                      <CategoryIcon />
                     </span>
                     <span className="support-category-chip__text">
                       <span className="support-category-chip__label">{label}</span>
                       <span className="support-category-chip__hint">{hint}</span>
                     </span>
                   </button>
-                ))}
+                  );
+                })}
               </div>
             </fieldset>
 

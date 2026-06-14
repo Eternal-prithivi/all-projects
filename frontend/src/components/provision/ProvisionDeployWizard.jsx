@@ -105,12 +105,6 @@ async function waitForBackend(maxWaitMs = WAKE_MAX_WAIT_MS) {
   return { ok: false, attempts: attempt };
 }
 
-const CSP_OPTIONS = [
-  { value: 'AWS', label: 'AWS' },
-  { value: 'GCP', label: 'GCP' },
-  { value: 'Azure', label: 'Azure' },
-];
-
 const EMPTY_FLAGS = {
   enable_vpc: false,
   enable_ec2: false,
@@ -290,13 +284,6 @@ export default function ProvisionDeployWizard({
       setConfig((prev) => ({ ...prev, csp: availableProviders[0] }));
     }
   }, [availableProviders, csp]);
-
-  const handleCspChange = (next) => {
-    setCsp(next);
-    setSelectedTemplate(null);
-    setStep(0);
-    setConfig((prev) => ({ ...prev, csp: next, template: null, ...EMPTY_FLAGS }));
-  };
 
   const handleCatalogCspChange = (next) => {
     if (next === csp) return;

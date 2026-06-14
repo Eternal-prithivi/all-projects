@@ -11,4 +11,5 @@ export const LANDING_PAGE_LINKS = [
   { href: '#features', label: 'Features' },
   { href: '#how-it-works', label: 'How it works' },
   { href: '#pricing', label: 'Pricing' },
+  { to: '/download', label: 'Download' },
 ];

@@ -116,11 +116,17 @@ function HomePage() {
             <ZenithLogo variant="full" size={40} badge="Cloud" textLayout="inline" />
           </Link>
           <div className="nav-links nav-links--desktop">
-            {LANDING_PAGE_LINKS.map((link) => (
-              <a key={link.href} href={link.href}>
-                {link.label}
-              </a>
-            ))}
+            {LANDING_PAGE_LINKS.map((link) =>
+              link.to ? (
+                <Link key={link.to} to={link.to}>
+                  {link.label}
+                </Link>
+              ) : (
+                <a key={link.href} href={link.href}>
+                  {link.label}
+                </a>
+              )
+            )}
             {user ? (
               <Link to="/dashboard" className="btn-nav-signup">
                 Go to Dashboard

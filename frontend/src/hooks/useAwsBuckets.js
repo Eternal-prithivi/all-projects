@@ -134,7 +134,7 @@ export function useAwsBuckets({
         setRefreshing(false);
       }
     },
-    [surface, selectedRegion, storageKeyPrefix, mode, platformMultiRegion, reloadToken]
+    [surface, selectedRegion, storageKeyPrefix, mode, platformMultiRegion]
   );
 
   useEffect(() => {
@@ -143,7 +143,7 @@ export function useAwsBuckets({
     }
     didInitialLoad.current = true;
     loadBuckets(false);
-  }, [loadBuckets]);
+  }, [loadBuckets, reloadToken]);
 
   const selectBucket = useCallback(
     (b) => {

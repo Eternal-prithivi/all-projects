@@ -77,7 +77,7 @@ export function useGcpBuckets({
       setLoading(false);
       setRefreshing(false);
     }
-  }, [enabled, storageKeyPrefix, reloadToken, surface]);
+  }, [enabled, storageKeyPrefix, surface]);
 
   useEffect(() => {
     if (!enabled) return;
@@ -86,7 +86,7 @@ export function useGcpBuckets({
     }
     didInitialLoad.current = true;
     loadBuckets();
-  }, [loadBuckets, enabled]);
+  }, [loadBuckets, enabled, reloadToken]);
 
   const selectBucket = useCallback(
     (b) => {

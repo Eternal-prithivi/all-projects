@@ -9,12 +9,13 @@ export default function Panel({
   actions,
   children,
   className = '',
-  as: Component = 'section',
+  as = 'section',
   id,
   ...rest
 }) {
+  const Section = as;
   return (
-    <Component
+    <Section
       id={id}
       className={['enterprise-panel', className].filter(Boolean).join(' ')}
       {...rest}
@@ -29,6 +30,6 @@ export default function Panel({
         </header>
       )}
       {children}
-    </Component>
+    </Section>
   );
 }

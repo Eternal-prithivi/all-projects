@@ -112,7 +112,7 @@ function BillingPage() {
   const formatINR = (amount) =>
     `₹${Number(amount || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`;
 
-  const resolvePlanMeta = (planId) => {
+  const resolvePlanMeta = useCallback((planId) => {
     const fromApi = plans.find((p) => p.plan_id === planId);
     if (fromApi) return fromApi;
     const fallback = getPlanById(planId);
@@ -125,7 +125,7 @@ function BillingPage() {
       };
     }
     return { plan_id: planId, name: planId || 'Free', price_monthly: 0, price_yearly: 0 };
-  };
+  }, [plans]);
 
   const getPlanDisplayName = (planId) => resolvePlanMeta(planId).name;
 
@@ -160,7 +160,7 @@ function BillingPage() {
       subscriptionINR,
       totalINR: cloudCostsINR + subscriptionINR,
     };
-  }, [currentMonthCosts, subscription, plans]);
+  }, [currentMonthCosts, subscription, resolvePlanMeta]);
 
   const handleOrgCheckout = async (planId) => {
     if (!orgBilling?.can_manage_billing) return;

@@ -69,7 +69,7 @@ export function useAzureContainers({
       setLoading(false);
       setRefreshing(false);
     }
-  }, [enabled, storageKeyPrefix, reloadToken, surface]);
+  }, [enabled, storageKeyPrefix, surface]);
 
   useEffect(() => {
     if (!enabled) return;
@@ -78,7 +78,7 @@ export function useAzureContainers({
     }
     didInitialLoad.current = true;
     loadContainers();
-  }, [loadContainers, enabled]);
+  }, [loadContainers, enabled, reloadToken]);
 
   const selectContainer = useCallback(
     (c) => {

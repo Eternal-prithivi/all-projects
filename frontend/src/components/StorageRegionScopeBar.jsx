@@ -90,6 +90,7 @@ export default function StorageRegionScopeBar({
   );
 }
 
+/* eslint-disable react-refresh/only-export-components */
 /** Resolve friendly platform label for a file row. */
 export function platformLabelForSlug(slug, platformRegions = []) {
   if (!slug) return null;

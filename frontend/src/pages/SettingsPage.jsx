@@ -94,7 +94,7 @@ const SettingsPage = () => {
   // BYOC State
   const [byocStatus, setByocStatus] = useState(null);
   const [byocCapabilities, setByocCapabilities] = useState(null);
-  const [byocEligible, setByocEligible] = useState(false);
+  const [, setByocEligible] = useState(false);
   const [azureExtending, setAzureExtending] = useState(false);
   const [gcpExtending, setGcpExtending] = useState(false);
   const [connectSummary, setConnectSummary] = useState(null);
@@ -108,7 +108,6 @@ const SettingsPage = () => {
   const [byocActiveCSP, setByocActiveCSP] = useState(null); // Which CSP form is open
   const [byocMethod, setByocMethod] = useState('access_keys'); // access_keys or iam_role
   const [byocConnecting, setByocConnecting] = useState(false);
-  const [byocTesting, setByocTesting] = useState(false);
   const [byocTestResult, setByocTestResult] = useState(null);
   const [showPolicy, setShowPolicy] = useState(false);
   const [policyTemplates, setPolicyTemplates] = useState(null);
@@ -118,11 +117,11 @@ const SettingsPage = () => {
   const [gcpConnectStep, setGcpConnectStep] = useState(1);
   const [gcpCredentialsVerified, setGcpCredentialsVerified] = useState(false);
   const [gcpVerifying, setGcpVerifying] = useState(false);
-  const [gcpDiscoveredBuckets, setGcpDiscoveredBuckets] = useState([]);
+  const [, setGcpDiscoveredBuckets] = useState([]);
   const [azureConnectStep, setAzureConnectStep] = useState(1);
   const [azureCredentialsVerified, setAzureCredentialsVerified] = useState(false);
   const [azureVerifying, setAzureVerifying] = useState(false);
-  const [azureDiscoveredContainers, setAzureDiscoveredContainers] = useState([]);
+  const [, setAzureDiscoveredContainers] = useState([]);
   const [bucketCheckStatus, setBucketCheckStatus] = useState({});
 
   // BYOC Form fields
@@ -352,30 +351,6 @@ const SettingsPage = () => {
       setPolicyTemplates(response.data);
     } catch (error) {
       console.error('Failed to fetch policy templates:', error);
-    }
-  };
-
-  const handleByocTest = async () => {
-    if (!byocValidation.isValid) {
-      setByocTestResult({ success: false, message: getValidationErrorMessage(byocValidation.errors) });
-      return;
-    }
-
-    setByocTesting(true);
-    setByocTestResult(null);
-    try {
-      let payload = { csp: byocActiveCSP, connection_method: byocMethod };
-      if (byocActiveCSP === 'AWS') Object.assign(payload, awsForm);
-      else if (byocActiveCSP === 'GCP') Object.assign(payload, gcpForm);
-      else if (byocActiveCSP === 'Azure') Object.assign(payload, azureForm);
-
-      const response = await apiClient.post('/byoc/test', payload);
-      setByocTestResult(response.data);
-    } catch (error) {
-      const detail = error.response?.data?.detail;
-      setByocTestResult({ success: false, message: detail?.message || detail || 'Connection test failed' });
-    } finally {
-      setByocTesting(false);
     }
   };
 

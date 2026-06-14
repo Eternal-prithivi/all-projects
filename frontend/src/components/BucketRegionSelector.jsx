@@ -47,6 +47,7 @@ export default function BucketRegionSelector({
     selectBucket,
     showRegionFilter,
     platformMultiRegion,
+    refresh,
   } = useAwsBuckets({
     surface,
     storageKeyPrefix,

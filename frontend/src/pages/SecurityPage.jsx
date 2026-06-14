@@ -82,14 +82,15 @@ function SecurityPage() {
     updateError,
   } = notifications;
   const { loading: availLoading, getFeature, credentialMode, getCredentialSource } = useCloudAvailability();
-  const securityProviders = getFeature("security").providers || [];
+  const securityProviders = useMemo(
+    () => getFeature("security").providers || [],
+    [getFeature]
+  );
   const securityToolbarOptions = useMemo(
     () => buildCloudProviderOptions(securityProviders),
     [securityProviders]
   );
   const [file, setFile] = useState(null);
-  const [encrypt, setEncrypt] = useState(false);
-  const [isUploading, setIsUploading] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [catalogReloadToken, setCatalogReloadToken] = useState(0);
   const { runPageRefresh, pageRefreshing } = usePageRefresh();
@@ -660,8 +661,7 @@ function SecurityPage() {
     if (!fileAwaitingEncryption) return;
 
     const encFilename = fileAwaitingEncryption.filename;
-    try {
-      await executeWithNotification(
+    await executeWithNotification(
         async () => {
           if (encryptionMethod === "server-side") {
             await chooseEncryption(encFilename, "server-side", null, token);
@@ -708,9 +708,6 @@ function SecurityPage() {
           },
         }
       );
-    } catch (err) {
-      throw err;
-    }
   };
 
   const handleChooseEncryption = (file) => {
@@ -805,8 +802,6 @@ function SecurityPage() {
         setShowArchivePasswordModal(false);
         setFileForArchivePassword(null);
       }
-    } catch (err) {
-      throw err;
     } finally {
       setArchivePasswordSubmitting(false);
     }
@@ -1310,6 +1305,7 @@ function SecurityPage() {
                             {f.replication_enabled && (
                               <span className="security-replica-badge">Replicated</span>
                             )}
+                            {renderEncryptionBadge(f)}
                           </span>
                         </div>
                       </td>

@@ -108,17 +108,6 @@ const CspIcon = ({ csp }) => (
   <CloudProviderLogo provider={csp} className="csp-icon" alt={`${csp} logo`} />
 );
 
-const formatPercent = (value) => `${Math.round((Number(value) || 0) * 100)}%`;
-
-const formatExpertName = (expert) => {
-  const labels = {
-    rule: "Rules",
-    random_forest: "Random Forest",
-    xgboost: "XGBoost",
-  };
-  return labels[expert] || expert;
-};
-
 // --- MAIN STORAGE PAGE COMPONENT ---
 
 function StoragePage() {
@@ -127,7 +116,6 @@ function StoragePage() {
   const [showOnlyMine, setShowOnlyMine] = useState(false);
   const {
     error: notifyError,
-    success: notifySuccess,
     info: notifyInfo,
     showLoading,
     updateSuccess,
@@ -136,7 +124,10 @@ function StoragePage() {
     executeWithNotification,
   } = useNotifications();
   const { loading: availLoading, getFeature, credentialMode, getCredentialSource } = useCloudAvailability();
-  const storageProviders = getFeature("storage").providers || [];
+  const storageProviders = useMemo(
+    () => getFeature("storage").providers || [],
+    [getFeature]
+  );
   const storageToolbarOptions = useMemo(
     () => buildCloudProviderOptions(storageProviders),
     [storageProviders]
@@ -767,7 +758,7 @@ function StoragePage() {
 
     setIsRestoring(true);
     try {
-      const result = await executeWithNotification(
+      await executeWithNotification(
         async () => {
           const res = await initiateArchiveRestore(
             fileToRestore,
@@ -795,13 +786,6 @@ function StoragePage() {
       setIsRestoring(false);
     }
   };
-
-  const finalUploadDestination =
-    manualCspSelection ||
-    (recommendation &&
-      (storageProviders.includes(recommendation.recommendation.csp)
-        ? recommendation.recommendation.csp
-        : storageProviders[0]));
 
   if (!availLoading && storageProviders.length === 0) {
     return (

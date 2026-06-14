@@ -185,7 +185,7 @@ function VMClusterPage() {
   const [showOnlyMine, setShowOnlyMine] = useState(false);
   const notifications = useNotifications();
   const { confirm } = useConfirm();
-  const { executeWithNotification, showLoading, updateSuccess, updateError } = notifications;
+  const { executeWithNotification } = notifications;
   const { runPageRefresh, pageRefreshing } = usePageRefresh();
   const {
     loading: availLoading,
@@ -195,7 +195,7 @@ function VMClusterPage() {
     getLockedProviders,
     getCredentialSource,
   } = useCloudAvailability();
-  const vmProviders = getFeature("vm").providers || [];
+  const vmProviders = useMemo(() => getFeature("vm").providers || [], [getFeature]);
   const vmToolbarOptions = useMemo(
     () => buildCloudProviderOptions(vmProviders),
     [vmProviders]
@@ -709,7 +709,7 @@ function VMClusterPage() {
 
     setIsRequesting(true);
     try {
-      const result = await executeWithNotification(
+      await executeWithNotification(
         async () => {
           const data = {
             csp: activeCsp,
