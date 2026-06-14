@@ -1,22 +1,19 @@
 # STATUS.md — Live Project Snapshot
 
-**Last Updated:** 2026-06-14 (Phase 29 download page)
+**Last Updated:** 2026-06-14 (Phases 25–30 complete)
 
 ---
 
 ## Identity
 
-| Phase | **29** Desktop download page + CI · **COMPLETE** |
-| Prior | Phase 25–27 Mobile · Phase 28 Electron shell · COMPLETE |
+| Phase | **30** Desktop signing prep · **COMPLETE** |
+| Prior | Phases 25–29 Mobile + download · COMPLETE |
 
 ---
 
 ## 🔴 Active Task
 
-**Phase 30 — Desktop signing prep (optional)** — `IN PROGRESS` (started 2026-06-14)
-
-- **Scope:** INSTALL.md, trust copy, signing guide — no paid certs required yet
-- **Done when:** Docs explain signing path; Trust Center links download
+**None** — awaiting user QA or `desktop-v0.1.0` release tag
 
 ---
 
@@ -24,17 +21,18 @@
 
 | Check | Status |
 |-------|--------|
-| Frontend build | pass (Phase 29) |
-| Desktop CI | `desktop-release.yml` on `desktop-v*.*.*` tags |
-| E2E | mobile-shell includes `/download` |
+| Frontend build | pass |
+| Desktop CI | `desktop-release.yml` on `desktop-v*.*.*` |
+| Mobile E2E | `mobile-shell.spec.ts` (marketing + download + dashboard nav) |
+| Signing | unsigned beta — see `docs/desktop/SIGNING.md` |
 
 ---
 
-## Phase 29 summary
+## Phase 25–30 summary
 
-- `/download` page, `releases.json`, nav/footer/sitemap
-- `desktop-release.yml` matrix → GitHub Releases
-- `detectPlatform.js`, `DESKTOP_DOWNLOAD_FAQ` in productFacts
+- **Mobile:** breakpoint consistency, card-table layouts, mobile onboarding tips, provision/settings/VM polish
+- **Desktop:** Electron shell → rajverse.me; `/download`; GitHub Releases CI
+- **Docs:** INSTALL.md, SIGNING.md, Trust Center, manual_testing 6.13–6.14
 
 ---
 

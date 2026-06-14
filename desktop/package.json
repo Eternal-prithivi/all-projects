@@ -15,7 +15,8 @@
   },
   "devDependencies": {
     "electron": "^35.0.0",
-    "electron-builder": "^25.1.8"
+    "electron-builder": "^25.1.8",
+    "electron-updater": "^6.3.9"
   },
   "build": {
     "appId": "me.rajverse.zenith",
@@ -57,6 +58,13 @@
       ],
       "category": "Office",
       "icon": "build"
-    }
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "Eternal-prithiviraj",
+        "repo": "all-projects"
+      }
+    ]
   }
 }

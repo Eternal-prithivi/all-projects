@@ -1,6 +1,16 @@
 const { app, BrowserWindow, shell, Menu } = require('electron');
 const path = require('path');
 
+let autoUpdater;
+if (app.isPackaged) {
+  try {
+    ({ autoUpdater } = require('electron-updater'));
+    autoUpdater.autoDownload = false;
+  } catch {
+    autoUpdater = null;
+  }
+}
+
 const DEFAULT_URL = process.env.ZENITH_APP_URL || 'https://rajverse.me';
 
 /** @type {BrowserWindow | null} */
@@ -104,6 +114,12 @@ function createWindow() {
 app.whenReady().then(() => {
   buildMenu();
   createWindow();
+
+  if (autoUpdater && process.env.ZENITH_DISABLE_UPDATES !== '1') {
+    autoUpdater.checkForUpdates().catch(() => {
+      // Unsigned beta builds may fail update checks — safe to ignore
+    });
+  }
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {

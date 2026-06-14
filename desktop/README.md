@@ -37,3 +37,5 @@ CI builds run on `desktop-v*.*.*` tags via `.github/workflows/desktop-release.ym
 - `nodeIntegration` is off; `contextIsolation` is on.
 - External links open in the system browser.
 - Unsigned builds may show Gatekeeper (macOS) or SmartScreen (Windows) warnings — see `/download` install instructions.
+- **Code signing:** see [docs/desktop/SIGNING.md](../docs/desktop/SIGNING.md) when ready for Apple Developer + Windows OV certs.
+- **Auto-update:** packaged builds check GitHub Releases via `electron-updater` (best with signed releases).

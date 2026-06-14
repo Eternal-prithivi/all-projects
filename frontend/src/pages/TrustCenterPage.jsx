@@ -62,6 +62,24 @@ export default function TrustCenterPage() {
           </div>
 
           <section className="legal-section">
+            <h2>Desktop app</h2>
+            <p>
+              Zenith offers an optional desktop shell for macOS, Windows, and Linux that loads the same
+              secure web application as your browser. Beta installers are unsigned; see install guidance on
+              the download page.
+            </p>
+            <ul>
+              <li>
+                <Link to="/download">Download Zenith for desktop</Link>
+              </li>
+              <li>
+                Install and verification details — see repository{' '}
+                <code>docs/desktop/INSTALL.md</code>
+              </li>
+            </ul>
+          </section>
+
+          <section className="legal-section">
             <h2>Compliance & policies</h2>
             <ul>
               <li>
