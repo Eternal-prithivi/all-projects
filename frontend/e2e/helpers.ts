@@ -86,6 +86,49 @@ export async function loginOnPage(
   }
 }
 
+/** Login as admin with cached session user pre-seeded (stable for /admin/* hard navigations). */
+export async function loginAdminOnPage(
+  page: import('@playwright/test').Page,
+  request: import('@playwright/test').APIRequestContext,
+  user: { username: string; password: string },
+): Promise<void> {
+  const body = new URLSearchParams({
+    username: user.username,
+    password: user.password,
+  });
+  const res = await request.post(`${apiRoot()}/api/auth/token`, {
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    data: body.toString(),
+  });
+  if (!res.ok()) {
+    throw new Error(`Admin login API failed (${res.status()}): ${await res.text()}`);
+  }
+  const payload = (await res.json()) as { access_token?: string };
+  if (!payload.access_token) {
+    throw new Error('Admin login API response missing access_token');
+  }
+
+  const meRes = await request.get(`${apiRoot()}/api/users/me`, {
+    headers: { Authorization: `Bearer ${payload.access_token}` },
+  });
+  if (!meRes.ok()) {
+    throw new Error(`Admin /users/me failed (${meRes.status()}): ${await meRes.text()}`);
+  }
+  const userData = (await meRes.json()) as { role?: string };
+  if (userData.role !== 'admin') {
+    throw new Error(`Expected admin role, got '${userData.role ?? 'unknown'}'`);
+  }
+
+  await page.goto('/login');
+  await page.evaluate(
+    ({ token, cached }) => {
+      localStorage.setItem('authToken', token);
+      sessionStorage.setItem('cachedUser', JSON.stringify(cached));
+    },
+    { token: payload.access_token, cached: userData },
+  );
+}
+
 export function adminCredentials(): { username: string; password: string } | null {
   const username = process.env.PLAYWRIGHT_ADMIN_USERNAME || 'e2e_admin';
   const password = process.env.PLAYWRIGHT_ADMIN_PASSWORD || 'SecurePass1';
