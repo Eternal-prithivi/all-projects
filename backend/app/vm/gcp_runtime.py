@@ -2,7 +2,7 @@
 Per-request GCP Compute context for BYOC users.
 
 When a user has GCP BYOC connected, VM operations use their service account
-(project from SA JSON, zone from platform settings until BYOC stores zone).
+(project from SA JSON, zone from BYOC gcp_primary_location when set).
 """
 
 from __future__ import annotations
@@ -14,7 +14,11 @@ from typing import Any, Iterator, Optional
 
 from google.oauth2 import service_account
 
-from app.byoc.credential_resolver import resolve_gcp_credentials
+from app.byoc.credential_resolver import (
+    get_user_cloud_credentials,
+    normalize_gcp_byoc_layout,
+    resolve_gcp_credentials,
+)
 from app.utils.config import settings
 from app.utils.logger import setup_logger
 
@@ -42,6 +46,43 @@ def gcp_user_context(username: str) -> Iterator[None]:
         reset_gcp_username(token)
 
 
+def _platform_credentials():
+    """Lazy import to avoid circular dependency at module load."""
+    from app.vm import manager as gcp_manager
+
+    return gcp_manager.credentials
+
+
+def gcp_compute_ready() -> bool:
+    """True when platform GCP key or active BYOC compute context is available."""
+    username = _gcp_username.get()
+    if username and _resolve_byoc_compute(username):
+        return True
+    return _platform_credentials() is not None
+
+
+def gcp_active_credentials():
+    """Credentials for GCP Compute API calls (BYOC first, then platform)."""
+    username = _gcp_username.get()
+    if username:
+        ctx = _resolve_byoc_compute(username)
+        if ctx:
+            return ctx["credentials"]
+    return _platform_credentials()
+
+
+def _byoc_compute_zone(username: str) -> str:
+    from app.vm.gcp_zones import gcp_zone_from_location
+
+    record = get_user_cloud_credentials(username, "GCP") or {}
+    layout = normalize_gcp_byoc_layout(record)
+    explicit_zone = (record.get("gcp_compute_zone") or "").strip() or None
+    return gcp_zone_from_location(
+        layout.get("primary_location") or "",
+        explicit_zone=explicit_zone,
+    )
+
+
 def _resolve_byoc_compute(username: str) -> Optional[dict[str, Any]]:
     gcp = resolve_gcp_credentials(username)
     if not gcp.get("is_byoc"):
@@ -55,7 +96,7 @@ def _resolve_byoc_compute(username: str) -> Optional[dict[str, Any]]:
         logger.warning("BYOC GCP SA missing project_id for user %s", username)
         return None
     credentials = service_account.Credentials.from_service_account_info(sa_info)
-    zone = getattr(settings, "GCP_ZONE", "us-central1-a")
+    zone = _byoc_compute_zone(username)
     return {
         "project_id": project_id,
         "zone": zone,
@@ -87,4 +128,3 @@ def gcp_zone() -> str:
         if ctx:
             return ctx["zone"]
     return getattr(settings, "GCP_ZONE", "us-central1-a")
-

@@ -14,7 +14,7 @@
 
 - Pass `csp` (`AWS`, `GCP`, `Azure`) on VM requests or query params.
 - Azure requires **service principal** fields (`subscription_id`, `tenant_id`, `client_id`, `client_secret`) in BYOC or platform `.env`, plus a **resource group** with at least one **subnet** (`AZURE_RESOURCE_GROUP`, default `zenith-rg`).
-- Storage-only Azure BYOC (account + key) enables storage/cost; VM assignment uses simulated pools until Compute credentials are added.
+- Storage-only Azure BYOC (account + key) enables storage/security only; VM/provision require a **service principal** (can be added in connect step 3 or via `PATCH /byoc/azure/compute`). Storage account keys cannot create VMs — that is an Azure platform limitation, not a Zenith gap.
 
 ## Cluster VM names
 

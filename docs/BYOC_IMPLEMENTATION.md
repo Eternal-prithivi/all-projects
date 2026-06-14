@@ -67,173 +67,63 @@ User → Zenith Platform → User's AWS/GCP Account → User's Resources
 
 ---
 
-## Backend Implementation
+## Backend Implementation (as built)
 
-### 1. Cloud Manager Factory Pattern
+Zenith does **not** use a `manager_factory.py` / `BYOCCloudManager` class hierarchy. Routing is implemented with:
 
-```python
-# backend/app/cloud/manager_factory.py
+| Layer | Module | Role |
+|-------|--------|------|
+| Credential store | `backend/app/byoc/routes_byoc.py` | Connect / disconnect / encrypt BYOC records |
+| Resolver | `backend/app/byoc/credential_resolver.py` | `resolve_*_credentials(username)` — BYOC first, else platform `.env` |
+| Feature gates | `backend/app/byoc/capabilities.py` | Per-CSP feature readiness (storage, vm, provision, cost) |
+| Availability | `backend/app/cloud/availability.py` | Hybrid union of BYOC + platform per feature |
+| VM runtime | `aws_runtime.py`, `gcp_runtime.py`, `azure_runtime.py` | Per-request `contextvars` bind username → resolver |
+| VM dispatch | `backend/app/vm/vm_provider.py` | Routes create/start/stop/list to `aws_manager` / `manager` (GCP) / `azure_manager` |
+| Provision | `backend/app/provision/byoc_credentials.py` | Terraform/Boto3/SDK env from resolver |
 
-from app.database.mongo_client import get_database
-from .managed_cloud import ManagedCloudManager
-from .byoc_cloud import BYOCCloudManager
-
-def get_cloud_manager(user_id: str):
-    """
-    Return appropriate cloud manager based on user's mode.
-    """
-    db = get_database()
-    user = db["users"].find_one({"_id": user_id})
-    
-    if user.get("cloud_mode") == "byoc":
-        # Use their cloud account
-        return BYOCCloudManager(user)
-    else:
-        # Use our cloud account (default)
-        return ManagedCloudManager(user)
-```
-
-### 2. Managed Cloud Manager
+### VM request flow (implemented)
 
 ```python
-# backend/app/cloud/managed_cloud.py
-
-import boto3
-from app.config import settings
-
-class ManagedCloudManager:
-    """
-    Manages resources using Zenith's cloud accounts.
-    """
-    
-    def __init__(self, user):
-        self.user = user
-        # Use OUR credentials
-        self.aws_session = boto3.Session(
-            aws_access_key_id=settings.ZENITH_AWS_ACCESS_KEY,
-            aws_secret_access_key=settings.ZENITH_AWS_SECRET_KEY,
-            region_name=settings.AWS_REGION
-        )
-    
-    def create_vm(self, config):
-        """
-        Create VM in our AWS account, tag with user ID.
-        """
-        ec2 = self.aws_session.client('ec2')
-        
-        response = ec2.run_instances(
-            ImageId=config["image_id"],
-            InstanceType=config["instance_type"],
-            MinCount=1,
-            MaxCount=1,
-            TagSpecifications=[{
-                'ResourceType': 'instance',
-                'Tags': [
-                    {'Key': 'ZenithUser', 'Value': self.user["_id"]},
-                    {'Key': 'Plan', 'Value': self.user["subscription_plan"]},
-                    {'Key': 'ManagedBy', 'Value': 'Zenith'}
-                ]
-            }]
-        )
-        
-        return response['Instances'][0]['InstanceId']
-    
-    def check_quota(self, resource_type):
-        """
-        Check if user is within plan limits.
-        """
-        plan_limits = {
-            "free": {"vms": 1, "storage_gb": 5},
-            "basic": {"vms": 3, "storage_gb": 50},
-            "pro": {"vms": 10, "storage_gb": 200}
-        }
-        
-        current_usage = self._get_user_usage()
-        plan = self.user.get("subscription_plan", "free")
-        limit = plan_limits[plan][resource_type]
-        
-        if current_usage[resource_type] >= limit:
-            raise Exception(f"Plan limit reached. Upgrade to get more {resource_type}.")
-        
-        return True
-```
-
-### 3. BYOC Cloud Manager
-
-```python
-# backend/app/cloud/byoc_cloud.py
-
-import boto3
-from .aws_integration import get_user_aws_session
-
-class BYOCCloudManager:
-    """
-    Manages resources using user's cloud account.
-    """
-    
-    def __init__(self, user):
-        self.user = user
-        # Use THEIR credentials via IAM role
-        self.aws_session = get_user_aws_session(user["_id"])
-    
-    def create_vm(self, config):
-        """
-        Create VM in user's AWS account.
-        """
-        ec2 = self.aws_session.client('ec2')
-        
-        response = ec2.run_instances(
-            ImageId=config["image_id"],
-            InstanceType=config["instance_type"],
-            MinCount=1,
-            MaxCount=1,
-            TagSpecifications=[{
-                'ResourceType': 'instance',
-                'Tags': [
-                    {'Key': 'ManagedBy', 'Value': 'Zenith'},
-                    {'Key': 'ZenithUser', 'Value': self.user["username"]}
-                ]
-            }]
-        )
-        
-        return response['Instances'][0]['InstanceId']
-    
-    def check_quota(self, resource_type):
-        """
-        No quota limits - user pays for their own resources.
-        """
-        return True
-```
-
-### 4. Update VM Routes
-
-```python
-# backend/app/vm/routes_vm.py
-
-from app.cloud.manager_factory import get_cloud_manager
+# backend/app/vm/routes_vm.py (simplified)
 
 @router.post("/request")
-async def request_vm(
-    config: VMConfig,
-    current_user: dict = Depends(get_current_user)
-):
-    """
-    Request VM - works for both managed and BYOC modes.
-    """
-    
-    # Get appropriate cloud manager
-    cloud_manager = get_cloud_manager(current_user["_id"])
-    
-    # Check quota (managed) or skip (BYOC)
-    cloud_manager.check_quota("vms")
-    
-    # Create VM in appropriate cloud account
-    vm_id = cloud_manager.create_vm(config.dict())
-    
-    return {"vm_id": vm_id, "mode": current_user.get("cloud_mode", "managed")}
+async def request_vm_assignment(request, current_user):
+    provider = normalize_provider(request.csp or "GCP")
+    assert_byoc_feature_ready(current_user.username, provider, CloudFeature.VM)
+    assert_provider_available(current_user.username, provider, CloudFeature.VM)
+    with vm_runtime_context(current_user.username, provider, region_slug):
+        vm_name, vm_ip, ... = assign_vm_to_user(..., csp=provider)
 ```
 
+Inside `vm_runtime_context`, AWS/GCP/Azure managers call cloud APIs with **the user's BYOC credentials** when that CSP is connected.
+
+### Per-CSP BYOC requirements for VMs
+
+| CSP | Minimum BYOC for VM | Notes |
+|-----|---------------------|-------|
+| **AWS** | Access keys or IAM role (storage connect) | EC2 uses same resolved creds; IAM role assume still needs platform STS keys |
+| **GCP** | Service account JSON (storage connect) | Compute zone derived from `gcp_primary_location` on the BYOC record; optional `gcp_compute_zone` |
+| **Azure** | Storage account **plus** service principal (4 fields) | Storage keys alone cannot create VMs — Azure Compute API requires SP; can be supplied in connect step 3 or `PATCH /byoc/azure/compute` |
+
+### Provision flow (implemented)
+
+`routes_provision.py` calls `resolve_provision_terraform_env(username, csp)` which maps BYOC records to subprocess env vars (AWS keys, `GOOGLE_CREDENTIALS`, Azure ARM vars).
+
+See also: [CREDENTIAL_CONTRACT.md](./cloud/CREDENTIAL_CONTRACT.md), [VM_MULTI_CLOUD_SCOPE.md](./cloud/VM_MULTI_CLOUD_SCOPE.md).
+
 ---
+
+## Legacy design note (not implemented)
+
+The sections below describing `ManagedCloudManager` / `BYOCCloudManager` / `get_cloud_manager()` were early design sketches. **Do not implement that factory** — extend the resolver + runtime pattern above instead.
+
+<!--
+### 1. Cloud Manager Factory Pattern (REMOVED — see table above)
+
+```python
+# NOT IN REPO — illustrative only
+```
+-->
 
 ## Frontend Implementation
 

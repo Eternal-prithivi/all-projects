@@ -61,10 +61,13 @@ def gcp_zone_from_location(
 
 def _project_zones() -> frozenset[str]:
     try:
-        from app.vm.gcp_runtime import gcp_project_id
-        from app.vm.manager import credentials
+        from app.vm.gcp_runtime import gcp_active_credentials, gcp_compute_ready, gcp_project_id
 
-        if credentials is None:
+        if not gcp_compute_ready():
+            return frozenset()
+
+        creds = gcp_active_credentials()
+        if creds is None:
             return frozenset()
 
         project_id = gcp_project_id()
@@ -74,7 +77,7 @@ def _project_zones() -> frozenset[str]:
 
         from google.cloud import compute_v1
 
-        client = compute_v1.ZonesClient(credentials=credentials)
+        client = compute_v1.ZonesClient(credentials=creds)
         req = compute_v1.ListZonesRequest(project=project_id)
         zones = frozenset(z.name for z in client.list(request=req))
         _zone_cache[project_id] = zones

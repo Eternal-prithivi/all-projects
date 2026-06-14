@@ -929,3 +929,21 @@ Reference: 97-page project report (Chapter 4–6). Last cross-check: 2026-05-24.
 | Maturity assessment (2026-05-29) | Chat + Phase 19–27 above |
 | Outdated “no CI” note | `PROFESSIONAL_IMPROVEMENTS.md` — update in **19.9** |
 
+---
+
+## 2026-06-14 — Phases 25–30: Mobile friendliness + Desktop download
+
+**Phase 25:** Standardized zenith-modal breakpoints (480/768), mobile rules for plan-upgrade drawer (bottom sheet + scroll lock), secure-upload-wizard, cards, dashboard-polish; UI_UX_AUDIT mobile checklist.
+
+**Phase 26:** Rolled `data-card-table` + `data-label` to FileList, SecureFileList, Cost Analysis, Team member grid, Admin tables, Provision cost estimate.
+
+**Phase 27:** Mobile 3-step tips sheet (OnboardingTour), provision sticky actions, settings BYOC stacking, VM header actions; Playwright dashboard bottom-nav + manual_testing 6.13–6.14.
+
+**Phase 28:** `desktop/` Electron package loading `https://rajverse.me`; README + root docs.
+
+**Phase 29:** `/download` page, `releases.json`, `detectPlatform.js`, marketing nav/footer/sitemap, `desktop-release.yml` GitHub Actions matrix.
+
+**Phase 30:** `docs/desktop/INSTALL.md`, `SIGNING.md`, Trust Center desktop section, `electron-updater` stub in packaged builds.
+
+**Git:** six commits on `stage` (Phases 25–30).
+

@@ -145,7 +145,9 @@ def cloud_configured(csp: str) -> bool:
         return aws_manager.aws_configured()
     if provider == "Azure":
         return azure_manager.azure_configured()
-    return gcp_manager.credentials is not None
+    from app.vm.gcp_runtime import gcp_compute_ready
+
+    return gcp_compute_ready()
 
 
 def cluster_max_vms(cluster_type: ClusterType) -> int:

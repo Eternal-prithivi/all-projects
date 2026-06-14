@@ -43,7 +43,7 @@ Extend `.github/workflows/desktop-release.yml`:
 With signed builds, enable `electron-updater` in `desktop/electron/main.js` (already stubbed). Configure `publish` in `package.json`:
 
 ```json
-"publish": [{ "provider": "github", "owner": "Eternal-prithiviraj", "repo": "all-projects" }]
+"publish": [{ "provider": "github", "owner": "Eternal-prithivi", "repo": "all-projects" }]
 ```
 
 Updates trigger on new `desktop-v*.*.*` GitHub Releases.

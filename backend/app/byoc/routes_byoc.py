@@ -546,14 +546,14 @@ def _merge_azure_sp_tier2(
         "client_secret": (client_secret or "").strip(),
     }
     if all(fields.values()):
-        cost_ok, cost_msg = _verify_azure_cost_management(
+        compute_ok, compute_msg = _verify_azure_compute_credentials(
             fields["subscription_id"],
             fields["tenant_id"],
             fields["client_id"],
             fields["client_secret"],
         )
-        if not cost_ok:
-            raise HTTPException(status_code=400, detail=cost_msg)
+        if not compute_ok:
+            raise HTTPException(status_code=400, detail=compute_msg)
         credentials.update(fields)
     elif any(fields.values()):
         raise HTTPException(
@@ -802,6 +802,35 @@ def _verify_azure_cost_management(
         return False, "Azure SDK not installed on server."
     except Exception as exc:
         return False, f"Cost Management check failed: {str(exc)[:120]}"
+
+
+def _verify_azure_compute_credentials(
+    subscription_id: str,
+    tenant_id: str,
+    client_id: str,
+    client_secret: str,
+) -> tuple[bool, str]:
+    """Validate SP can reach Azure Compute (VM / Provision unlock)."""
+    if not all([subscription_id, tenant_id, client_id, client_secret]):
+        return False, "Service principal fields incomplete."
+    try:
+        from azure.identity import ClientSecretCredential
+        from azure.mgmt.compute import ComputeManagementClient
+
+        credential = ClientSecretCredential(
+            tenant_id=tenant_id,
+            client_id=client_id,
+            client_secret=client_secret,
+        )
+        client = ComputeManagementClient(credential, subscription_id)
+        next(client.resource_groups.list(), None)
+        return True, "Compute credentials validated."
+    except ImportError:
+        return False, "Azure SDK not installed on server."
+    except StopIteration:
+        return True, "Compute credentials validated."
+    except Exception as exc:
+        return False, f"Compute check failed: {str(exc)[:120]}"
 
 
 @router.get("/gcp-buckets", summary="List GCS buckets (BYOC or platform)")
@@ -1548,14 +1577,21 @@ async def extend_azure_compute(
     if not record:
         raise HTTPException(status_code=404, detail="No active Azure BYOC connection.")
 
-    cost_ok, cost_msg = _verify_azure_cost_management(
+    compute_ok, compute_msg = _verify_azure_compute_credentials(
         body.subscription_id.strip(),
         body.tenant_id.strip(),
         body.client_id.strip(),
         body.client_secret.strip(),
     )
-    if not cost_ok:
-        raise HTTPException(status_code=400, detail=cost_msg)
+    if not compute_ok:
+        raise HTTPException(status_code=400, detail=compute_msg)
+
+    cost_ok, _cost_msg = _verify_azure_cost_management(
+        body.subscription_id.strip(),
+        body.tenant_id.strip(),
+        body.client_id.strip(),
+        body.client_secret.strip(),
+    )
 
     updates = {
         "subscription_id": body.subscription_id.strip(),
@@ -1572,11 +1608,17 @@ async def extend_azure_compute(
         {"$set": {"credentials": encrypted, "updated_at": datetime.utcnow()}},
     )
     logger.info("BYOC: %s extended Azure compute credentials", user.username)
+    message = (
+        "Azure service principal saved. VMs and Provision are unlocked."
+        if cost_ok
+        else "Azure service principal saved. VMs and Provision are unlocked. "
+        "Cost may still require Cost Management Reader on this principal."
+    )
     return {
         "success": True,
-        "message": "Azure service principal saved. VMs, Provision, and Cost are unlocked when validation passes.",
+        "message": message,
         "csp": "Azure",
-        "cost_management_verified": True,
+        "cost_management_verified": cost_ok,
         **_byoc_connect_extras(user.username, "Azure"),
     }
 

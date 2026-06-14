@@ -32,7 +32,13 @@ from app.ml.repository import (
 )
 from app.vm.metrics_collector import VMMetricsCollector
 from app.vm import vm_provider
-from app.vm.gcp_runtime import gcp_project_id, gcp_zone, _gcp_username, _resolve_byoc_compute
+from app.vm.gcp_runtime import (
+    gcp_project_id,
+    gcp_zone,
+    gcp_compute_ready,
+    _gcp_username,
+    _resolve_byoc_compute,
+)
 import uuid
 
 # Set up logger
@@ -165,7 +171,7 @@ def _generate_instance_name(cluster_type: str) -> str:
 
 def list_vms() -> List[Dict[str, Any]]:
     """Lists all VM instances in the configured zone."""
-    if credentials is None:
+    if not gcp_compute_ready():
         logger.debug("GCP not configured, returning empty VM list from DB fallback")
         # Fallback: return VMs from MongoDB assignments
         DB = get_database()
@@ -218,7 +224,7 @@ def create_vm(
     disk_type: str = "",
 ) -> Dict[str, Any]:
     """Provisions a new VM instance."""
-    if credentials is None:
+    if not gcp_compute_ready():
         raise Exception("GCP credentials not loaded. Cannot create VM.")
 
     image_uri = _resolve_gcp_boot_image(source_image)
@@ -286,7 +292,7 @@ def start_vm(name: str) -> Dict[str, Any]:
 
 def find_gcp_instance_zone(name: str) -> Optional[str]:
     """Locate a VM by name across all zones in the project."""
-    if credentials is None:
+    if not gcp_compute_ready():
         return None
     request = compute_v1.AggregatedListInstancesRequest(
         project=gcp_project_id(),
@@ -352,7 +358,7 @@ def delete_vm(name: str, zone: Optional[str] = None) -> Dict[str, Any]:
 
 def get_vm_details(name: str, zone: str) -> Dict[str, Any]:
     """Retrieves details for a specific VM instance."""
-    if credentials is None:
+    if not gcp_compute_ready():
         return {
             "name": name,
             "status": "UNKNOWN",
