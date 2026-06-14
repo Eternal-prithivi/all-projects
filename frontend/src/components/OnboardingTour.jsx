@@ -158,7 +158,7 @@ function OnboardingTour() {
     const isDismissed = localStorage.getItem(TOUR_DISMISSED_KEY);
     const isDashboard = location.pathname === '/dashboard';
 
-    if (!isComplete && !isDismissed && isDashboard && !isMobile) {
+    if (!isComplete && !isDismissed && isDashboard) {
       const timer = setTimeout(() => {
         setShowWelcome(true);
       }, 1500);
@@ -166,6 +166,33 @@ function OnboardingTour() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- welcome modal once on dashboard mount
   }, [isMobile]);
+
+  const [mobileTipIndex, setMobileTipIndex] = useState(0);
+
+  const mobileTips = [
+    {
+      title: 'Bottom navigation',
+      body: 'Use the tabs at the bottom for Overview, Storage, Infrastructure, and Cost. Tap More for Security, Billing, Settings, and Help.',
+    },
+    {
+      title: 'Upload & analyze',
+      body: 'Open Storage to upload files with ML tier recommendations, or Cost Analysis to refresh live spend from your connected clouds.',
+    },
+    {
+      title: 'Need help?',
+      body: 'Tap More → Help for FAQs, or open Support from the header profile menu. You can restart this tips sheet from Settings.',
+    },
+  ];
+
+  const completeMobileTips = useCallback(() => {
+    setShowWelcome(false);
+    localStorage.setItem(TOUR_STORAGE_KEY, 'true');
+  }, []);
+
+  const dismissMobileTips = useCallback(() => {
+    setShowWelcome(false);
+    localStorage.setItem(TOUR_DISMISSED_KEY, 'true');
+  }, []);
 
   const startTour = useCallback(() => {
     setShowWelcome(false);
@@ -252,7 +279,41 @@ function OnboardingTour() {
   return (
     <>
       {/* Welcome modal — appears before tour starts */}
-      {showWelcome && (
+      {showWelcome && isMobile && (
+        <div className="tour-welcome-overlay mobile-tips-overlay" onClick={dismissMobileTips}>
+          <div className="tour-welcome-card mobile-tips-card" onClick={(e) => e.stopPropagation()}>
+            <div className="tour-welcome-glow" />
+            <p className="mobile-tips-kicker">Mobile tips</p>
+            <h2>{mobileTips[mobileTipIndex].title}</h2>
+            <p>{mobileTips[mobileTipIndex].body}</p>
+            <div className="mobile-tips-dots" aria-hidden="true">
+              {mobileTips.map((_, i) => (
+                <span key={i} className={`tour-dot ${i === mobileTipIndex ? 'active' : ''}`} />
+              ))}
+            </div>
+            <div className="tour-welcome-actions">
+              {mobileTipIndex < mobileTips.length - 1 ? (
+                <button
+                  type="button"
+                  className="tour-btn tour-btn-next"
+                  onClick={() => setMobileTipIndex((i) => i + 1)}
+                >
+                  Next
+                </button>
+              ) : (
+                <button type="button" className="tour-btn tour-btn-next" onClick={completeMobileTips}>
+                  Got it
+                </button>
+              )}
+              <button type="button" className="tour-btn tour-btn-skip" onClick={dismissMobileTips}>
+                Skip
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showWelcome && !isMobile && (
         <div className="tour-welcome-overlay" onClick={dismissTour}>
           <div className="tour-welcome-card" onClick={(e) => e.stopPropagation()}>
             <div className="tour-welcome-glow" />

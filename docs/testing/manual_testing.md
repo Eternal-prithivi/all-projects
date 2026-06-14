@@ -231,6 +231,31 @@
 
 ---
 
+## Phase 6.13 — Mobile UX (Phases 25–27)
+
+| Done | # | Action | Where | Pass when |
+|------|---|--------|-------|-----------|
+| - [ ] | 6.13a | Bottom nav | `/dashboard` at 390px width | Overview, Storage, Infrastructure, Cost tabs visible; More opens sheet |
+| - [ ] | 6.13b | Card tables | Storage file list, Billing history | Rows stack as labeled cards; no horizontal page overflow |
+| - [ ] | 6.13c | Modals / drawers | Billing upgrade, VM request modal | Full-width or bottom sheet; dismiss works |
+| - [ ] | 6.13d | Mobile tips | First visit `/dashboard` on phone | 3-step tips sheet appears (or skip); does not block forever |
+| - [ ] | 6.13e | Settings BYOC | `/dashboard/settings` mobile | Credential fields stack; connect buttons ≥44px tap target |
+| - [ ] | 6.13f | Provision wizard | `/dashboard/provision` deploy flow | Step indicator scrolls; sticky Back/Next above bottom nav |
+| - [ ] | 6.13g | Marketing nav | `/`, `/features` | Hamburger opens drawer with Features, About, Contact, Help |
+
+---
+
+## Phase 6.14 — Desktop download (Phases 28–29)
+
+| Done | # | Action | Where | Pass when |
+|------|---|--------|-------|-----------|
+| - [ ] | 6.14a | Download page | `/download` | Platform cards for macOS, Windows, Linux; browser fallback CTA |
+| - [ ] | 6.14b | Nav links | Footer + marketing nav | Download link present |
+| - [ ] | 6.14c | Electron dev | `desktop/` package | `npm run dev` opens native window loading rajverse.me |
+| - [ ] | 6.14d | Release tag | `desktop-v*.*.*` push | GitHub Release with DMG, EXE, AppImage/deb artifacts |
+
+---
+
 ## Phase 9 — Cleanup (after paid tests)
 
 | Done | # | Action | Where | Pass when |

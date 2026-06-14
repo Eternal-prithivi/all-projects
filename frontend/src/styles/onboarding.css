@@ -378,3 +378,31 @@
     justify-content: flex-end;
   }
 }
+
+.mobile-tips-overlay {
+  align-items: flex-end;
+  padding-bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
+}
+
+.mobile-tips-card {
+  width: calc(100% - 1.5rem);
+  max-width: 420px;
+  margin: 0 auto 0.5rem;
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+}
+
+.mobile-tips-kicker {
+  margin: 0 0 0.35rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--gold-primary);
+}
+
+.mobile-tips-dots {
+  display: flex;
+  justify-content: center;
+  gap: 0.4rem;
+  margin: 1rem 0 0.5rem;
+}

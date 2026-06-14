@@ -164,6 +164,6 @@
 | 2 | plan-upgrade / secure-upload-wizard / cards / dashboard-polish no `@media` | 25 | Fixed |
 | 3 | Plan upgrade drawer — no scroll lock / bottom sheet | 25 | Fixed |
 | 4 | Tables horizontal scroll only (not card layout) | 26 | Done |
-| 5 | Onboarding tour disabled on mobile | 27 | Pending |
-| 6 | E2E — dashboard/admin mobile shell | 27 | Pending |
+| 5 | Onboarding tour disabled on mobile | 27 | Done |
+| 6 | E2E — dashboard/admin mobile shell | 27 | Done (dashboard bottom nav) |
 | 7 | `/download` page + desktop installers | 29 | Pending |

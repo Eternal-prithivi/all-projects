@@ -1465,6 +1465,41 @@ html.theme-light .provision-action-status {
   .compare-grid {
     grid-template-columns: 1fr;
   }
+
+  .wizard-steps {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    flex-wrap: nowrap;
+    gap: 0.5rem;
+    padding: 0.75rem 1rem;
+    margin-bottom: 1.25rem;
+  }
+
+  .wizard-step {
+    flex: 0 0 auto;
+    min-width: 4.5rem;
+  }
+
+  .wizard-step-connector {
+    display: none;
+  }
+
+  .provision-actions {
+    position: sticky;
+    bottom: calc(var(--mobile-shell-bottom, 56px) + 0.5rem);
+    z-index: 5;
+    flex-direction: column-reverse;
+    gap: 0.65rem;
+    margin-top: 1rem;
+    padding: 0.75rem 0;
+    background: linear-gradient(to top, var(--bg-base, #050505) 70%, transparent);
+  }
+
+  .provision-actions .btn-provision {
+    width: 100%;
+    min-height: var(--touch-min, 44px);
+    justify-content: center;
+  }
 }
 
 /* ── Intent-first wizard (Phase provision upgrade) ── */
