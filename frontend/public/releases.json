@@ -15,7 +15,7 @@
     "win": {
       "label": "Windows",
       "extension": "exe",
-      "artifactName": "Zenith Setup 0.1.0.exe",
+      "artifactName": "Zenith.Setup.0.1.0.exe",
       "minOs": "Windows 10 or later (64-bit)",
       "sha256": "f94ea669d0811381b17550c0794b46b2eb4e2e5dd43bea8220bd73251cdda99c"
     },

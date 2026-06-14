@@ -47,7 +47,7 @@
       "target": [
         "nsis"
       ],
-      "artifactName": "Zenith Setup ${version}.${ext}"
+      "artifactName": "Zenith.Setup.${version}.${ext}"
     },
     "nsis": {
       "oneClick": false,

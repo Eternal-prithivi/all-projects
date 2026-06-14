@@ -147,7 +147,7 @@ jobs:
               "win": {
                 "label": "Windows",
                 "extension": "exe",
-                "artifactName": "Zenith Setup ${VERSION}.exe",
+                "artifactName": "Zenith.Setup.${VERSION}.exe",
                 "minOs": "Windows 10 or later (64-bit)",
                 "sha256": "${WIN_SHA}"
               },
