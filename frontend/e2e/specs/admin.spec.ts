@@ -13,8 +13,14 @@ test.describe('Admin smoke', () => {
     }
 
     await loginOnPage(page, admin, request);
-    await page.waitForResponse((r) => r.url().includes('/api/users/me') && r.ok(), { timeout: 30_000 });
+    await expect
+      .poll(async () =>
+        page.evaluate(() => JSON.parse(sessionStorage.getItem('cachedUser') || '{}')?.role),
+      )
+      .toBe('admin');
+
     await page.goto('/admin/system');
+    await expect(page).not.toHaveURL(/access-denied/);
 
     await expect(page.getByRole('heading', { level: 1, name: /system health/i })).toBeVisible({
       timeout: 30_000,

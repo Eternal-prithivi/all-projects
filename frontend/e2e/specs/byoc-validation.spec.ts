@@ -10,7 +10,7 @@ test.describe('BYOC form validation', () => {
     const user = await registerTestUser(request);
 
     await mockProEntitlements(page);
-    await page.route('**/api/byoc/status', async (route) => {
+    await page.route('**/byoc/status', async (route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -30,22 +30,21 @@ test.describe('BYOC form validation', () => {
         }),
       });
     });
-    await page.route('**/api/byoc/policy-templates', async (route) => {
+    await page.route('**/byoc/policy-templates', async (route) => {
       await route.fulfill({ status: 200, contentType: 'application/json', body: '{}' });
     });
 
     await loginOnPage(page, user, request);
     await page.goto('/dashboard/settings');
-    await page.locator('#byoc-section').scrollIntoViewIfNeeded();
+    await expect(page.locator('#byoc-section')).toBeVisible({ timeout: 15_000 });
 
     await page
-      .locator('.byoc-provider-card')
+      .locator('#byoc-section .byoc-provider-card')
       .filter({ hasText: /google cloud/i })
       .getByRole('button', { name: /^connect$/i })
       .click();
 
     await expect(page.getByText(/step 1 — verify credentials/i)).toBeVisible();
-    await page.getByRole('button', { name: /verify & continue/i }).click();
     await expect(page.getByText(/service account json is required/i)).toBeVisible();
   });
 });

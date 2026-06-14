@@ -109,13 +109,15 @@ export const PRO_ENTITLEMENTS = {
 };
 
 export async function mockProEntitlements(page: import('@playwright/test').Page): Promise<void> {
-  await page.route('**/api/payments/entitlements', async (route) => {
+  const handler = async (route: import('@playwright/test').Route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify(PRO_ENTITLEMENTS),
     });
-  });
+  };
+  await page.route('**/payments/entitlements', handler);
+  await page.route('**/api/payments/entitlements', handler);
 }
 
 export async function waitForSessionUser(page: import('@playwright/test').Page): Promise<void> {
