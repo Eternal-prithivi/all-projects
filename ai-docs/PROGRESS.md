@@ -1,17 +1,19 @@
 # PROGRESS.md — Task Tracker
 
-> **Last Updated:** 2026-06-11
+> **Last Updated:** 2026-06-14
 
 ---
 
 ## 🔴 Active Task
 
-**Provision page fixes** — IN PROGRESS (2026-06-12)
+**Phase 25 — Mobile foundation** — IN PROGRESS (2026-06-14)
 
-- [x] Fix `getApiErrorMessage` for FastAPI validation arrays
-- [x] Update provision panels to use shared error formatter
-- [x] Unit test + API smoke + build verify
-- [ ] Additional provision issues (user-reported)
+- [ ] Align zenith-modal breakpoints to 768px
+- [ ] Add mobile rules: secure-upload-wizard, plan-upgrade, cards, dashboard-polish
+- [ ] Plan upgrade drawer bottom-sheet + scroll lock
+- [ ] Quick Actions FAB clearance above bottom nav
+- [ ] UI_UX_AUDIT mobile gaps section
+- [ ] Lint + build + commit + push
 
 ---
 

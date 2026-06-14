@@ -280,7 +280,8 @@
   .modal-overlay,
   .encryption-modal-overlay,
   .decryption-modal-overlay,
-  .delete-account-modal-overlay {
+  .delete-account-modal-overlay,
+  .zenith-modal-overlay {
     padding: calc(0.75rem + var(--safe-top)) 0.75rem calc(0.75rem + var(--safe-bottom));
     align-items: flex-end;
     box-sizing: border-box;

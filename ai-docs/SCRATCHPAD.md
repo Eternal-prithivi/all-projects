@@ -2,23 +2,21 @@
 
 ## 🔄 Current Resume State
 
-**Status:** IN PROGRESS (awaiting next provision issue from user)
+**Status:** IN PROGRESS (started: 2026-06-14 14:00)
 
-**Done this session (2026-06-12):** Fixed React crash when FastAPI returns validation `detail` arrays — `getApiErrorMessage` + all provision panels.
+**Plan:** Phase 25 mobile foundation. Files: zenith-modal.css, plan-upgrade.css, secure-upload-wizard.css, cards.css, dashboard-polish.css, quick-actions.css, PlanUpgradeDrawer.jsx, UI_UX_AUDIT_2026.md
 
-**Verify:** `npm test -- src/utils/apiError.test.js`; provision API smoke (status/deployments/audit-log/policies → 200); build passes.
-
-**Next:** User may report additional provision page issues.
+- [ ] Step 1: zenith-modal 720/520 → 768px — NOT YET DONE
+- [ ] Step 2: secure-upload-wizard + plan-upgrade + cards + dashboard-polish mobile CSS — NOT YET DONE
+- [ ] Step 3: PlanUpgradeDrawer bottom-sheet + scroll lock — NOT YET DONE
+- [ ] Step 4: quick-actions FAB clearance — NOT YET DONE
+- [ ] Step 5: UI_UX_AUDIT mobile gaps section — NOT YET DONE
+- [ ] Step 6: lint + build + POST docs + commit + push — NOT YET DONE
 
 ---
 
 ## ✅ Last Known Good State
 
-**Provision error handling fix** (2026-06-12)
+**Provision error handling fix** (2026-06-12) — COMPLETE
 
-- `frontend/src/api.js` — `getApiErrorMessage` handles Pydantic `{type,loc,msg}` arrays
-- Provision panels: Manage, Activity, Policies, DeployWizard use shared formatter
-- Test: `frontend/src/utils/apiError.test.js`
-- E2E smoke: `frontend/e2e/specs/provision-smoke.spec.ts` (needs `npx playwright install`)
-
-**Prior:** Phase 24 org billing — COMPLETE (2026-06-11)
+**Phase 24 org billing** — COMPLETE (2026-06-11)

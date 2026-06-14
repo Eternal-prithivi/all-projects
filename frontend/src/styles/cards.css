@@ -11,8 +11,8 @@
 }
 
 .stat-card:hover {
-  transform: translateY(-5px);
-  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+  transform: none;
+  box-shadow: var(--shadow-card);
 }
 
 .card-icon {
@@ -38,4 +38,35 @@
   font-weight: 700;
   color: var(--text-primary);
   margin: 0;
+}
+
+@media (max-width: 768px) {
+  .stat-card {
+    flex-direction: row;
+    align-items: center;
+    padding: 1rem 1.125rem;
+    gap: 1rem;
+  }
+
+  .card-icon {
+    font-size: 1.75rem;
+    padding: 0.6rem;
+    flex-shrink: 0;
+  }
+
+  .card-title {
+    font-size: 0.875rem;
+  }
+
+  .card-value {
+    font-size: 1.35rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .stat-card {
+    flex-direction: column;
+    align-items: flex-start;
+    text-align: left;
+  }
 }

@@ -13,12 +13,28 @@ export default function PlanUpgradeDrawer({
 }) {
   useEffect(() => {
     if (!open) return undefined;
+    const prevBody = document.body.style.overflow;
+    const prevHtml = document.documentElement.style.overflow;
+    document.body.style.overflow = 'hidden';
+    document.documentElement.style.overflow = 'hidden';
     const onKey = (e) => {
       if (e.key === 'Escape') onClose();
     };
     document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
+    return () => {
+      document.body.style.overflow = prevBody;
+      document.documentElement.style.overflow = prevHtml;
+      document.removeEventListener('keydown', onKey);
+    };
   }, [open, onClose]);
+
+  useEffect(
+    () => () => {
+      document.body.style.overflow = '';
+      document.documentElement.style.overflow = '';
+    },
+    []
+  );
 
   if (!open) return null;
 

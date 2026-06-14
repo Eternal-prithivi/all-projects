@@ -153,3 +153,17 @@
 | 3 | Done | admin-pages/layout purple→gold; stat-icon--gold |
 | 4 | Done | storage/provision/public CSS; zenith-cost-hub |
 | 5 | Done | PageHeader, GlassPanel, zenith-ui.css; DESIGN_SYSTEM §5/§7 |
+
+---
+
+## Mobile gaps checklist (Phase 25+)
+
+| # | Gap | Phase | Status |
+|---|-----|-------|--------|
+| 1 | Fragmented breakpoints (520/720 vs 768) | 25 | Fixed zenith-modal → 480/768 |
+| 2 | plan-upgrade / secure-upload-wizard / cards / dashboard-polish no `@media` | 25 | Fixed |
+| 3 | Plan upgrade drawer — no scroll lock / bottom sheet | 25 | Fixed |
+| 4 | Tables horizontal scroll only (not card layout) | 26 | Pending |
+| 5 | Onboarding tour disabled on mobile | 27 | Pending |
+| 6 | E2E — dashboard/admin mobile shell | 27 | Pending |
+| 7 | `/download` page + desktop installers | 29 | Pending |

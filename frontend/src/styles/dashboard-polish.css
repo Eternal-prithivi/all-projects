@@ -9,14 +9,21 @@
   color: var(--text-primary);
 }
 
-/* Nested pages must not force full viewport height inside dashboard shell */
+/* Nested dashboard pages: shell gutter only — no extra horizontal inset */
 .dashboard-content :is(
+  .enterprise-page:not(.enterprise-page--config),
+  .storage-container,
+  .security-page,
+  .vm-container,
+  .provision-page,
   .cost-analysis-container,
   .cost-simulator-container,
-  .cost-optimization-container
+  .cost-optimization-container,
+  .billing-page,
+  .dashboard-overview
 ) {
+  padding-inline: 0;
   min-height: auto;
-  padding: 0;
   background: transparent;
 }
 
@@ -115,4 +122,26 @@
 .admin-content :is(.modal-content, .admin-modal, .detail-panel) {
   background: var(--bg-elevated);
   border-color: var(--border-default);
+}
+
+@media (max-width: 768px) {
+  .dashboard-content .page-kicker,
+  .admin-content .page-kicker {
+    font-size: 11px;
+    padding: 5px 10px;
+  }
+
+  .dashboard-content .back-button {
+    min-height: var(--touch-min, 44px);
+    padding: 0.25rem 0;
+  }
+
+  .dashboard-content :is(
+    .btn-primary,
+    .btn-upgrade,
+    .primary-btn,
+    .submit-btn
+  ):not(:disabled) {
+    min-height: var(--touch-min, 44px);
+  }
 }
