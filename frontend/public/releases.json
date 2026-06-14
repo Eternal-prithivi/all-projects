@@ -10,14 +10,14 @@
       "extension": "dmg",
       "artifactName": "Zenith-0.1.1.dmg",
       "minOs": "macOS 11 (Big Sur) or later",
-      "sha256": "4e1d3de1962f7736f92bda3699b9c7f1eacd1bf8a423ca882d29295797893116"
+      "sha256": "ddd1d004ccbe608a960cb14cab3151d4d43c57679b454281193280c2002b7ae7"
     },
     "win": {
       "label": "Windows",
       "extension": "exe",
       "artifactName": "Zenith.Setup.0.1.1.exe",
       "minOs": "Windows 10 or later (64-bit)",
-      "sha256": "851aa9ace4db160d79383a9b9e18722d6ecd6ed257f3d9fef3e2dca6ba07ba97"
+      "sha256": "c667986be72e091cfb065adb455bcc0d13db7e0d1fb7164ae9db0d60aadf1700"
     },
     "linux": {
       "label": "Linux",
@@ -25,7 +25,7 @@
       "artifactName": "Zenith-0.1.1.AppImage",
       "altArtifactName": "zenith-desktop_0.1.1_amd64.deb",
       "minOs": "Ubuntu 20.04+ or equivalent (64-bit)",
-      "sha256": "2b32f72f4d52fd6787b1d36ede7a77dd92b313965b0df4dc21dc5d225fcee879"
+      "sha256": "fe957b7d4dfd6815138fe446abacfb71dd738e314e9df03e67021e0510bd73d2"
     }
   }
 }
