@@ -2,9 +2,13 @@
   "name": "zenith-desktop",
   "version": "0.1.0",
   "description": "Zenith Cloud Platform — Electron shell loading the live web app",
+  "homepage": "https://rajverse.me",
   "private": true,
   "main": "electron/main.js",
-  "author": "Zenith",
+  "author": {
+    "name": "Zenith",
+    "email": "support@rajverse.me"
+  },
   "license": "UNLICENSED",
   "scripts": {
     "dev": "electron .",
@@ -55,7 +59,8 @@
         "deb"
       ],
       "category": "Office",
-      "artifactName": "Zenith-${version}.${ext}"
+      "artifactName": "Zenith-${version}.${ext}",
+      "maintainer": "Zenith <support@rajverse.me>"
     },
     "deb": {
       "artifactName": "zenith-desktop_${version}_amd64.deb"
