@@ -7,8 +7,9 @@ from app.provision.audit_logger import log_provision_action
 pytestmark = pytest.mark.integration
 
 
-def test_builtin_policy_override_disable_and_reset(client, auth_headers, db):
+def test_builtin_policy_override_disable_and_reset(client, auth_headers, db, pro_subscription):
     headers, user = auth_headers()
+    pro_subscription(user["username"])
     builtin_name = "expensive_ec2_instance"
 
     disable = client.put(
@@ -44,8 +45,9 @@ def test_builtin_policy_override_disable_and_reset(client, auth_headers, db):
     db["provision_policy_overrides"].delete_many({"username": user["username"]})
 
 
-def test_builtin_policy_unknown_returns_400(client, auth_headers):
-    headers, _user = auth_headers()
+def test_builtin_policy_unknown_returns_400(client, auth_headers, pro_subscription):
+    headers, user = auth_headers()
+    pro_subscription(user["username"])
     response = client.put(
         "/api/provision/policy-rules/builtin/not_a_real_rule",
         headers=headers,

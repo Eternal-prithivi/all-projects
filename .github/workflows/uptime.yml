@@ -11,14 +11,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Health check
-        if: ${{ secrets.UPTIME_API_URL != '' }}
+        env:
+          UPTIME_API_URL: ${{ secrets.UPTIME_API_URL }}
         run: |
-          BASE="${{ secrets.UPTIME_API_URL }}"
-          BASE="${BASE%/}"
+          if [ -z "${UPTIME_API_URL}" ]; then
+            echo "Set UPTIME_API_URL repository secret to enable scheduled uptime checks."
+            exit 0
+          fi
+
+          BASE="${UPTIME_API_URL%/}"
           curl -fsS "${BASE}/health/ready" | tee health.json
           curl -fsS "${BASE}/api/platform/status" | tee status.json
           python3 -c "import json; h=json.load(open('health.json')); assert h.get('mongo_connected') is True, h"
-
-      - name: Skip (no secret)
-        if: ${{ secrets.UPTIME_API_URL == '' }}
-        run: echo "Set UPTIME_API_URL repository secret to enable scheduled uptime checks."

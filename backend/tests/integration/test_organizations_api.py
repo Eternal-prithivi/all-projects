@@ -5,7 +5,7 @@ import pytest
 pytestmark = pytest.mark.integration
 
 
-def test_create_org_invite_and_accept(client, auth_headers, user_factory):
+def test_create_org_invite_and_accept(client, auth_headers, user_factory, db):
     owner_headers, owner = auth_headers()
     member = user_factory(email="invitee@example.com")
     member_headers, _ = auth_headers(user=member)
@@ -17,6 +17,13 @@ def test_create_org_invite_and_accept(client, auth_headers, user_factory):
     )
     assert create.status_code == 200, create.text
     org_id = create.json()["org_id"]
+
+    from bson import ObjectId
+
+    db["organizations"].update_one(
+        {"_id": ObjectId(org_id)},
+        {"$set": {"seat_count": 5}},
+    )
 
     invite = client.post(
         "/api/organizations/invites",

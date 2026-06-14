@@ -50,6 +50,8 @@ _TEST_ENV: dict[str, str] = {
     "GCP_SECURE_REPLICA_BUCKET_NAME": "test-gcp-secure-replica",
     "GCP_PROJECT_ID": "test-gcp-project",
     "GCP_ZONE": "us-central1-a",
+    "GCP_BILLING_DATASET_ID": "test_billing_dataset",
+    "GCP_BILLING_TABLE_ID": "test_billing_table",
     "GCP_SERVICE_ACCOUNT_JSON_PATH": "",
     "AZURE_STORAGE_ACCOUNT_NAME": "testazure",
     "AZURE_STORAGE_ACCOUNT_KEY": "testazurekey",
