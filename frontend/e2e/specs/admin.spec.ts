@@ -76,10 +76,10 @@ test.describe('Admin smoke', () => {
     await page.getByRole('link', { name: /admin portal/i }).click();
     await expect(page).toHaveURL(/\/admin\/?$/);
 
-    await page
-      .getByRole('navigation', { name: /admin navigation/i })
-      .getByRole('link', { name: /system health/i })
-      .click();
+    await expect(page.getByRole('navigation', { name: /admin navigation/i })).toBeVisible({
+      timeout: 30_000,
+    });
+    await page.getByRole('menuitem', { name: /system health/i }).click();
     await expect(page).toHaveURL(/\/admin\/system/);
 
     await expect(page.getByText(/loading system health/i)).toBeHidden({ timeout: 30_000 });
