@@ -8,10 +8,10 @@
   "license": "UNLICENSED",
   "scripts": {
     "dev": "electron .",
-    "build": "electron-builder",
-    "build:mac": "electron-builder --mac",
-    "build:win": "electron-builder --win",
-    "build:linux": "electron-builder --linux"
+    "build": "electron-builder --publish never",
+    "build:mac": "electron-builder --mac --publish never",
+    "build:win": "electron-builder --win --publish never",
+    "build:linux": "electron-builder --linux --publish never"
   },
   "devDependencies": {
     "electron": "^35.0.0",
@@ -34,7 +34,7 @@
       "target": [
         "dmg"
       ],
-      "icon": "build/icon.png"
+      "artifactName": "Zenith-${version}.${ext}"
     },
     "dmg": {
       "title": "Zenith ${version}"
@@ -43,13 +43,11 @@
       "target": [
         "nsis"
       ],
-      "icon": "build/icon.png"
+      "artifactName": "Zenith Setup ${version}.${ext}"
     },
     "nsis": {
       "oneClick": false,
-      "allowToChangeInstallationDirectory": true,
-      "installerIcon": "build/icon.png",
-      "uninstallerIcon": "build/icon.png"
+      "allowToChangeInstallationDirectory": true
     },
     "linux": {
       "target": [
@@ -57,14 +55,10 @@
         "deb"
       ],
       "category": "Office",
-      "icon": "build"
+      "artifactName": "Zenith-${version}.${ext}"
     },
-    "publish": [
-      {
-        "provider": "github",
-        "owner": "Eternal-prithiviraj",
-        "repo": "all-projects"
-      }
-    ]
+    "deb": {
+      "artifactName": "zenith-desktop_${version}_amd64.deb"
+    }
   }
 }
