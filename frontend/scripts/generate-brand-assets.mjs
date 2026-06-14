@@ -11,7 +11,9 @@ const flattenOnBrand = (pipeline) => pipeline.flatten({ background: BRAND_BG });
 
 const frontendRoot = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const publicRoot = path.join(frontendRoot, 'public');
-const sourceLogo = path.join(frontendRoot, '..', 'assets', 'brand', 'zenith-icon.png');
+const repoRoot = path.join(frontendRoot, '..');
+const desktopBuildRoot = path.join(repoRoot, 'desktop', 'build');
+const sourceLogo = path.join(repoRoot, 'assets', 'brand', 'zenith-icon.png');
 
 if (!fs.existsSync(sourceLogo)) {
   console.error('Missing source logo:', sourceLogo);
@@ -118,11 +120,24 @@ await sharp(ogTextSvg)
   .png()
   .toFile(path.join(publicRoot, 'og-image.png'));
 
-const BRAND_VERSION = '4';
+/** Desktop installers (Electron) — same padded mark on #050505 as web PWA icons. */
+fs.mkdirSync(path.join(desktopBuildRoot, 'icons'), { recursive: true });
+
+const desktopSizes = [16, 32, 48, 64, 128, 256, 512, 1024];
+for (const size of desktopSizes) {
+  const buf = icons[size] ?? (await padIcon(size));
+  const outName = size === 1024 ? 'icon.png' : path.join('icons', `${size}x${size}.png`);
+  await sharp(buf)
+    .resize(size, size)
+    .png()
+    .toFile(path.join(desktopBuildRoot, outName));
+}
+
+const BRAND_VERSION = '5';
 fs.writeFileSync(
   path.join(publicRoot, 'brand-asset-version.txt'),
   BRAND_VERSION,
   'utf8',
 );
 
-console.log(`Brand assets generated → frontend/public/ (v${BRAND_VERSION})`);
+console.log(`Brand assets generated → frontend/public/ + desktop/build/ (v${BRAND_VERSION})`);

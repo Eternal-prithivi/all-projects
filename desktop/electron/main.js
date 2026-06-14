@@ -76,6 +76,8 @@ function buildMenu() {
 }
 
 function createWindow() {
+  const iconPath = path.join(__dirname, '..', 'build', 'icon.png');
+
   mainWindow = new BrowserWindow({
     width: 1280,
     height: 800,
@@ -83,6 +85,7 @@ function createWindow() {
     minHeight: 700,
     backgroundColor: '#050505',
     show: false,
+    icon: iconPath,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,

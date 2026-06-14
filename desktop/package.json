@@ -12,6 +12,7 @@
   "license": "UNLICENSED",
   "scripts": {
     "dev": "electron .",
+    "icons": "cd ../frontend && npm run brand:assets",
     "build": "electron-builder --publish never",
     "build:mac": "electron-builder --mac --publish never",
     "build:win": "electron-builder --win --publish never",
@@ -33,6 +34,7 @@
       "electron/**/*",
       "package.json"
     ],
+    "icon": "icon.png",
     "mac": {
       "category": "public.app-category.productivity",
       "target": [
@@ -41,7 +43,8 @@
       "artifactName": "Zenith-${version}.${ext}"
     },
     "dmg": {
-      "title": "Zenith ${version}"
+      "title": "Zenith ${version}",
+      "iconSize": 80
     },
     "win": {
       "target": [
@@ -60,7 +63,8 @@
       ],
       "category": "Office",
       "artifactName": "Zenith-${version}.${ext}",
-      "maintainer": "Zenith <support@rajverse.me>"
+      "maintainer": "Zenith <support@rajverse.me>",
+      "icon": "icons"
     },
     "deb": {
       "artifactName": "zenith-desktop_${version}_amd64.deb"
