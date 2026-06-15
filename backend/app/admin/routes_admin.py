@@ -19,6 +19,7 @@ from typing import List, Optional
 from pydantic import BaseModel
 from ..database.mongo_client import get_database
 from ..auth.auth_utils import get_current_user
+from app.utils.config import settings
 from app.utils.logger import setup_logger
 from app.auth.auth_utils import get_password_hash
 from app.utils.audit_log import categorize_audit_action, dedupe_audit_entries
@@ -71,6 +72,13 @@ async def verify_admin(current_user = Depends(get_current_user)):
             status_code=403,
             detail="Access denied. Admin privileges required."
         )
+
+    if getattr(settings, "ENVIRONMENT", "development") == "production":
+        if not getattr(current_user, "two_fa_enabled", False):
+            raise HTTPException(
+                status_code=403,
+                detail="Platform admins must enable two-factor authentication in Settings.",
+            )
     
     logger.debug(f"Admin access granted")
     return current_user
@@ -344,6 +352,20 @@ async def create_user(
             user_doc["hashed_password"] = get_password_hash(payload.password)
 
         DB["users"].insert_one(user_doc)
+
+        from app.trust.signup_notify import notify_new_user_signup
+
+        admin_username = getattr(
+            admin_user,
+            "username",
+            admin_user.get("username") if isinstance(admin_user, dict) else None,
+        )
+        notify_new_user_signup(
+            username=payload.username,
+            email=payload.email,
+            source="admin",
+            created_by=admin_username,
+        )
 
         plan_id = payload.plan_id or "free"
         if plan_id != "free":

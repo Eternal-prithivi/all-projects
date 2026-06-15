@@ -35,7 +35,7 @@ export const validateUsername = (value) => {
 };
 
 export const validatePassword = (value, options = {}) => {
-  const { minLength = 8 } = options;
+  const { minLength = 12 } = options;
   const trimmedValue = value.trim();
 
   if (!trimmedValue) {
@@ -44,6 +44,10 @@ export const validatePassword = (value, options = {}) => {
 
   if (trimmedValue.length < minLength) {
     return `Password must be at least ${minLength} characters.`;
+  }
+
+  if (!/[a-z]/.test(trimmedValue) || !/[A-Z]/.test(trimmedValue) || !/\d/.test(trimmedValue) || !/[^A-Za-z0-9]/.test(trimmedValue)) {
+    return 'Password must include uppercase, lowercase, a number, and a symbol.';
   }
 
   return '';

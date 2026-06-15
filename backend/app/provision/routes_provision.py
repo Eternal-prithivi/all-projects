@@ -44,6 +44,9 @@ from pydantic import BaseModel
 
 from app.database.mongo_client import get_database
 from app.users.routes_users import get_current_user
+from app.trust.account_gate import require_platform_resource_access
+from app.utils.resource_limiter import resource_limiter
+from fastapi import Request
 from app.provision.models import (
     CompareCloudsBody,
     DeploymentRecord,
@@ -503,9 +506,11 @@ async def review_summary(
 
 
 @router.post("/plan")
+@resource_limiter.limit("5/day")
 async def run_plan(
     config: ProvisionConfig,
-    user: dict = Depends(get_current_user),
+    request: Request,
+    user: dict = Depends(require_platform_resource_access),
 ):
     """
     Plan deployment — boto3 (instant) or Terraform (background poll) per Settings.
@@ -768,7 +773,7 @@ async def get_plan_status(
 @router.post("/apply/{deployment_id}")
 async def run_apply(
     deployment_id: str,
-    user: dict = Depends(get_current_user),
+    user: dict = Depends(require_platform_resource_access),
 ):
     """Run terraform apply on a previously planned deployment."""
     collection = _get_deployments_collection()
@@ -928,7 +933,7 @@ async def run_apply(
 @router.post("/destroy/{deployment_id}")
 async def run_destroy(
     deployment_id: str,
-    user: dict = Depends(get_current_user),
+    user: dict = Depends(require_platform_resource_access),
 ):
     """Run terraform destroy on a deployed infrastructure."""
     collection = _get_deployments_collection()

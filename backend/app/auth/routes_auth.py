@@ -33,6 +33,7 @@ from app.utils.config import settings
 from app.utils.logger import setup_logger
 from app.utils.responses import StandardResponse, ErrorResponses
 from app.contact.email_service import EmailService
+from app.trust.signup_notify import notify_new_user_signup
 
 # Set up logger
 logger = setup_logger(__name__)
@@ -63,6 +64,14 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
 @limiter.limit("3/minute")  # Max 3 registrations per minute per IP
 def register_user_route(request: Request, user: UserCreate, db: Collection = Depends(get_users_collection)):
     logger.info(f"Registration attempt for username: {user.username}")
+
+    from app.auth.password_policy import validate_password_strength
+    from app.trust.signup_guards import assert_email_allowed, verify_turnstile_token
+    from app.utils.session_utils import get_client_ip
+
+    validate_password_strength(user.password)
+    assert_email_allowed(str(user.email))
+    verify_turnstile_token(user.captcha_token, get_client_ip(request))
     
     if db.find_one({"username": user.username}):
         logger.warning(f"Registration failed: Username '{user.username}' already exists")
@@ -70,7 +79,10 @@ def register_user_route(request: Request, user: UserCreate, db: Collection = Dep
     
     try:
         hashed_password = get_password_hash(user.password)
-        user_in_db = UserInDB(**user.model_dump(), hashed_password=hashed_password)
+        user_in_db = UserInDB(
+            **user.model_dump(exclude={"password", "captcha_token"}),
+            hashed_password=hashed_password,
+        )
         doc = user_in_db.model_dump()
         require_verify = _email_verification_required(db)
         if require_verify:
@@ -89,6 +101,12 @@ def register_user_route(request: Request, user: UserCreate, db: Collection = Dep
                 username=user.username,
                 verify_link=verify_link,
             )
+
+        notify_new_user_signup(
+            username=user.username,
+            email=user.email,
+            source="register",
+        )
 
         logger.info(f"User '{user.username}' registered successfully")
         return StandardResponse.success(
@@ -195,9 +213,20 @@ def login_for_access_token_route(
             e,
         )
 
-    access_token = create_access_token(data={"sub": user_in_db.username})
+    from app.auth.token_service import issue_token_pair
+
+    access_token, refresh_token = issue_token_pair(user_in_db.username)
     logger.info(f"User '{form_data.username}' logged in successfully")
-    return Token(access_token=access_token, token_type="bearer")
+    return Token(access_token=access_token, token_type="bearer", refresh_token=refresh_token)
+
+
+@router.post("/refresh", response_model=Token)
+def refresh_access_token(body: dict):
+    from app.auth.token_service import rotate_refresh_token
+
+    raw = (body or {}).get("refresh_token", "")
+    access, refresh = rotate_refresh_token(raw)
+    return Token(access_token=access, token_type="bearer", refresh_token=refresh)
 
 
 @router.post("/verify-email")

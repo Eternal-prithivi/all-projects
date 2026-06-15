@@ -25,7 +25,7 @@ class ForgotPasswordRequest(BaseModel):
 
 
 class ResetPasswordRequest(BaseModel):
-    new_password: str = Field(..., min_length=8)
+    new_password: str = Field(..., min_length=12)
     method: str = Field("email", pattern="^(email|sms)$")
     token: str | None = Field(None, description="Token from email link")
     otp: str | None = Field(None, description="6-digit SMS code")
@@ -60,6 +60,9 @@ async def forgot_password(request: Request, body: ForgotPasswordRequest):
 @limiter.limit("5/minute")
 async def reset_password(request: Request, body: ResetPasswordRequest):
     """Complete password reset with email token or SMS OTP."""
+    from app.auth.password_policy import validate_password_strength
+
+    validate_password_strength(body.new_password)
     success, error = complete_password_reset(
         new_password=body.new_password,
         method=body.method,  # type: ignore[arg-type]

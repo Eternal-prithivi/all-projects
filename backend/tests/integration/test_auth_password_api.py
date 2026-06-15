@@ -28,7 +28,7 @@ def test_reset_password_invalid_token(client):
     response = client.post(
         "/api/auth/reset-password",
         json={
-            "new_password": "NewPass123",
+            "new_password": "NewPassword123!",
             "method": "email",
             "token": "not-a-real-token",
         },
@@ -54,7 +54,7 @@ def test_reset_password_valid_token(mock_email_cls, client, user_factory, db):
     response = client.post(
         "/api/auth/reset-password",
         json={
-            "new_password": "BrandNew1",
+            "new_password": "BrandNewPass1!",
             "method": "email",
             "token": token,
         },
@@ -63,7 +63,7 @@ def test_reset_password_valid_token(mock_email_cls, client, user_factory, db):
 
     login = client.post(
         "/api/auth/token",
-        data={"username": user["username"], "password": "BrandNew1"},
+        data={"username": user["username"], "password": "BrandNewPass1!"},
     )
     assert login.status_code == 200
 

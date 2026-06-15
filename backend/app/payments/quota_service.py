@@ -78,6 +78,11 @@ def count_personal_storage_bytes(username: str) -> int:
 
 
 def _limits_for_user(username: str) -> Dict[str, Any]:
+    from app.billing.csp_free_tier import (
+        FREE_PLAN_STORAGE_GB,
+        FREE_PLAN_VM_LIMIT,
+        is_free_platform_plan,
+    )
     from app.organizations.billing import get_org_limits
     from app.payments.routes_payments import PLANS
     from app.payments.subscription_service import get_effective_plan_id
@@ -86,6 +91,8 @@ def _limits_for_user(username: str) -> Dict[str, Any]:
     if ctx:
         return get_org_limits(ctx["org_id"])
     plan_id = get_effective_plan_id(username)
+    if is_free_platform_plan(plan_id):
+        return {"vm_limit": FREE_PLAN_VM_LIMIT, "storage_gb": FREE_PLAN_STORAGE_GB}
     plan = PLANS.get(plan_id) or PLANS["free"]
     return {"vm_limit": plan.vm_limit, "storage_gb": plan.storage_gb}
 

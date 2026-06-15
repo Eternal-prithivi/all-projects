@@ -36,16 +36,17 @@ describe('formValidation', () => {
     const good = validateRegisterForm({
       username: 'alice',
       email: 'alice@example.com',
-      password: 'SecurePass1',
+      password: 'SecurePass1!',
     });
     expect(good.isValid).toBe(true);
 
     const lettersOnly = validateRegisterForm({
       username: 'alice',
       email: 'alice@example.com',
-      password: 'abcdefgh',
+      password: 'abcdefghijkl',
     });
-    expect(lettersOnly.isValid).toBe(true);
+    expect(lettersOnly.isValid).toBe(false);
+    expect(lettersOnly.errors.password).toBeTruthy();
   });
 
   it('validates BYOC AWS step 1 access keys', () => {

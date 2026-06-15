@@ -1,7 +1,9 @@
 from datetime import datetime
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, EmailStr
 
@@ -20,6 +22,7 @@ optional_bearer = HTTPBearer(auto_error=False)
 
 logger = setup_logger(__name__)
 router = APIRouter(prefix="/api/contact", tags=["contact"])
+contact_limiter = Limiter(key_func=get_remote_address)
 DB = get_database()
 
 
@@ -53,7 +56,9 @@ def _optional_user(
 
 
 @router.post("/submit")
+@contact_limiter.limit("3/hour")
 async def submit_contact_form(
+    request: Request,
     contact: ContactRequest,
     current_user: Optional[UserInDB] = Depends(_optional_user),
 ):

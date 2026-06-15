@@ -15,7 +15,7 @@
 # =============================================================================
 from typing import Optional
 
-from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException, Query, status
+from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException, Query, Request, status
 from fastapi.responses import JSONResponse
 from pymongo.collection import Collection
 from pydantic import BaseModel
@@ -40,6 +40,10 @@ from app.ml.repository import log_ensemble_storage_prediction
 from app.ml.workflow_orchestrator import run_storage_closed_loop_workflow
 from app.utils.config import settings
 from app.users.routes_users import get_current_user
+from app.trust.account_gate import require_platform_resource_access
+from app.utils.resource_limiter import resource_limiter
+from app.utils.config import settings
+from app.payments.subscription_service import get_effective_plan_id
 from app.users.user_model import User
 from app.database.mongo_client import mongodb_client
 from app.storage.models_storage import FileMetadata
@@ -248,7 +252,9 @@ async def storage_file_intelligence(
 
 
 @router.post("/upload", status_code=201)
+@resource_limiter.limit("20/hour")
 async def upload_file_to_csp(
+    request: Request,
     csp: str = Form(...),
     storage_class: str = Form(...),
     file: UploadFile = File(...),
@@ -258,7 +264,7 @@ async def upload_file_to_csp(
     user_priority: Optional[str] = Form(None),
     user_intent: Optional[str] = Form(None),
     initial_planned_tier: Optional[str] = Form(None),
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_platform_resource_access),
     files_db: Collection = Depends(get_files_collection),
 ):
     try:
@@ -276,6 +282,17 @@ async def upload_file_to_csp(
         file.file.seek(0, 2)
         file_size = file.file.tell()
         file.file.seek(0)
+        plan_id = get_effective_plan_id(user.username)
+        max_bytes = (
+            settings.MAX_UPLOAD_BYTES_FREE
+            if plan_id == "free"
+            else settings.MAX_UPLOAD_BYTES_PAID
+        )
+        if file_size > max_bytes:
+            raise HTTPException(
+                status_code=413,
+                detail=f"File exceeds upload limit ({max_bytes // (1024 * 1024)} MB for your plan).",
+            )
         platform_dest = resolve_platform_storage_target(
             user.username,
             csp,

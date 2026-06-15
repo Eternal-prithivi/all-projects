@@ -95,15 +95,15 @@ PLANS = {
         price_monthly=0,
         price_yearly=0,
         features=[
-            "2 VMs (Performance + Storage clusters)",
-            "10 GB org storage quota",
+            "1 micro VM (CSP free-tier class)",
+            "5 GB storage (CSP free-tier aligned)",
             "Demo cost dashboard & cached VM metrics",
             "Storage uploads via platform cloud (when configured)",
-            "Provision templates — deploy with platform keys",
+            "Static-site provision templates on platform keys",
             "Community support (Help Center)",
         ],
-        vm_limit=2,
-        storage_gb=10,
+        vm_limit=1,
+        storage_gb=5,
         priority_support=False,
     ),
     "basic": PaymentPlan(
@@ -317,6 +317,62 @@ async def create_razorpay_order(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Payment initialization failed: {str(e)}")
 
+
+def activate_subscription_from_payment_order(
+    order: dict,
+    *,
+    username: str,
+    razorpay_payment_id: str,
+    razorpay_order_id: str,
+) -> datetime:
+    """Activate subscription from a paid Razorpay order (verify-payment or webhook)."""
+    from app.payments.subscription_service import set_user_subscription
+
+    billing_cycle = order["billing_cycle"]
+    current_period_start = datetime.utcnow()
+    current_period_end = (
+        current_period_start + timedelta(days=365)
+        if billing_cycle == "yearly"
+        else current_period_start + timedelta(days=30)
+    )
+    set_user_subscription(
+        username,
+        order["plan_id"],
+        status="active",
+        razorpay_payment_id=razorpay_payment_id,
+        razorpay_order_id=razorpay_order_id,
+        billing_cycle=billing_cycle,
+        current_period_start=current_period_start,
+        current_period_end=current_period_end,
+        auto_renew=True,
+    )
+    DB["payment_orders"].update_one(
+        {"order_id": razorpay_order_id},
+        {
+            "$set": {
+                "status": "paid",
+                "payment_id": razorpay_payment_id,
+                "paid_at": datetime.utcnow(),
+            }
+        },
+    )
+    DB["payments"].insert_one(
+        {
+            "username": username,
+            "plan_id": order["plan_id"],
+            "amount": order["total_amount"],
+            "currency": "INR",
+            "status": "success",
+            "payment_method": "razorpay",
+            "razorpay_order_id": razorpay_order_id,
+            "razorpay_payment_id": razorpay_payment_id,
+            "billing_cycle": billing_cycle,
+            "created_at": datetime.utcnow(),
+        }
+    )
+    return current_period_end
+
+
 @router.post("/verify-payment", summary="Verify Razorpay Payment")
 async def verify_payment(
     payment_data: Dict[str, str],
@@ -349,62 +405,21 @@ async def verify_payment(
         order = DB["payment_orders"].find_one({"order_id": razorpay_order_id})
         if not order:
             raise HTTPException(status_code=404, detail="Order not found")
-        
-        # Calculate subscription period
-        billing_cycle = order["billing_cycle"]
-        current_period_start = datetime.utcnow()
-        current_period_end = (
-            current_period_start + timedelta(days=365) if billing_cycle == "yearly"
-            else current_period_start + timedelta(days=30)
-        )
-        
-        # Create/update subscription in MongoDB
-        from app.payments.subscription_service import set_user_subscription
 
-        set_user_subscription(
-            current_user.username,
-            order["plan_id"],
-            status="active",
+        current_period_end = activate_subscription_from_payment_order(
+            order,
+            username=current_user.username,
             razorpay_payment_id=razorpay_payment_id,
             razorpay_order_id=razorpay_order_id,
-            billing_cycle=billing_cycle,
-            current_period_start=current_period_start,
-            current_period_end=current_period_end,
-            auto_renew=True,
         )
-        
-        # Update order status
-        DB["payment_orders"].update_one(
-            {"order_id": razorpay_order_id},
-            {"$set": {
-                "status": "paid",
-                "payment_id": razorpay_payment_id,
-                "paid_at": datetime.utcnow()
-            }}
-        )
-        
-        # Also create a payment record for admin analytics
-        DB["payments"].insert_one({
-            "username": current_user.username,
-            "plan_id": order["plan_id"],
-            "amount": order["total_amount"],
-            "currency": "INR",
-            "status": "success",
-            "payment_method": "razorpay",
-            "razorpay_order_id": razorpay_order_id,
-            "razorpay_payment_id": razorpay_payment_id,
-            "billing_cycle": order["billing_cycle"],
-            "created_at": datetime.utcnow()
-        })
-        
+
         logger.info(f"Subscription activated for user {current_user.username}: {order['plan_id']}")
-        logger.info(f"Payment record created: ₹{order['total_amount']}")
-        
+
         return {
             "success": True,
             "message": "Payment verified and subscription activated",
             "plan_id": order["plan_id"],
-            "valid_until": current_period_end
+            "valid_until": current_period_end,
         }
         
     except HTTPException:
@@ -446,33 +461,42 @@ async def razorpay_webhook(request: Request):
             if order_id:
                 # Find order in MongoDB
                 order = DB["payment_orders"].find_one({"order_id": order_id})
-                if order:
-                    # Update order status
-                    DB["payment_orders"].update_one(
-                        {"order_id": order_id},
-                        {"$set": {
-                            "status": "paid",
-                            "payment_id": payment["id"],
-                            "paid_at": datetime.utcnow()
-                        }}
-                    )
-                    
-                    # Create payment record for admin analytics
-                    DB["payments"].insert_one({
-                        "username": order["user_id"],
-                        "plan_id": order["plan_id"],
-                        "amount": order["total_amount"],
-                        "currency": "INR",
-                        "status": "success",
-                        "payment_method": "razorpay",
-                        "razorpay_order_id": order_id,
-                        "razorpay_payment_id": payment["id"],
-                        "billing_cycle": order["billing_cycle"],
-                        "created_at": datetime.utcnow()
-                    })
-                    
+                if order and order.get("status") != "paid":
+                    username = order.get("user_id") or order.get("username")
+                    if username:
+                        activate_subscription_from_payment_order(
+                            order,
+                            username=username,
+                            razorpay_payment_id=payment["id"],
+                            razorpay_order_id=order_id,
+                        )
+                    else:
+                        DB["payment_orders"].update_one(
+                            {"order_id": order_id},
+                            {
+                                "$set": {
+                                    "status": "paid",
+                                    "payment_id": payment["id"],
+                                    "paid_at": datetime.utcnow(),
+                                }
+                            },
+                        )
+                        DB["payments"].insert_one(
+                            {
+                                "username": order.get("user_id"),
+                                "plan_id": order["plan_id"],
+                                "amount": order["total_amount"],
+                                "currency": "INR",
+                                "status": "success",
+                                "payment_method": "razorpay",
+                                "razorpay_order_id": order_id,
+                                "razorpay_payment_id": payment["id"],
+                                "billing_cycle": order["billing_cycle"],
+                                "created_at": datetime.utcnow(),
+                            }
+                        )
+
                     logger.info(f"Payment captured for order {order_id}")
-                    logger.info(f"Payment record created for user {order['user_id']}")
         
         # Handle payment.failed event
         elif event_type == "payment.failed":
@@ -504,7 +528,13 @@ async def razorpay_webhook(request: Request):
                         "error_description": payment.get("error_description"),
                         "created_at": datetime.utcnow()
                     })
-                    
+                    username = order.get("user_id") or order.get("username")
+                    if username:
+                        DB["subscriptions"].update_one(
+                            {"$or": [{"user_id": username}, {"username": username}]},
+                            {"$set": {"status": "past_due", "updated_at": datetime.utcnow()}},
+                        )
+
                     logger.warning(f"Payment failed for order {order_id}")
 
         

@@ -67,6 +67,15 @@ def get_current_user(token: str = Depends(oauth2_scheme)) -> UserInDB:
         raise credentials_exception
     if user_data.get("deleted") or user_data.get("status") == "deleted":
         raise credentials_exception
+    acct_status = (user_data.get("status") or "active").lower()
+    if acct_status in ("suspended", "banned"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={
+                "code": "ACCOUNT_SUSPENDED",
+                "message": f"Account is {acct_status}.",
+            },
+        )
     return UserInDB(**user_data)
 
 # --- 2FA specific functions ---

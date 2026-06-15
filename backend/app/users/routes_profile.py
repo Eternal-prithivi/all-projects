@@ -154,6 +154,9 @@ async def change_password(
         if not stored_hash or not verify_password(password_data.current_password, stored_hash):
             raise HTTPException(status_code=400, detail="Current password is incorrect")
 
+        from app.auth.password_policy import validate_password_strength
+        validate_password_strength(password_data.new_password, field_name="New password")
+
         new_hashed = get_password_hash(password_data.new_password)
 
         users_collection.update_one(

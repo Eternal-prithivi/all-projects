@@ -19,6 +19,7 @@ celery_app = Celery(
         "app.ml.tasks_feedback",  # Phase 8 feedback evaluation/retraining readiness
         "app.provision.tasks",  # Phase 11 Terraform drift detection
         "app.organizations.tasks",  # Org budget alerts
+        "app.payments.subscription_tasks",
     ]
 )
 
@@ -110,6 +111,16 @@ celery_app.conf.beat_schedule = {
     'federated-statistics-weekly': {
         'task': 'federated_statistics_round',
         'schedule': crontab(day_of_week=0, hour=4, minute=0),  # Sunday 04:00 UTC
+    },
+
+    'enforce-subscription-expiry-daily': {
+        'task': 'enforce_subscription_expiry',
+        'schedule': crontab(hour=4, minute=30),
+    },
+
+    'teardown-inactive-free-provisions-daily': {
+        'task': 'teardown_inactive_free_provisions',
+        'schedule': crontab(hour=5, minute=0),
     },
 }
 

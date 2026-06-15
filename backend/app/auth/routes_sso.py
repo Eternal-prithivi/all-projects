@@ -145,15 +145,40 @@ async def google_login_callback(code: str):
             }
         )
         user = users.find_one({"username": username})
+        from app.trust.signup_notify import notify_new_user_signup
+
+        notify_new_user_signup(
+            username=username,
+            email=email.lower(),
+            source="google_sso",
+        )
     else:
         users.update_one(
             {"_id": user["_id"]},
             {"$set": {"google_id": google_id, "email_verified": True}},
         )
 
-    access_token = create_access_token(data={"sub": user["username"]})
+    from app.trust.sso_exchange import create_sso_exchange_code
+
+    code = create_sso_exchange_code(user["username"])
     frontend = settings.FRONTEND_URL.rstrip("/")
-    return RedirectResponse(f"{frontend}/auth/sso/callback?token={access_token}")
+    return RedirectResponse(f"{frontend}/auth/sso/callback?code={code}")
+
+
+@router.post("/exchange")
+async def sso_exchange_code(body: dict):
+    """Exchange short-lived SSO code for JWT pair (avoids token in browser URL)."""
+    from app.trust.sso_exchange import consume_sso_exchange_code
+    from app.auth.token_service import issue_token_pair
+
+    code = (body or {}).get("code", "")
+    username = consume_sso_exchange_code(code)
+    access, refresh = issue_token_pair(username)
+    return {
+        "access_token": access,
+        "refresh_token": refresh,
+        "token_type": "bearer",
+    }
 
 
 @router.get("/oidc/login")

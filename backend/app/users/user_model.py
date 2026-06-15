@@ -10,7 +10,8 @@ class User(BaseModel):
 class UserCreate(BaseModel):
     username: str = Field(..., min_length=3, max_length=50)
     email: EmailStr
-    password: str = Field(..., min_length=8)
+    password: str = Field(..., min_length=12)
+    captcha_token: Optional[str] = None
 
 class UserInDB(User):
     # Pydantic model for users as they are stored in the database
@@ -27,6 +28,7 @@ class UserInDB(User):
 class Token(BaseModel):
     access_token: str
     token_type: str
+    refresh_token: Optional[str] = None
 
 class TokenData(BaseModel):
     username: Optional[str] = None

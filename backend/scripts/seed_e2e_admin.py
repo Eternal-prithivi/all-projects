@@ -16,7 +16,7 @@ from app.auth.auth_utils import get_password_hash
 
 def main() -> None:
     username = os.environ.get("E2E_ADMIN_USERNAME", "e2e_admin")
-    password = os.environ.get("E2E_ADMIN_PASSWORD", "SecurePass1")
+    password = os.environ.get("E2E_ADMIN_PASSWORD", "SecurePass1!")
     email = os.environ.get("E2E_ADMIN_EMAIL", f"{username}@example.com")
     uri = os.environ.get("MONGO_CONNECTION_STRING", "mongodb://localhost:27017")
     db_name = os.environ.get("MONGO_DB_NAME", "zenith_test")

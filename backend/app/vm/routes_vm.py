@@ -13,7 +13,7 @@
 #   - Delete vm_assignments without updating vm_metrics records
 # =============================================================================
 
-from fastapi import APIRouter, HTTPException, Depends, Body, Query
+from fastapi import APIRouter, HTTPException, Depends, Body, Query, Request
 from typing import List, Dict, Any, Optional
 from datetime import datetime
 from pydantic import BaseModel, Field
@@ -43,7 +43,10 @@ from app.vm.workload_analyzer import WorkloadAnalyzer
 from app.vm.metrics_collector import VMMetricsCollector
 from app.utils.config import settings
 from app.database.mongo_client import get_database
-from app.users.routes_users import get_current_user  # Import real auth
+from app.users.routes_users import get_current_user
+from app.admin.routes_admin import verify_admin
+from app.trust.account_gate import require_platform_resource_access
+from app.utils.resource_limiter import resource_limiter
 from app.users.user_model import User
 from app.vm.gcp_runtime import set_gcp_username, reset_gcp_username
 from app.utils.logger import setup_logger
@@ -560,9 +563,11 @@ async def analyze_workload_description(
 
 
 @router.post("/request", response_model=VMAssignmentResponse, summary="Request VM Assignment")
+@resource_limiter.limit("10/day")
 async def request_vm_assignment(
-    request: VMRequestModel,
-    current_user: User = Depends(get_current_user),
+    request: Request,
+    body: VMRequestModel,
+    current_user: User = Depends(require_platform_resource_access),
 ) -> VMAssignmentResponse:
     """
     Intelligent VM assignment based on workload analysis.
@@ -571,25 +576,25 @@ async def request_vm_assignment(
     try:
         from app.vm.workload_guidance import merge_follow_up_answers
 
-        provider = normalize_provider(request.csp or "GCP")
+        provider = normalize_provider(body.csp or "GCP")
         from app.byoc.capabilities import assert_byoc_feature_ready
         from app.cloud.availability import CloudFeature, assert_provider_available
 
         assert_byoc_feature_ready(current_user.username, provider, CloudFeature.VM)
         assert_provider_available(current_user.username, provider, CloudFeature.VM)
         effective_workload = merge_follow_up_answers(
-            request.workload_description or "",
-            request.follow_up_answers,
+            body.workload_description or "",
+            body.follow_up_answers,
         )
-        region_slug = _validate_platform_region_slug(request.platform_region_slug)
+        region_slug = _validate_platform_region_slug(body.platform_region_slug)
         with vm_runtime_context(current_user.username, provider, region_slug):
             vm_name, vm_ip, ssh_command, cluster_type, assigned_at, expires_at = assign_vm_to_user(
                 user_id=current_user.username,
                 workload_description=effective_workload,
-                cluster_preference=request.cluster_preference,
-                priority_level=request.priority_level,
+                cluster_preference=body.cluster_preference,
+                priority_level=body.priority_level,
                 csp=provider,
-                vm_preference=request.vm_preference,
+                vm_preference=body.vm_preference,
                 platform_region_slug=region_slug,
             )
 
@@ -853,7 +858,8 @@ async def get_vm_configuration(
 @router.get("/admin/recommendations", response_model=List[MigrationRecommendation], summary="Get AI Migration Recommendations")
 async def get_migration_recommendations(
     cluster_type: Optional[ClusterType] = None,
-    min_score: int = 50
+    min_score: int = 50,
+    _admin=Depends(verify_admin),
 ) -> List[MigrationRecommendation]:
     """
     Admin endpoint: Get AI-powered migration recommendations for load balancing and cost optimization.
@@ -952,7 +958,10 @@ async def get_migration_recommendations(
 
 
 @router.post("/admin/apply-recommendation/{recommendation_id}", summary="Apply Migration Recommendation")
-async def apply_recommendation(recommendation_id: str) -> Dict[str, Any]:
+async def apply_recommendation(
+    recommendation_id: str,
+    _admin=Depends(verify_admin),
+) -> Dict[str, Any]:
     """
     Admin endpoint: Execute a specific migration recommendation.
     """
@@ -970,7 +979,7 @@ async def apply_recommendation(recommendation_id: str) -> Dict[str, Any]:
 async def get_cluster_metrics(
     cluster_type: ClusterType,
     csp: str = Query("GCP"),
-    _user: User = Depends(get_vm_user),
+    _admin=Depends(verify_admin),
 ) -> Dict[str, Any]:
     """
     Admin endpoint: Get aggregated health metrics for entire cluster.
@@ -1001,7 +1010,10 @@ async def get_cluster_metrics(
 
 
 @router.get("/admin/predict-load", summary="Predict Cluster Load (1 Hour)")
-async def predict_cluster_load(cluster_type: ClusterType) -> Dict[str, Any]:
+async def predict_cluster_load(
+    cluster_type: ClusterType,
+    _admin=Depends(verify_admin),
+) -> Dict[str, Any]:
     """
     Admin endpoint: Predict cluster state in 1 hour using historical trends.
     """

@@ -40,6 +40,14 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Collection = Depen
     user = db.find_one({"username": username})
     if user is None:
         raise credentials_exception
+    if user.get("deleted") or (user.get("status") or "").lower() == "deleted":
+        raise credentials_exception
+    acct_status = (user.get("status") or "active").lower()
+    if acct_status in ("suspended", "banned"):
+        raise HTTPException(
+            status_code=403,
+            detail={"code": "ACCOUNT_SUSPENDED", "message": f"Account is {acct_status}."},
+        )
     return User(**user)
 
 @router.get("/me", response_model=UserResponse)

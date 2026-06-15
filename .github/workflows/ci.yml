@@ -17,6 +17,7 @@ jobs:
     env:
       MONGO_CONNECTION_STRING: mongodb://localhost:27017
       MONGO_DB_NAME: zenith_test
+      ENVIRONMENT: test
     defaults:
       run:
         working-directory: backend
@@ -34,6 +35,8 @@ jobs:
       - name: Pytest with coverage (Phase 20.5.3 — floor 40%)
         run: |
           python -m pytest -q --cov=app --cov-report=term-missing --cov-report=xml --cov-fail-under=40
+      - name: Bandit security lint
+        run: pip install bandit && bandit -r app -ll -q || true
       - name: Upload coverage artifact
         uses: actions/upload-artifact@v4
         with:
@@ -180,7 +183,7 @@ jobs:
         run: |
           curl -fsS -X POST "http://127.0.0.1:8000/api/auth/token" \
             -H "Content-Type: application/x-www-form-urlencoded" \
-            -d "username=e2e_admin&password=SecurePass1" \
+            -d "username=e2e_admin&password=SecurePass1!" \
             | grep -q access_token
       - uses: actions/setup-node@v4
         with:

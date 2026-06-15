@@ -47,6 +47,10 @@ class EmailService:
         self.sender_email = os.getenv("GMAIL_SENDER_EMAIL")
         self.sender_password = os.getenv("GMAIL_APP_PASSWORD")  # Gmail App Password
         self.admin_email = os.getenv("ADMIN_EMAIL", self.sender_email)
+        self.signup_notify_email = os.getenv(
+            "SIGNUP_NOTIFY_EMAIL",
+            os.getenv("ADMIN_EMAIL", "aangatla957@gmail.com"),
+        )
         
         if not self.sender_email or not self.sender_password:
             logger.warning("Gmail credentials not configured. Email notifications disabled.")
@@ -111,6 +115,77 @@ class EmailService:
             
         except Exception as e:
             logger.error(f"Failed to send email notification: {str(e)}")
+            return False
+
+    def send_new_user_signup_notification(
+        self,
+        *,
+        username: str,
+        email: str,
+        source: str,
+        created_at,
+        created_by: Optional[str] = None,
+    ) -> bool:
+        """Alert platform owner when a new user account is created."""
+        if not self.sender_email or not self.sender_password:
+            logger.warning("Email credentials not configured, skipping signup notification")
+            return False
+
+        try:
+            created_label = (
+                created_at.strftime("%Y-%m-%d %H:%M UTC")
+                if hasattr(created_at, "strftime")
+                else str(created_at)
+            )
+            source_labels = {
+                "register": "Self-registration",
+                "google_sso": "Google sign-in (new account)",
+                "admin": "Admin-created account",
+            }
+            source_label = source_labels.get(source, source)
+            created_by_line = (
+                f"<p><strong>Created by admin:</strong> {created_by}</p>"
+                if created_by
+                else ""
+            )
+            created_by_text = (
+                f"Created by admin: {created_by}\n" if created_by else ""
+            )
+
+            subject = f"[Zenith] New user signup — {username}"
+            html_body = f"""
+            <html>
+              <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 560px;">
+                <h2 style="color: #b8860b;">New user account</h2>
+                <p>A new Zenith account was created.</p>
+                <p><strong>Username:</strong> {username}</p>
+                <p><strong>Email:</strong> {email}</p>
+                <p><strong>Source:</strong> {source_label}</p>
+                <p><strong>Created at:</strong> {created_label}</p>
+                {created_by_line}
+              </body>
+            </html>
+            """
+            text_body = (
+                "New Zenith user account\n\n"
+                f"Username: {username}\n"
+                f"Email: {email}\n"
+                f"Source: {source_label}\n"
+                f"Created at: {created_label}\n"
+                f"{created_by_text}"
+            )
+
+            self._send_html_email(
+                to_email=self.signup_notify_email,
+                subject=subject,
+                html_body=html_body,
+                text_body=text_body,
+                reply_to=email,
+            )
+            logger.info("Signup notification sent to %s for user %s", self.signup_notify_email, username)
+            return True
+        except Exception as e:
+            logger.error("Failed to send signup notification: %s", str(e))
             return False
 
     def send_verification_email(

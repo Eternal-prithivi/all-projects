@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
+import api from '../api';
 import '../styles/error-pages.css';
 
 export default function SsoCallbackPage() {
@@ -10,13 +11,30 @@ export default function SsoCallbackPage() {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    const token = searchParams.get('token');
-    if (!token) {
-      setError('Missing sign-in token. Try logging in again.');
-      return;
-    }
-    login(token);
-    navigate('/dashboard', { replace: true });
+    const legacyToken = searchParams.get('token');
+    const code = searchParams.get('code');
+
+    (async () => {
+      try {
+        if (code) {
+          const { data } = await api.post('/auth/sso/exchange', { code });
+          if (data?.refresh_token) {
+            sessionStorage.setItem('refreshToken', data.refresh_token);
+          }
+          login(data.access_token);
+          navigate('/dashboard', { replace: true });
+          return;
+        }
+        if (legacyToken) {
+          login(legacyToken);
+          navigate('/dashboard', { replace: true });
+          return;
+        }
+        setError('Missing sign-in code. Try logging in again.');
+      } catch {
+        setError('SSO sign-in failed. Try logging in again.');
+      }
+    })();
   }, [searchParams, login, navigate]);
 
   if (error) {

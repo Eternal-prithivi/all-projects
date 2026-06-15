@@ -18,7 +18,7 @@ export async function registerTestUser(
   request: import('@playwright/test').APIRequestContext,
 ): Promise<{ username: string; password: string; email: string }> {
   const username = `e2e_${Date.now().toString(36)}`;
-  const password = 'SecurePass1';
+  const password = 'SecurePass1!';
   const email = `${username}@example.com`;
   const res = await request.post(`${apiRoot()}/api/auth/register`, {
     headers: { 'Content-Type': 'application/json' },
@@ -131,7 +131,7 @@ export async function loginAdminOnPage(
 
 export function adminCredentials(): { username: string; password: string } | null {
   const username = process.env.PLAYWRIGHT_ADMIN_USERNAME || 'e2e_admin';
-  const password = process.env.PLAYWRIGHT_ADMIN_PASSWORD || 'SecurePass1';
+  const password = process.env.PLAYWRIGHT_ADMIN_PASSWORD || 'SecurePass1!';
   return { username, password };
 }
 

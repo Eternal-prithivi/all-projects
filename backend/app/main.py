@@ -59,6 +59,7 @@ from app.utils.config import settings
 import os
 import re
 
+from app.middleware.security_headers import SecurityHeadersMiddleware
 from app.utils.gcp_credentials import gcp_credentials_file_present
 
 
@@ -83,14 +84,30 @@ def _init_sentry() -> None:
 
 _init_sentry()
 
+_env = getattr(settings, "ENVIRONMENT", "development") or "development"
+_docs_url = None if _env == "production" else "/docs"
+_redoc_url = None if _env == "production" else "/redoc"
+_openapi_url = None if _env == "production" else "/openapi.json"
+
 # Initialize rate limiter
 limiter = Limiter(key_func=get_remote_address)
 
-app = FastAPI(title="Zenith API")
+app = FastAPI(
+    title="Zenith API",
+    docs_url=_docs_url,
+    redoc_url=_redoc_url,
+    openapi_url=_openapi_url,
+)
 
 # Add rate limiter to app state
 app.state.limiter = limiter
+from app.utils.resource_limiter import resource_limiter
+from app.contact.routes_contact import contact_limiter
+
+resource_limiter.state = app.state
+contact_limiter.state = app.state
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_middleware(SecurityHeadersMiddleware)
 
 # CORS — explicit allowlist + Vercel patterns (see docs/setup/DEPLOYMENT_SECRETS.md)
 _STATIC_ALLOWED_ORIGINS = [
@@ -216,7 +233,7 @@ app.include_router(routes_billing_setup.router, prefix="/api/cost", tags=["Cost 
 app.include_router(routes_pricing.router, prefix="/api", tags=["Pricing"])
 app.include_router(routes_budgets.router, prefix="/api/budgets", tags=["Budgets"])
 app.include_router(routes_vm.router, prefix="/api/vm", tags=["Virtual Machines"])
-app.include_router(routes_admin_cleanup.router, prefix="/api", tags=["Admin"])  # Cleanup endpoint
+app.include_router(routes_admin_cleanup.router, tags=["Admin"])
 app.include_router(routes_admin.router)
 app.include_router(routes_billing.router, prefix="/api", tags=["Billing"])
 app.include_router(routes_payments.router, prefix="/api/payments", tags=["Payments"])
@@ -290,11 +307,17 @@ def on_startup():
             get_terraform_version,
         )
 
-        if check_terraform_installed():
-            version = get_terraform_version()
-            print(f"\u2705 Terraform CLI detected: v{version}")
-        else:
-            print("\u26a0\ufe0f  Terraform CLI not found — /api/provision endpoints will return 503")
+        env = getattr(settings, "ENVIRONMENT", "development")
+        if env != "test":
+            if check_terraform_installed():
+                version = get_terraform_version()
+                print(f"\u2705 Terraform CLI detected: v{version}")
+            else:
+                print(
+                    "\u26a0\ufe0f  Terraform CLI not found — "
+                    "/api/provision Terraform engine will return 503 "
+                    "(Cloud SDK fast path still works)."
+                )
 
         try:
             from app.provision.audit_logger import ensure_audit_indexes
@@ -309,5 +332,14 @@ def on_startup():
             ensure_notification_indexes()
         except Exception as exc:
             print(f"\u26a0\ufe0f  Notification index setup skipped: {exc}")
+
+        try:
+            from app.trust.sso_exchange import ensure_sso_exchange_indexes
+            from app.auth.token_service import ensure_refresh_token_indexes
+
+            ensure_sso_exchange_indexes()
+            ensure_refresh_token_indexes()
+        except Exception as exc:
+            print(f"\u26a0\ufe0f  Auth exchange index setup skipped: {exc}")
 
     threading.Thread(target=_warm_dependencies, daemon=True).start()

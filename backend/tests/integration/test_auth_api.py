@@ -10,7 +10,7 @@ pytestmark = pytest.mark.integration
 def test_register_login_and_me(client, db):
     username = f"reg_{uuid.uuid4().hex[:8]}"
     email = f"{username}@example.com"
-    password = "SecurePass1"
+    password = "SecurePass1!"
 
     reg = client.post(
         "/api/auth/register",

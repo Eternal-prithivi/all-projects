@@ -101,6 +101,17 @@ class Settings(BaseSettings):
     BACKEND_URL: str = "http://localhost:8000"   # Update to your production API domain
     ENVIRONMENT: str = "development"  # development, staging, production
 
+    # Platform cloud liability caps (USD, estimated)
+    PLATFORM_MONTHLY_BUDGET_USD: float = 0.0  # 0 = use platform_settings doc only
+    SUBSCRIPTION_GRACE_DAYS: int = 3
+    MAX_UPLOAD_BYTES_FREE: int = 25 * 1024 * 1024  # 25 MB
+    MAX_UPLOAD_BYTES_PAID: int = 100 * 1024 * 1024  # 100 MB
+    FREE_TIER_VM_IDLE_MINUTES: int = 15
+    PAID_TIER_VM_IDLE_MINUTES: int = 30
+
+    # New-user signup alerts (defaults to aangatla957@gmail.com if unset)
+    SIGNUP_NOTIFY_EMAIL: str = "aangatla957@gmail.com"
+
     # --- Single-tenant / owner account (optional) ---
     # Comma-separated Zenith usernames that always receive PLATFORM_OWNER_PLAN on this deployment.
     # Example: PLATFORM_OWNER_USERNAMES=Tanjore developer

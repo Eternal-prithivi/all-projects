@@ -88,20 +88,29 @@ def auto_release_inactive_vms_task():
     Runs every 10 minutes via Celery Beat.
     """
     logger.info(f"Checking for inactive VM assignments")
-    
-    inactivity_threshold = datetime.utcnow() - timedelta(minutes=30)
-    
-    # Find active assignments with no recent activity
-    inactive_assignments = vm_assignments_collection.find({
-        "status": "ACTIVE",
-        "last_active": {"$lt": inactivity_threshold}
+
+    from app.payments.subscription_service import get_effective_plan_id
+    from app.utils.config import settings
+
+    now = datetime.utcnow()
+    active_assignments = vm_assignments_collection.find({
+        "status": {"$in": ["ACTIVE", "active"]},
     })
-    
+
     released_count = 0
     reclaimed_vms = []
 
-    for assignment in inactive_assignments:
-        user_id = assignment["user_id"]
+    for assignment in active_assignments:
+        user_id = assignment.get("user_id")
+        last_active = assignment.get("last_active") or assignment.get("assigned_at") or now
+        idle_minutes = (
+            settings.FREE_TIER_VM_IDLE_MINUTES
+            if get_effective_plan_id(user_id) == "free"
+            else settings.PAID_TIER_VM_IDLE_MINUTES
+        )
+        if last_active >= now - timedelta(minutes=idle_minutes):
+            continue
+
         vm_name = assignment["vm_name"]
 
         try:

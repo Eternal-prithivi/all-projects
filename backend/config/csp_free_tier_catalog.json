@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "description": "Per-user platform-key quotas aligned to CSP free-tier ceilings",
+  "defaults": {
+    "max_storage_gb": 5,
+    "max_concurrent_vms": 1,
+    "max_vm_hours_per_month": 750,
+    "terraform_on_platform": false
+  },
+  "providers": {
+    "AWS": {
+      "allowed_vm_skus": ["t2.micro", "t3.micro"],
+      "provision_modules": ["s3", "dynamodb"]
+    },
+    "GCP": {
+      "allowed_vm_skus": ["e2-micro", "f1-micro"],
+      "provision_modules": ["gcs", "firestore"]
+    },
+    "Azure": {
+      "allowed_vm_skus": ["Standard_B1s", "Standard_B1ms"],
+      "provision_modules": ["azure_storage", "cosmos"]
+    }
+  }
+}
