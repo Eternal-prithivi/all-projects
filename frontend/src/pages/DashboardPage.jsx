@@ -19,12 +19,12 @@ import {
   IconServer,
   IconHardDrive,
   IconShieldCheck,
-  IconRefresh,
   IconUploadCloud,
   IconBarChart,
   IconActivity,
   IconAlert,
 } from "../components/dashboard/Icons.jsx";
+import ZenithRefreshButton from '../components/ui/ZenithRefreshButton.jsx';
 import { useNavigate } from 'react-router-dom';
 import { useNotifications } from "../hooks/useNotifications.js";
 import PageHeader from "../components/ui/PageHeader.jsx";
@@ -472,19 +472,6 @@ function DashboardPage() {
           trend={trendChip?.trend}
           trendValue={trendChip?.value}
           data-tour="card-costs"
-          action={
-            <button
-              className="refresh-costs-btn"
-              type="button"
-              onClick={refreshCosts}
-              disabled={isRefreshingCosts}
-              aria-label="Refresh cost data for all connected clouds"
-              title="Refresh cost data for all connected clouds"
-            >
-              <IconRefresh className={isRefreshingCosts ? 'refresh-icon is-spinning' : 'refresh-icon'} />
-              Refresh
-            </button>
-          }
           subtitle={
             `${costDemoMode ? 'Demo data · ' : ''}${
               lastCostUpdate
@@ -499,13 +486,22 @@ function DashboardPage() {
             }`
           }
         >
-          {sparklineData.length > 0 ? (
-            <SparklineChart data={sparklineData} height={140} showXAxis={true} />
-          ) : (
-            <p className="dashboard-sparkline-empty">
-              Refresh costs to build your 7-day trend.
-            </p>
-          )}
+          <div className="card-chart-area">
+            <div className="card-chart-toolbar">
+              <ZenithRefreshButton
+                onClick={refreshCosts}
+                busy={isRefreshingCosts}
+                title="Refresh cost data for all connected clouds"
+              />
+            </div>
+            {sparklineData.length > 0 ? (
+              <SparklineChart data={sparklineData} height={140} showXAxis={true} />
+            ) : (
+              <p className="dashboard-sparkline-empty">
+                Refresh costs to build your 7-day trend.
+              </p>
+            )}
+          </div>
         </StatCard>
 
         <StatCard

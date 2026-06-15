@@ -374,6 +374,20 @@
   margin-bottom: 2rem;
 }
 
+.time-series-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.time-series-header h2 {
+  margin: 0;
+  font-size: 1.5rem;
+  color: var(--text-secondary);
+}
+
 .time-series h2 {
   font-size: 1.5rem;
   margin-bottom: 1.5rem;

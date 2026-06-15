@@ -1,5 +1,6 @@
 /* eslint-disable react-refresh/only-export-components */
 import React from 'react';
+import ZenithRefreshButton from './ui/ZenithRefreshButton.jsx';
 import '../styles/cloud-provider-toolbar.css';
 
 export const CLOUD_PROVIDER_OPTIONS = [
@@ -61,28 +62,13 @@ export default function CloudProviderToolbar({
         ))}
       </select>
       {typeof onRefresh === 'function' && (
-        <button
-          type="button"
-          className="cloud-provider-toolbar__refresh"
+        <ZenithRefreshButton
           onClick={onRefresh}
-          disabled={refreshDisabled || refreshBusy}
-          aria-label={refreshLabel}
-        >
-          <svg
-            className={refreshBusy ? 'cloud-provider-toolbar__spin' : ''}
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            aria-hidden="true"
-          >
-            <path d="M21 12a9 9 0 1 1-2.64-6.36" />
-            <path d="M21 3v6h-6" />
-          </svg>
-          {refreshBusy ? 'Refreshing…' : refreshLabel}
-        </button>
+          busy={refreshBusy}
+          disabled={refreshDisabled}
+          label={refreshLabel}
+          className="cloud-provider-toolbar__refresh"
+        />
       )}
       {typeof onAction === 'function' && (
         <button

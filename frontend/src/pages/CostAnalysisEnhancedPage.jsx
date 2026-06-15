@@ -17,6 +17,7 @@ import { useNotifications } from "../hooks/useNotifications";
 import { usePreferences } from '../context/PreferencesContext.jsx';
 import PageHeader from '../components/ui/PageHeader.jsx';
 import PageContainer from '../components/ui/PageContainer.jsx';
+import ZenithRefreshButton from '../components/ui/ZenithRefreshButton.jsx';
 import { usePageRefresh } from '../hooks/usePageRefresh.js';
 import CostHubNav from '../components/dashboard/CostHubNav.jsx';
 import {
@@ -876,9 +877,13 @@ const CostAnalysisEnhancedPage = () => {
           </select>
         </div>
 
-        <button type="button" onClick={fetchCostData} disabled={loading} className="fetch-button">
-          {loading ? 'Loading...' : 'Fetch Data'}
-        </button>
+        <ZenithRefreshButton
+          onClick={fetchCostData}
+          busy={loading}
+          disabled={!startDate || !endDate}
+          label="Fetch Data"
+          busyLabel="Loading…"
+        />
       </div>
 
       {/* Action Buttons */}
@@ -1012,7 +1017,16 @@ const CostAnalysisEnhancedPage = () => {
       {/* Time Series Display */}
       {costData && costData.data.ResultsByTime && (
         <div className="time-series">
-          <h2>Cost Over Time</h2>
+          <div className="time-series-header">
+            <h2>Cost Over Time</h2>
+            <ZenithRefreshButton
+              onClick={fetchCostData}
+              busy={loading}
+              disabled={!startDate || !endDate}
+              label="Refresh chart"
+              busyLabel="Refreshing…"
+            />
+          </div>
           <div className="time-series-list">
             {costData.data.ResultsByTime.map((item, index) => {
               const cost = parseFloat(item.Total?.UnblendedCost?.Amount || 0);
