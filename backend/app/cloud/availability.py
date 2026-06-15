@@ -11,6 +11,7 @@ Rules:
 
 from __future__ import annotations
 
+import time
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
@@ -210,7 +211,13 @@ def resolve_credential_mode(username: str) -> str:
 
 
 def build_availability_payload(username: str) -> Dict[str, Any]:
-    """API response for GET /api/cloud/availability."""
+    """API response for GET /api/cloud/availability (cached 2 min per user)."""
+    entry = _availability_cache.get(username)
+    if entry is not None:
+        data, ts = entry
+        if (time.time() - ts) < AVAILABILITY_CACHE_TTL:
+            return data
+
     from app.byoc.capabilities import build_byoc_capabilities_payload
 
     connected = [p for p in _ALL if _byoc_connected(username, p)]
@@ -231,7 +238,7 @@ def build_availability_payload(username: str) -> Dict[str, Any]:
             "locked_providers": locked_byoc_providers(username, feat),
         }
 
-    return {
+    payload = {
         "credential_mode": mode,
         "byoc_connected": connected,
         "credential_sources": sources,
@@ -244,3 +251,17 @@ def build_availability_payload(username: str) -> Dict[str, Any]:
             "storage_count": len(features["storage"]["providers"]),
         },
     }
+    _availability_cache[username] = (payload, time.time())
+    return payload
+
+
+_availability_cache: Dict[str, tuple] = {}
+AVAILABILITY_CACHE_TTL = 120  # 2 minutes
+
+
+def invalidate_availability_cache(username: Optional[str] = None) -> None:
+    """Clear availability payload cache (BYOC connect/disconnect)."""
+    if username is None:
+        _availability_cache.clear()
+    else:
+        _availability_cache.pop(username, None)

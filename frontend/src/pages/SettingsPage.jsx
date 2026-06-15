@@ -14,8 +14,9 @@
 //   - Remove the "Restart Tour" button from Preferences section (localStorage: zenith_onboarding_complete)
 // =============================================================================
 import React, { useMemo, useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useNotifications } from "../hooks/useNotifications";
+import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
 import { usePreferences } from "../context/PreferencesContext";
 import { apiClient } from '../api';
@@ -48,6 +49,8 @@ import PlatformRegionPills from '../components/PlatformRegionPills.jsx';
 import CloudProviderLogo from '../components/cloud/CloudProviderLogo.jsx';
 
 const SettingsPage = () => {
+  const navigate = useNavigate();
+  const { user } = useAuth();
   const notifications = useNotifications();
   const { confirm } = useConfirm();
   const { executeWithNotification, showLoading, updateSuccess, updateError } = notifications;
@@ -1988,9 +1991,15 @@ const SettingsPage = () => {
               className="btn-save"
               style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--text-secondary)', border: '1px solid rgba(255,255,255,0.08)' }}
               onClick={() => {
+                const username = user?.username;
+                const suffix = username ? `_${username}` : '';
+                localStorage.removeItem(`zenith_onboarding_complete${suffix}`);
+                localStorage.removeItem(`zenith_onboarding_dismissed${suffix}`);
+                // Also clear legacy keys without suffix
                 localStorage.removeItem('zenith_onboarding_complete');
                 localStorage.removeItem('zenith_onboarding_dismissed');
-                notifications.success('Tour will start on your next dashboard visit');
+                notifications.success('Tour restarted — taking you to the dashboard…');
+                setTimeout(() => navigate('/dashboard'), 800);
               }}
             >
               Restart Tour

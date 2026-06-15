@@ -7,6 +7,19 @@
 
 ---
 
+**Stage 1 — Production Beta closeout** — COMPLETE 2026-06-15
+
+- **CI:** Playwright admin tests refactored (API layer + sidebar link); Redis in CI playwright services; desktop-release `releases.json` stash/rebase; CI green on `stage`.
+- **Onboarding:** Username-scoped tour localStorage; Getting Started checklist on dashboard; Restart Tour navigates to dashboard; `docs/development/ONBOARDING_GUIDE.md`.
+- **Cache:** Per-user `billing_cache`; auth on `DELETE /cost/cache/clear`; cloud availability 5m sessionStorage TTL + server cache; BYOC single-query + invalidation hooks; `CACHING_GUIDE.md` rewrite; `ADR_001_CACHING_STRATEGY.md`.
+- **Performance:** Dashboard critical path 3 APIs + deferred secondary loads; no `refresh_user_costs` on GET `/stats`; Mongo aggregation + indexes; MaintenanceGate 60s cache; Vite `manualChunks`; lazy joyride + recharts sparkline.
+- **Desktop:** `png2icons` generates `icon.icns` / `icon.ico` from brand master; electron-builder mac/win/linux icon paths; `prebuild` hooks; `docs/desktop/INSTALL.md` note.
+- **Admin:** `AdminLayout.jsx` loading state while auth user resolves.
+
+**How to test:** `npm run lint && npm run build && npm run test:e2e`; open `/dashboard` (fast load + Getting Started card); `npm run brand:assets && npm run build:mac` → DMG shows Zenith Z icon.
+
+---
+
 **Phase 22 — SaaS pages polish (zero/low-cost)** — COMPLETE 2026-06-11
 
 - **Trust copy:** `productFacts.js` — Help FAQs, public pricing, support email; removed stale USD/personal-email content.

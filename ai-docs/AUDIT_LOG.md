@@ -23,6 +23,17 @@ Notes: [one line optional]
 ## Session Log (recent only)
 
 ---
+SESSION_ID: 20260615-stage1-production-beta
+Date: 2026-06-15
+Agent: Cursor Composer
+Task: Stage 1 production beta closeout — CI, onboarding, cache, performance, desktop icons
+Changes:
+- Playwright admin smoke; billing/cache/availability fixes; dashboard performance
+- Onboarding checklist + per-user tour; cache/onboarding docs + ADR-001
+- Desktop icon.icns/ico pipeline; STATUS/PROGRESS/SCRATCHPAD updated
+Outcome: Done
+Notes: Stage 1 COMPLETE; push stage + verify Vercel/Render
+---
 SESSION_ID: 20260610-phase20-trust-byoc-encrypt
 Date: 2026-06-10
 Agent: Cursor Composer

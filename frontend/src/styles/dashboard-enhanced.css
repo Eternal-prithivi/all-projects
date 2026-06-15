@@ -803,3 +803,159 @@
   font-size: 0.85rem;
   text-decoration: underline;
 }
+
+/* ─── Getting Started Checklist Card ──────────────────────────────────────── */
+.gs-card {
+  background: linear-gradient(135deg, rgba(255, 215, 0, 0.05) 0%, rgba(255, 255, 255, 0.02) 100%);
+  border: 1px solid rgba(255, 215, 0, 0.15);
+  border-radius: 16px;
+  padding: 1.25rem 1.5rem;
+  margin-bottom: 1.25rem;
+  animation: fadeInUp 0.4s ease both;
+}
+
+.gs-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.gs-header-text { flex: 1; }
+
+.gs-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0 0 0.15rem;
+}
+
+.gs-subtitle {
+  font-size: 0.8rem;
+  color: var(--text-tertiary);
+  margin: 0;
+}
+
+.gs-progress-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  min-width: 120px;
+}
+
+.gs-progress-bar {
+  flex: 1;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 99px;
+  overflow: hidden;
+}
+
+.gs-progress-fill {
+  height: 100%;
+  background: var(--gold-primary);
+  border-radius: 99px;
+  transition: width 0.5s ease;
+}
+
+.gs-progress-label {
+  font-size: 0.75rem;
+  color: var(--gold-primary);
+  font-weight: 600;
+  min-width: 2.5rem;
+  text-align: right;
+}
+
+.gs-dismiss {
+  background: none;
+  border: none;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  font-size: 0.9rem;
+  padding: 0.25rem;
+  border-radius: 4px;
+  line-height: 1;
+  transition: color 0.15s;
+}
+.gs-dismiss:hover { color: var(--text-primary); }
+
+.gs-steps {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 0.6rem;
+}
+
+.gs-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  padding: 0.75rem 0.85rem;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 10px;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s, border-color 0.15s;
+  width: 100%;
+}
+
+.gs-step:hover {
+  background: rgba(255, 215, 0, 0.06);
+  border-color: rgba(255, 215, 0, 0.2);
+}
+
+.gs-step--done {
+  background: rgba(74, 222, 128, 0.04);
+  border-color: rgba(74, 222, 128, 0.15);
+}
+
+.gs-step-icon { font-size: 1.2rem; line-height: 1; flex-shrink: 0; }
+
+.gs-step-check {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(255, 255, 255, 0.2);
+  font-size: 0.65rem;
+  color: #4ade80;
+  flex-shrink: 0;
+  margin-top: 2px;
+  transition: border-color 0.2s, background 0.2s;
+}
+
+.gs-step--done .gs-step-check {
+  border-color: #4ade80;
+  background: rgba(74, 222, 128, 0.15);
+}
+
+.gs-step-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.gs-step-label {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.gs-step--done .gs-step-label {
+  color: var(--text-secondary);
+  text-decoration: line-through;
+  text-decoration-color: rgba(74, 222, 128, 0.4);
+}
+
+.gs-step-desc {
+  font-size: 0.75rem;
+  color: var(--text-tertiary);
+  line-height: 1.4;
+}
+
+@media (max-width: 640px) {
+  .gs-steps { grid-template-columns: 1fr; }
+  .gs-progress-wrap { min-width: 80px; }
+}

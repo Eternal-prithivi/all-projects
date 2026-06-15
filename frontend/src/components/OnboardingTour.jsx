@@ -13,14 +13,20 @@
 //   - Move out of DashboardLayout — must mount once, not inside individual pages
 //   - Add location.pathname to useEffect deps — causes re-trigger on navigation
 // =============================================================================
-import React, { useState, useEffect, useCallback } from 'react';
-import { Joyride, STATUS, ACTIONS, EVENTS } from 'react-joyride';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useMediaQuery, MOBILE_MEDIA_QUERY } from '../hooks/useMediaQuery.js';
+import { useAuth } from '../context/AuthContext.jsx';
 import '../styles/onboarding.css';
 
-const TOUR_STORAGE_KEY = 'zenith_onboarding_complete';
-const TOUR_DISMISSED_KEY = 'zenith_onboarding_dismissed';
+/** Build per-user localStorage keys so each account gets its own tour state. */
+function tourKeys(username) {
+  const suffix = username ? `_${username}` : '';
+  return {
+    complete: `zenith_onboarding_complete${suffix}`,
+    dismissed: `zenith_onboarding_dismissed${suffix}`,
+  };
+}
 
 /**
  * OnboardingTour — Guided first-time walkthrough using react-joyride v3.
@@ -34,10 +40,21 @@ const TOUR_DISMISSED_KEY = 'zenith_onboarding_dismissed';
  */
 function OnboardingTour() {
   const location = useLocation();
+  const { user } = useAuth();
   const isMobile = useMediaQuery(MOBILE_MEDIA_QUERY);
   const [run, setRun] = useState(false);
   const [showWelcome, setShowWelcome] = useState(false);
+  const [joyrideLib, setJoyrideLib] = useState(null);
+  const joyrideRef = useRef(null);
   const hasCheckedRef = React.useRef(false);
+
+  const loadJoyride = useCallback(async () => {
+    if (joyrideRef.current) return joyrideRef.current;
+    const mod = await import('react-joyride');
+    joyrideRef.current = mod;
+    setJoyrideLib(mod);
+    return mod;
+  }, []);
 
   // Tour steps targeting data-tour attributes and data-type selectors
   const steps = [
@@ -154,8 +171,9 @@ function OnboardingTour() {
     if (hasCheckedRef.current) return;
     hasCheckedRef.current = true;
 
-    const isComplete = localStorage.getItem(TOUR_STORAGE_KEY);
-    const isDismissed = localStorage.getItem(TOUR_DISMISSED_KEY);
+    const keys = tourKeys(user?.username);
+    const isComplete = localStorage.getItem(keys.complete);
+    const isDismissed = localStorage.getItem(keys.dismissed);
     const isDashboard = location.pathname === '/dashboard';
 
     if (!isComplete && !isDismissed && isDashboard) {
@@ -165,7 +183,7 @@ function OnboardingTour() {
       return () => clearTimeout(timer);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- welcome modal once on dashboard mount
-  }, [isMobile]);
+  }, [isMobile, user?.username]);
 
   const [mobileTipIndex, setMobileTipIndex] = useState(0);
 
@@ -185,43 +203,46 @@ function OnboardingTour() {
   ];
 
   const completeMobileTips = useCallback(() => {
+    const keys = tourKeys(user?.username);
     setShowWelcome(false);
-    localStorage.setItem(TOUR_STORAGE_KEY, 'true');
-  }, []);
+    localStorage.setItem(keys.complete, 'true');
+  }, [user?.username]);
 
   const dismissMobileTips = useCallback(() => {
+    const keys = tourKeys(user?.username);
     setShowWelcome(false);
-    localStorage.setItem(TOUR_DISMISSED_KEY, 'true');
-  }, []);
+    localStorage.setItem(keys.dismissed, 'true');
+  }, [user?.username]);
 
-  const startTour = useCallback(() => {
+  const startTour = useCallback(async () => {
     setShowWelcome(false);
-    // Small delay to let welcome modal unmount before joyride starts
-    setTimeout(() => {
-      setRun(true);
-    }, 300);
-  }, []);
+    await loadJoyride();
+    setTimeout(() => setRun(true), 300);
+  }, [loadJoyride]);
 
   const dismissTour = useCallback(() => {
+    const keys = tourKeys(user?.username);
     setShowWelcome(false);
-    localStorage.setItem(TOUR_DISMISSED_KEY, 'true');
-  }, []);
+    localStorage.setItem(keys.dismissed, 'true');
+  }, [user?.username]);
 
   const handleJoyrideCallback = useCallback((data) => {
+    const { STATUS, ACTIONS } = joyrideRef.current || {};
+    if (!STATUS || !ACTIONS) return;
+
+    const keys = tourKeys(user?.username);
     const { status, action } = data;
 
-    // Tour finished or user clicked skip
     if (status === STATUS.FINISHED || status === STATUS.SKIPPED) {
       setRun(false);
-      localStorage.setItem(TOUR_STORAGE_KEY, 'true');
+      localStorage.setItem(keys.complete, 'true');
     }
 
-    // User clicked close (X button)
     if (action === ACTIONS.CLOSE) {
       setRun(false);
-      localStorage.setItem(TOUR_DISMISSED_KEY, 'true');
+      localStorage.setItem(keys.dismissed, 'true');
     }
-  }, []);
+  }, [user?.username]);
 
   // Custom tooltip component matching Zenith design
   const ZenithTooltip = ({
@@ -340,9 +361,9 @@ function OnboardingTour() {
         </div>
       )}
 
-      {/* Joyride tour — desktop/tablet only (skipped on narrow viewports) */}
-      {!isMobile && (
-      <Joyride
+      {/* Joyride tour — desktop/tablet only; library loaded on demand */}
+      {!isMobile && joyrideLib && (
+      <joyrideLib.Joyride
         steps={steps}
         run={run}
         continuous

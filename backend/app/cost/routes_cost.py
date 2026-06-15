@@ -230,16 +230,16 @@ async def get_cache_stats():
     }
 
 @router.delete("/cache/clear", summary="Clear Cost Cache")
-async def clear_cost_cache():
+async def clear_cost_cache(user: dict = Depends(get_current_user)):
     """
-    Manually clear all cached cost data.
+    Manually clear all cached cost data. Requires authentication.
     Use this if you suspect stale or incorrect data in cache.
     Next request will fetch fresh data from AWS Cost Explorer ($0.01).
     """
     entries_cleared = len(cost_cache)
     cost_cache.clear()
-    logger.info(f"Cost cache manually cleared. {entries_cleared} entries removed.")
-    
+    logger.info(f"Cost cache manually cleared by {user.username}. {entries_cleared} entries removed.")
+
     return {
         "success": True,
         "entries_cleared": entries_cleared,

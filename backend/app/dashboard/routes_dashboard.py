@@ -7,7 +7,7 @@ from app.users.routes_users import get_current_user
 from app.database.mongo_client import get_database
 from app.dashboard.cost_aggregation import get_cached_user_costs, refresh_user_costs
 from app.dashboard.cost_snapshots import get_cost_trend
-from datetime import datetime
+from datetime import datetime, timedelta
 import logging
 
 logger = logging.getLogger(__name__)
@@ -20,38 +20,56 @@ async def get_dashboard_stats(user: dict = Depends(get_current_user)):
     """
     Returns real statistics for the main dashboard overview.
     Monthly cost = sum of all available providers (BYOC + platform hybrid).
+    Does not call cloud billing APIs — use POST /refresh-costs for a live refresh.
     """
     DB = get_database()
 
     try:
         cost_snapshot = get_cached_user_costs(user.username)
-        if not cost_snapshot.get("providers_included"):
-            try:
-                cost_snapshot = refresh_user_costs(user.username)
-            except Exception as refresh_err:
-                logger.warning("Initial dashboard cost refresh skipped: %s", refresh_err)
         monthly_costs = cost_snapshot.get("monthly_costs", 0.0) or 0.0
 
         vm_assignments = DB["vm_assignments"]
-        active_vms = vm_assignments.count_documents({"status": "assigned"})
+        active_vms = vm_assignments.count_documents(
+            {"user_id": user.username, "status": "assigned"}
+        )
 
         files_collection = DB["files"]
-        total_files = files_collection.count_documents({})
+        user_files_filter = {"owner_username": user.username}
+        total_files = files_collection.count_documents(user_files_filter)
 
-        total_size_bytes = 0
-        for file_doc in files_collection.find({}, {"size": 1, "size_bytes": 1}):
-            total_size_bytes += file_doc.get("size_bytes") or file_doc.get("size", 0)
+        storage_agg = list(
+            files_collection.aggregate(
+                [
+                    {"$match": user_files_filter},
+                    {
+                        "$group": {
+                            "_id": None,
+                            "bytes": {
+                                "$sum": {"$ifNull": ["$size_bytes", {"$ifNull": ["$size", 0]}]}
+                            },
+                        }
+                    },
+                ]
+            )
+        )
+        total_size_bytes = storage_agg[0]["bytes"] if storage_agg else 0
         storage_used_tb = round(total_size_bytes / (1024 ** 4), 2)
 
         secure_files = DB["secure_files"]
         security_alerts = secure_files.count_documents(
-            {"is_sensitive": True, "is_encrypted": False}
+            {
+                "owner_username": user.username,
+                "is_sensitive": True,
+                "is_encrypted": False,
+            }
         )
 
         vm_metrics = DB["vm_metrics"]
         vm_health = {"healthy": 0, "warning": 0, "critical": 0}
+        metrics_cutoff = datetime.utcnow() - timedelta(hours=24)
 
         pipeline = [
+            {"$match": {"timestamp": {"$gte": metrics_cutoff}}},
             {"$sort": {"timestamp": -1}},
             {
                 "$group": {

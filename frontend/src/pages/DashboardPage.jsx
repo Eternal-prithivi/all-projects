@@ -9,7 +9,6 @@ import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useAuth } from "../context/AuthContext.jsx";
 import { usePreferences } from "../context/PreferencesContext.jsx";
 import { getDashboardStats, apiClient } from "../api.js";
-import { apiUrl } from "../config/apiBase.js";
 import StatCard from "../components/dashboard/StatCard.jsx";
 import SparklineChart from "../components/dashboard/SparklineChart.jsx";
 import ProgressRing from "../components/dashboard/ProgressRing.jsx";
@@ -35,8 +34,109 @@ import { useCountUp } from "../hooks/useCountUp.js";
 import { DashboardSkeleton } from "../components/Skeletons.jsx";
 import { PATHS } from "../data/productFacts.js";
 import { usePlanEntitlementsContext } from "../context/PlanEntitlementsContext.jsx";
+import { useCloudAvailabilityContext } from "../context/CloudAvailabilityContext.jsx";
 import { Link } from "react-router-dom";
 import '../styles/dashboard-enhanced.css';
+
+// ─── Getting Started checklist ──────────────────────────────────────────────
+const GS_DISMISS_KEY = (username) => `zenith_gs_dismissed_${username || ''}`;
+
+const GS_STEPS = [
+  {
+    id: 'connect_cloud',
+    label: 'Connect your cloud',
+    description: 'Link AWS, GCP, or Azure credentials to unlock cost analysis and storage.',
+    path: '/dashboard/settings#byoc',
+    icon: '☁️',
+  },
+  {
+    id: 'analyze_costs',
+    label: 'Analyze your costs',
+    description: 'View multi-cloud spend broken down by service, region, and date range.',
+    path: '/dashboard/costs',
+    icon: '📊',
+  },
+  {
+    id: 'upload_file',
+    label: 'Upload a file',
+    description: 'Our ML engine picks the cheapest cloud tier for every file you store.',
+    path: '/dashboard/storage',
+    icon: '📁',
+  },
+  {
+    id: 'request_vm',
+    label: 'Request a VM cluster',
+    description: 'Describe your workload in plain English — the NLP engine handles the rest.',
+    path: '/dashboard/vmcluster',
+    icon: '🖥️',
+  },
+];
+
+function GettingStartedCard({ username, stats, byocConnected }) {
+  const navigate = useNavigate();
+  const [dismissed, setDismissed] = React.useState(
+    () => !!localStorage.getItem(GS_DISMISS_KEY(username)),
+  );
+
+  if (dismissed) return null;
+
+  const completed = {
+    connect_cloud: byocConnected?.length > 0,
+    analyze_costs: !!localStorage.getItem(`zenith_visited_costs_${username}`),
+    upload_file: (stats?.total_files || 0) > 0,
+    request_vm: (stats?.active_vms || 0) > 0,
+  };
+
+  const doneCount = Object.values(completed).filter(Boolean).length;
+  const pct = Math.round((doneCount / GS_STEPS.length) * 100);
+
+  const handleDismiss = () => {
+    localStorage.setItem(GS_DISMISS_KEY(username), '1');
+    setDismissed(true);
+  };
+
+  return (
+    <div className="gs-card" role="region" aria-label="Getting started checklist">
+      <div className="gs-header">
+        <div className="gs-header-text">
+          <h3 className="gs-title">Get started with Zenith</h3>
+          <p className="gs-subtitle">{doneCount} of {GS_STEPS.length} steps complete</p>
+        </div>
+        <div className="gs-progress-wrap">
+          <div className="gs-progress-bar" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}>
+            <div className="gs-progress-fill" style={{ width: `${pct}%` }} />
+          </div>
+          <span className="gs-progress-label">{pct}%</span>
+        </div>
+        <button type="button" className="gs-dismiss" onClick={handleDismiss} aria-label="Dismiss getting started">
+          ✕
+        </button>
+      </div>
+      <div className="gs-steps">
+        {GS_STEPS.map((step) => {
+          const done = completed[step.id];
+          return (
+            <button
+              key={step.id}
+              type="button"
+              className={`gs-step ${done ? 'gs-step--done' : ''}`}
+              onClick={() => navigate(step.path)}
+            >
+              <span className="gs-step-icon" aria-hidden="true">{step.icon}</span>
+              <span className="gs-step-check" aria-label={done ? 'Complete' : 'Incomplete'}>
+                {done ? '✓' : ''}
+              </span>
+              <span className="gs-step-body">
+                <span className="gs-step-label">{step.label}</span>
+                <span className="gs-step-desc">{step.description}</span>
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
 const getGreeting = () => {
   const hour = new Date().getHours();
@@ -63,6 +163,7 @@ function platformStatusLabel(data) {
 function DashboardPage() {
   const { token, user } = useAuth();
   const { isFeatureEnabled, limits: planLimits } = usePlanEntitlementsContext();
+  const { byocConnected } = useCloudAvailabilityContext();
   const { formatCurrency, formatDateFriendly, currencySymbol } = usePreferences();
   const navigate = useNavigate();
   const notifications = useNotifications();
@@ -78,8 +179,6 @@ function DashboardPage() {
   const [lastCostUpdate, setLastCostUpdate] = useState(null);
   const [costByProvider, setCostByProvider] = useState({});
   const [costDemoMode, setCostDemoMode] = useState(false);
-  const [subscription, setSubscription] = useState(null);
-  const [platformStatus, setPlatformStatus] = useState(null);
   const [billingStatus, setBillingStatus] = useState(null);
   const [teamOrg, setTeamOrg] = useState(null);
   const [teamSummary, setTeamSummary] = useState(null);
@@ -93,10 +192,9 @@ function DashboardPage() {
   const animatedAlerts = useCountUp(stats?.security_alerts || 0, 800);
 
   const storageCapTb = useMemo(() => {
-    const storageGb =
-      planLimits?.storage_gb ?? subscription?.storage_gb ?? 10;
+    const storageGb = planLimits?.storage_gb ?? 10;
     return Math.max(storageGb / 1024, 0.01);
-  }, [subscription, planLimits]);
+  }, [planLimits]);
 
   const storagePercentage = useMemo(() => {
     if (!stats) return 0;
@@ -137,15 +235,7 @@ function DashboardPage() {
     try {
       const parallel = await Promise.allSettled([
         getDashboardStats(token),
-        apiClient.get('/budgets/status'),
         apiClient.get('/dashboard/recent-activity?limit=6'),
-        apiClient.get('/payments/my-subscription'),
-        fetch(apiUrl('/platform/status')),
-        apiClient.get('/cost/billing-status'),
-        apiClient.get('/organizations/me'),
-        apiClient.get('/organizations/summary'),
-        apiClient.get('/cost/anomalies/summary'),
-        apiClient.get('/support/tickets'),
         loadCostTrend(),
       ]);
 
@@ -158,40 +248,8 @@ function DashboardPage() {
         }
       }
       if (parallel[1].status === 'fulfilled') {
-        setBudgets((parallel[1].value.data || []).slice(0, 3));
+        setRecentActivity(parallel[1].value.data || []);
       }
-      if (parallel[2].status === 'fulfilled') {
-        setRecentActivity(parallel[2].value.data || []);
-      }
-      if (parallel[3].status === 'fulfilled') {
-        setSubscription(parallel[3].value.data);
-      }
-      if (parallel[4].status === 'fulfilled' && parallel[4].value.ok) {
-        setPlatformStatus(await parallel[4].value.json());
-      }
-      if (parallel[5].status === 'fulfilled') {
-        setBillingStatus(parallel[5].value.data);
-      }
-      if (parallel[6].status === 'fulfilled') {
-        setTeamOrg(parallel[6].value.data);
-      }
-      if (parallel[7].status === 'fulfilled') {
-        setTeamSummary(parallel[7].value.data);
-      } else {
-        setTeamSummary(null);
-      }
-      const anomalyCount =
-        parallel[8].status === 'fulfilled'
-          ? parallel[8].value.data?.total_unacknowledged || 0
-          : 0;
-      const ticketCount =
-        parallel[9].status === 'fulfilled'
-          ? (parallel[9].value.data?.tickets || []).filter((t) => t.status === 'open').length
-          : 0;
-      setAttention({
-        anomalies: anomalyCount,
-        tickets: ticketCount,
-      });
     } catch (err) {
       console.error("Failed to fetch dashboard data:", err);
       setError("Failed to load dashboard data. Please try again.");
@@ -199,11 +257,69 @@ function DashboardPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [token, notifications, loadCostTrend]);
+  }, [token, loadCostTrend, notifications]);
+
+  const fetchDeferredDashboardData = useCallback(async () => {
+    if (!token) return;
+
+    const parallel = await Promise.allSettled([
+      apiClient.get('/budgets/status'),
+      apiClient.get('/cost/billing-status'),
+      apiClient.get('/organizations/me'),
+      apiClient.get('/organizations/summary'),
+      apiClient.get('/cost/anomalies/summary'),
+      apiClient.get('/support/tickets'),
+    ]);
+
+    if (parallel[0].status === 'fulfilled') {
+      setBudgets((parallel[0].value.data || []).slice(0, 3));
+    }
+    if (parallel[1].status === 'fulfilled') {
+      setBillingStatus(parallel[1].value.data);
+    }
+    if (parallel[2].status === 'fulfilled') {
+      setTeamOrg(parallel[2].value.data);
+    }
+    if (parallel[3].status === 'fulfilled') {
+      setTeamSummary(parallel[3].value.data);
+    } else {
+      setTeamSummary(null);
+    }
+    const anomalyCount =
+      parallel[4].status === 'fulfilled'
+        ? parallel[4].value.data?.total_unacknowledged || 0
+        : 0;
+    const ticketCount =
+      parallel[5].status === 'fulfilled'
+        ? (parallel[5].value.data?.tickets || []).filter((t) => t.status === 'open').length
+        : 0;
+    setAttention({
+      anomalies: anomalyCount,
+      tickets: ticketCount,
+    });
+  }, [token]);
 
   useEffect(() => {
     fetchDashboardData();
   }, [fetchDashboardData]);
+
+  useEffect(() => {
+    if (!token || isLoading) return;
+    const runDeferred = () => fetchDeferredDashboardData();
+    let idleId;
+    let timeoutId;
+    if (typeof requestIdleCallback !== 'undefined') {
+      idleId = requestIdleCallback(runDeferred, { timeout: 2000 });
+    } else {
+      timeoutId = setTimeout(runDeferred, 150);
+    }
+    return () => {
+      if (idleId != null && typeof cancelIdleCallback !== 'undefined') {
+        cancelIdleCallback(idleId);
+      }
+      if (timeoutId != null) clearTimeout(timeoutId);
+    };
+  }, [token, isLoading, fetchDeferredDashboardData]);
 
   const refreshCosts = async () => {
     setIsRefreshingCosts(true);
@@ -253,7 +369,7 @@ function DashboardPage() {
       .map(([key]) => key.toUpperCase());
   }, [billingStatus]);
 
-  const statusBanner = platformStatusLabel(platformStatus);
+  const statusBanner = platformStatusLabel(null);
 
   if (isLoading) {
     return <DashboardSkeleton />;
@@ -336,6 +452,12 @@ function DashboardPage() {
           </button>
         </div>
       )}
+
+      <GettingStartedCard
+        username={user?.username}
+        stats={stats}
+        byocConnected={byocConnected}
+      />
 
       <div className="bento-grid" data-tour="bento-grid">
         <StatCard

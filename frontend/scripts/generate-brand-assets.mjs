@@ -133,7 +133,19 @@ for (const size of desktopSizes) {
     .toFile(path.join(desktopBuildRoot, outName));
 }
 
-const BRAND_VERSION = '5';
+/** macOS .icns + Windows .ico — required for Electron; PNG alone falls back to default Electron icon. */
+const png2icons = (await import('png2icons')).default;
+const masterPng = fs.readFileSync(path.join(desktopBuildRoot, 'icon.png'));
+const icns = png2icons.createICNS(masterPng, png2icons.BILINEAR, 0);
+const ico = png2icons.createICO(masterPng, png2icons.HERMITE, 0, true);
+if (!icns?.length || !ico?.length) {
+  console.error('Failed to generate desktop .icns / .ico from brand master');
+  process.exit(1);
+}
+fs.writeFileSync(path.join(desktopBuildRoot, 'icon.icns'), icns);
+fs.writeFileSync(path.join(desktopBuildRoot, 'icon.ico'), ico);
+
+const BRAND_VERSION = '6';
 fs.writeFileSync(
   path.join(publicRoot, 'brand-asset-version.txt'),
   BRAND_VERSION,

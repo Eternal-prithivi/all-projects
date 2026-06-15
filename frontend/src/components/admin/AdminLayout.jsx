@@ -60,7 +60,20 @@ const AdminLayout = () => {
     );
   }
 
-  if (!token || !user || user.role !== 'admin') {
+  if (!token) {
+    return null;
+  }
+
+  if (!user) {
+    return (
+      <div className="admin-loading-screen">
+        <div className="spinner" />
+        <p>Loading admin portal...</p>
+      </div>
+    );
+  }
+
+  if (user.role !== 'admin') {
     return null;
   }
 

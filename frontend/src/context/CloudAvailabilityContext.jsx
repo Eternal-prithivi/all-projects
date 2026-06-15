@@ -9,6 +9,8 @@ import React, {
 import { apiClient } from "../api";
 
 const CACHE_KEY = "cache_cloud_availability";
+/** 5 minutes — short enough to pick up BYOC changes without a hard refresh. */
+const CACHE_TTL_MS = 5 * 60 * 1000;
 
 const EMPTY_FEATURE = {
   providers: [],
@@ -21,7 +23,13 @@ const CloudAvailabilityContext = createContext(null);
 function readCache() {
   try {
     const raw = sessionStorage.getItem(CACHE_KEY);
-    return raw ? JSON.parse(raw) : null;
+    if (!raw) return null;
+    const { data, ts } = JSON.parse(raw);
+    if (!data || Date.now() - ts > CACHE_TTL_MS) {
+      sessionStorage.removeItem(CACHE_KEY);
+      return null;
+    }
+    return data;
   } catch {
     return null;
   }
@@ -29,9 +37,18 @@ function readCache() {
 
 function writeCache(data) {
   try {
-    if (data) sessionStorage.setItem(CACHE_KEY, JSON.stringify(data));
+    if (data) sessionStorage.setItem(CACHE_KEY, JSON.stringify({ data, ts: Date.now() }));
   } catch {
     /* ignore quota */
+  }
+}
+
+/** Call this after any BYOC connect / disconnect to force a fresh fetch. */
+export function invalidateCloudAvailabilityCache() {
+  try {
+    sessionStorage.removeItem(CACHE_KEY);
+  } catch {
+    /* ignore */
   }
 }
 
@@ -56,6 +73,10 @@ export function CloudAvailabilityProvider({ children }) {
   }, []);
 
   useEffect(() => {
+    const cached = readCache();
+    if (cached) {
+      return;
+    }
     reload();
   }, [reload]);
 

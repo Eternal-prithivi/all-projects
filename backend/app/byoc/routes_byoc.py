@@ -51,6 +51,9 @@ from app.byoc.aws_bucket_discovery import (
     get_buckets_for_user,
     invalidate_bucket_cache,
 )
+from app.byoc.credential_resolver import invalidate_byoc_status_cache
+from app.cost.billing_status import invalidate_billing_status_cache
+from app.cloud.availability import invalidate_availability_cache
 from app.byoc.gcp_bucket_discovery import (
     list_gcp_buckets_for_user,
     list_gcp_buckets_from_json,
@@ -84,6 +87,14 @@ subscriptions_collection = DB["subscriptions"]
 
 # Zenith's AWS Account ID — needed for IAM Role trust policy
 ZENITH_AWS_ACCOUNT_ID = "412628362844"
+
+
+def _invalidate_user_cloud_caches(username: str) -> None:
+    """Bust caches that depend on BYOC / billing connectivity."""
+    invalidate_bucket_cache(username)
+    invalidate_billing_status_cache(username)
+    invalidate_byoc_status_cache(username)
+    invalidate_availability_cache(username)
 
 BYOC_ELIGIBLE_PLANS = ("pro", "enterprise")
 
@@ -1316,6 +1327,7 @@ async def connect_cloud(request: BYOCConnectRequest, user: User = Depends(get_cu
         if bucket_message and "Created" in bucket_message:
             connect_message = f"{connect_message} {bucket_message}"
 
+        _invalidate_user_cloud_caches(user.username)
         return {
             "success": True,
             "message": connect_message,
@@ -1414,6 +1426,7 @@ async def connect_cloud(request: BYOCConnectRequest, user: User = Depends(get_cu
             extras["next_steps"].append(
                 "Add BigQuery billing export dataset and table IDs in Settings to unlock Cost."
             )
+        _invalidate_user_cloud_caches(user.username)
         return {
             "success": True,
             "message": connect_message,
@@ -1517,6 +1530,7 @@ async def connect_cloud(request: BYOCConnectRequest, user: User = Depends(get_cu
                 0,
                 "Add service principal fields in Settings to unlock VMs, Provision, and Cost.",
             )
+        _invalidate_user_cloud_caches(user.username)
         return {
             "success": True,
             "message": connect_message,
@@ -1555,6 +1569,7 @@ async def connect_cloud(request: BYOCConnectRequest, user: User = Depends(get_cu
 
     logger.info(f"BYOC: {user.username} connected {csp} account (method: {request.connection_method})")
 
+    _invalidate_user_cloud_caches(user.username)
     return {
         "success": True,
         "message": test_result.message,
@@ -1608,6 +1623,7 @@ async def extend_azure_compute(
         {"$set": {"credentials": encrypted, "updated_at": datetime.utcnow()}},
     )
     logger.info("BYOC: %s extended Azure compute credentials", user.username)
+    _invalidate_user_cloud_caches(user.username)
     message = (
         "Azure service principal saved. VMs and Provision are unlocked."
         if cost_ok
@@ -1678,6 +1694,7 @@ async def disconnect_cloud(csp: str, user: User = Depends(get_current_user)):
     if result.modified_count == 0:
         raise HTTPException(status_code=404, detail=f"No BYOC connection found for {csp}.")
     
+    _invalidate_user_cloud_caches(user.username)
     logger.info(f"BYOC: {user.username} disconnected {csp} account")
     
     return {

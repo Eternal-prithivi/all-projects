@@ -2,20 +2,30 @@
 
 ## 🔄 Current Resume State
 
-**Status:** COMPLETE (2026-06-14)
+**Status:** COMPLETE (2026-06-15)
 
-**Phases 25–30 delivered:** Mobile foundation + card tables + QA; Electron shell; `/download` + CI; signing docs + updater stub.
+**Stage 1 — Production Beta:** CI, onboarding, cache, performance, desktop branded icons — all delivered and pushed to `stage`.
 
-**Next:** Push tag `desktop-v0.1.0` to produce first GitHub Release installers (optional).
+**Next (Stage 2 — when user asks):** Desktop code signing; tag `desktop-v0.1.2` with rebuilt branded installers; Redis app cache; dashboard BFF endpoint.
 
 ---
 
 ## ✅ Last Known Good State
 
-**Mobile + Desktop Download** (2026-06-14) — pushed `stage` @ Phase 30
+**Stage 1 closeout** (2026-06-15)
 
-- Mobile: breakpoints, card tables, mobile tips, E2E
-- Desktop: `desktop/`, `/download`, `desktop-release.yml`
-- Docs: `docs/desktop/INSTALL.md`, `SIGNING.md`
+- CI: Playwright green; desktop-release workflow fixed
+- Onboarding: `OnboardingTour.jsx`, `GettingStartedCard`, `ONBOARDING_GUIDE.md`
+- Cache: billing/cost/availability fixes; `CACHING_GUIDE.md`, `ADR_001_CACHING_STRATEGY.md`
+- Performance: `DashboardPage.jsx` deferred loads; `billing_status.py` cache; `routes_dashboard.py` Mongo aggregation
+- Desktop: `generate-brand-assets.mjs` → icns/ico; `desktop/package.json` prebuild + platform icons
+- Docs: `STATUS.md`, `PROGRESS.md`, `PROGRESS_HISTORY.md` updated
 
-**Git:** `stage` branch — see latest commit on origin
+**Git:** `stage` @ latest push — verify CI + Vercel + Render after push
+
+**Verify locally:**
+```bash
+cd backend && .venv/bin/python -m pytest -q
+cd frontend && npm run lint && npm run build
+cd frontend && npm run test:e2e
+```

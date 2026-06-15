@@ -83,6 +83,22 @@ class MongoDB:
 
             self._create_index_if_missing("sessions", [("username", 1), ("last_active", -1)])
             self._create_index_if_missing("activity_log", [("username", 1), ("timestamp", -1)])
+            self._create_index_if_missing("users", [("username", 1)], unique=True)
+            self._create_index_if_missing(
+                "byoc_credentials",
+                [("username", 1), ("csp", 1), ("is_active", 1)],
+            )
+            self._create_index_if_missing("vm_metrics", [("vm_name", 1), ("timestamp", -1)])
+            self._create_index_if_missing("vm_assignments", [("status", 1)])
+            self._create_index_if_missing(
+                "vm_assignments", [("user_id", 1), ("assigned_at", -1)]
+            )
+            self._create_index_if_missing(
+                "files", [("owner_username", 1), ("upload_date", -1)]
+            )
+            self._create_index_if_missing(
+                "secure_files", [("owner_username", 1), ("upload_date", -1)]
+            )
             self._create_index_if_missing("password_reset_requests", [("token_hash", 1)])
             self._create_index_if_missing(
                 "password_reset_requests",

@@ -75,34 +75,56 @@ class InvoicesListResponse(BaseModel):
     current_month_costs: CostBreakdown
 
 
-# Cache for billing cost data (1 hour TTL)
-billing_cache = {
-    "data": None,
-    "timestamp": 0,
-    "ttl": 3600  # 1 hour
-}
+# Cache for billing cost data (1 hour TTL) — keyed per user + date range to prevent
+# cross-user data leakage when multiple users share the same process instance.
+# Format: {cache_key: (CostBreakdown, timestamp)}
+_billing_cache: Dict[str, Any] = {}
+BILLING_CACHE_TTL = 3600  # 1 hour
+
+
+def _billing_cache_key(username: str, start_date: str, end_date: str) -> str:
+    return f"{username}:{start_date}:{end_date}"
+
+
+def _billing_cache_get(key: str) -> Optional[Any]:
+    entry = _billing_cache.get(key)
+    if entry is None:
+        return None
+    data, ts = entry
+    if (time.time() - ts) >= BILLING_CACHE_TTL:
+        del _billing_cache[key]
+        return None
+    return data
+
+
+def _billing_cache_set(key: str, data: Any) -> None:
+    # Evict entries beyond 200 to avoid unbounded growth
+    if len(_billing_cache) >= 200:
+        oldest = min(_billing_cache, key=lambda k: _billing_cache[k][1])
+        del _billing_cache[oldest]
+    _billing_cache[key] = (data, time.time())
 
 
 def fetch_real_cloud_costs(
     username: str, start_date: str, end_date: str, use_cache: bool = True
 ) -> CostBreakdown:
     """
-    Fetch real costs from cloud providers for the specified date range (cached for 1 hour)
-    Returns CostBreakdown with actual costs or 0.0 if provider not configured
+    Fetch real costs from cloud providers for the specified date range (cached per user, 1 h TTL).
+    Each (username, start_date, end_date) tuple gets its own cache slot so users can never
+    see each other's cost data even within the same process.
     """
-    # Check cache first
+    cache_key = _billing_cache_key(username, start_date, end_date)
+
     if use_cache:
-        current_time = time.time()
-        cache_key = f"{username}_{start_date}_{end_date}"
-        if billing_cache["data"] is not None and (current_time - billing_cache["timestamp"]) < billing_cache["ttl"]:
+        cached = _billing_cache_get(cache_key)
+        if cached is not None:
             logger.info(f"Using cached billing cost data for {cache_key}")
-            return billing_cache["data"]
-    
-    logger.info(f"Fetching fresh billing cost data for {start_date} to {end_date} (Cost Explorer API call)")
+            return cached
+
+    logger.info(f"Fetching fresh billing cost data for {username} {start_date}→{end_date}")
     costs = CostBreakdown()
-    
+
     try:
-        # Fetch AWS costs
         aws_data = get_aws_cost_and_usage(
             username,
             start_date=start_date,
@@ -111,43 +133,31 @@ def fetch_real_cloud_costs(
             group_by=[],
         )
         if aws_data and 'ResultsByTime' in aws_data:
-            aws_total = sum(
-                float(period['Total']['UnblendedCost']['Amount']) 
-                for period in aws_data['ResultsByTime']
-            )
-            costs.aws = round(aws_total, 2)
+            costs.aws = round(sum(
+                float(p['Total']['UnblendedCost']['Amount'])
+                for p in aws_data['ResultsByTime']
+            ), 2)
     except Exception as e:
-        logger.error(f"AWS cost fetch failed: {e}")
-        costs.aws = 0.0
-    
+        logger.error(f"AWS cost fetch failed for {username}: {e}")
+
     try:
-        # Fetch GCP costs
         gcp_data = get_gcp_billing_data(username, start_date=start_date, end_date=end_date)
         if gcp_data and 'TotalCost' in gcp_data:
             costs.gcp = round(gcp_data['TotalCost'], 2)
-        elif gcp_data and gcp_data.get('status') in ['missing_config', 'missing_dependency', 'error']:
-            costs.gcp = 0.0
     except Exception as e:
-        logger.error(f"GCP cost fetch failed: {e}")
-        costs.gcp = 0.0
-    
+        logger.error(f"GCP cost fetch failed for {username}: {e}")
+
     try:
-        # Fetch Azure costs
         azure_data = get_azure_billing_data(username, start_date=start_date, end_date=end_date)
         if azure_data and 'TotalCost' in azure_data:
             costs.azure = round(azure_data['TotalCost'], 2)
-        elif azure_data and azure_data.get('status') in ['missing_config', 'missing_dependency', 'error']:
-            costs.azure = 0.0
     except Exception as e:
-        logger.error(f"Azure cost fetch failed: {e}")
-        costs.azure = 0.0
-    
-    # Update cache
+        logger.error(f"Azure cost fetch failed for {username}: {e}")
+
     if use_cache:
-        billing_cache["data"] = costs
-        billing_cache["timestamp"] = time.time()
-        logger.info(f"Billing cost data cached")
-    
+        _billing_cache_set(cache_key, costs)
+        logger.info(f"Billing cost cached for {cache_key}")
+
     _apply_storage_api_metering(username, costs, start_date, end_date)
     return costs
 

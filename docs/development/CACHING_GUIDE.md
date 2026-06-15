@@ -1,253 +1,287 @@
-# Caching Strategy & Real-Time Mode Guide
+# Zenith Caching Strategy — Complete Reference
+
+> **Last updated:** June 2026  
+> **Scope:** frontend browser caches + backend in-memory caches + Mongo-backed caches
+
+---
 
 ## Overview
 
-Your application uses intelligent caching to **reduce cloud API costs** while maintaining good user experience. This guide explains what's cached, what isn't, and how to enable real-time mode.
+Zenith uses a layered caching strategy to keep cloud API costs low and page loads fast.
+There is no dedicated cache service (Redis is the Celery broker only; an application-level
+Redis cache is on the Phase 25 roadmap). All caches today are either **browser sessionStorage /
+localStorage** or **in-process Python dicts / `@lru_cache`**.
+
+### Key principle
+
+> Each cache slot is **keyed by the requesting user and query parameters**. Sharing a single
+> slot across users would leak one user's cloud cost data to another — this was a bug in
+> `billing_cache` (fixed June 2026, see below).
 
 ---
 
-## 🎛️ Configuration Variables
+## Backend caches
 
-### `DEMO_MODE` (default: `true`)
-- **What it does**: Uses mock data instead of real cloud APIs
-- **Cost**: $0 (no API calls)
-- **When to use**: Development, testing, portfolio demos
+### 1. VM metrics, cluster health, and recommendations (`routes_vm.py`)
 
-### `REAL_TIME_MODE` (default: `false`)
-- **What it does**: Disables all caching, fetches fresh data every request
-- **Cost**: 💰💰 Higher (more GCP API calls)
-- **When to use**: Production environments requiring absolute real-time accuracy
+| Cache | TTL | Invalidation |
+|-------|-----|--------------|
+| `metrics_cache` | 120 s | `invalidate_all_caches()` on any VM operation; skipped if `REAL_TIME_MODE=true` |
+| `cluster_health_cache` | 60 s | Same |
+| `recommendations_cache` | 180 s | Same |
 
----
+These are in-process dicts. They are **not shared across Render instances** — each dyno keeps
+its own copy. Invalidation on one instance does not propagate to others.
 
-## 📊 What's Cached (REAL_TIME_MODE=false)
-
-### ✅ **VM Metrics** (2-minute cache)
-**What's cached:**
-- CPU usage %
-- Memory usage %
-- Disk I/O (read/write MB)
-- Network I/O (in/out MB)
-- Uptime hours
-- Estimated cost
-
-**What's ALWAYS real-time (never cached):**
-- Active user count (from MongoDB, zero cost)
-- VM status (RUNNING/STOPPED)
-
-**Cache invalidation:**
-- Auto-expires after 2 minutes
-- Manually cleared on VM request/release/migrate
-
-**Impact of caching:**
-- ✅ **Not critical** - Metrics changing every 2 minutes is acceptable
-- 💰 **Cost savings**: ~80% reduction in GCP Monitoring API calls
-- **Example**: If 10 users check metrics within 2 minutes, only 1 API call is made
+**Cost impact:** Without caching, 100 users checking 10 VMs over 8 hours = ~48 000 GCP
+Monitoring API calls/day. With the 2-minute cache: ~4 000 calls (~90 % saving).
 
 ---
 
-### ✅ **Cluster Health Dashboard** (1-minute cache)
-**What's cached:**
-- Total VMs in cluster
-- Average CPU/memory across cluster
-- Total active users
-- Cluster utilization %
-- Health status (healthy/warning/critical)
+### 2. Cost query cache (`routes_cost.py`)
 
-**Cache invalidation:**
-- Auto-expires after 1 minute
-- Manually cleared on any VM operation (request/release/migrate)
+| Property | Value |
+|----------|-------|
+| Type | In-process dict keyed `{username}_{provider}_{start}_{end}_{granularity}` |
+| TTL | 3 600 s (1 h) |
+| Max entries | 50 (LRU eviction) |
+| Invalidation | TTL expiry · `DELETE /api/cost/cache/clear` (auth required) |
 
-**Impact of caching:**
-- ✅ **Not critical** - Dashboard refreshing every minute is acceptable
-- 💰 **Cost savings**: ~85% reduction in bulk GCP API calls
-- **Example**: Dashboard auto-refreshes every 30 seconds, but only 1 real API call per minute
+The `/api/cost/cache/clear` endpoint requires authentication (fixed June 2026; was unauthenticated
+before, allowing anyone to force expensive cache-miss refreshes).
 
 ---
 
-### ✅ **Migration Recommendations** (3-minute cache)
-**What's cached:**
-- AI-powered load balancing suggestions
-- Over-utilized VM detection
-- Under-utilized VM detection
-- Optimal migration targets
-- Confidence scores
+### 3. Billing cost cache (`routes_billing.py`)
 
-**Cache invalidation:**
-- Auto-expires after 3 minutes
-- Manually cleared on VM operations
+| Property | Value |
+|----------|-------|
+| Type | In-process dict `_billing_cache` keyed `{username}:{start_date}:{end_date}` |
+| TTL | 3 600 s (1 h) per entry |
+| Max entries | 200 (LRU eviction) |
+| Invalidation | TTL expiry |
 
-**Impact of caching:**
-- ✅ **Not critical** - Recommendations don't change frequently
-- 💰 **Cost savings**: ~90% reduction (recommendations are expensive to compute)
-- **Example**: Multiple admins viewing recommendations use same cached data
+> **Bug fixed June 2026:** The old implementation used a single global `{data, timestamp}`
+> slot. All users shared it — user B could receive user A's costs within the 1-hour window.
+> The new implementation uses a per-(user, start, end) tuple as the cache key.
 
 ---
 
-## 🚫 What's NEVER Cached (Always Real-Time)
+### 4. Dashboard cost aggregation (`cost_aggregation.py`)
 
-### ❌ **User Actions**
-- Request VM
-- Release VM
-- Migrate VM
-- Start/Stop VM
-**Why**: Critical operations must execute immediately
-
-### ❌ **Authentication**
-- Login
-- Logout
-- Token validation
-- Session management
-**Why**: Security-critical, must be real-time
-
-### ❌ **MongoDB Queries**
-- Active user counts
-- VM assignments
-- User profiles
-- Activity logs
-**Why**: MongoDB is fast and free to query
-
-### ❌ **File Operations**
-- Upload to S3/GCS/Azure
-- Download files
-- Delete files
-**Why**: Must reflect immediately
+| Property | Value |
+|----------|-------|
+| Key | Per-username |
+| TTL | 3 600 s |
+| Force refresh | `POST /api/dashboard/refresh-costs` (calls `refresh_user_costs(force=True)`) |
 
 ---
 
-## 💰 Cost Impact Analysis
+### 5. Budget cost cache (`routes_budgets.py`)
 
-### **With Caching (REAL_TIME_MODE=false)** - RECOMMENDED
+| Property | Value |
+|----------|-------|
+| TTL | 900 s (15 min) |
+| Invalidation | TTL expiry only |
+
+---
+
+### 6. Organisation summary cache (`organizations/service.py`)
+
+| Property | Value |
+|----------|-------|
+| Key | Per `org_id` |
+| TTL | 300 s |
+| Invalidation | `invalidate_org_cache(org_id)` — called on billing + member changes |
+
+---
+
+### 7. AWS bucket discovery cache (`byoc/aws_bucket_discovery.py`)
+
+| Property | Value |
+|----------|-------|
+| Store | MongoDB `aws_bucket_cache` collection |
+| TTL | 600 s (10 min) |
+| Invalidation | `invalidate_bucket_cache(username)` on credential update; `POST /byoc/aws-buckets/refresh` |
+
+---
+
+### 8. Pricing cache (`pricing/routes_pricing.py`)
+
+| Property | Value |
+|----------|-------|
+| Store | MongoDB `pricing_cache` collection |
+| TTL | 7 days |
+| Invalidation | Celery `update_pricing_cache` weekly task; `POST /pricing/refresh` |
+
+> **Known issue:** Refresh inserts new documents rather than upserting — the collection
+> grows over time. A cleanup task should be added to prune old entries.
+
+---
+
+### 9. GCP zone cache (`vm/gcp_zones.py`)
+
+| Property | Value |
+|----------|-------|
+| Key | Per GCP project ID |
+| TTL | **None** (process lifetime) |
+| Invalidation | `invalidate_gcp_zone_cache()` manual call |
+
+Action: this should be given a TTL (e.g., 1 h) to handle zone additions without a deploy.
+
+---
+
+### 10. `@lru_cache` — process-lifetime singletons
+
+| Location | What | Invalidation |
+|----------|------|--------------|
+| `cloud/platform_storage_catalog.py` | Platform region catalog | `invalidate_platform_catalog_cache()` |
+| `ml/inference.py` | ML model artefacts | `clear_model_artifact_cache()` |
+
+---
+
+## Frontend caches
+
+### A. Auth tokens (localStorage + sessionStorage)
+
+| Key | Store | TTL | Invalidation |
+|-----|-------|-----|--------------|
+| `authToken` | localStorage | None (JWT expiry is server-side) | Logout, 401 response, session expiry |
+| `cachedUser` | sessionStorage | Session lifetime | Re-fetched on every login; cleared on logout / 401 / 403 |
+
+`cachedUser` is written by `AuthContext` after every successful `/api/users/me` fetch.
+It is read on startup to avoid a loading flash. The session lifetime ensures it is cleared
+when the tab closes.
+
+---
+
+### B. Cloud availability (`CloudAvailabilityContext.jsx`)
+
+| Key | Store | TTL | Invalidation |
+|-----|-------|-----|--------------|
+| `cache_cloud_availability` | sessionStorage | **5 minutes** | `invalidateCloudAvailabilityCache()` exported from context — call after BYOC connect / disconnect |
+
+> **Fixed June 2026:** Previously had no TTL — a stale availability snapshot could persist
+> for the entire session after a BYOC credential change.
+
+---
+
+### C. Page-level UI caches (sessionStorage)
+
+These caches prevent page flicker on re-navigation within a session. They have **no TTL**;
+they survive until the tab closes or the relevant action triggers a re-fetch.
+
+| Page / Hook | Keys | Stale risk | Notes |
+|-------------|------|-----------|-------|
+| `VMClusterPage` | `cache_vm_assignments`, `cache_vm_clusters`, `cache_vm_recs` | Low — VM ops trigger re-fetch | May show outdated data if another browser tab triggers a VM action |
+| `BillingPage` | `cache_billing_sub`, `cache_billing_history`, `cache_billing_costs` | Low — refreshed on page visit | No invalidation after payment events |
+| `SecurityPage` | `cache_secureFiles`, `cache_2faStatus` | Low | Could lag after file upload/delete in another tab |
+| `StoragePage` | `zenith.storage.*` bucket/region | Very low — user selections only | Intentional persistence |
+| Cloud bucket hooks | `{prefix}.bucket`, `.region` | Very low | User selection persistence |
+
+**Recommendation:** Add a `ts` field to these caches and evict entries older than 15 minutes
+on page mount. This would make stale-data windows predictable.
+
+---
+
+### D. Onboarding / preferences (localStorage)
+
+| Key | Content | Cleared by |
+|-----|---------|-----------|
+| `zenith_onboarding_complete_{username}` | Tour finished flag | "Restart Tour" button in Settings |
+| `zenith_onboarding_dismissed_{username}` | Tour dismissed (skip) | Same |
+| `zenith_gs_dismissed_{username}` | Getting Started checklist dismissed | Dismiss button on card |
+| `zenith-preferences` | Currency, timezone, date format | Overwritten on settings save |
+| `zenith-theme` | dark / light / auto | `ThemeContext.setTheme()` |
+
+Keys are suffixed with `_{username}` (fixed June 2026) so each account gets its own state
+on shared devices.
+
+---
+
+## What is NOT cached
+
+| Layer | Reason |
+|-------|--------|
+| User actions (VM request, release, migrate) | Must execute immediately; cache invalidated on completion |
+| Authentication (login, logout, token validation) | Security-critical — never cache |
+| File operations (upload, download, delete) | Must reflect immediately |
+| MongoDB document reads | MongoDB is fast and local; no additional caching needed |
+| WebSocket fan-out | Planned for Phase 25 with Redis pub/sub |
+
+---
+
+## Configuration variables
+
+| Variable | Default | Effect |
+|----------|---------|--------|
+| `DEMO_MODE=true` | `true` | Returns mock data — zero cloud API calls, zero cost |
+| `REAL_TIME_MODE=false` | `false` | When `true`: disables all in-process backend caches — ~10× API cost increase |
+
+### Cost scenario (100 users, 10 VMs, 8-hour day)
+
 ```
-Scenario: 100 users, 10 VMs, 8-hour workday
+REAL_TIME_MODE=false (recommended):
+  VM metrics:       ~4 000 calls/day   (vs 48 000 — 92 % saving)
+  Cluster health:   ~96 calls/day      (vs 480    — 80 % saving)
+  Estimated cost:   ~$2–5/day
 
-VM Metrics:
-- Without cache: 100 users × 10 VMs × 480 checks = 48,000 API calls/day
-- With 2-min cache: ~4,000 API calls/day
-- 💰 Savings: ~90%
-
-Cluster Health:
-- Without cache: Dashboard × 60 refreshes/hour × 8 hours = 480 API calls/day
-- With 1-min cache: ~96 API calls/day
-- 💰 Savings: ~80%
-
-Total Daily Cost: ~$2-5/day
+REAL_TIME_MODE=true:
+  VM metrics:        48 000 calls/day
+  Cluster health:      480 calls/day
+  Estimated cost:   ~$20–40/day
 ```
-
-### **Without Caching (REAL_TIME_MODE=true)** - USE CAREFULLY
-```
-Same scenario:
-- VM Metrics: 48,000 API calls/day
-- Cluster Health: 480 API calls/day
-- Recommendations: 1,440 API calls/day
-
-Total Daily Cost: ~$20-40/day
-```
-
-**10x cost increase for minimal UX improvement**
 
 ---
 
-## 🎯 Recommendations
+## Cache monitoring
 
-### **Use REAL_TIME_MODE=false (cached) when:**
-✅ Cost optimization is important
-✅ 1-2 minute delays are acceptable
-✅ Running on free/hobby tier
-✅ Development/staging environments
-✅ Portfolio/demo projects
-
-### **Use REAL_TIME_MODE=true (real-time) when:**
-⚠️ Absolute accuracy is critical
-⚠️ Cost is not a concern
-⚠️ Handling live production traffic
-⚠️ SLA requires <1 minute data freshness
-⚠️ Customer-facing enterprise dashboard
-
----
-
-## 🔧 How to Enable Real-Time Mode
-
-### **Option 1: Render Environment Variable**
-1. Go to Render Dashboard → Your backend service
-2. Click **Environment** tab
-3. Add new variable:
-   ```
-   Key: REAL_TIME_MODE
-   Value: true
-   ```
-4. Click **Save Changes**
-5. Render redeploys automatically
-
-### **Option 2: .env File (Local Development)**
 ```bash
-# backend/.env
-REAL_TIME_MODE=true
+# Cost cache stats (authenticated)
+curl -H "Authorization: Bearer $TOKEN" https://<api>/api/cost/cache/stats
+
+# Force cost cache clear (authenticated)
+curl -X DELETE -H "Authorization: Bearer $TOKEN" https://<api>/api/cost/cache/clear
+
+# Force budget cost refresh
+curl -X POST -H "Authorization: Bearer $TOKEN" https://<api>/api/dashboard/refresh-costs
+
+# Pricing refresh
+curl -X POST -H "Authorization: Bearer $TOKEN" https://<api>/api/pricing/refresh
 ```
 
 ---
 
-## 📈 Monitoring Cache Performance
+## Known gaps and future work
 
-**Check logs for cache hits/misses:**
-```
-Mode: CACHED
-✓ All VM caches invalidated (cluster health, metrics, recommendations) - Mode: CACHED
-Collecting metrics for general-vm-1... (Mode: cached)
-```
-
-```
-Mode: REAL-TIME
-✓ All VM caches invalidated (cluster health, metrics, recommendations) - Mode: REAL-TIME
-Collecting metrics for general-vm-1... (Mode: REAL-TIME)
-```
+| Gap | Priority | Plan |
+|-----|----------|------|
+| GCP zone cache has no TTL | Medium | Add 1-hour TTL |
+| Pricing Mongo cache grows (no cleanup) | Low | Add TTL index + pruning task |
+| Page-level sessionStorage has no TTL | Low | Add `ts` field + 15-min eviction on mount |
+| No shared backend cache across Render instances | Medium | Phase 25: Redis app cache for cost / billing data |
+| `BYOC` connect/disconnect should call `invalidateCloudAvailabilityCache()` | Done ✓ | Exported helper available in `CloudAvailabilityContext` |
 
 ---
 
-## 🎓 Best Practices
+## Summary table
 
-1. **Start with caching enabled** (`REAL_TIME_MODE=false`)
-2. **Monitor your cloud bills** for actual API costs
-3. **Enable real-time only if needed** based on user feedback
-4. **Use demo mode** (`DEMO_MODE=true`) for free testing
-5. **Cache invalidation works automatically** on VM operations
-
----
-
-## 📝 Summary Table
-
-| Feature | Cache Duration | Always Real-Time? | Critical? | Cost Impact |
-|---------|---------------|-------------------|-----------|-------------|
-| VM Metrics | 2 minutes | User count | ✅ No | High |
-| Cluster Health | 1 minute | No | ✅ No | High |
-| Recommendations | 3 minutes | No | ✅ No | Very High |
-| User Actions | N/A | ✅ Yes | ⚠️ Yes | Low |
-| Authentication | N/A | ✅ Yes | ⚠️ Yes | Low |
-| MongoDB Queries | N/A | ✅ Yes | ✅ No | Zero |
-| File Operations | N/A | ✅ Yes | ⚠️ Yes | Medium |
-
----
-
-## 🚀 Current Production Setup
-
-**Your default configuration (BEST for portfolio/demo):**
-```bash
-DEMO_MODE=true           # Using mock data (zero cost)
-REAL_TIME_MODE=false     # Caching enabled (N/A in demo mode)
-```
-
-**When you switch to real cloud APIs:**
-```bash
-DEMO_MODE=false          # Using real cloud APIs
-REAL_TIME_MODE=false     # Keep caching for cost savings
-```
-
-**Only if absolutely necessary:**
-```bash
-DEMO_MODE=false          # Using real cloud APIs
-REAL_TIME_MODE=true      # Real-time data (10x cost increase)
-```
-
----
-
-**💡 Bottom Line:** Keep `REAL_TIME_MODE=false` unless you have a specific reason to pay 10x more for marginally fresher data. The current caching strategy provides excellent UX while keeping costs minimal.
+| Cache | Layer | TTL | User-keyed | Invalidation |
+|-------|-------|-----|-----------|--------------|
+| VM metrics | Backend in-memory | 120 s | ✓ | VM operations |
+| Cluster health | Backend in-memory | 60 s | ✓ | VM operations |
+| VM recommendations | Backend in-memory | 180 s | ✓ | VM operations |
+| Cost query | Backend in-memory | 3 600 s | ✓ | Auth-protected endpoint |
+| Billing costs | Backend in-memory | 3 600 s | ✓ | TTL only |
+| Dashboard costs | Backend in-memory | 3 600 s | ✓ | Force refresh endpoint |
+| Org summary | Backend in-memory | 300 s | ✓ | Member/billing changes |
+| AWS buckets | MongoDB | 600 s | ✓ | Credential update |
+| Pricing data | MongoDB | 7 days | ✗ | Celery weekly + manual |
+| GCP zones | `@lru_cache` | None | ✓ | Manual call |
+| Platform catalog | `@lru_cache` | None | ✗ | App startup |
+| ML model | `@lru_cache` | None | ✗ | Clear call |
+| `authToken` | localStorage | JWT expiry | ✓ | Logout / 401 |
+| `cachedUser` | sessionStorage | Session | ✓ | Logout / 401 / 403 |
+| Cloud availability | sessionStorage | 5 min | ✓ | BYOC changes |
+| VM/Billing/Security UI | sessionStorage | Session | ✓ | Page re-fetch |
+| Onboarding state | localStorage | Forever | ✓ | Restart Tour button |

@@ -13,6 +13,10 @@
   "scripts": {
     "dev": "electron .",
     "icons": "cd ../frontend && npm run brand:assets",
+    "prebuild": "npm run icons",
+    "prebuild:mac": "npm run icons",
+    "prebuild:win": "npm run icons",
+    "prebuild:linux": "npm run icons",
     "build": "electron-builder --publish never",
     "build:mac": "electron-builder --mac --publish never",
     "build:win": "electron-builder --win --publish never",
@@ -34,9 +38,9 @@
       "electron/**/*",
       "package.json"
     ],
-    "icon": "icon.png",
     "mac": {
       "category": "public.app-category.productivity",
+      "icon": "icon.icns",
       "target": [
         "dmg"
       ],
@@ -44,9 +48,11 @@
     },
     "dmg": {
       "title": "Zenith ${version}",
+      "icon": "icon.icns",
       "iconSize": 80
     },
     "win": {
+      "icon": "icon.ico",
       "target": [
         "nsis"
       ],

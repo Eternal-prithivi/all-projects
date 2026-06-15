@@ -10,6 +10,8 @@
 
 Download links: [https://rajverse.me/download](https://rajverse.me/download)
 
+Desktop installers use the same gold **Z** mark as the web app (`assets/brand/zenith-icon.png`). If an older build shows the default Electron atom icon, download the latest release or rebuild with `npm run icons` before packaging.
+
 ## Unsigned beta warnings
 
 Current releases are **unsigned** (no Apple notarization or Windows Authenticode yet).

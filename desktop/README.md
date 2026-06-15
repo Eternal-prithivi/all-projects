@@ -24,7 +24,10 @@ ZENITH_APP_URL=http://localhost:5173 npm run dev
 
 ## Build installers (unsigned beta)
 
+Icons are generated from `assets/brand/zenith-icon.png` (same Z mark as the web app) via `npm run icons`, which runs automatically before each build.
+
 ```bash
+npm run icons       # regenerate build/icon.icns, icon.ico, icons/*.png
 npm run build:mac    # .dmg in dist/
 npm run build:win    # NSIS .exe in dist/
 npm run build:linux  # .AppImage + .deb in dist/

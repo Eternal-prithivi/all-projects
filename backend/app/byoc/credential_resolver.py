@@ -14,6 +14,7 @@
 or the user's own BYOC credentials for each operation.
 """
 
+import time
 from typing import Optional, Dict, Any
 from app.database.mongo_client import get_database
 from app.byoc.aws_bucket_helpers import REPLICA_REGION_DEFAULT
@@ -464,19 +465,38 @@ def resolve_credentials(username: str, provider: str = "aws") -> Optional[Dict[s
     return None
 
 
+def invalidate_byoc_status_cache(username: Optional[str] = None) -> None:
+    """Clear BYOC status cache after connect/disconnect."""
+    if username is None:
+        _byoc_status_cache.clear()
+    else:
+        _byoc_status_cache.pop(username, None)
+
+
+_byoc_status_cache: Dict[str, tuple] = {}
+BYOC_STATUS_TTL = 60  # seconds
+
+
 def get_byoc_status(username: str) -> Dict[str, Any]:
     """
     Get BYOC status for all CSPs for a user.
     Returns which clouds have BYOC configured.
+    Uses a single Mongo query and a short TTL cache.
     """
+    entry = _byoc_status_cache.get(username)
+    if entry is not None:
+        data, ts = entry
+        if (time.time() - ts) < BYOC_STATUS_TTL:
+            return data
+
+    records = {
+        doc["csp"]: doc
+        for doc in byoc_collection.find({"username": username, "is_active": True})
+    }
     status = {}
     for csp in ["AWS", "GCP", "Azure"]:
-        record = byoc_collection.find_one({
-            "username": username,
-            "csp": csp,
-            "is_active": True
-        })
-        entry = {
+        record = records.get(csp)
+        entry_data = {
             "connected": record is not None,
             "connection_method": record.get("connection_method", None) if record else None,
             "bucket_name": record.get("bucket_name", record.get("container_name", "")) if record else "",
@@ -484,8 +504,10 @@ def get_byoc_status(username: str) -> Dict[str, Any]:
         }
         if record and csp == "AWS":
             layout = normalize_aws_byoc_layout(record)
-            entry.update({**layout, "bucket_name": layout["storage_bucket_name"]})
-        status[csp.lower()] = entry
+            entry_data.update({**layout, "bucket_name": layout["storage_bucket_name"]})
+        status[csp.lower()] = entry_data
+
+    _byoc_status_cache[username] = (status, time.time())
     return status
 
 
