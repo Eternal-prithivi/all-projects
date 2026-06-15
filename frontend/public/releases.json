@@ -1,31 +1,31 @@
 {
-  "version": "0.1.2",
+  "version": "0.1.3",
   "publishedAt": "2026-06-15",
   "beta": true,
-  "releaseTag": "desktop-v0.1.2",
+  "releaseTag": "desktop-v0.1.3",
   "githubRepo": "Eternal-prithivi/all-projects",
   "platforms": {
     "mac": {
       "label": "macOS",
       "extension": "dmg",
-      "artifactName": "Zenith-0.1.2.dmg",
+      "artifactName": "Zenith-0.1.3.dmg",
       "minOs": "macOS 11 (Big Sur) or later",
-      "sha256": "292a015a274d94b8bd46cbf94159b015008dba999f7dcf127225db7499e93b7f"
+      "sha256": "52e1896fb70d9f5bd2fcce3d196d5732e38ea94d66e546230254a4f5785a1b40"
     },
     "win": {
       "label": "Windows",
       "extension": "exe",
-      "artifactName": "Zenith.Setup.0.1.2.exe",
+      "artifactName": "Zenith.Setup.0.1.3.exe",
       "minOs": "Windows 10 or later (64-bit)",
-      "sha256": "caa4fac02183a95b4b527219515b0e95452f861e89f5c88fcd6b3c5199d914b0"
+      "sha256": "b1c1da4f9982e8ba5de8b441cb05245f37aabad5d8ccf8ad8bec4b0dba191d8e"
     },
     "linux": {
       "label": "Linux",
       "extension": "AppImage",
-      "artifactName": "Zenith-0.1.2.AppImage",
-      "altArtifactName": "zenith-desktop_0.1.2_amd64.deb",
+      "artifactName": "Zenith-0.1.3.AppImage",
+      "altArtifactName": "zenith-desktop_0.1.3_amd64.deb",
       "minOs": "Ubuntu 20.04+ or equivalent (64-bit)",
-      "sha256": "277654a5a3289f73025e50d6db6aca993de89f41699d84aa3029397d4f632edc"
+      "sha256": "5cdb51f8c2fbb0fcb773f3f176330c48495cac4542cd0b45af6cc6e2f890886c"
     }
   }
 }
