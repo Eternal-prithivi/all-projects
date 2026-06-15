@@ -28,6 +28,9 @@ function tourKeys(username) {
   };
 }
 
+/** Session flag — Settings → Restart Tour sets this before navigating to /dashboard. */
+const ONBOARDING_RESTART_KEY = 'zenith_onboarding_restart';
+
 /**
  * OnboardingTour — Guided first-time walkthrough using react-joyride v3.
  * 
@@ -46,7 +49,8 @@ function OnboardingTour() {
   const [showWelcome, setShowWelcome] = useState(false);
   const [joyrideLib, setJoyrideLib] = useState(null);
   const joyrideRef = useRef(null);
-  const hasCheckedRef = React.useRef(false);
+  const checkedUsernameRef = useRef(null);
+  const pendingRunRef = useRef(false);
 
   const loadJoyride = useCallback(async () => {
     if (joyrideRef.current) return joyrideRef.current;
@@ -89,13 +93,14 @@ function OnboardingTour() {
       disableBeacon: true,
     },
     {
-      target: '[data-type="costs"]',
+      target: '[data-tour="card-costs"]',
       content: (
         <div className="tour-step-content">
           <h3>Cost Overview</h3>
           <p>
-            Track your multi-cloud spending at a glance. The sparkline shows your
-            7-day trend. Hit <strong>Refresh</strong> to pull live data from AWS.
+            Your <strong>30-day multi-cloud spend</strong> and 7-day trend live here.
+            Connect AWS, GCP, or Azure in Settings, then hit <strong>Refresh</strong> to pull
+            live billing data into this card.
           </p>
         </div>
       ),
@@ -103,14 +108,14 @@ function OnboardingTour() {
       disableBeacon: true,
     },
     {
-      target: '[data-type="storage"]',
+      target: '[data-tour="card-storage"]',
       content: (
         <div className="tour-step-content">
           <h3>Storage Management</h3>
           <p>
-            Monitor your storage usage across AWS, GCP, and Azure.
-            Our <strong>ML engine</strong> automatically recommends the cheapest
-            provider and tier for each file you upload.
+            Track how much of your plan capacity you&apos;re using. Upload files from the
+            <strong> Storage </strong> page — our <strong>ML engine</strong> recommends the
+            cheapest cloud tier for each file.
           </p>
         </div>
       ),
@@ -118,14 +123,14 @@ function OnboardingTour() {
       disableBeacon: true,
     },
     {
-      target: '[data-type="vms"]',
+      target: '[data-tour="card-vms"]',
       content: (
         <div className="tour-step-content">
           <h3>VM Cluster Health</h3>
           <p>
-            See all your virtual machines at a glance — healthy, warning, and critical.
-            Describe your workload in plain English and our <strong>NLP classifier</strong> will
-            assign you to the optimal cluster.
+            See healthy, warning, and critical VMs at a glance. On the
+            <strong> VM Cluster </strong> page, describe your workload in plain English —
+            our <strong>NLP classifier</strong> assigns the right cluster for you.
           </p>
         </div>
       ),
@@ -166,39 +171,50 @@ function OnboardingTour() {
     },
   ];
 
-  // Check ONCE on mount — never re-trigger on navigation
+  // Show welcome when auth is ready; honour Settings → Restart Tour in the same session.
   useEffect(() => {
-    if (hasCheckedRef.current) return;
-    hasCheckedRef.current = true;
+    if (!user?.username || location.pathname !== '/dashboard') return undefined;
 
-    const keys = tourKeys(user?.username);
-    const isComplete = localStorage.getItem(keys.complete);
-    const isDismissed = localStorage.getItem(keys.dismissed);
-    const isDashboard = location.pathname === '/dashboard';
+    const keys = tourKeys(user.username);
+    const forceRestart = sessionStorage.getItem(ONBOARDING_RESTART_KEY) === '1';
 
-    if (!isComplete && !isDismissed && isDashboard) {
-      const timer = setTimeout(() => {
-        setShowWelcome(true);
-      }, 1500);
+    if (forceRestart) {
+      sessionStorage.removeItem(ONBOARDING_RESTART_KEY);
+      setRun(false);
+      setMobileTipIndex(0);
+      const timer = setTimeout(() => setShowWelcome(true), 400);
       return () => clearTimeout(timer);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- welcome modal once on dashboard mount
-  }, [isMobile, user?.username]);
+
+    if (checkedUsernameRef.current === user.username) return undefined;
+    checkedUsernameRef.current = user.username;
+
+    const isComplete = localStorage.getItem(keys.complete);
+    const isDismissed = localStorage.getItem(keys.dismissed);
+    if (isComplete || isDismissed) return undefined;
+
+    const timer = setTimeout(() => setShowWelcome(true), 1500);
+    return () => clearTimeout(timer);
+  }, [user?.username, location.pathname]);
 
   const [mobileTipIndex, setMobileTipIndex] = useState(0);
 
   const mobileTips = [
     {
+      title: 'Welcome to Zenith',
+      body: 'This short orientation replaces the desktop tour. Zenith unifies AWS, GCP, and Azure costs, storage, and VMs in one place.',
+    },
+    {
       title: 'Bottom navigation',
       body: 'Use the tabs at the bottom for Overview, Storage, Infrastructure, and Cost. Tap More for Security, Billing, Settings, and Help.',
     },
     {
-      title: 'Upload & analyze',
-      body: 'Open Storage to upload files with ML tier recommendations, or Cost Analysis to refresh live spend from your connected clouds.',
+      title: 'Your first tasks',
+      body: 'Connect a cloud in Settings, upload a file in Storage, or open Cost Analysis. The Getting Started checklist on the dashboard tracks your progress.',
     },
     {
       title: 'Need help?',
-      body: 'Tap More → Help for FAQs, or open Support from the header profile menu. You can restart this tips sheet from Settings.',
+      body: 'Tap More → Help for FAQs, or open Support from the profile menu. You can replay these tips from Settings → Restart Tour.',
     },
   ];
 
@@ -216,9 +232,18 @@ function OnboardingTour() {
 
   const startTour = useCallback(async () => {
     setShowWelcome(false);
+    pendingRunRef.current = true;
     await loadJoyride();
-    setTimeout(() => setRun(true), 300);
   }, [loadJoyride]);
+
+  useEffect(() => {
+    if (!joyrideLib || !pendingRunRef.current || isMobile) return undefined;
+    pendingRunRef.current = false;
+    const outer = requestAnimationFrame(() => {
+      requestAnimationFrame(() => setRun(true));
+    });
+    return () => cancelAnimationFrame(outer);
+  }, [joyrideLib, isMobile]);
 
   const dismissTour = useCallback(() => {
     const keys = tourKeys(user?.username);
@@ -304,7 +329,7 @@ function OnboardingTour() {
         <div className="tour-welcome-overlay mobile-tips-overlay" onClick={dismissMobileTips}>
           <div className="tour-welcome-card mobile-tips-card" onClick={(e) => e.stopPropagation()}>
             <div className="tour-welcome-glow" />
-            <p className="mobile-tips-kicker">Mobile tips</p>
+            <p className="mobile-tips-kicker">Quick orientation</p>
             <h2>{mobileTips[mobileTipIndex].title}</h2>
             <p>{mobileTips[mobileTipIndex].body}</p>
             <div className="mobile-tips-dots" aria-hidden="true">
@@ -343,19 +368,24 @@ function OnboardingTour() {
             </div>
             <h2>Welcome to Zenith</h2>
             <p>
-              Your multi-cloud management platform is ready.
-              Take a quick tour to discover the key features?
+              Zenith brings your <strong>AWS, GCP, and Azure</strong> costs, storage, and VMs
+              into one dashboard.
+            </p>
+            <p className="tour-welcome-detail">
+              This 7-step tour (~2 min) shows where to connect clouds, read your live widgets,
+              jump to common tasks, and find help. You&apos;ll also see a <strong>Getting Started</strong>{' '}
+              checklist below the tour for hands-on setup.
             </p>
             <div className="tour-welcome-actions">
-              <button className="tour-btn tour-btn-next" onClick={startTour}>
+              <button type="button" className="tour-btn tour-btn-next" onClick={startTour}>
                 Start Tour
               </button>
-              <button className="tour-btn tour-btn-skip" onClick={dismissTour}>
-                I'll explore on my own
+              <button type="button" className="tour-btn tour-btn-skip" onClick={dismissTour}>
+                Skip — I&apos;ll use the checklist
               </button>
             </div>
             <p className="tour-welcome-hint">
-              You can restart this tour anytime from Settings
+              Replay anytime from Settings → Preferences → Restart Tour
             </p>
           </div>
         </div>

@@ -14,9 +14,9 @@ import React from 'react';
  * @param {string} size - Bento grid size ('lg', 'md', 'sm')
  * @param {React.ReactNode} children - Content below the header (charts, rings, etc.)
  */
-function StatCard({ title, value, icon, trend, trendValue, subtitle, action, type, size = 'md', children }) {
+function StatCard({ title, value, icon, trend, trendValue, subtitle, action, type, size = 'md', children, ...rest }) {
   return (
-    <div className={`bento-card size-${size}`} data-type={type}>
+    <div className={`bento-card size-${size}`} data-type={type} {...rest}>
       <div className="stat-card-header">
         <div className="stat-icon">{icon}</div>
         <h3 className="card-title">{title}</h3>

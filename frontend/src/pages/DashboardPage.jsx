@@ -99,8 +99,11 @@ function GettingStartedCard({ username, stats, byocConnected }) {
     <div className="gs-card" role="region" aria-label="Getting started checklist">
       <div className="gs-header">
         <div className="gs-header-text">
-          <h3 className="gs-title">Get started with Zenith</h3>
-          <p className="gs-subtitle">{doneCount} of {GS_STEPS.length} steps complete</p>
+          <h3 className="gs-title">Getting started checklist</h3>
+          <p className="gs-subtitle">
+            Four hands-on steps to connect clouds, analyze spend, upload files, and request VMs.
+            {' '}{doneCount} of {GS_STEPS.length} complete
+          </p>
         </div>
         <div className="gs-progress-wrap">
           <div className="gs-progress-bar" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}>
@@ -511,6 +514,7 @@ function DashboardPage() {
           type="vms"
           size="md"
           value={`${animatedVMs} Active`}
+          data-tour="card-vms"
         >
           <div className="vm-rings-row">
             <div className="vm-ring-item">
@@ -557,6 +561,7 @@ function DashboardPage() {
           icon={<IconHardDrive />}
           type="storage"
           size="sm"
+          data-tour="card-storage"
         >
           <div className="storage-ring-center">
             <ProgressRing

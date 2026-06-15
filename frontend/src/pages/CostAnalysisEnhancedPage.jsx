@@ -12,6 +12,7 @@
 // =============================================================================
 import React, { useState, useEffect } from 'react';
 import { apiClient, getApiErrorMessage } from '../api.js';
+import { useAuth } from '../context/AuthContext.jsx';
 import { useNotifications } from "../hooks/useNotifications";
 import { usePreferences } from '../context/PreferencesContext.jsx';
 import PageHeader from '../components/ui/PageHeader.jsx';
@@ -45,6 +46,7 @@ const ProviderLogo = ({ provider }) => (
 );
 
 const CostAnalysisEnhancedPage = () => {
+  const { user } = useAuth();
   const notifications = useNotifications();
   const { formatCurrency } = usePreferences();
   const { runPageRefresh, pageRefreshing } = usePageRefresh();
@@ -53,6 +55,12 @@ const CostAnalysisEnhancedPage = () => {
   const costProviderKeys = (getFeature('cost').providers || []).map((p) => CSP_TO_COST_KEY[p]).filter(Boolean);
   const lockedCostProviders = getLockedProviders('cost');
   const costFullyBlocked = !costProviderKeys.length && lockedCostProviders.length > 0;
+
+  useEffect(() => {
+    if (user?.username) {
+      localStorage.setItem(`zenith_visited_costs_${user.username}`, '1');
+    }
+  }, [user?.username]);
 
   // Core state
   const [selectedProvider, setSelectedProvider] = useState('aws');

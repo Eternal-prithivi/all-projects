@@ -1984,7 +1984,7 @@ const SettingsPage = () => {
           <div className="setting-item setting-item--action settings-tour-row">
             <div className="setting-info">
               <h4>Onboarding Tour</h4>
-              <p>Restart the guided walkthrough of Zenith&apos;s key features</p>
+              <p>Replay the welcome walkthrough — 7 steps on desktop, a short orientation on mobile.</p>
             </div>
             <button
               type="button"
@@ -1995,9 +1995,9 @@ const SettingsPage = () => {
                 const suffix = username ? `_${username}` : '';
                 localStorage.removeItem(`zenith_onboarding_complete${suffix}`);
                 localStorage.removeItem(`zenith_onboarding_dismissed${suffix}`);
-                // Also clear legacy keys without suffix
                 localStorage.removeItem('zenith_onboarding_complete');
                 localStorage.removeItem('zenith_onboarding_dismissed');
+                sessionStorage.setItem('zenith_onboarding_restart', '1');
                 notifications.success('Tour restarted — taking you to the dashboard…');
                 setTimeout(() => navigate('/dashboard'), 800);
               }}
