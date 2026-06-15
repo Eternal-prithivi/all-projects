@@ -2100,25 +2100,24 @@
   border-color: var(--primary-gold);
 }
 
-/* VM Process Info */
+/* VM Process Info — compute accent palette */
 .vm-process-info {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  grid-template-columns: repeat(4, 1fr);
   gap: 1.5rem;
-  margin: 2rem 0;
+  margin: 1.5rem 0 0;
   padding: 1.5rem;
-  background: linear-gradient(145deg, var(--bg-elevated), var(--bg-card));
+  background: var(--bg-elevated);
   border-radius: var(--radius-lg);
   border: 1px solid var(--border-default);
-  box-shadow: var(--shadow-card);
-  backdrop-filter: blur(22px);
-  -webkit-backdrop-filter: blur(22px);
 }
 
 .vm-process-info .process-step {
   display: flex;
   align-items: flex-start;
   gap: 1rem;
+  padding: 0.75rem;
+  min-height: 80px;
 }
 
 .vm-process-info .process-icon {
@@ -2140,24 +2139,24 @@
   z-index: 2;
 }
 
-.vm-process-info .process-icon.workload {
-  background: rgba(59, 130, 246, 0.12);
-  color: var(--info);
+.vm-process-info .process-icon.nlp {
+  background: rgba(168, 85, 247, 0.14);
+  color: #c084fc;
 }
 
-.vm-process-info .process-icon.assign {
-  background: rgba(212, 175, 55, 0.12);
-  color: var(--gold-primary);
+.vm-process-info .process-icon.cluster {
+  background: rgba(6, 182, 212, 0.14);
+  color: #22d3ee;
 }
 
-.vm-process-info .process-icon.monitor {
-  background: rgba(34, 197, 94, 0.12);
-  color: var(--success);
+.vm-process-info .process-icon.telemetry {
+  background: rgba(244, 63, 94, 0.14);
+  color: #fb7185;
 }
 
-.vm-process-info .process-icon.scale {
-  background: rgba(245, 158, 11, 0.12);
-  color: var(--warning);
+.vm-process-info .process-icon.lifecycle {
+  background: rgba(99, 102, 241, 0.14);
+  color: #818cf8;
 }
 
 .vm-process-info .process-text {
@@ -2179,6 +2178,12 @@
 }
 
 /* Responsive */
+@media (max-width: 1200px) {
+  .vm-process-info {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
 @media (max-width: 768px) {
   .vm-process-info {
     grid-template-columns: 1fr;

@@ -26,6 +26,7 @@ import LoadingSpinner from "../components/LoadingSpinner.jsx";
 import EmptyState from "../components/EmptyState.jsx";
 import PageHeader from "../components/ui/PageHeader.jsx";
 import PageContainer from "../components/ui/PageContainer.jsx";
+import Panel from "../components/ui/Panel.jsx";
 import { usePageRefresh } from "../hooks/usePageRefresh.js";
 import { VMClusterSkeleton } from "../components/Skeletons.jsx";
 import WorkloadGuidancePanel from "../components/vm/WorkloadGuidancePanel.jsx";
@@ -951,6 +952,66 @@ function VMClusterPage() {
         lockedProviders={getLockedProviders('vm')}
         className="vm-capability-banner"
       />
+
+      <Panel
+        title="Intelligent Workload Placement"
+        description="Describe your workload in plain English. Zenith runs NLP analysis, assigns the optimal cluster pool (General, Storage, Memory, Performance, or AI/ML), and tracks live telemetry with lifecycle controls across AWS, Google Cloud, or Azure."
+        className="page-card zenith-surface zenith-surface--accent-vm"
+      >
+        <div className="vm-process-info">
+          <div className="process-step">
+            <div className="process-icon nlp">
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                <path d="M8 9h8M8 13h6" />
+              </svg>
+            </div>
+            <div className="process-text">
+              <strong>NLP Workload Analysis</strong>
+              <span>Plain-English intent, tech stack & urgency scoring</span>
+            </div>
+          </div>
+
+          <div className="process-step">
+            <div className="process-icon cluster">
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                <rect x="2" y="2" width="8" height="8" rx="1" />
+                <rect x="14" y="2" width="8" height="8" rx="1" />
+                <rect x="2" y="14" width="8" height="8" rx="1" />
+                <rect x="14" y="14" width="8" height="8" rx="1" />
+              </svg>
+            </div>
+            <div className="process-text">
+              <strong>Smart Cluster Assignment</strong>
+              <span>Performance, Storage, Memory, or AI/ML pools</span>
+            </div>
+          </div>
+
+          <div className="process-step">
+            <div className="process-icon telemetry">
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+              </svg>
+            </div>
+            <div className="process-text">
+              <strong>Live Telemetry</strong>
+              <span>CPU, memory & health rings per instance</span>
+            </div>
+          </div>
+
+          <div className="process-step">
+            <div className="process-icon lifecycle">
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
+              </svg>
+            </div>
+            <div className="process-text">
+              <strong>Lifecycle Controls</strong>
+              <span>Provision, release, transfer & cost preview</span>
+            </div>
+          </div>
+        </div>
+      </Panel>
 
       <div className="vm-cloud-toolbar-row">
         <CloudProviderToolbar

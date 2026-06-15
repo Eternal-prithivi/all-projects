@@ -383,6 +383,27 @@
   --process-glow-soft: rgba(59, 130, 246, 0.2);
 }
 
+/* VM cluster — violet / cyan / rose / indigo (distinct from storage & security) */
+.process-icon.nlp {
+  --process-glow: rgba(168, 85, 247, 0.55);
+  --process-glow-soft: rgba(168, 85, 247, 0.22);
+}
+
+.process-icon.cluster {
+  --process-glow: rgba(6, 182, 212, 0.55);
+  --process-glow-soft: rgba(6, 182, 212, 0.22);
+}
+
+.process-icon.telemetry {
+  --process-glow: rgba(244, 63, 94, 0.5);
+  --process-glow-soft: rgba(244, 63, 94, 0.2);
+}
+
+.process-icon.lifecycle {
+  --process-glow: rgba(99, 102, 241, 0.55);
+  --process-glow-soft: rgba(99, 102, 241, 0.22);
+}
+
 .wizard-step.active .wizard-step-number {
   --process-glow: rgba(212, 175, 55, 0.55);
   --process-glow-soft: rgba(212, 175, 55, 0.22);
