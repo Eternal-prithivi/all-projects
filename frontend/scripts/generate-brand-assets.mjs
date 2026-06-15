@@ -58,6 +58,28 @@ await transparentPng
  * Favicon / PWA: matte pad — scale mark larger on small sizes so the full "Z" reads
  * (avoids looking like a lone gold triangle in browser / Google search UI).
  */
+/**
+ * macOS Big Sur+ squircle — same ~22.37% corner curve as Apple icon templates.
+ * Transparent outside the shape so Launchpad shows rounded edges like native apps.
+ */
+function squircleMaskSvg(size) {
+  const r = (size * 0.2237).toFixed(3);
+  return Buffer.from(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}">
+      <rect width="${size}" height="${size}" rx="${r}" ry="${r}" fill="white"/>
+    </svg>`,
+  );
+}
+
+async function applySquircleMask(input, size) {
+  return sharp(input)
+    .ensureAlpha()
+    .resize(size, size)
+    .composite([{ input: squircleMaskSvg(size), blend: 'dest-in' }])
+    .png()
+    .toBuffer();
+}
+
 const padIcon = async (size, bg = BRAND_BG) => {
   const padRatio = size <= 48 ? 0.06 : size <= 96 ? 0.07 : 0.08;
   const pad = Math.max(2, Math.round(size * padRatio));
@@ -136,7 +158,8 @@ for (const size of desktopSizes) {
 /** macOS .icns + Windows .ico — required for Electron; PNG alone falls back to default Electron icon. */
 const png2icons = (await import('png2icons')).default;
 const masterPng = fs.readFileSync(path.join(desktopBuildRoot, 'icon.png'));
-const icns = png2icons.createICNS(masterPng, png2icons.BILINEAR, 0);
+const macMasterPng = await applySquircleMask(masterPng, 1024);
+const icns = png2icons.createICNS(macMasterPng, png2icons.BILINEAR, 0);
 const ico = png2icons.createICO(masterPng, png2icons.HERMITE, 0, true);
 if (!icns?.length || !ico?.length) {
   console.error('Failed to generate desktop .icns / .ico from brand master');
@@ -145,7 +168,7 @@ if (!icns?.length || !ico?.length) {
 fs.writeFileSync(path.join(desktopBuildRoot, 'icon.icns'), icns);
 fs.writeFileSync(path.join(desktopBuildRoot, 'icon.ico'), ico);
 
-const BRAND_VERSION = '6';
+const BRAND_VERSION = '7';
 fs.writeFileSync(
   path.join(publicRoot, 'brand-asset-version.txt'),
   BRAND_VERSION,
