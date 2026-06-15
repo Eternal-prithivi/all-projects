@@ -14,7 +14,7 @@ export const OG_IMAGE_PATH = '/og-image.png';
  * Bump when regenerating public/ favicons (npm run brand:assets) so browsers
  * and Google Search drop cached old marks.
  */
-export const BRAND_ASSET_VERSION = '6';
+export const BRAND_ASSET_VERSION = import.meta.env.VITE_BRAND_ASSET_VERSION || '8';
 
 /** Served from public/; source master is assets/brand/zenith-icon.png */
 export const LOGO_ICON_PATH = `/zenith-icon.png?v=${BRAND_ASSET_VERSION}`;

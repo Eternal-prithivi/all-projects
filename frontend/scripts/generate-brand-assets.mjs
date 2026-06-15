@@ -47,13 +47,6 @@ async function logoWithTransparentBg(input, { threshold = 42, feather = 58 } = {
 
 const transparentPng = await logoWithTransparentBg(sourceLogo);
 
-/** UI + schema: square transparent PNG (Google Organization logo). */
-await transparentPng
-  .clone()
-  .resize(512, 512, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
-  .png()
-  .toFile(path.join(publicRoot, 'zenith-icon.png'));
-
 /**
  * Favicon / PWA: matte pad — scale mark larger on small sizes so the full "Z" reads
  * (avoids looking like a lone gold triangle in browser / Google search UI).
@@ -100,11 +93,19 @@ const padIcon = async (size, bg = BRAND_BG) => {
   return flattenOnBrand(pipeline).png().toBuffer();
 };
 
+/** Padded brand tile clipped to macOS-style squircle (web + desktop). */
+async function padIconSquircle(size, bg = BRAND_BG) {
+  return applySquircleMask(await padIcon(size, bg), size);
+}
+
 const sizes = [16, 32, 48, 96, 192, 512];
 const icons = {};
 for (const size of sizes) {
-  icons[size] = await padIcon(size);
+  icons[size] = await padIconSquircle(size);
 }
+
+/** In-app logo (nav, auth, sidebar) — squircle tile matches desktop / PWA. */
+await sharp(icons[512]).toFile(path.join(publicRoot, 'zenith-icon.png'));
 
 await sharp(icons[512]).toFile(path.join(publicRoot, 'icon-512.png'));
 await sharp(icons[192]).toFile(path.join(publicRoot, 'icon-192.png'));
@@ -122,11 +123,7 @@ await sharp(icons[48]).toFile(path.join(publicRoot, 'favicon.ico'));
 await sharp(icons[512]).toFile(path.join(publicRoot, 'zenith-icon-solid.png'));
 
 const ogMarkSize = 300;
-const ogLogo = await transparentPng
-  .clone()
-  .resize(ogMarkSize, ogMarkSize, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
-  .png()
-  .toBuffer();
+const ogLogo = await padIconSquircle(ogMarkSize);
 
 const ogTextSvg = Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630">
   <rect width="1200" height="630" fill="${BRAND_BG}"/>
@@ -147,7 +144,7 @@ fs.mkdirSync(path.join(desktopBuildRoot, 'icons'), { recursive: true });
 
 const desktopSizes = [16, 32, 48, 64, 128, 256, 512, 1024];
 for (const size of desktopSizes) {
-  const buf = icons[size] ?? (await padIcon(size));
+  const buf = icons[size] ?? (await padIconSquircle(size));
   const outName = size === 1024 ? 'icon.png' : path.join('icons', `${size}x${size}.png`);
   await sharp(buf)
     .resize(size, size)
@@ -158,8 +155,7 @@ for (const size of desktopSizes) {
 /** macOS .icns + Windows .ico — required for Electron; PNG alone falls back to default Electron icon. */
 const png2icons = (await import('png2icons')).default;
 const masterPng = fs.readFileSync(path.join(desktopBuildRoot, 'icon.png'));
-const macMasterPng = await applySquircleMask(masterPng, 1024);
-const icns = png2icons.createICNS(macMasterPng, png2icons.BILINEAR, 0);
+const icns = png2icons.createICNS(masterPng, png2icons.BILINEAR, 0);
 const ico = png2icons.createICO(masterPng, png2icons.HERMITE, 0, true);
 if (!icns?.length || !ico?.length) {
   console.error('Failed to generate desktop .icns / .ico from brand master');
@@ -168,11 +164,19 @@ if (!icns?.length || !ico?.length) {
 fs.writeFileSync(path.join(desktopBuildRoot, 'icon.icns'), icns);
 fs.writeFileSync(path.join(desktopBuildRoot, 'icon.ico'), ico);
 
-const BRAND_VERSION = '7';
+const BRAND_VERSION = '8';
 fs.writeFileSync(
   path.join(publicRoot, 'brand-asset-version.txt'),
   BRAND_VERSION,
   'utf8',
 );
+
+const manifestPath = path.join(publicRoot, 'manifest.json');
+const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+for (const icon of manifest.icons) {
+  const base = icon.src.split('?')[0];
+  icon.src = `${base}?v=${BRAND_VERSION}`;
+}
+fs.writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
 
 console.log(`Brand assets generated → frontend/public/ + desktop/build/ (v${BRAND_VERSION})`);

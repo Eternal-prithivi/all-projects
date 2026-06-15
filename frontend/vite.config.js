@@ -1,15 +1,30 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
+const frontendRoot = path.dirname(fileURLToPath(import.meta.url));
 const SITE_URL = (process.env.VITE_SITE_URL || 'https://rajverse.me').replace(/\/$/, '');
 
+function readBrandAssetVersion() {
+  const versionPath = path.join(frontendRoot, 'public', 'brand-asset-version.txt');
+  return fs.readFileSync(versionPath, 'utf8').trim();
+}
+
 export default defineConfig({
+  define: {
+    'import.meta.env.VITE_BRAND_ASSET_VERSION': JSON.stringify(readBrandAssetVersion()),
+  },
   plugins: [
     react(),
     {
       name: 'inject-site-url',
       transformIndexHtml(html) {
-        return html.replace(/https:\/\/rajverse\.me/g, SITE_URL);
+        const brandVersion = readBrandAssetVersion();
+        return html
+          .replace(/https:\/\/rajverse\.me/g, SITE_URL)
+          .replace(/\?v=\d+/g, `?v=${brandVersion}`);
       },
     },
   ],

@@ -8,36 +8,40 @@
   "theme_color": "#050505",
   "icons": [
     {
-      "src": "/favicon-48.png?v=4",
+      "src": "/favicon-48.png?v=8",
       "sizes": "48x48",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/favicon-96.png?v=4",
+      "src": "/favicon-96.png?v=8",
       "sizes": "96x96",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/zenith-icon-solid.png?v=4",
+      "src": "/zenith-icon-solid.png?v=8",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/icon-192.png?v=4",
+      "src": "/icon-192.png?v=8",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "maskable"
     },
     {
-      "src": "/icon-512.png?v=4",
+      "src": "/icon-512.png?v=8",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"
     }
   ],
-  "categories": ["productivity", "business", "utilities"],
+  "categories": [
+    "productivity",
+    "business",
+    "utilities"
+  ],
   "orientation": "portrait-primary"
 }
