@@ -1,6 +1,7 @@
 import React from 'react';
 import { useAuth } from '../context/AuthContext.jsx';
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
+import { PlanEntitlementsProvider } from '../context/PlanEntitlementsContext.jsx';
 
 const ProtectedRoute = () => {
   const { isAuthenticated, loading } = useAuth();
@@ -42,7 +43,11 @@ const ProtectedRoute = () => {
     );
   }
 
-  return <Outlet />;
+  return (
+    <PlanEntitlementsProvider>
+      <Outlet />
+    </PlanEntitlementsProvider>
+  );
 };
 
 export default ProtectedRoute;

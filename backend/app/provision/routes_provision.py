@@ -38,7 +38,7 @@ from app.debug_agent_log import agent_log
 from typing import Any, Optional
 
 from bson import ObjectId
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel
 
@@ -46,7 +46,7 @@ from app.database.mongo_client import get_database
 from app.users.routes_users import get_current_user
 from app.trust.account_gate import require_platform_resource_access
 from app.utils.resource_limiter import resource_limiter
-from fastapi import Request
+from app.core.module_health import assert_module_available
 from app.provision.models import (
     CompareCloudsBody,
     DeploymentRecord,
@@ -516,6 +516,7 @@ async def run_plan(
     Plan deployment — boto3 (instant) or Terraform (background poll) per Settings.
     Works on localhost and Render; engine from users.settings.preferences.provision_engine.
     """
+    assert_module_available("provision")
     from app.cloud.providers import normalize_provider
 
     from app.cloud.availability import CloudFeature, assert_provider_available
@@ -776,6 +777,7 @@ async def run_apply(
     user: dict = Depends(require_platform_resource_access),
 ):
     """Run terraform apply on a previously planned deployment."""
+    assert_module_available("provision")
     collection = _get_deployments_collection()
     deployment = collection.find_one({"deployment_name": deployment_id, "user_id": user.username})
 
@@ -890,6 +892,19 @@ async def run_apply(
     if not workspace:
         raise HTTPException(status_code=500, detail="Workspace path missing from deployment record.")
 
+    from app.provision.terraform_jobs import dispatch_terraform_apply, should_offload_terraform
+
+    if should_offload_terraform():
+        mode = dispatch_terraform_apply(deployment_id, user.username)
+        return {
+            "success": True,
+            "status": DeploymentStatus.APPLYING,
+            "deployment_id": deployment_id,
+            "async": True,
+            "dispatch": mode,
+            "message": f"Terraform apply started ({mode}). Poll GET /api/provision/apply/status/{deployment_id}.",
+        }
+
     runner = TerraformRunner(workspace, cloud_env=cloud_env)
 
     apply_result = runner.apply()
@@ -927,6 +942,54 @@ async def run_apply(
         "created_resources": created,
         "output": apply_result.get("output", ""),
         "error": apply_result.get("error"),
+    }
+
+
+@router.get("/apply/status/{deployment_id}")
+async def get_apply_status(
+    deployment_id: str,
+    user: dict = Depends(get_current_user),
+):
+    """Poll async Terraform apply result."""
+    doc = await asyncio.to_thread(_get_deployment_for_user, deployment_id, user.username)
+    if not doc:
+        raise HTTPException(status_code=404, detail="Deployment not found.")
+    status = doc.get("status")
+    status_value = status.value if isinstance(status, DeploymentStatus) else str(status)
+    done = status_value in (
+        DeploymentStatus.DEPLOYED.value,
+        DeploymentStatus.APPLY_FAILED.value,
+    )
+    return {
+        "deployment_id": deployment_id,
+        "done": done,
+        "success": status_value == DeploymentStatus.DEPLOYED.value,
+        "status": status_value,
+        "output": doc.get("apply_output") or "",
+        "error": doc.get("plan_error") or "",
+    }
+
+
+@router.get("/destroy/status/{deployment_id}")
+async def get_destroy_status(
+    deployment_id: str,
+    user: dict = Depends(get_current_user),
+):
+    """Poll async Terraform destroy result."""
+    doc = await asyncio.to_thread(_get_deployment_for_user, deployment_id, user.username)
+    if not doc:
+        raise HTTPException(status_code=404, detail="Deployment not found.")
+    status = doc.get("status")
+    status_value = status.value if isinstance(status, DeploymentStatus) else str(status)
+    done = status_value in (
+        DeploymentStatus.DESTROYED.value,
+        DeploymentStatus.DESTROY_FAILED.value,
+    )
+    return {
+        "deployment_id": deployment_id,
+        "done": done,
+        "success": status_value == DeploymentStatus.DESTROYED.value,
+        "status": status_value,
     }
 
 
@@ -971,6 +1034,18 @@ async def run_destroy(
                 status_code=400,
                 detail="Terraform workspace missing for this deployment. Cannot destroy via Terraform.",
             )
+        from app.provision.terraform_jobs import dispatch_terraform_destroy, should_offload_terraform
+
+        if should_offload_terraform():
+            mode = dispatch_terraform_destroy(deployment_id, user.username)
+            return {
+                "success": True,
+                "status": DeploymentStatus.DESTROYING,
+                "deployment_id": deployment_id,
+                "async": True,
+                "dispatch": mode,
+                "message": f"Terraform destroy started ({mode}). Poll GET /api/provision/destroy/status/{deployment_id}.",
+            }
         runner = TerraformRunner(workspace, cloud_env=cloud_env)
         destroy_result = runner.destroy()
 

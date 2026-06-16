@@ -16,6 +16,7 @@ function LoginPage() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [needsEmailVerification, setNeedsEmailVerification] = useState(false);
   const [fieldErrors, setFieldErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
   const [ssoProviders, setSsoProviders] = useState([]);
@@ -86,6 +87,7 @@ function LoginPage() {
   const handleSubmit = async (event) => {
     event.preventDefault();
     setError('');
+    setNeedsEmailVerification(false);
     setFieldErrors(validation.errors);
 
     if (!validation.isValid) {
@@ -102,12 +104,16 @@ function LoginPage() {
       } catch {
         fingerprint = null;
       }
-      const data = await loginUser(credentials, fingerprint);
-      login(data.access_token);
+      await loginUser(credentials, fingerprint);
+      await login();
       // After login, AuthContext will fetch user data
       // The useEffect above will handle the redirect once isAuthenticated is true
     } catch (err) {
-      setError(getApiErrorMessage(err, 'An error occurred during login.'));
+      const message = getApiErrorMessage(err, 'An error occurred during login.');
+      setError(message);
+      if (/verify/i.test(message)) {
+        setNeedsEmailVerification(true);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -263,6 +269,12 @@ function LoginPage() {
             </button>
 
             {error && <p className="auth-error" id="login-error" role="alert">{error}</p>}
+            {needsEmailVerification && (
+              <p className="auth-hint" role="status">
+                Check your inbox for the verification link, or visit{' '}
+                <Link to="/verify-email">verify email</Link> for help.
+              </p>
+            )}
           </form>
 
           {ssoProviders.length > 0 && (

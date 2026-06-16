@@ -1,0 +1,39 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+ARG TERRAFORM_VERSION=1.10.5
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc \
+    ca-certificates \
+    curl \
+    unzip \
+    && curl -fsSL "https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_amd64.zip" \
+        -o /tmp/terraform.zip \
+    && unzip -q /tmp/terraform.zip -d /usr/local/bin \
+    && rm /tmp/terraform.zip \
+    && terraform version \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY app ./app
+COPY terraform ./terraform
+
+RUN mkdir -p /app/terraform_workspaces /app/terraform-plugin-cache
+
+ENV TERRAFORM_ROOT=/app/terraform
+ENV TF_PLUGIN_CACHE_DIR=/app/terraform-plugin-cache
+ENV ZENITH_SERVICE_ROLE=provision
+ENV PROVISION_CELERY_QUEUE=provision
+
+RUN cd /app/terraform && terraform init -backend=false -input=false -no-color
+
+RUN useradd --create-home --uid 10001 --shell /usr/sbin/nologin appuser \
+    && chown -R appuser:appuser /app
+
+USER appuser
+
+CMD ["celery", "-A", "app.provision_worker", "worker", "--loglevel=info", "--concurrency=1", "-Q", "provision"]

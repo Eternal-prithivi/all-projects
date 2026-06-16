@@ -28,7 +28,6 @@ import SupportWsBridge from "../support/SupportWsBridge.jsx";
 import { useTheme } from "../../context/ThemeContext.jsx";
 import { useAppKeyboardShortcuts } from "../../hooks/useAppKeyboardShortcuts.js";
 import { DASHBOARD_GO_ROUTES } from "../../utils/keyboardShortcuts.js";
-import { PlanEntitlementsProvider } from "../../context/PlanEntitlementsContext.jsx";
 import { CloudAvailabilityProvider } from "../../context/CloudAvailabilityContext.jsx";
 import { ConfirmProvider } from "../../context/ConfirmContext.jsx";
 import "../../styles/plan-upgrade.css";
@@ -57,7 +56,6 @@ function DashboardLayout() {
 
   return (
     <NotificationProvider>
-      <PlanEntitlementsProvider>
       <CloudAvailabilityProvider>
       <ConfirmProvider>
       <SupportWsBridge notifyOnAgentReply />
@@ -116,7 +114,6 @@ function DashboardLayout() {
       </div>
       </ConfirmProvider>
       </CloudAvailabilityProvider>
-      </PlanEntitlementsProvider>
     </NotificationProvider>
   );
 }

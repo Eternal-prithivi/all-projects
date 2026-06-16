@@ -11,13 +11,13 @@ const EMPTY = {
 };
 
 export function usePlanEntitlements() {
-  const { token } = useAuth();
+  const { isAuthenticated } = useAuth();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   const reload = useCallback(async () => {
-    if (!token) {
+    if (!isAuthenticated) {
       setData(null);
       setLoading(false);
       return;
@@ -33,7 +33,7 @@ export function usePlanEntitlements() {
     } finally {
       setLoading(false);
     }
-  }, [token]);
+  }, [isAuthenticated]);
 
   useEffect(() => {
     reload();

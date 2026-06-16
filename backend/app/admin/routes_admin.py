@@ -913,7 +913,7 @@ async def get_admin_settings(admin_user = Depends(verify_admin)):
                 "default_vm_limit": 2,
                 "default_storage_gb": 10,
                 "email_notifications_enabled": True,
-                "require_email_verification": False,
+                "require_email_verification": True,
                 "session_timeout_hours": 24,
                 "max_login_attempts": 5,
                 "updated_at": datetime.utcnow()

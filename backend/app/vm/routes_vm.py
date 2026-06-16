@@ -42,6 +42,7 @@ from app.vm.migration_recommender import MigrationRecommender
 from app.vm.workload_analyzer import WorkloadAnalyzer
 from app.vm.metrics_collector import VMMetricsCollector
 from app.utils.config import settings
+from app.core.module_health import assert_module_available
 from app.database.mongo_client import get_database
 from app.users.routes_users import get_current_user
 from app.admin.routes_admin import verify_admin
@@ -222,6 +223,7 @@ async def get_vm_clusters(
     csp: str = Query("GCP"),
     _user: User = Depends(get_current_user),
 ) -> Dict[str, Any]:
+    assert_module_available("compute")
     provider = normalize_provider(csp)
     if not getattr(settings, "VM_EXTENDED_CLUSTERS_ENABLED", True):
         from app.vm.cluster_catalog import get_cluster_definition

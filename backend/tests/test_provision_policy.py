@@ -78,6 +78,23 @@ def test_get_yaml_rules_loads_production_file():
     assert any(r.get("name") == "public_s3_bucket" for r in rules)
 
 
+def test_custom_rule_injection_rejected():
+    from app.provision.policy_store import validate_policy_condition
+
+    assert validate_policy_condition("__import__('os').system('id')") is not None
+    assert validate_policy_condition("open('/etc/passwd')") is not None
+
+
+def test_all_builtin_yaml_conditions_evaluate():
+    from app.provision.policy_eval import evaluate_condition
+
+    rules = get_yaml_rules()
+    base = config_to_policy_dict({})
+    for rule in rules:
+        condition = rule.get("condition", "False")
+        evaluate_condition(condition, base)
+
+
 def test_custom_rule_blocks_deploy_for_user():
     username = "custom_policy_eval_user"
     coll = get_database()["provision_custom_policies"]

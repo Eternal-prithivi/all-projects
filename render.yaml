@@ -1,16 +1,11 @@
-aservices:
+services:
   - type: web
-    name: zenith-backend
+    name: zenith-api
     env: docker
     region: singapore
     plan: free
     rootDir: backend
-    # Dockerfile installs Terraform CLI, copies terraform/ modules, pre-downloads
-    # AWS provider plugins, and starts uvicorn — required for /api/provision to work.
-    # DO NOT switch back to env: python — Terraform CLI will not be available and
-    # all infrastructure deploy endpoints will return 503.
-    dockerfilePath: ./Dockerfile
-    # Fast liveness endpoint — must not block on MongoDB (see app/main.py /health)
+    dockerfilePath: ./Dockerfile.api
     healthCheckPath: /health
     autoDeploy: true
     envVars:
@@ -18,7 +13,14 @@ aservices:
         value: production
       - key: FRONTEND_URL
         value: https://rajverse.me
-      # Secure vault targets (non-secret resource names — keys stay in Render dashboard)
+      - key: BACKEND_URL
+        value: https://api.rajverse.me
+      - key: PUBLIC_API_URL
+        value: https://api.rajverse.me
+      - key: ZENITH_SERVICE_ROLE
+        value: api
+      - key: PROVISION_OFFLOAD_TERRAFORM
+        value: "true"
       - key: GCP_SECURE_BUCKET_NAME
         value: zenith-secure-gcp
       - key: GCP_SECURE_REPLICA_BUCKET_NAME
@@ -27,24 +29,43 @@ aservices:
         value: zenith-secure
       - key: AZURE_SECURE_REPLICA_CONTAINER_NAME
         value: zenith-secure-replica
-      # Multi-region platform storage: mount catalog JSON in the image or set via Render secret.
-      # See docs/cloud/PLATFORM_STORAGE_REGIONS.md
-      # - key: PLATFORM_STORAGE_CATALOG_JSON
-      #   value: config/platform_storage_catalog.json
 
-  # Background jobs: storage tiering, cost anomalies, ML retrain, VM agent, drift checks.
-  # Copy the same env vars as zenith-backend in the Render dashboard (CELERY_BROKER_URL, Mongo, etc.).
   - type: worker
     name: zenith-celery
     env: docker
     region: singapore
     plan: free
     rootDir: backend
-    dockerfilePath: ./Dockerfile
+    dockerfilePath: ./Dockerfile.api
     dockerCommand: celery -A app.celery_worker worker --beat --loglevel=info --concurrency=2
     envVars:
       - key: ENVIRONMENT
         value: production
+      - key: ZENITH_SERVICE_ROLE
+        value: worker
+      - key: GCP_SECURE_BUCKET_NAME
+        value: zenith-secure-gcp
+      - key: GCP_SECURE_REPLICA_BUCKET_NAME
+        value: zenith-secure-gcp-replica
+      - key: AZURE_SECURE_CONTAINER_NAME
+        value: zenith-secure
+      - key: AZURE_SECURE_REPLICA_CONTAINER_NAME
+        value: zenith-secure-replica
+
+  - type: worker
+    name: zenith-provision
+    env: docker
+    region: singapore
+    plan: free
+    rootDir: backend
+    dockerfilePath: ./Dockerfile.provision
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: ZENITH_SERVICE_ROLE
+        value: provision
+      - key: PROVISION_CELERY_QUEUE
+        value: provision
       - key: GCP_SECURE_BUCKET_NAME
         value: zenith-secure-gcp
       - key: GCP_SECURE_REPLICA_BUCKET_NAME

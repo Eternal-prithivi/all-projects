@@ -33,11 +33,17 @@ def _disposable_domains() -> frozenset[str]:
     return frozenset(domains)
 
 
+def is_disposable_email(email: str) -> bool:
+    if not email or "@" not in email:
+        return False
+    domain = email.split("@")[-1].lower().strip()
+    return domain in _disposable_domains()
+
+
 def assert_email_allowed(email: str) -> None:
     if not email or "@" not in email:
         raise HTTPException(status_code=400, detail="Invalid email address")
-    domain = email.split("@")[-1].lower().strip()
-    if domain in _disposable_domains():
+    if is_disposable_email(email):
         raise HTTPException(
             status_code=400,
             detail="Disposable email addresses are not allowed. Use a permanent email.",
@@ -67,11 +73,22 @@ def verify_turnstile_token(token: Optional[str], remote_ip: Optional[str] = None
 
 
 def email_verification_required() -> bool:
+    """
+    Whether new signups must verify inbox before login / platform cloud use.
+
+    Precedence: REQUIRE_EMAIL_VERIFICATION env > platform_settings flag > env default.
+    """
+    from app.utils.config import settings
+
+    explicit = getattr(settings, "REQUIRE_EMAIL_VERIFICATION", None)
+    if explicit is not None:
+        return bool(explicit)
+
     from app.database.mongo_client import get_database
 
     doc = get_database()["platform_settings"].find_one({"_id": "platform_config"}) or {}
-    if doc.get("require_email_verification"):
-        return True
-    # Production default: require verification for platform cloud safety
-    env = os.getenv("ENVIRONMENT", "development")
-    return env == "production"
+    if "require_email_verification" in doc:
+        return bool(doc["require_email_verification"])
+
+    env = (getattr(settings, "ENVIRONMENT", None) or os.getenv("ENVIRONMENT", "development")).lower()
+    return env in ("production", "staging")

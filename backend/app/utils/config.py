@@ -11,6 +11,8 @@
 # =============================================================================
 # backend/app/utils/config.py
 
+from typing import Optional
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pathlib import Path
 import os
@@ -98,7 +100,8 @@ class Settings(BaseSettings):
     
     # --- Production Configuration ---
     FRONTEND_URL: str = "http://localhost:5173"  # Update to your production domain
-    BACKEND_URL: str = "http://localhost:8000"   # Update to your production API domain
+    BACKEND_URL: str = "http://localhost:8000"   # Production: https://api.rajverse.me
+    PUBLIC_API_URL: str = ""  # Defaults to BACKEND_URL when empty
     ENVIRONMENT: str = "development"  # development, staging, production
 
     # Platform cloud liability caps (USD, estimated)
@@ -111,6 +114,9 @@ class Settings(BaseSettings):
 
     # New-user signup alerts (defaults to aangatla957@gmail.com if unset)
     SIGNUP_NOTIFY_EMAIL: str = "aangatla957@gmail.com"
+
+    # Signup trust — unset uses platform_settings / production default
+    REQUIRE_EMAIL_VERIFICATION: Optional[bool] = None
 
     # --- Single-tenant / owner account (optional) ---
     # Comma-separated Zenith usernames that always receive PLATFORM_OWNER_PLAN on this deployment.

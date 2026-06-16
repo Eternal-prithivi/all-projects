@@ -1,24 +1,13 @@
 // =============================================================================
-// CONTEXT: AuthContext.jsx  (84 lines)
-// PURPOSE: JWT auth state — the backbone of every protected page
-//   - Provides: isAuthenticated, user, token, login(), logout()
-//   - token: stored in localStorage (key: "token")
-//   - login(token): saves token, fetches user from /api/users/me, sets state
-//   - logout(): clears localStorage token, resets state, redirects to /login
-// USED BY: Every dashboard page via: const { token, user } = useAuth()
-//          ProtectedRoute.jsx uses isAuthenticated to guard routes
-// DO NOT:
-//   - Store token in sessionStorage or cookies — localStorage is intentional
-//   - Add extra fields to AuthContext without updating every page that destructures it
-//   - Call getCurrentUser() from pages directly — let AuthContext manage it
+// CONTEXT: AuthContext.jsx
+// PURPOSE: Cookie-based auth state — httpOnly cookies on api.rajverse.me
 // =============================================================================
-import React, { createContext, useState, useContext, useEffect, useRef } from 'react';
-import { getCurrentUser } from '../api';
+import React, { createContext, useState, useContext, useEffect, useCallback } from 'react';
+import { getCurrentUser, logoutUser } from '../api';
 import { resetSessionExpiredGuard, triggerSessionExpired } from '../utils/sessionExpiry.js';
 
 const AuthContext = createContext(null);
 
-// Helper to read cached user from sessionStorage
 const getCachedUser = () => {
   try {
     const cached = sessionStorage.getItem('cachedUser');
@@ -29,93 +18,75 @@ const getCachedUser = () => {
 };
 
 export const AuthProvider = ({ children }) => {
-  const [token, setToken] = useState(localStorage.getItem('authToken'));
-  const [user, setUser] = useState(getCachedUser); // Restore cached user immediately
-  // Only show full loading spinner if we have NO cached user at all
-  const [loading, setLoading] = useState(() => !!localStorage.getItem('authToken') && !getCachedUser());
-  const fetchedRef = useRef(false);
+  const [user, setUser] = useState(getCachedUser);
+  const [loading, setLoading] = useState(true);
+  const [sessionKey, setSessionKey] = useState(0);
 
-  // This effect runs when the app loads or when the token changes
   useEffect(() => {
-    // Reset the fetch guard when token changes
-    fetchedRef.current = false;
-
-    const fetchUser = async () => {
-      if (token) {
-        // If we already have a cached user, don't block the UI
-        const hasCachedUser = !!getCachedUser();
-        if (!hasCachedUser) {
-          setLoading(true);
-        }
-        try {
-          const userData = await getCurrentUser(token);
-          setUser(userData);
-          // Cache user data for instant navigation
-          sessionStorage.setItem('cachedUser', JSON.stringify(userData));
-        } catch (error) {
-          const status = error?.response?.status;
-          console.error("❌ AuthContext: Failed to fetch user", error);
-          // Only clear session when the token is rejected — not on network blips
-          if (status === 401) {
-            setToken(null);
-            setUser(null);
-            triggerSessionExpired();
-          } else if (status === 403) {
-            setToken(null);
-            setUser(null);
-            localStorage.removeItem('authToken');
-            sessionStorage.removeItem('cachedUser');
-          }
-        } finally {
-          setLoading(false);
-          fetchedRef.current = true;
-        }
-      } else {
-        setUser(null);
-        sessionStorage.removeItem('cachedUser');
-        setLoading(false);
-      }
-    };
-
-    fetchUser();
-  }, [token]);
-
-  const login = (newToken) => {
-    resetSessionExpiredGuard();
-    setToken(newToken);
-    localStorage.setItem('authToken', newToken);
-  };
-
-  const logout = () => {
-    setToken(null);
-    setUser(null); // Clear the user data on logout
     localStorage.removeItem('authToken');
-    sessionStorage.removeItem('cachedUser');
-  };
+    sessionStorage.removeItem('refreshToken');
+  }, []);
 
-  const refreshUser = async () => {
-    if (!token) return null;
+  const loadUser = useCallback(async ({ silent = false } = {}) => {
+    if (!silent && !getCachedUser()) {
+      setLoading(true);
+    }
     try {
-      const userData = await getCurrentUser(token);
+      const userData = await getCurrentUser();
       setUser(userData);
       sessionStorage.setItem('cachedUser', JSON.stringify(userData));
       return userData;
     } catch (error) {
-      console.error('AuthContext: failed to refresh user', error);
+      const status = error?.response?.status;
+      if (status === 401) {
+        setUser(null);
+        sessionStorage.removeItem('cachedUser');
+        if (!silent) {
+          triggerSessionExpired({ redirect: false });
+        }
+      } else if (status === 403) {
+        setUser(null);
+        sessionStorage.removeItem('cachedUser');
+      }
       return null;
+    } finally {
+      setLoading(false);
     }
+  }, []);
+
+  useEffect(() => {
+    loadUser({ silent: !!getCachedUser() });
+  }, [loadUser, sessionKey]);
+
+  const login = async () => {
+    resetSessionExpiredGuard();
+    setSessionKey((k) => k + 1);
+    return loadUser();
   };
 
-  const isAuthenticated = !!token;
+  const logout = async () => {
+    try {
+      await logoutUser();
+    } catch {
+      // Clear local state even if API call fails
+    }
+    setUser(null);
+    sessionStorage.removeItem('cachedUser');
+    setSessionKey((k) => k + 1);
+  };
 
-  // Provide the user object and loading state to the rest of the app
+  const refreshUser = async () => loadUser({ silent: true });
+
+  const isAuthenticated = !!user;
+  const token = user ? 'cookie' : null;
+
   return (
-    <AuthContext.Provider value={{ isAuthenticated, token, user, loading, login, logout, refreshUser }}>
+    <AuthContext.Provider
+      value={{ isAuthenticated, token, user, loading, login, logout, refreshUser }}
+    >
       {children}
     </AuthContext.Provider>
   );
 };
 
-export const useAuth = () => {
-  return useContext(AuthContext);
-};
+export const useAuth = () => useContext(AuthContext);

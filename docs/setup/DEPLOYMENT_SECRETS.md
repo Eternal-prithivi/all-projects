@@ -22,19 +22,35 @@ Set in **Render → Service → Environment**:
 - `ENVIRONMENT=production`
 - `FRONTEND_URL=https://your-frontend-domain` (exact origin, no trailing slash)
 - `CORS_ALLOWED_ORIGINS` — comma-separated extra origins if needed (preview URLs, custom domains)
-- `PUBLIC_API_URL=https://your-api.onrender.com`
+- `PUBLIC_API_URL=https://api.rajverse.me` (custom domain — see [API_SUBDOMAIN.md](API_SUBDOMAIN.md))
 - Optional single-tenant owner plan (keeps Settings/Billing/BYOC in sync on production):
   - `PLATFORM_OWNER_USERNAMES` — exact Zenith username(s), comma-separated (e.g. `Tanjore developer`)
   - `PLATFORM_OWNER_PLAN` — `enterprise` (default), `pro`, `basic`, or `free`
 - Optional: `SENTRY_DSN`, `GOOGLE_OAUTH_*`
 
+### Signup trust (genuine email)
+
+| Variable | Where | Purpose |
+|----------|-------|---------|
+| `GMAIL_SENDER_EMAIL` | Render | From address for verification emails |
+| `GMAIL_APP_PASSWORD` | Render | Gmail app password (not your main password) |
+| `REQUIRE_EMAIL_VERIFICATION` | Render | `true` / `false` — overrides Mongo admin toggle |
+| `TURNSTILE_SECRET_KEY` | Render | Cloudflare Turnstile server secret |
+| `DISPOSABLE_EMAIL_DOMAINS` | Render | Optional extra throwaway domains (comma-separated) |
+| `VITE_TURNSTILE_SITE_KEY` | Vercel | Turnstile widget on register page |
+
+Email verification defaults **on** in `production` and `staging` unless disabled via env or **Admin → Settings**. Users must click the inbox link before login.
+
+Cloudflare Turnstile is optional until keys are set. For local dev without a Cloudflare account, use [Cloudflare test keys](https://developers.cloudflare.com/turnstile/troubleshooting/testing/) (`1x00000000000000000000AA` site key + matching secret).
+
 ## Production (Vercel frontend)
 
 Set in **Vercel → Project → Environment Variables**:
 
-- `VITE_API_URL` — backend base URL **without** `/api` (e.g. `https://zenith-backend-707i.onrender.com`)
+- `VITE_API_URL` — backend base URL **without** `/api` (e.g. `https://api.rajverse.me`)
 - `VITE_SITE_URL` — public frontend URL for canonical/OG tags (production: `https://rajverse.me`). Defaults in `index.html`, `robots.txt`, and `sitemap.xml` match this domain.
 - Optional: `VITE_SENTRY_DSN`
+- Optional: `VITE_TURNSTILE_SITE_KEY` — register-page CAPTCHA (pair with `TURNSTILE_SECRET_KEY` on Render)
 
 ## CORS
 

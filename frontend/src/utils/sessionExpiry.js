@@ -11,6 +11,8 @@ const AUTH_PATH_PREFIXES = [
   '/auth/forgot-password',
   '/auth/reset-password',
   '/auth/verify-email',
+  '/auth/refresh',
+  '/auth/logout',
   '/auth/sso/',
 ];
 
@@ -28,7 +30,6 @@ export function triggerSessionExpired(options = {}) {
   if (handling) return;
   handling = true;
 
-  localStorage.removeItem('authToken');
   sessionStorage.removeItem('cachedUser');
 
   const text =

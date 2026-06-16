@@ -260,8 +260,9 @@ def auth_headers(client: TestClient, user_factory):
             },
         )
         assert response.status_code == 200, response.text
-        token = response.json()["access_token"]
-        return {"Authorization": f"Bearer {token}"}, user
+        token = response.json().get("access_token")
+        headers = {"Authorization": f"Bearer {token}"} if token else {}
+        return headers, user
 
     return _login
 

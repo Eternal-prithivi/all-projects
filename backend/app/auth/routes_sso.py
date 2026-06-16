@@ -5,7 +5,7 @@ import secrets
 from urllib.parse import urlencode
 
 from fastapi import APIRouter, HTTPException
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, JSONResponse
 
 from app.auth.auth_utils import create_access_token, get_password_hash
 from app.database.mongo_client import get_database, get_users_collection
@@ -124,6 +124,10 @@ async def google_login_callback(code: str):
     user = users.find_one({"google_id": google_id}) or users.find_one({"email": email.lower()})
 
     if not user:
+        from app.trust.signup_guards import assert_email_allowed
+
+        assert_email_allowed(email.lower())
+
         base_username = email.split("@")[0].replace(".", "_")[:40]
         username = base_username
         suffix = 0
@@ -167,18 +171,15 @@ async def google_login_callback(code: str):
 
 @router.post("/exchange")
 async def sso_exchange_code(body: dict):
-    """Exchange short-lived SSO code for JWT pair (avoids token in browser URL)."""
+    """Exchange short-lived SSO code for JWT pair (sets httpOnly cookies)."""
     from app.trust.sso_exchange import consume_sso_exchange_code
     from app.auth.token_service import issue_token_pair
+    from app.auth.routes_auth import _auth_token_response
 
     code = (body or {}).get("code", "")
     username = consume_sso_exchange_code(code)
     access, refresh = issue_token_pair(username)
-    return {
-        "access_token": access,
-        "refresh_token": refresh,
-        "token_type": "bearer",
-    }
+    return _auth_token_response(access, refresh)
 
 
 @router.get("/oidc/login")

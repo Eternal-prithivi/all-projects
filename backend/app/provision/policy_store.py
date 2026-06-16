@@ -39,6 +39,8 @@ def _collection():
 
 def validate_policy_condition(condition: str) -> Optional[str]:
     """Return error message if condition is invalid, else None."""
+    from app.provision.policy_eval import validate_condition_syntax
+
     condition = (condition or "").strip()
     if not condition:
         return "Condition is required"
@@ -46,6 +48,9 @@ def validate_policy_condition(condition: str) -> Optional[str]:
         return "Condition must be 500 characters or fewer"
     if _UNSAFE_CONDITION.search(condition):
         return "Condition contains disallowed tokens"
+    syntax_err = validate_condition_syntax(condition)
+    if syntax_err:
+        return f"Invalid condition syntax: {syntax_err}"
     return None
 
 

@@ -26,31 +26,51 @@ if (import.meta.env.MODE === 'production') {
   console.info('[Zenith] API →', API_BASE_URL);
 }
 
-// Create a reusable axios client
+export const bearerHeaders = (token) =>
+  token && token !== 'cookie' ? { Authorization: `Bearer ${token}` } : {};
+
+// Create a reusable axios client (httpOnly cookies + optional Bearer for E2E)
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,
+  withCredentials: true,
 });
 
-// Add request interceptor to automatically attach token
-apiClient.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem('authToken'); // Changed from 'token' to 'authToken'
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
-  },
-  (error) => {
-    return Promise.reject(error);
+let refreshInFlight = null;
+
+const refreshSession = async () => {
+  if (!refreshInFlight) {
+    refreshInFlight = apiClient.post('/auth/refresh', {}).finally(() => {
+      refreshInFlight = null;
+    });
   }
-);
+  return refreshInFlight;
+};
 
 apiClient.interceptors.response.use(
   (response) => response,
-  (error) => {
+  async (error) => {
     const status = error?.response?.status;
-    if (status === 401 && shouldHandle401(error.config)) {
-      triggerSessionExpired();
+    const config = error?.config;
+    if (
+      status === 401
+      && shouldHandle401(config)
+      && config
+      && !config.__authRetried
+    ) {
+      try {
+        await refreshSession();
+        config.__authRetried = true;
+        return apiClient(config);
+      } catch {
+        triggerSessionExpired();
+      }
+    }
+    if (
+      status === 503
+      && error?.response?.data?.detail?.code === 'MODULE_UNAVAILABLE'
+    ) {
+      const mod = error.response.data.detail.module || 'service';
+      console.warn(`[Zenith] Module unavailable: ${mod}`);
     }
     return Promise.reject(error);
   }
@@ -161,11 +181,16 @@ export const resetPasswordWithToken = async ({ newPassword, method, token, otp, 
   }
 };
 
-// Current user
+// Current user (cookie session or optional Bearer for tests)
 export const getCurrentUser = async (token) => {
   const response = await apiClient.get("/users/me", {
-    headers: { Authorization: `Bearer ${token}` },
+    headers: bearerHeaders(token),
   });
+  return response.data;
+};
+
+export const logoutUser = async () => {
+  const response = await apiClient.post("/auth/logout");
   return response.data;
 };
 

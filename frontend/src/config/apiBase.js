@@ -2,11 +2,12 @@
  * Normalized API URLs for fetch() and axios.
  *
  * Vercel production must set:
- *   VITE_API_URL=https://zenith-backend-707i.onrender.com
+ *   VITE_API_URL=https://api.rajverse.me
  * (no trailing /api)
  */
 
-const PRODUCTION_API_ROOT = 'https://zenith-backend-707i.onrender.com';
+const PRODUCTION_API_ROOT = 'https://api.rajverse.me';
+const LEGACY_PRODUCTION_API_ROOT = 'https://zenith-backend-707i.onrender.com';
 const DEV_API_ROOT = 'http://localhost:8000';
 
 function isLocalhostUrl(url) {
@@ -25,7 +26,7 @@ export function getApiRoot() {
     if (fromEnv && !isLocalhostUrl(fromEnv)) {
       // Old Render hostname without the trailing "i" returns 404
       if (/zenith-backend-707\.onrender\.com/i.test(fromEnv) && !/707i/i.test(fromEnv)) {
-        return PRODUCTION_API_ROOT;
+        return LEGACY_PRODUCTION_API_ROOT;
       }
       return fromEnv;
     }

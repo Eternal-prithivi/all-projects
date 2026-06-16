@@ -15,13 +15,13 @@
 import bcrypt
 from datetime import datetime, timedelta
 from typing import Optional
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordBearer, HTTPAuthorizationCredentials
 from jose import jwt, JWTError
 from app.database.mongo_client import get_users_collection
 from app.users.user_model import UserInDB
 from app.utils.config import settings
-from fastapi import WebSocket, status, Query
+from fastapi import WebSocket, status, Query, Request
 # --- existing password functions ---
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
@@ -31,19 +31,31 @@ def get_password_hash(password: str) -> str:
     return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
 
 # --- JWT authentication ---
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/auth/token")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/auth/token", auto_error=False)
 
-def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
-    to_encode = data.copy()
-    if expires_delta:
-        expire = datetime.utcnow() + expires_delta
-    else:
-        expire = datetime.utcnow() + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-    to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
-    return encoded_jwt
 
-def get_current_user(token: str = Depends(oauth2_scheme)) -> UserInDB:
+def _resolve_bearer_token(
+    request: Request,
+    bearer_token: Optional[str] = Depends(oauth2_scheme),
+) -> str:
+    from app.auth.cookie_auth import get_access_token_from_request
+
+    cookie_token = get_access_token_from_request(request)
+    if cookie_token:
+        return cookie_token
+    if bearer_token:
+        return bearer_token
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+
+
+def get_current_user(
+    request: Request,
+    token: str = Depends(_resolve_bearer_token),
+) -> UserInDB:
     """
     Decodes the JWT token and fetches the current user from the database.
     """
@@ -78,6 +90,23 @@ def get_current_user(token: str = Depends(oauth2_scheme)) -> UserInDB:
         )
     return UserInDB(**user_data)
 
+
+def get_current_user_optional(
+    request: Request,
+    bearer_token: Optional[str] = Depends(oauth2_scheme),
+) -> Optional[UserInDB]:
+    """Return user when authenticated; None when no/invalid credentials (no 401)."""
+    from app.auth.cookie_auth import get_access_token_from_request
+
+    token = get_access_token_from_request(request) or bearer_token
+    if not token:
+        return None
+    try:
+        return get_current_user(request=request, token=token)
+    except HTTPException:
+        return None
+
+
 # --- 2FA specific functions ---
 def mark_2fa_unverified(username: str):
     """
@@ -98,20 +127,37 @@ def require_2fa(current_user: UserInDB = Depends(get_current_user)) -> UserInDB:
         )
     return current_user
 
+def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
+    to_encode = data.copy()
+    if expires_delta:
+        expire = datetime.utcnow() + expires_delta
+    else:
+        expire = datetime.utcnow() + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    to_encode.update({"exp": expire})
+    encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
+    return encoded_jwt
+
+
 async def get_current_user_ws(
     websocket: WebSocket,
-    token: str = Query(...),
+    token: Optional[str] = Query(None),
 ) -> UserInDB:
     """
-    Decodes the JWT token from a query parameter for WebSocket authentication.
+    WebSocket auth: query token (legacy) or zenith_access cookie.
     """
+    from app.auth.cookie_auth import ACCESS_COOKIE_NAME
+
+    raw_token = token or websocket.cookies.get(ACCESS_COOKIE_NAME)
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
+    if not raw_token:
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+        raise credentials_exception
     try:
-        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        payload = jwt.decode(raw_token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
         username: str = payload.get("sub")
         if username is None:
             raise credentials_exception

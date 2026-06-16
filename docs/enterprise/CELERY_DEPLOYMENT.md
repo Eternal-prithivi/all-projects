@@ -26,12 +26,19 @@ Set in `backend/.env` (and Render dashboard for both web + worker):
 
 ## Render
 
-[`render.yaml`](../../render.yaml) defines:
+[`render.yaml`](../../render.yaml) defines three services:
 
-1. **zenith-backend** — web (uvicorn)
-2. **zenith-celery** — worker with `--beat`
+1. **zenith-api** — slim web image (`Dockerfile.api`), no Terraform CLI; `ZENITH_SERVICE_ROLE=api`
+2. **zenith-celery** — general background jobs + Beat (`Dockerfile.api`)
+3. **zenith-provision** — Terraform worker on `provision` queue (`Dockerfile.provision`)
 
-Copy all env vars from the web service to the worker service in the Render dashboard (especially `CELERY_BROKER_URL`, Mongo, cloud keys).
+**Enable on Render (manual):**
+
+- [ ] Create all three services from `render.yaml` (or add `zenith-provision` if upgrading)
+- [ ] Copy **all** env vars from `zenith-api` to `zenith-celery` and `zenith-provision` (Mongo, `CELERY_BROKER_URL`, cloud keys, Razorpay, etc.)
+- [ ] Set `BACKEND_URL` / `PUBLIC_API_URL` to `https://api.rajverse.me` on API service
+- [ ] Add custom domain `api.rajverse.me` — see [API_SUBDOMAIN.md](../setup/API_SUBDOMAIN.md)
+- [ ] Confirm worker logs show Beat schedule and `provision.terraform_apply` registered on `zenith-provision`
 
 ## Verify
 

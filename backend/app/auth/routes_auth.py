@@ -16,6 +16,7 @@ import secrets
 
 from fastapi import APIRouter, Depends, HTTPException, status, Request, Query
 from fastapi.security import OAuth2PasswordRequestForm
+from fastapi.responses import JSONResponse
 from pymongo.collection import Collection
 from datetime import datetime, timedelta, timezone
 from typing import Optional
@@ -28,11 +29,12 @@ from app.users.user_model import Token, UserCreate, UserInDB
 from app.database.mongo_client import get_users_collection
 # --- MODIFIED LINE ---
 # Import the new function to reset 2FA status on login
-from app.auth.auth_utils import get_password_hash, verify_password, mark_2fa_unverified
+from app.auth.auth_utils import get_password_hash, verify_password, mark_2fa_unverified, get_current_user_optional
 from app.utils.config import settings
 from app.utils.logger import setup_logger
 from app.utils.responses import StandardResponse, ErrorResponses
 from app.contact.email_service import EmailService
+from app.trust.signup_guards import email_verification_required
 from app.trust.signup_notify import notify_new_user_signup
 
 # Set up logger
@@ -46,19 +48,24 @@ limiter = Limiter(key_func=get_remote_address)
 router = APIRouter(tags=["Authentication"])
 
 
-def _email_verification_required(db) -> bool:
-    from app.database.mongo_client import get_database
-
-    settings_doc = get_database()["platform_settings"].find_one({"_id": "platform_config"})
-    return bool(settings_doc and settings_doc.get("require_email_verification"))
-
-
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     to_encode = data.copy()
     expire = datetime.now(timezone.utc) + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
     return encoded_jwt
+
+
+def _auth_token_response(access_token: str, refresh_token: str) -> JSONResponse:
+    from app.auth.cookie_auth import attach_auth_cookies, legacy_token_body_enabled
+
+    body: dict = {"token_type": "bearer"}
+    if legacy_token_body_enabled():
+        body["access_token"] = access_token
+        body["refresh_token"] = refresh_token
+    response = JSONResponse(content=body)
+    attach_auth_cookies(response, access_token, refresh_token)
+    return response
 
 @router.post("/register", status_code=201)
 @limiter.limit("3/minute")  # Max 3 registrations per minute per IP
@@ -84,7 +91,7 @@ def register_user_route(request: Request, user: UserCreate, db: Collection = Dep
             hashed_password=hashed_password,
         )
         doc = user_in_db.model_dump()
-        require_verify = _email_verification_required(db)
+        require_verify = email_verification_required()
         if require_verify:
             token = secrets.token_urlsafe(32)
             doc["email_verified"] = False
@@ -125,7 +132,7 @@ def register_user_route(request: Request, user: UserCreate, db: Collection = Dep
         logger.error(f"Registration error for '{user.username}': {str(e)}")
         raise ErrorResponses.internal_error("Failed to create user account")
 
-@router.post("/token", response_model=Token)
+@router.post("/token")
 @limiter.limit("5/minute")  # Max 5 login attempts per minute per IP
 def login_for_access_token_route(
     request: Request,
@@ -146,7 +153,7 @@ def login_for_access_token_route(
         logger.warning("Login blocked for deleted account: %r", username)
         raise ErrorResponses.unauthorized("Incorrect username or password")
 
-    if _email_verification_required(db) and not user_dict.get("email_verified", True):
+    if email_verification_required() and not user_dict.get("email_verified", True):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Please verify your email before signing in.",
@@ -217,16 +224,31 @@ def login_for_access_token_route(
 
     access_token, refresh_token = issue_token_pair(user_in_db.username)
     logger.info(f"User '{form_data.username}' logged in successfully")
-    return Token(access_token=access_token, token_type="bearer", refresh_token=refresh_token)
+    return _auth_token_response(access_token, refresh_token)
 
 
-@router.post("/refresh", response_model=Token)
-def refresh_access_token(body: dict):
+@router.post("/refresh")
+def refresh_access_token(request: Request, body: dict | None = None):
+    from app.auth.cookie_auth import get_refresh_token_from_request
     from app.auth.token_service import rotate_refresh_token
 
-    raw = (body or {}).get("refresh_token", "")
+    raw = (body or {}).get("refresh_token") or get_refresh_token_from_request(request) or ""
     access, refresh = rotate_refresh_token(raw)
-    return Token(access_token=access, token_type="bearer", refresh_token=refresh)
+    return _auth_token_response(access, refresh)
+
+
+@router.post("/logout")
+def logout_route(
+    current_user: Optional[UserInDB] = Depends(get_current_user_optional),
+):
+    from app.auth.cookie_auth import clear_auth_cookies
+    from app.auth.token_service import revoke_refresh_tokens
+
+    response = JSONResponse(content={"success": True, "message": "Logged out"})
+    clear_auth_cookies(response)
+    if current_user is not None:
+        revoke_refresh_tokens(current_user.username)
+    return response
 
 
 @router.post("/verify-email")

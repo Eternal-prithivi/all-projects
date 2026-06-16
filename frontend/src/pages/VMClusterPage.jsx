@@ -66,10 +66,25 @@ import {
 import { usePlatformStorageRegions } from "../hooks/usePlatformStorageRegions.js";
 import "../styles/vmcluster.css";
 
-// API Functions
-const API_BASE_URL = import.meta.env.DEV 
-  ? 'http://localhost:8000/api/vm'
-  : 'https://zenith-backend-707i.onrender.com/api/vm';
+import { getApiBaseUrl } from '../config/apiBase.js';
+
+const VM_API_BASE = `${getApiBaseUrl()}/vm`;
+
+const vmFetch = (path, { token, method = 'GET', body, headers = {} } = {}) => {
+  const reqHeaders = { ...headers };
+  if (token && token !== 'cookie') {
+    reqHeaders.Authorization = `Bearer ${token}`;
+  }
+  if (body && !reqHeaders['Content-Type']) {
+    reqHeaders['Content-Type'] = 'application/json';
+  }
+  return fetch(`${VM_API_BASE}${path}`, {
+    method,
+    headers: reqHeaders,
+    credentials: 'include',
+    body: body ? JSON.stringify(body) : undefined,
+  });
+};
 
 const handleApiResponse = async (response) => {
   if (!response.ok) {
@@ -81,87 +96,59 @@ const handleApiResponse = async (response) => {
 };
 
 const analyzeWorkload = (data, token) =>
-  fetch(`${API_BASE_URL}/analyze-workload`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify(data),
-  }).then(handleApiResponse);
+  vmFetch('/analyze-workload', { token, method: 'POST', body: data }).then(handleApiResponse);
 
 const requestVMAssignment = (data, token) =>
-  fetch(`${API_BASE_URL}/request`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify({
-      csp: data.csp || "GCP",
-      ...data,
-    }),
+  vmFetch('/request', {
+    token,
+    method: 'POST',
+    body: { csp: data.csp || 'GCP', ...data },
   }).then(handleApiResponse);
 
 const getAllMyAssignments = (token) =>
-  fetch(`${API_BASE_URL}/my-assignments`, {
-    headers: { Authorization: `Bearer ${token}` },
-  }).then(handleApiResponse);
+  vmFetch('/my-assignments', { token }).then(handleApiResponse);
 
 const transferVM = (data, token) =>
-  fetch(`${API_BASE_URL}/transfer`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify({
-      csp: data.csp || "GCP",
-      ...data,
-    }),
+  vmFetch('/transfer', {
+    token,
+    method: 'POST',
+    body: { csp: data.csp || 'GCP', ...data },
   }).then(handleApiResponse);
 
-const getVMMetrics = (vmName, token, csp = "GCP", useRealMetrics = false) =>
-  fetch(
-    `${API_BASE_URL}/metrics/${encodeURIComponent(vmName)}?csp=${encodeURIComponent(csp)}&use_real=${useRealMetrics}`,
-    { headers: { Authorization: `Bearer ${token}` } }
+const getVMMetrics = (vmName, token, csp = 'GCP', useRealMetrics = false) =>
+  vmFetch(
+    `/metrics/${encodeURIComponent(vmName)}?csp=${encodeURIComponent(csp)}&use_real=${useRealMetrics}`,
+    { token },
   ).then(handleApiResponse);
 
-const getClusterHealth = (clusterType, token, csp = "GCP") =>
-  fetch(
-    `${API_BASE_URL}/admin/cluster-metrics/${clusterType}?csp=${encodeURIComponent(csp)}`,
-    { headers: { Authorization: `Bearer ${token}` } }
+const getClusterHealth = (clusterType, token, csp = 'GCP') =>
+  vmFetch(
+    `/admin/cluster-metrics/${clusterType}?csp=${encodeURIComponent(csp)}`,
+    { token },
   ).then(handleApiResponse);
 
-const getVmClusters = (token, csp = "GCP") =>
-  fetch(`${API_BASE_URL}/clusters?csp=${encodeURIComponent(csp)}`, {
-    headers: { Authorization: `Bearer ${token}` },
-  }).then(handleApiResponse);
+const getVmClusters = (token, csp = 'GCP') =>
+  vmFetch(`/clusters?csp=${encodeURIComponent(csp)}`, { token }).then(handleApiResponse);
 
-const getVmConfig = (vmName, token, csp = "GCP", platformRegionSlug = null) => {
+const getVmConfig = (vmName, token, csp = 'GCP', platformRegionSlug = null) => {
   const params = new URLSearchParams({ csp });
   if (platformRegionSlug) {
-    params.set("platform_region_slug", platformRegionSlug);
+    params.set('platform_region_slug', platformRegionSlug);
   }
-  return fetch(
-    `${API_BASE_URL}/config/${encodeURIComponent(vmName)}?${params.toString()}`,
-    { headers: { Authorization: `Bearer ${token}` } }
-  ).then(handleApiResponse);
+  return vmFetch(`/config/${encodeURIComponent(vmName)}?${params.toString()}`, { token }).then(
+    handleApiResponse,
+  );
 };
 
 const getRecommendations = (token, minScore = 50) =>
-  fetch(`${API_BASE_URL}/admin/recommendations?min_score=${minScore}`, {
-    headers: { Authorization: `Bearer ${token}` },
-  }).then(handleApiResponse);
+  vmFetch(`/admin/recommendations?min_score=${minScore}`, { token }).then(handleApiResponse);
 
 const getVmCostEstimate = (token, { csp, vmName, clusterType, rangeOnly }) => {
-  const params = new URLSearchParams({ csp: csp || "GCP" });
-  if (vmName) params.set("vm_name", vmName);
-  if (clusterType) params.set("cluster_type", clusterType);
-  if (rangeOnly) params.set("range_only", "true");
-  return fetch(`${API_BASE_URL}/cost-estimate?${params.toString()}`, {
-    headers: { Authorization: `Bearer ${token}` },
-  }).then(handleApiResponse);
+  const params = new URLSearchParams({ csp: csp || 'GCP' });
+  if (vmName) params.set('vm_name', vmName);
+  if (clusterType) params.set('cluster_type', clusterType);
+  if (rangeOnly) params.set('range_only', 'true');
+  return vmFetch(`/cost-estimate?${params.toString()}`, { token }).then(handleApiResponse);
 };
 
 function VMClusterPage() {
@@ -572,10 +559,7 @@ function VMClusterPage() {
     const regionQuery = platformRegionSlug
       ? `&platform_region_slug=${encodeURIComponent(platformRegionSlug)}`
       : "";
-    fetch(
-      `${API_BASE_URL}/pool?csp=${encodeURIComponent(activeCsp)}${regionQuery}`,
-      { headers: { Authorization: `Bearer ${token}` } }
-    )
+    vmFetch(`/pool?csp=${encodeURIComponent(activeCsp)}${regionQuery}`, { token })
       .then(handleApiResponse)
       .then((data) => {
         if (!cancelled) setVmPool(data);
@@ -597,10 +581,7 @@ function VMClusterPage() {
     const regionQuery = platformRegionSlug
       ? `&platform_region_slug=${encodeURIComponent(platformRegionSlug)}`
       : "";
-    fetch(
-      `${API_BASE_URL}/pool?csp=${encodeURIComponent(activeCsp)}${regionQuery}`,
-      { headers: { Authorization: `Bearer ${token}` } }
-    )
+    vmFetch(`/pool?csp=${encodeURIComponent(activeCsp)}${regionQuery}`, { token })
       .then(handleApiResponse)
       .then((data) => {
         if (!cancelled) setVmPool(data);
@@ -755,13 +736,10 @@ function VMClusterPage() {
     try {
       await executeWithNotification(
         async () => {
-          const url = assignmentId
-            ? `${API_BASE_URL}/release/${assignmentId}`
-            : `${API_BASE_URL}/release`;
-          await fetch(url, {
-            method: "POST",
-            headers: { Authorization: `Bearer ${token}` },
-          }).then(handleApiResponse);
+          const path = assignmentId
+            ? `/release/${assignmentId}`
+            : '/release';
+          await vmFetch(path, { token, method: 'POST' }).then(handleApiResponse);
           await Promise.all([fetchAssignment(), fetchClusterHealth(), fetchVMMetrics()]);
         },
         {
@@ -817,10 +795,7 @@ function VMClusterPage() {
     try {
       await executeWithNotification(
         async () => {
-          const response = await fetch(`${API_BASE_URL}/ssh-key/${assignmentId}`, {
-            method: "GET",
-            headers: { Authorization: `Bearer ${token}` },
-          });
+          const response = await vmFetch(`/ssh-key/${assignmentId}`, { token });
           if (!response.ok) {
             throw new Error("Failed to download SSH key");
           }
@@ -847,10 +822,7 @@ function VMClusterPage() {
 
   const handleViewSSHInstructions = async (assignmentId) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/ssh-instructions/${assignmentId}`, {
-        method: "GET",
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const response = await vmFetch(`/ssh-instructions/${assignmentId}`, { token });
 
       if (!response.ok) {
         throw new Error("Failed to fetch SSH instructions");

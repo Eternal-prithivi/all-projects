@@ -20,6 +20,7 @@ celery_app = Celery(
         "app.provision.tasks",  # Phase 11 Terraform drift detection
         "app.organizations.tasks",  # Org budget alerts
         "app.payments.subscription_tasks",
+        "app.provision.terraform_tasks",
     ]
 )
 

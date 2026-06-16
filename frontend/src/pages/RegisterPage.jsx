@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { registerUser } from '../api';
 import { getValidationErrorMessage, validateRegisterForm } from '../utils/formValidation.js';
+import TurnstileWidget from '../components/auth/TurnstileWidget.jsx';
+import { turnstileSiteKey } from '../config/turnstile.js';
 import '../styles/auth.css';
 import '../styles/auth-polish.css';
 import ZenithLogo from '../components/brand/ZenithLogo.jsx';
@@ -15,9 +17,27 @@ function RegisterPage() {
   const [error, setError] = useState('');
   const [fieldErrors, setFieldErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState('');
+  const [turnstileResetKey, setTurnstileResetKey] = useState(0);
+
+  const captchaRequired = Boolean(turnstileSiteKey());
+
+  const handleCaptchaToken = useCallback((token) => {
+    setCaptchaToken(token || '');
+  }, []);
+
+  const handleCaptchaExpire = useCallback(() => {
+    setCaptchaToken('');
+  }, []);
+
+  const resetCaptcha = useCallback(() => {
+    setCaptchaToken('');
+    setTurnstileResetKey((key) => key + 1);
+  }, []);
 
   const validation = validateRegisterForm({ username, email, password });
-  const isSubmitDisabled = isLoading || !validation.isValid;
+  const isSubmitDisabled =
+    isLoading || !validation.isValid || (captchaRequired && !captchaToken);
 
   const handleSubmit = async (event) => {
     event.preventDefault();
@@ -34,6 +54,9 @@ function RegisterPage() {
     setIsLoading(true);
     try {
       const userData = { username, email, password };
+      if (captchaToken) {
+        userData.captcha_token = captchaToken;
+      }
       const response = await registerUser(userData);
       const payload = response?.data?.data || response?.data || response;
       if (payload?.email_verification_required) {
@@ -43,6 +66,7 @@ function RegisterPage() {
         setMessage(response.message);
       }
     } catch (err) {
+      resetCaptcha();
       setError(err.detail || 'An error occurred during registration.');
     } finally {
       setIsLoading(false);
@@ -188,6 +212,12 @@ function RegisterPage() {
                 </p>
               )}
             </div>
+
+            <TurnstileWidget
+              onToken={handleCaptchaToken}
+              onExpire={handleCaptchaExpire}
+              resetKey={turnstileResetKey}
+            />
 
             <button 
               type="submit" 

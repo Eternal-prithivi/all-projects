@@ -14,6 +14,16 @@ export async function isBackendAvailable(
   }
 }
 
+async function syncApiCookiesToPage(
+  page: import('@playwright/test').Page,
+  request: import('@playwright/test').APIRequestContext,
+): Promise<void> {
+  const state = await request.storageState();
+  if (state.cookies?.length) {
+    await page.context().addCookies(state.cookies);
+  }
+}
+
 export async function registerTestUser(
   request: import('@playwright/test').APIRequestContext,
 ): Promise<{ username: string; password: string; email: string }> {
@@ -30,7 +40,7 @@ export async function registerTestUser(
   return { username, password, email };
 }
 
-/** Obtain JWT via API (avoids UI rate limits and flaky full-page load waits). */
+/** Obtain session via API cookies (httpOnly auth). */
 export async function loginViaApi(
   page: import('@playwright/test').Page,
   request: import('@playwright/test').APIRequestContext,
@@ -47,16 +57,8 @@ export async function loginViaApi(
   if (!res.ok()) {
     throw new Error(`Login API failed (${res.status()}): ${await res.text()}`);
   }
-  const payload = (await res.json()) as { access_token?: string };
-  if (!payload.access_token) {
-    throw new Error('Login API response missing access_token');
-  }
 
-  await page.goto('/login');
-  await page.evaluate((token) => {
-    localStorage.setItem('authToken', token);
-    sessionStorage.removeItem('cachedUser');
-  }, payload.access_token);
+  await syncApiCookiesToPage(page, request);
   await page.goto('/dashboard');
   await page.waitForURL(/\/dashboard/, { timeout: 30_000, waitUntil: 'commit' });
   await waitForSessionUser(page);
@@ -86,7 +88,7 @@ export async function loginOnPage(
   }
 }
 
-/** Login as admin with cached session user pre-seeded (stable for /admin/* hard navigations). */
+/** Login as admin with API cookies + cached session user. */
 export async function loginAdminOnPage(
   page: import('@playwright/test').Page,
   request: import('@playwright/test').APIRequestContext,
@@ -103,14 +105,8 @@ export async function loginAdminOnPage(
   if (!res.ok()) {
     throw new Error(`Admin login API failed (${res.status()}): ${await res.text()}`);
   }
-  const payload = (await res.json()) as { access_token?: string };
-  if (!payload.access_token) {
-    throw new Error('Admin login API response missing access_token');
-  }
 
-  const meRes = await request.get(`${apiRoot()}/api/users/me`, {
-    headers: { Authorization: `Bearer ${payload.access_token}` },
-  });
+  const meRes = await request.get(`${apiRoot()}/api/users/me`);
   if (!meRes.ok()) {
     throw new Error(`Admin /users/me failed (${meRes.status()}): ${await meRes.text()}`);
   }
@@ -119,14 +115,11 @@ export async function loginAdminOnPage(
     throw new Error(`Expected admin role, got '${userData.role ?? 'unknown'}'`);
   }
 
+  await syncApiCookiesToPage(page, request);
   await page.goto('/login');
-  await page.evaluate(
-    ({ token, cached }) => {
-      localStorage.setItem('authToken', token);
-      sessionStorage.setItem('cachedUser', JSON.stringify(cached));
-    },
-    { token: payload.access_token, cached: userData },
-  );
+  await page.evaluate((cached) => {
+    sessionStorage.setItem('cachedUser', JSON.stringify(cached));
+  }, userData);
 }
 
 export function adminCredentials(): { username: string; password: string } | null {

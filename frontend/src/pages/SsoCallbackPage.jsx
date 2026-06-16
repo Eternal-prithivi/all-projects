@@ -17,16 +17,13 @@ export default function SsoCallbackPage() {
     (async () => {
       try {
         if (code) {
-          const { data } = await api.post('/auth/sso/exchange', { code });
-          if (data?.refresh_token) {
-            sessionStorage.setItem('refreshToken', data.refresh_token);
-          }
-          login(data.access_token);
+          await api.post('/auth/sso/exchange', { code });
+          await login();
           navigate('/dashboard', { replace: true });
           return;
         }
         if (legacyToken) {
-          login(legacyToken);
+          await login();
           navigate('/dashboard', { replace: true });
           return;
         }

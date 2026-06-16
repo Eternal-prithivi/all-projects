@@ -13,6 +13,7 @@
 #   - Change CORS to restrict without testing all frontend API calls still work
 # =============================================================================
 from fastapi import FastAPI
+from fastapi import HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
@@ -257,6 +258,23 @@ def health_check():
     HEAD is supported for UptimeRobot free tier (GET is paid-only on their HTTP monitors).
     """
     return {"status": "ok", "service": "zenith-api"}
+
+
+@app.api_route("/health/modules/{module_name}", methods=["GET", "HEAD"], tags=["Health"])
+def health_module(module_name: str):
+    from app.core.module_health import MODULE_NAMES, module_health_snapshot
+
+    if module_name not in MODULE_NAMES:
+        raise HTTPException(status_code=404, detail="Unknown module")
+    snap = module_health_snapshot()[module_name]
+    return {"module": module_name, **snap}
+
+
+@app.api_route("/health/modules", methods=["GET", "HEAD"], tags=["Health"])
+def health_all_modules():
+    from app.core.module_health import module_health_snapshot
+
+    return {"modules": module_health_snapshot()}
 
 
 @app.api_route("/health/ready", methods=["GET", "HEAD"], tags=["Health"])

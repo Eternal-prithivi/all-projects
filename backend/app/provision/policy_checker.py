@@ -16,6 +16,7 @@ from typing import Any, Optional
 import yaml
 
 from app.provision.models import PolicyCheckResult, PolicyViolation
+from app.provision.policy_eval import evaluate_condition
 from app.provision.terraform_runner import TERRAFORM_ROOT
 
 logger = logging.getLogger(__name__)
@@ -118,7 +119,7 @@ def _evaluate_rules_list(
     for rule in rules:
         condition = rule.get("condition", "False")
         try:
-            triggered = bool(eval(condition, {"__builtins__": {}}, policy_dict))  # noqa: S307
+            triggered = bool(evaluate_condition(condition, policy_dict))
         except Exception:
             triggered = False
 
