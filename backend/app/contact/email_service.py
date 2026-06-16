@@ -125,11 +125,14 @@ class EmailService:
         source: str,
         created_at,
         created_by: Optional[str] = None,
+        to_email: Optional[str] = None,
     ) -> bool:
         """Alert platform owner when a new user account is created."""
         if not self.sender_email or not self.sender_password:
             logger.warning("Email credentials not configured, skipping signup notification")
             return False
+
+        destination = to_email or self.signup_notify_email
 
         try:
             created_label = (
@@ -152,7 +155,10 @@ class EmailService:
                 f"Created by admin: {created_by}\n" if created_by else ""
             )
 
-            subject = f"[Zenith] New user signup — {username}"
+            subject_prefix = "[Zenith] New user signup"
+            if to_email:
+                subject_prefix = "[Zenith] Test signup"
+            subject = f"{subject_prefix} — {username}"
             html_body = f"""
             <html>
               <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 560px;">
@@ -176,13 +182,13 @@ class EmailService:
             )
 
             self._send_html_email(
-                to_email=self.signup_notify_email,
+                to_email=destination,
                 subject=subject,
                 html_body=html_body,
                 text_body=text_body,
                 reply_to=email,
             )
-            logger.info("Signup notification sent to %s for user %s", self.signup_notify_email, username)
+            logger.info("Signup notification sent to %s for user %s", destination, username)
             return True
         except Exception as e:
             logger.error("Failed to send signup notification: %s", str(e))

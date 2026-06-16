@@ -28,7 +28,33 @@ def test_assert_email_allowed_rejects_disposable():
 def test_assert_email_allowed_accepts_legitimate_domain():
     from app.trust.signup_guards import assert_email_allowed
 
-    assert_email_allowed("user@example.com")
+    assert_email_allowed("user@gmail.com")
+
+
+def test_assert_email_allowed_rejects_example_com_on_production():
+    from app.trust.signup_guards import assert_email_allowed
+    from app.utils.config import settings
+
+    with patch.object(settings, "ENVIRONMENT", "production"):
+        with pytest.raises(HTTPException) as exc:
+            assert_email_allowed("user@example.com")
+        assert exc.value.status_code == 400
+        assert "Test email" in exc.value.detail
+
+
+def test_assert_email_allowed_accepts_example_com_in_test_env():
+    from app.trust.signup_guards import assert_email_allowed
+    from app.utils.config import settings
+
+    with patch.object(settings, "ENVIRONMENT", "test"):
+        assert_email_allowed("user@example.com")
+
+
+def test_is_test_signup_email_detects_reserved_domains():
+    from app.trust.signup_guards import is_test_signup_email
+
+    assert is_test_signup_email("verify_abc@example.com") is True
+    assert is_test_signup_email("user@gmail.com") is False
 
 
 @patch("app.database.mongo_client.get_database")

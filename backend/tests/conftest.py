@@ -65,6 +65,8 @@ _TEST_ENV: dict[str, str] = {
     "FRONTEND_URL": "http://localhost:5173",
     "BACKEND_URL": "http://localhost:8000",
     "ENVIRONMENT": "test",
+    "GMAIL_SENDER_EMAIL": "",
+    "GMAIL_APP_PASSWORD": "",
     "DEMO_MODE": "true",
     "RAZORPAY_KEY_ID": "rzp_test",
     "RAZORPAY_KEY_SECRET": "rzp_test_secret",
@@ -157,6 +159,22 @@ def app(test_database: Database):
     _disable_rate_limits(fastapi_app)
     _rebind_route_databases(test_database)
     return fastapi_app
+
+
+@pytest.fixture(autouse=True)
+def _mock_outbound_email(request: pytest.FixtureRequest) -> Generator[None, None, None]:
+    """Never send real SMTP from integration tests, even if local .env has Gmail configured."""
+    if "integration" not in request.keywords:
+        yield
+        return
+    with patch("app.contact.email_service.EmailService.send_verification_email", return_value=True), patch(
+        "app.contact.email_service.EmailService.send_new_user_signup_notification",
+        return_value=True,
+    ), patch(
+        "app.contact.email_service.EmailService.send_password_reset",
+        return_value=True,
+    ):
+        yield
 
 
 @pytest.fixture(autouse=True)

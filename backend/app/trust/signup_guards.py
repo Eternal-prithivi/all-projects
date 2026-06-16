@@ -22,6 +22,15 @@ _BUILTIN_DISPOSABLE = frozenset(
     }
 )
 
+# RFC 2606 reserved domains used by pytest / Playwright — blocked on production & staging
+_TEST_ONLY_EMAIL_DOMAINS = frozenset(
+    {
+        "example.com",
+        "example.org",
+        "example.net",
+    }
+)
+
 
 def _disposable_domains() -> frozenset[str]:
     extra = os.getenv("DISPOSABLE_EMAIL_DOMAINS", "")
@@ -40,6 +49,26 @@ def is_disposable_email(email: str) -> bool:
     return domain in _disposable_domains()
 
 
+def _current_environment() -> str:
+    from app.utils.config import settings
+
+    return (
+        getattr(settings, "ENVIRONMENT", None) or os.getenv("ENVIRONMENT", "development")
+    ).lower()
+
+
+def is_test_environment() -> bool:
+    return _current_environment() == "test"
+
+
+def is_test_signup_email(email: str) -> bool:
+    """True for reserved test domains (e.g. user@example.com from pytest / Playwright)."""
+    if not email or "@" not in email:
+        return False
+    domain = email.split("@")[-1].lower().strip()
+    return domain in _TEST_ONLY_EMAIL_DOMAINS
+
+
 def assert_email_allowed(email: str) -> None:
     if not email or "@" not in email:
         raise HTTPException(status_code=400, detail="Invalid email address")
@@ -47,6 +76,12 @@ def assert_email_allowed(email: str) -> None:
         raise HTTPException(
             status_code=400,
             detail="Disposable email addresses are not allowed. Use a permanent email.",
+        )
+    env = _current_environment()
+    if env in ("production", "staging") and is_test_signup_email(email):
+        raise HTTPException(
+            status_code=400,
+            detail="Test email domains are not allowed for registration. Use a real email address.",
         )
 
 

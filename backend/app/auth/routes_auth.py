@@ -103,11 +103,14 @@ def register_user_route(request: Request, user: UserCreate, db: Collection = Dep
 
         if require_verify:
             verify_link = f"{settings.FRONTEND_URL.rstrip('/')}/verify-email?token={token}"
-            EmailService().send_verification_email(
-                to_email=user.email,
-                username=user.username,
-                verify_link=verify_link,
-            )
+            from app.trust.signup_guards import is_test_signup_email
+
+            if not is_test_signup_email(user.email):
+                EmailService().send_verification_email(
+                    to_email=user.email,
+                    username=user.username,
+                    verify_link=verify_link,
+                )
 
         notify_new_user_signup(
             username=user.username,
