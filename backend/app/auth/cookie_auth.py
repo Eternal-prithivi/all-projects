@@ -33,6 +33,15 @@ def _cookie_domain() -> Optional[str]:
     return None
 
 
+def _served_from_onrender() -> bool:
+    """True when this API process is deployed on Render (cookie auth to rajverse.me won't work)."""
+    for key in ("BACKEND_URL", "PUBLIC_API_URL", "RENDER_EXTERNAL_URL"):
+        val = (getattr(settings, key, None) or os.getenv(key, "") or "").lower()
+        if "onrender.com" in val:
+            return True
+    return False
+
+
 def _hosts_cross_origin() -> bool:
     """True when browser cannot share httpOnly cookies between frontend and API hosts."""
     frontend = (getattr(settings, "FRONTEND_URL", "") or os.getenv("FRONTEND_URL", "") or "").strip()
@@ -66,7 +75,10 @@ def legacy_token_body_enabled() -> bool:
     env = (getattr(settings, "ENVIRONMENT", "") or "").lower()
     if env in ("development", "test"):
         return True
-    if env in ("production", "staging") and _hosts_cross_origin():
+    if env in ("production", "staging"):
+        # Render + rajverse.me always needs Bearer tokens until api.rajverse.me DNS is live.
+        if _served_from_onrender() or _hosts_cross_origin():
+            return True
         return True
     return False
 

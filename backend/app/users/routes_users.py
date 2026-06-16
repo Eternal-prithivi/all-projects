@@ -1,13 +1,11 @@
-from fastapi import APIRouter, Depends, HTTPException
-from jose import jwt, JWTError
-from fastapi.security import OAuth2PasswordBearer
+from fastapi import APIRouter, Depends
 from pymongo.collection import Collection
 from pydantic import BaseModel, EmailStr
 from typing import Optional
 
-from app.users.user_model import User
+from app.auth.auth_utils import get_current_user
 from app.database.mongo_client import get_users_collection
-from app.utils.config import settings
+from app.users.user_model import UserInDB
 
 # Response model without hashed_password
 class UserResponse(BaseModel):
@@ -16,49 +14,15 @@ class UserResponse(BaseModel):
     role: str = "user"
     profile_picture: Optional[str] = None
 
-# The prefix is now handled in main.py, so it's removed from here.
 router = APIRouter(tags=["Users"])
 
-# This helper function will expect a token in the request header
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/token") # Corrected tokenUrl to match full path
-
-# This function decodes the token, finds the user in the database, and returns their data
-def get_current_user(token: str = Depends(oauth2_scheme), db: Collection = Depends(get_users_collection)):
-    credentials_exception = HTTPException(
-        status_code=401,
-        detail="Could not validate credentials",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
-    try:
-        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
-        username: str = payload.get("sub")
-        if username is None:
-            raise credentials_exception
-    except JWTError:
-        raise credentials_exception
-
-    user = db.find_one({"username": username})
-    if user is None:
-        raise credentials_exception
-    if user.get("deleted") or (user.get("status") or "").lower() == "deleted":
-        raise credentials_exception
-    acct_status = (user.get("status") or "active").lower()
-    if acct_status in ("suspended", "banned"):
-        raise HTTPException(
-            status_code=403,
-            detail={"code": "ACCOUNT_SUSPENDED", "message": f"Account is {acct_status}."},
-        )
-    return User(**user)
 
 @router.get("/me", response_model=UserResponse)
 async def read_users_me(
-    current_user: User = Depends(get_current_user),
+    current_user: UserInDB = Depends(get_current_user),
     db: Collection = Depends(get_users_collection),
 ):
-    """
-    An endpoint that returns the details for the currently logged-in user.
-    It's protected by the get_current_user dependency.
-    """
+    """Return the currently authenticated user (Bearer header or httpOnly cookie)."""
     user_doc = db.find_one({"username": current_user.username}) or {}
     return UserResponse(
         username=current_user.username,
