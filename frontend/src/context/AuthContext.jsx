@@ -3,7 +3,8 @@
 // PURPOSE: Cookie-based auth state — httpOnly cookies on api.rajverse.me
 // =============================================================================
 import React, { createContext, useState, useContext, useEffect, useCallback } from 'react';
-import { getCurrentUser, logoutUser } from '../api';
+import { logoutUser, restoreSession } from '../api';
+import { clearAuthTokens, getStoredAccessToken, shouldProbeSessionOnLoad } from '../utils/authTokens.js';
 import { resetSessionExpiredGuard, triggerSessionExpired } from '../utils/sessionExpiry.js';
 
 const AuthContext = createContext(null);
@@ -24,7 +25,6 @@ export const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     localStorage.removeItem('authToken');
-    sessionStorage.removeItem('refreshToken');
   }, []);
 
   const loadUser = useCallback(async ({ silent = false } = {}) => {
@@ -32,21 +32,24 @@ export const AuthProvider = ({ children }) => {
       setLoading(true);
     }
     try {
-      const userData = await getCurrentUser();
+      const hadCachedUser = Boolean(getCachedUser());
+      const userData = await restoreSession();
+      if (!userData) {
+        setUser(null);
+        if (!silent && hadCachedUser) {
+          triggerSessionExpired({ redirect: false });
+        }
+        return null;
+      }
       setUser(userData);
       sessionStorage.setItem('cachedUser', JSON.stringify(userData));
       return userData;
     } catch (error) {
       const status = error?.response?.status;
-      if (status === 401) {
+      if (status === 403) {
         setUser(null);
         sessionStorage.removeItem('cachedUser');
-        if (!silent) {
-          triggerSessionExpired({ redirect: false });
-        }
-      } else if (status === 403) {
-        setUser(null);
-        sessionStorage.removeItem('cachedUser');
+        clearAuthTokens();
       }
       return null;
     } finally {
@@ -55,6 +58,10 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   useEffect(() => {
+    if (!shouldProbeSessionOnLoad()) {
+      setLoading(false);
+      return;
+    }
     loadUser({ silent: !!getCachedUser() });
   }, [loadUser, sessionKey]);
 
@@ -72,13 +79,14 @@ export const AuthProvider = ({ children }) => {
     }
     setUser(null);
     sessionStorage.removeItem('cachedUser');
+    clearAuthTokens();
     setSessionKey((k) => k + 1);
   };
 
   const refreshUser = async () => loadUser({ silent: true });
 
   const isAuthenticated = !!user;
-  const token = user ? 'cookie' : null;
+  const token = user ? (getStoredAccessToken() || 'cookie') : null;
 
   return (
     <AuthContext.Provider

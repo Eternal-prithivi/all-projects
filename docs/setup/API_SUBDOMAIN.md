@@ -2,6 +2,8 @@
 
 Zenith uses **api.rajverse.me** for httpOnly cookie auth so the browser treats API cookies as first-party (shared with rajverse.me via `Domain=.rajverse.me`).
 
+**Until DNS is live**, production uses `https://zenith-backend-707i.onrender.com` with bearer tokens (`AUTH_LEGACY_TOKEN_BODY=true`). Login on rajverse.me will fail if the frontend points at `api.rajverse.me` while that hostname does not resolve.
+
 ## DNS (manual)
 
 1. In your DNS provider (where rajverse.me is hosted), add:
@@ -25,4 +27,5 @@ Zenith uses **api.rajverse.me** for httpOnly cookie auth so the browser treats A
 1. Deploy backend with hybrid auth (cookies + Bearer fallback).
 2. Point DNS and update env vars.
 3. Deploy frontend with `withCredentials` and no localStorage tokens.
-4. Set `AUTH_LEGACY_TOKEN_BODY=false` in production when migration is complete.
+4. Remove the `isUnconfiguredCustomApiHost` guard in `frontend/src/config/apiBase.js` so `VITE_API_URL=https://api.rajverse.me` is honored.
+5. Set `AUTH_LEGACY_TOKEN_BODY=false` in production when cookie migration is complete.

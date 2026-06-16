@@ -37,7 +37,7 @@ Set in **Render → Service → Environment**:
 | `REQUIRE_EMAIL_VERIFICATION` | Render | `true` / `false` — overrides Mongo admin toggle |
 | `TURNSTILE_SECRET_KEY` | Render | Cloudflare Turnstile server secret |
 | `DISPOSABLE_EMAIL_DOMAINS` | Render | Optional extra throwaway domains (comma-separated) |
-| `VITE_TURNSTILE_SITE_KEY` | Vercel | Turnstile widget on register page |
+| `VITE_TURNSTILE_SITE_KEY` | Vercel | Turnstile widget on login & register pages |
 
 Email verification defaults **on** in `production` and `staging` unless disabled via env or **Admin → Settings**. Users must click the inbox link before login.
 
@@ -50,7 +50,7 @@ Set in **Vercel → Project → Environment Variables**:
 - `VITE_API_URL` — backend base URL **without** `/api` (e.g. `https://api.rajverse.me`)
 - `VITE_SITE_URL` — public frontend URL for canonical/OG tags (production: `https://rajverse.me`). Defaults in `index.html`, `robots.txt`, and `sitemap.xml` match this domain.
 - Optional: `VITE_SENTRY_DSN`
-- Optional: `VITE_TURNSTILE_SITE_KEY` — register-page CAPTCHA (pair with `TURNSTILE_SECRET_KEY` on Render)
+- Optional: `VITE_TURNSTILE_SITE_KEY` — login/register CAPTCHA (pair with `TURNSTILE_SECRET_KEY` on Render)
 
 ## CORS
 

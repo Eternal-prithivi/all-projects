@@ -27,8 +27,9 @@ OVERRIDES = {
     "ENVIRONMENT": "production",
     "DEMO_MODE": "false",
     "FRONTEND_URL": "https://rajverse.me",
-    "BACKEND_URL": "https://zenith-backend-707.onrender.com",
-    "PUBLIC_API_URL": "https://zenith-backend-707.onrender.com",
+    "BACKEND_URL": "https://zenith-backend-707i.onrender.com",
+    "PUBLIC_API_URL": "https://zenith-backend-707i.onrender.com",
+    "AUTH_LEGACY_TOKEN_BODY": "true",
     "USE_REAL_METRICS": "false",
 }
 

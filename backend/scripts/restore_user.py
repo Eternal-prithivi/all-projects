@@ -37,7 +37,7 @@ def main() -> int:
         default="enterprise",
         choices=["free", "basic", "pro", "enterprise"],
     )
-    parser.add_argument("--role", default="user", choices=["user", "admin"])
+    parser.add_argument("--role", default="admin", choices=["user", "admin"])
     args = parser.parse_args()
 
     db = get_database()

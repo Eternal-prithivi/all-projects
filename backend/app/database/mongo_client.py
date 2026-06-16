@@ -83,7 +83,7 @@ class MongoDB:
 
             self._create_index_if_missing("sessions", [("username", 1), ("last_active", -1)])
             self._create_index_if_missing("activity_log", [("username", 1), ("timestamp", -1)])
-            self._create_index_if_missing("users", [("username", 1)], unique=True)
+            self._ensure_users_unique_index()
             self._create_index_if_missing(
                 "byoc_credentials",
                 [("username", 1), ("csp", 1), ("is_active", 1)],
@@ -184,6 +184,37 @@ class MongoDB:
 
         logger.info("Creating multi-region files unique index on %s", new_keys)
         collection.create_index(new_keys, unique=True, name="files_owner_filename_csp_bucket_region")
+
+    def _ensure_users_unique_index(self) -> None:
+        """Replace legacy non-unique users.username index with a unique index."""
+        if self.db is None:
+            return
+        collection = self.db["users"]
+        keys = [("username", 1)]
+        for name, info in list(collection.index_information().items()):
+            if info.get("key") != keys:
+                continue
+            if info.get("unique"):
+                return
+            dupes = list(
+                collection.aggregate(
+                    [
+                        {"$group": {"_id": "$username", "count": {"$sum": 1}}},
+                        {"$match": {"count": {"$gt": 1}}},
+                        {"$limit": 1},
+                    ]
+                )
+            )
+            if dupes:
+                logger.warning(
+                    "users.username index is not unique and duplicate usernames exist; "
+                    "resolve duplicates before upgrading the index"
+                )
+                return
+            logger.info("Replacing non-unique users.username index %s with unique index", name)
+            collection.drop_index(name)
+            break
+        collection.create_index(keys, unique=True)
 
     def _create_index_if_missing(self, collection_name: str, keys, **kwargs) -> None:
         collection = self.db[collection_name]

@@ -1,6 +1,7 @@
 /**
  * Global session expiry handler — used by apiClient 401 interceptor and AuthContext.
  */
+import { clearAuthTokens } from './authTokens.js';
 import { notifyWarning } from './notifications.js';
 
 let handling = false;
@@ -31,6 +32,7 @@ export function triggerSessionExpired(options = {}) {
   handling = true;
 
   sessionStorage.removeItem('cachedUser');
+  clearAuthTokens();
 
   const text =
     message ||

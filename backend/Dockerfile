@@ -20,6 +20,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Python dependencies
 COPY requirements.txt .
+ENV PIP_ROOT_USER_ACTION=ignore
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Application + Terraform modules (provision copies modules into per-deploy workspaces)

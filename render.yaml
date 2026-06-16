@@ -14,9 +14,13 @@ services:
       - key: FRONTEND_URL
         value: https://rajverse.me
       - key: BACKEND_URL
-        value: https://api.rajverse.me
+        value: https://zenith-backend-707i.onrender.com
       - key: PUBLIC_API_URL
-        value: https://api.rajverse.me
+        value: https://zenith-backend-707i.onrender.com
+      - key: AUTH_LEGACY_TOKEN_BODY
+        value: "true"
+      - key: AUTH_COOKIE_DOMAIN
+        value: ""
       - key: ZENITH_SERVICE_ROLE
         value: api
       - key: PROVISION_OFFLOAD_TERRAFORM

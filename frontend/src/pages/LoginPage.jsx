@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Link, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { resetSessionExpiredGuard } from '../utils/sessionExpiry.js';
 import { loginUser, getApiErrorMessage } from '../api';
@@ -11,6 +11,8 @@ import { getApiRoot } from '../config/apiBase.js';
 import { wakeRenderBackend } from '../utils/renderKeepAlive.js';
 import { FaBolt, FaChartBar, FaLock } from 'react-icons/fa';
 import ZenithLogo from '../components/brand/ZenithLogo.jsx';
+import TurnstileWidget from '../components/auth/TurnstileWidget.jsx';
+import { turnstileSiteKey } from '../config/turnstile.js';
 
 function LoginPage() {
   const [username, setUsername] = useState('');
@@ -21,7 +23,24 @@ function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [ssoProviders, setSsoProviders] = useState([]);
   const [backendWaking, setBackendWaking] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState('');
+  const [turnstileResetKey, setTurnstileResetKey] = useState(0);
   const { login, isAuthenticated } = useAuth();
+
+  const captchaRequired = Boolean(turnstileSiteKey());
+
+  const handleCaptchaToken = useCallback((token) => {
+    setCaptchaToken(token || '');
+  }, []);
+
+  const handleCaptchaExpire = useCallback(() => {
+    setCaptchaToken('');
+  }, []);
+
+  const resetCaptcha = useCallback(() => {
+    setCaptchaToken('');
+    setTurnstileResetKey((key) => key + 1);
+  }, []);
 
   const apiRoot = useMemo(() => getApiRoot(), []);
   const navigate = useNavigate();
@@ -82,7 +101,8 @@ function LoginPage() {
   };
 
   const validation = validateLoginForm({ username, password });
-  const isSubmitDisabled = isLoading || !validation.isValid;
+  const isSubmitDisabled =
+    isLoading || !validation.isValid || (captchaRequired && !captchaToken);
 
   const handleSubmit = async (event) => {
     event.preventDefault();
@@ -98,6 +118,9 @@ function LoginPage() {
     setIsLoading(true);
     try {
       const credentials = { username: username.trim(), password };
+      if (captchaToken) {
+        credentials.captcha_token = captchaToken;
+      }
       let fingerprint = null;
       try {
         fingerprint = await getDeviceFingerprint();
@@ -109,6 +132,7 @@ function LoginPage() {
       // After login, AuthContext will fetch user data
       // The useEffect above will handle the redirect once isAuthenticated is true
     } catch (err) {
+      resetCaptcha();
       const message = getApiErrorMessage(err, 'An error occurred during login.');
       setError(message);
       if (/verify/i.test(message)) {
@@ -258,6 +282,12 @@ function LoginPage() {
                 </p>
               )}
             </div>
+
+            <TurnstileWidget
+              onToken={handleCaptchaToken}
+              onExpire={handleCaptchaExpire}
+              resetKey={turnstileResetKey}
+            />
 
             <button 
               type="submit" 

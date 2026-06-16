@@ -18,6 +18,16 @@
 // =============================================================================
 import axios from "axios";
 import { getApiBaseUrl } from "./config/apiBase.js";
+import {
+  clearAuthTokens,
+  clearStaleSessionArtifacts,
+  getStoredAccessToken,
+  getStoredRefreshToken,
+  storeAuthTokens,
+  canAttemptSessionRefresh,
+  shouldProbeSessionOnLoad,
+  isAccessTokenExpired,
+} from "./utils/authTokens.js";
 import { shouldHandle401, triggerSessionExpired } from "./utils/sessionExpiry.js";
 
 const API_BASE_URL = getApiBaseUrl();
@@ -39,12 +49,29 @@ let refreshInFlight = null;
 
 const refreshSession = async () => {
   if (!refreshInFlight) {
-    refreshInFlight = apiClient.post('/auth/refresh', {}).finally(() => {
-      refreshInFlight = null;
-    });
+    const refreshToken = getStoredRefreshToken();
+    const body = refreshToken ? { refresh_token: refreshToken } : {};
+    refreshInFlight = apiClient
+      .post('/auth/refresh', body)
+      .then((response) => {
+        storeAuthTokens(response.data);
+        return response;
+      })
+      .finally(() => {
+        refreshInFlight = null;
+      });
   }
   return refreshInFlight;
 };
+
+apiClient.interceptors.request.use((config) => {
+  const token = getStoredAccessToken();
+  if (token && !config.headers?.Authorization) {
+    config.headers = config.headers || {};
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
 
 apiClient.interceptors.response.use(
   (response) => response,
@@ -56,12 +83,14 @@ apiClient.interceptors.response.use(
       && shouldHandle401(config)
       && config
       && !config.__authRetried
+      && canAttemptSessionRefresh()
     ) {
       try {
         await refreshSession();
         config.__authRetried = true;
         return apiClient(config);
       } catch {
+        clearStaleSessionArtifacts();
         triggerSessionExpired();
       }
     }
@@ -140,6 +169,9 @@ export const loginUser = async (credentials, deviceFingerprint = null) => {
   const formData = new URLSearchParams();
   formData.append("username", String(credentials.username || "").trim());
   formData.append("password", credentials.password);
+  if (credentials.captcha_token) {
+    formData.append("captcha_token", credentials.captcha_token);
+  }
 
   const headers = { "Content-Type": "application/x-www-form-urlencoded" };
   if (deviceFingerprint) {
@@ -148,7 +180,8 @@ export const loginUser = async (credentials, deviceFingerprint = null) => {
 
   try {
     const response = await apiClient.post("/auth/token", formData, { headers });
-    return response.data; // { access_token, token_type }
+    storeAuthTokens(response.data);
+    return response.data;
   } catch (error) {
     throw error.response?.data || error;
   }
@@ -182,6 +215,38 @@ export const resetPasswordWithToken = async ({ newPassword, method, token, otp, 
 };
 
 // Current user (cookie session or optional Bearer for tests)
+export const restoreSession = async () => {
+  if (!shouldProbeSessionOnLoad()) {
+    return null;
+  }
+
+  const access = getStoredAccessToken();
+  const refresh = getStoredRefreshToken();
+
+  if (refresh && (!access || isAccessTokenExpired(access))) {
+    try {
+      await refreshSession();
+    } catch {
+      clearStaleSessionArtifacts();
+      return null;
+    }
+  }
+
+  try {
+    const response = await apiClient.get("/users/me", {
+      // Bootstrap only — skip the 401→refresh interceptor loop (refresh handled above).
+      __authRetried: true,
+    });
+    return response.data;
+  } catch (error) {
+    if (error?.response?.status === 401) {
+      clearStaleSessionArtifacts();
+      return null;
+    }
+    throw error;
+  }
+};
+
 export const getCurrentUser = async (token) => {
   const response = await apiClient.get("/users/me", {
     headers: bearerHeaders(token),
@@ -190,8 +255,12 @@ export const getCurrentUser = async (token) => {
 };
 
 export const logoutUser = async () => {
-  const response = await apiClient.post("/auth/logout");
-  return response.data;
+  try {
+    const response = await apiClient.post("/auth/logout");
+    return response.data;
+  } finally {
+    clearAuthTokens();
+  }
 };
 
 // ---------------- STORAGE ----------------

@@ -14,7 +14,7 @@
 # =============================================================================
 import secrets
 
-from fastapi import APIRouter, Depends, HTTPException, status, Request, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Request, Query, Form
 from fastapi.security import OAuth2PasswordRequestForm
 from fastapi.responses import JSONResponse
 from pymongo.collection import Collection
@@ -139,11 +139,16 @@ def register_user_route(request: Request, user: UserCreate, db: Collection = Dep
 @limiter.limit("5/minute")  # Max 5 login attempts per minute per IP
 def login_for_access_token_route(
     request: Request,
-    form_data: OAuth2PasswordRequestForm = Depends(), 
-    db: Collection = Depends(get_users_collection)
+    form_data: OAuth2PasswordRequestForm = Depends(),
+    captcha_token: Optional[str] = Form(None),
+    db: Collection = Depends(get_users_collection),
 ):
     from app.database.mongo_client import get_database
-    
+    from app.trust.signup_guards import verify_turnstile_token
+    from app.utils.session_utils import get_client_ip
+
+    verify_turnstile_token(captcha_token, get_client_ip(request))
+
     username = (form_data.username or "").strip()
     logger.info("Login attempt for username: %r", username)
 
