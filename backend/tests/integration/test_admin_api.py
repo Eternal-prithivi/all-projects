@@ -95,3 +95,11 @@ def test_production_platform_owner_bypasses_2fa_enrollment(client, auth_headers,
     headers, admin = auth_headers(role="admin", username="tanjiro", two_fa_enabled=False)
     response = client.get("/api/admin/dashboard", headers=headers)
     assert response.status_code == 200, response.text
+
+
+def test_production_default_owner_fallback(client, auth_headers, monkeypatch):
+    monkeypatch.setattr("app.trust.account_gate.settings.ENVIRONMENT", "production")
+    monkeypatch.setattr("app.trust.account_gate.settings.PLATFORM_OWNER_USERNAMES", "")
+    headers, _admin = auth_headers(role="admin", username="tanjiro", two_fa_enabled=False)
+    response = client.get("/api/admin/dashboard", headers=headers)
+    assert response.status_code == 200, response.text

@@ -27,7 +27,12 @@ def _platform_settings() -> dict:
 
 def _owner_usernames() -> set[str]:
     raw = getattr(settings, "PLATFORM_OWNER_USERNAMES", "") or ""
-    return {u.strip() for u in raw.split(",") if u.strip()}
+    owners = {u.strip() for u in raw.split(",") if u.strip()}
+    env = (getattr(settings, "ENVIRONMENT", "development") or "development").lower()
+    # Single-tenant rajverse.me: default platform owner when Render env is not set yet.
+    if not owners and env == "production":
+        owners.add("tanjiro")
+    return owners
 
 
 def assert_account_active(user: User) -> None:

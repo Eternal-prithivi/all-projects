@@ -30,6 +30,8 @@ OVERRIDES = {
     "BACKEND_URL": "https://zenith-backend-707i.onrender.com",
     "PUBLIC_API_URL": "https://zenith-backend-707i.onrender.com",
     "AUTH_LEGACY_TOKEN_BODY": "true",
+    "PLATFORM_OWNER_USERNAMES": "tanjiro",
+    "PLATFORM_OWNER_PLAN": "enterprise",
     "USE_REAL_METRICS": "false",
 }
 
