@@ -1,13 +1,12 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-
-const SECURITY_SETTINGS_PATH = '/dashboard/security-settings';
+import { ADMIN_SECURITY_SETTINGS_PATH } from '../../utils/adminPortalGate.js';
 
 const AdminPortalGateBanner = ({ gateError }) => {
   if (!gateError) return null;
 
   const isVerify = gateError.code === 'ADMIN_2FA_VERIFY';
-  const setupPath = gateError.setupPath || SECURITY_SETTINGS_PATH;
+  const setupPath = gateError.setupPath || ADMIN_SECURITY_SETTINGS_PATH;
 
   return (
     <div className="admin-portal-gate-banner" role="alert">
@@ -23,29 +22,3 @@ const AdminPortalGateBanner = ({ gateError }) => {
 };
 
 export default AdminPortalGateBanner;
-
-export const parseAdminPortalGateError = (error) => {
-  const detail = error?.response?.data?.detail;
-  if (!detail) return null;
-
-  if (typeof detail === 'string') {
-    if (/two-factor|2fa/i.test(detail)) {
-      return {
-        code: 'ADMIN_2FA_REQUIRED',
-        message: detail,
-        setupPath: SECURITY_SETTINGS_PATH,
-      };
-    }
-    return null;
-  }
-
-  if (typeof detail === 'object' && detail.code?.startsWith('ADMIN_2FA')) {
-    return {
-      code: detail.code,
-      message: detail.message || 'Admin portal access requires two-factor authentication.',
-      setupPath: detail.setup_path || SECURITY_SETTINGS_PATH,
-    };
-  }
-
-  return null;
-};

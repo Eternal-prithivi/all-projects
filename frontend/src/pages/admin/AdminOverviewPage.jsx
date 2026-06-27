@@ -6,7 +6,8 @@ import '../../styles/admin-pages.css';
 import '../../styles/dashboard-enhanced.css';
 import StatCard from '../../components/dashboard/StatCard.jsx';
 import PageRefreshButton from '../../components/ui/PageRefreshButton.jsx';
-import AdminPortalGateBanner, { parseAdminPortalGateError } from '../../components/admin/AdminPortalGateBanner.jsx';
+import AdminPortalGateBanner from '../../components/admin/AdminPortalGateBanner.jsx';
+import { parseAdminPortalGateError } from '../../utils/adminPortalGate.js';
 import { usePageRefresh } from '../../hooks/usePageRefresh.js';
 import { 
   FaUsers, FaServer, FaDatabase, FaDollarSign,

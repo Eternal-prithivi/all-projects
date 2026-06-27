@@ -5,7 +5,8 @@ import '../../styles/admin-pages.css';
 import { FaChartLine, FaUsers, FaServer, FaDollarSign, FaFileDownload, FaFilePdf } from 'react-icons/fa';
 import { exportToCSV, prepareAnalyticsForExport, exportAnalyticsToPDF } from '../../utils/exportUtils';
 import PageHeader from '../../components/ui/PageHeader.jsx';
-import AdminPortalGateBanner, { parseAdminPortalGateError } from '../../components/admin/AdminPortalGateBanner.jsx';
+import AdminPortalGateBanner from '../../components/admin/AdminPortalGateBanner.jsx';
+import { parseAdminPortalGateError } from '../../utils/adminPortalGate.js';
 import { usePageRefresh } from '../../hooks/usePageRefresh.js';
 
 const AdminAnalyticsPage = () => {
