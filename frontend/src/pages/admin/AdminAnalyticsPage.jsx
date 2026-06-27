@@ -5,11 +5,13 @@ import '../../styles/admin-pages.css';
 import { FaChartLine, FaUsers, FaServer, FaDollarSign, FaFileDownload, FaFilePdf } from 'react-icons/fa';
 import { exportToCSV, prepareAnalyticsForExport, exportAnalyticsToPDF } from '../../utils/exportUtils';
 import PageHeader from '../../components/ui/PageHeader.jsx';
+import AdminPortalGateBanner, { parseAdminPortalGateError } from '../../components/admin/AdminPortalGateBanner.jsx';
 import { usePageRefresh } from '../../hooks/usePageRefresh.js';
 
 const AdminAnalyticsPage = () => {
   const [loading, setLoading] = useState(true);
   const [analytics, setAnalytics] = useState(null);
+  const [gateError, setGateError] = useState(null);
   const { runPageRefresh, pageRefreshing } = usePageRefresh();
 
   useEffect(() => {
@@ -17,12 +19,19 @@ const AdminAnalyticsPage = () => {
   }, []);
 
   const fetchAnalytics = async () => {
+    setGateError(null);
     try {
       const response = await api.get('/admin/analytics');
       setAnalytics(response.data);
     } catch (error) {
-      console.error('Failed to fetch analytics:', error);
-      toast.error('Failed to load analytics data');
+      const portalGate = parseAdminPortalGateError(error);
+      if (portalGate) {
+        setGateError(portalGate);
+        setAnalytics(null);
+      } else {
+        console.error('Failed to fetch analytics:', error);
+        toast.error('Failed to load analytics data');
+      }
     } finally {
       setLoading(false);
     }
@@ -54,14 +63,20 @@ const AdminAnalyticsPage = () => {
 
   if (!analytics) {
     return (
-      <div className="admin-loading">
-        <p>Failed to load analytics data</p>
+      <div className="admin-analytics">
+        <AdminPortalGateBanner gateError={gateError} />
+        {!gateError && (
+          <div className="admin-loading">
+            <p>Failed to load analytics data</p>
+          </div>
+        )}
       </div>
     );
   }
 
   return (
     <div className="admin-analytics">
+      <AdminPortalGateBanner gateError={gateError} />
       <PageHeader
         kicker="Admin"
         title="Platform Analytics"

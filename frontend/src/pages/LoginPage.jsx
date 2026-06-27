@@ -116,7 +116,16 @@ function LoginPage() {
     }
 
     setIsLoading(true);
+    setBackendWaking(true);
     try {
+      const warm = await wakeRenderBackend();
+      if (!warm) {
+        setError(
+          `Cannot reach the API at ${apiRoot}. The server may be starting up — wait a minute and try again.`,
+        );
+        return;
+      }
+
       const credentials = { username: username.trim(), password };
       if (captchaToken) {
         credentials.captcha_token = captchaToken;
@@ -128,7 +137,13 @@ function LoginPage() {
         fingerprint = null;
       }
       await loginUser(credentials, fingerprint);
-      await login();
+      const userData = await login();
+      if (!userData) {
+        setError(
+          'Sign-in succeeded but your session could not be loaded. Clear site data for this browser and try again.',
+        );
+        return;
+      }
       // After login, AuthContext will fetch user data
       // The useEffect above will handle the redirect once isAuthenticated is true
     } catch (err) {
@@ -140,6 +155,7 @@ function LoginPage() {
       }
     } finally {
       setIsLoading(false);
+      setBackendWaking(false);
     }
   };
 

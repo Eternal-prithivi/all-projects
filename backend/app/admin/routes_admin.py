@@ -19,6 +19,7 @@ from typing import List, Optional
 from pydantic import BaseModel
 from ..database.mongo_client import get_database
 from ..auth.auth_utils import get_current_user
+from app.trust.account_gate import require_admin_for_portal
 from app.utils.config import settings
 from app.utils.logger import setup_logger
 from app.auth.auth_utils import get_password_hash
@@ -56,31 +57,9 @@ class UserOverview(BaseModel):
     status: str
 
 
-# Helper function to verify admin
-async def verify_admin(current_user = Depends(get_current_user)):
-    """Verify that the current user has admin role"""
-    logger.debug(f"Admin auth check for user: {current_user}")
-    logger.debug(f"User type: {type(current_user)}")
-    logger.debug(f"User role: {getattr(current_user, 'role', 'NO ROLE ATTR')}")
-    
-    # Handle both dict and UserInDB object
-    user_role = getattr(current_user, 'role', None) or (current_user.get('role') if isinstance(current_user, dict) else None)
-    
-    if user_role != "admin":
-        logger.warning(f"Admin access denied - role is '{user_role}', not 'admin'")
-        raise HTTPException(
-            status_code=403,
-            detail="Access denied. Admin privileges required."
-        )
-
-    if getattr(settings, "ENVIRONMENT", "development") == "production":
-        if not getattr(current_user, "two_fa_enabled", False):
-            raise HTTPException(
-                status_code=403,
-                detail="Platform admins must enable two-factor authentication in Settings.",
-            )
-    
-    logger.debug(f"Admin access granted")
+async def verify_admin(current_user=Depends(require_admin_for_portal)):
+    """Verify admin role and production 2FA policy for admin portal APIs."""
+    logger.debug(f"Admin access granted for {getattr(current_user, 'username', current_user)}")
     return current_user
 
 

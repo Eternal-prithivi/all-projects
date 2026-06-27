@@ -6,6 +6,7 @@ import '../../styles/admin-pages.css';
 import '../../styles/dashboard-enhanced.css';
 import StatCard from '../../components/dashboard/StatCard.jsx';
 import PageRefreshButton from '../../components/ui/PageRefreshButton.jsx';
+import AdminPortalGateBanner, { parseAdminPortalGateError } from '../../components/admin/AdminPortalGateBanner.jsx';
 import { usePageRefresh } from '../../hooks/usePageRefresh.js';
 import { 
   FaUsers, FaServer, FaDatabase, FaDollarSign,
@@ -16,6 +17,7 @@ const AdminOverviewPage = () => {
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState(null);
   const [activities, setActivities] = useState([]);
+  const [gateError, setGateError] = useState(null);
   const { runPageRefresh, pageRefreshing } = usePageRefresh();
 
   const greeting = useMemo(() => {
@@ -33,6 +35,7 @@ const AdminOverviewPage = () => {
 
   const fetchData = useCallback(async () => {
     setLoading(true);
+    setGateError(null);
     try {
       const [statsRes, activityRes] = await Promise.all([
         api.get('/admin/dashboard'),
@@ -42,7 +45,14 @@ const AdminOverviewPage = () => {
       setStats(statsRes.data);
       setActivities(activityRes.data.activities);
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Failed to load admin dashboard');
+      const portalGate = parseAdminPortalGateError(error);
+      if (portalGate) {
+        setGateError(portalGate);
+        setStats(null);
+        setActivities([]);
+      } else {
+        toast.error(error.response?.data?.detail?.message || error.response?.data?.detail || 'Failed to load admin dashboard');
+      }
     } finally {
       setLoading(false);
     }
@@ -86,14 +96,20 @@ const AdminOverviewPage = () => {
 
   if (!stats) {
     return (
-      <div className="admin-loading">
-        <p>Failed to load admin data. Please check your permissions.</p>
+      <div className="admin-overview dashboard-overview">
+        <AdminPortalGateBanner gateError={gateError} />
+        {!gateError && (
+          <div className="admin-loading">
+            <p>Failed to load admin data. Please check your permissions.</p>
+          </div>
+        )}
       </div>
     );
   }
 
   return (
     <div className="admin-overview dashboard-overview">
+      <AdminPortalGateBanner gateError={gateError} />
       <div className="mc-greeting">
         <div className="mc-greeting-text">
           <span className="mc-kicker">

@@ -16,8 +16,8 @@ from app.billing.platform_spend import assert_platform_budget_available
 from app.database.mongo_client import get_database
 from app.payments.subscription_service import get_effective_plan_id, get_user_subscription
 from app.trust.signup_guards import email_verification_required
-from app.users.routes_users import get_current_user
-from app.users.user_model import User
+from app.auth.auth_utils import get_current_user
+from app.users.user_model import User, UserInDB
 from app.utils.config import settings
 
 
@@ -132,14 +132,58 @@ def require_platform_resource_access(
     return user
 
 
-def require_admin_with_2fa(
-    user: User = Depends(get_current_user),
-) -> User:
-    if getattr(user, "role", None) != "admin":
-        raise HTTPException(status_code=403, detail="Admin privileges required.")
-    if getattr(user, "two_fa_enabled", False) and not getattr(user, "two_fa_verified", False):
+def _assert_admin_portal_access(user: UserInDB) -> None:
+    """Shared admin-portal gate: role, production 2FA enrollment, session 2FA verify."""
+    role = getattr(user, "role", None)
+    if role != "admin":
         raise HTTPException(
             status_code=403,
-            detail="Admin accounts must complete 2FA verification for this action.",
+            detail={
+                "code": "ADMIN_REQUIRED",
+                "message": "Access denied. Admin privileges required.",
+            },
         )
+
+    username = getattr(user, "username", "") or ""
+    is_owner = username in _owner_usernames()
+    if is_owner:
+        return
+
+    two_fa_enabled = bool(getattr(user, "two_fa_enabled", False))
+    two_fa_verified = bool(getattr(user, "two_fa_verified", False))
+    env = (getattr(settings, "ENVIRONMENT", "development") or "development").lower()
+
+    if env == "production" and not is_owner and not two_fa_enabled:
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "code": "ADMIN_2FA_REQUIRED",
+                "message": "Platform admins must enable two-factor authentication in Settings.",
+                "setup_path": "/dashboard/security-settings",
+            },
+        )
+
+    if two_fa_enabled and not two_fa_verified:
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "code": "ADMIN_2FA_VERIFY",
+                "message": "Complete two-factor authentication to access the admin portal.",
+                "setup_path": "/dashboard/security-settings",
+            },
+        )
+
+
+def require_admin_for_portal(
+    user: UserInDB = Depends(get_current_user),
+) -> UserInDB:
+    _assert_admin_portal_access(user)
+    return user
+
+
+def require_admin_with_2fa(
+    user: UserInDB = Depends(get_current_user),
+) -> UserInDB:
+    """Legacy alias — same gate as admin portal routes."""
+    _assert_admin_portal_access(user)
     return user

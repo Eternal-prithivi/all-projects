@@ -78,3 +78,20 @@ def test_admin_system_health_includes_celery(client, auth_headers):
     celery = platform.get("celery") or {}
     assert "broker" in celery
     assert "beat_schedule" in celery
+
+
+def test_production_admin_requires_2fa_enrollment(client, auth_headers, monkeypatch):
+    monkeypatch.setattr("app.trust.account_gate.settings.ENVIRONMENT", "production")
+    headers, _admin = auth_headers(role="admin", two_fa_enabled=False)
+    response = client.get("/api/admin/dashboard", headers=headers)
+    assert response.status_code == 403
+    detail = response.json()["detail"]
+    assert detail["code"] == "ADMIN_2FA_REQUIRED"
+
+
+def test_production_platform_owner_bypasses_2fa_enrollment(client, auth_headers, monkeypatch):
+    monkeypatch.setattr("app.trust.account_gate.settings.ENVIRONMENT", "production")
+    monkeypatch.setattr("app.trust.account_gate.settings.PLATFORM_OWNER_USERNAMES", "tanjiro")
+    headers, admin = auth_headers(role="admin", username="tanjiro", two_fa_enabled=False)
+    response = client.get("/api/admin/dashboard", headers=headers)
+    assert response.status_code == 200, response.text

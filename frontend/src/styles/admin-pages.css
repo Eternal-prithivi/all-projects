@@ -1,5 +1,28 @@
 /* Admin Pages Styles */
 
+.admin-portal-gate-banner {
+  margin-bottom: var(--space-lg);
+  padding: var(--space-lg);
+  border-radius: var(--radius-lg);
+  border: 1px solid rgba(212, 175, 55, 0.35);
+  background: linear-gradient(135deg, rgba(212, 175, 55, 0.12), rgba(10, 10, 12, 0.6));
+}
+
+.admin-portal-gate-banner__content h3 {
+  margin: 0 0 var(--space-sm);
+  color: var(--gold-light);
+}
+
+.admin-portal-gate-banner__content p {
+  margin: 0 0 var(--space-md);
+  color: var(--text-secondary);
+  max-width: 52rem;
+}
+
+.admin-portal-gate-banner__content .btn-primary {
+  display: inline-flex;
+}
+
 /* Prefer PageHeader — legacy hook for any remaining admin-page-header markup */
 .admin-page-header {
   margin-bottom: var(--space-lg);

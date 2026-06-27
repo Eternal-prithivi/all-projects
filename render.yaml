@@ -19,6 +19,10 @@ services:
         value: https://zenith-backend-707i.onrender.com
       - key: AUTH_LEGACY_TOKEN_BODY
         value: "true"
+      - key: PLATFORM_OWNER_USERNAMES
+        value: tanjiro
+      - key: PLATFORM_OWNER_PLAN
+        value: enterprise
       - key: AUTH_COOKIE_DOMAIN
         value: ""
       - key: ZENITH_SERVICE_ROLE
