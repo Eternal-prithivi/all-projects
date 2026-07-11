@@ -1,6 +1,7 @@
 // =============================================================================
 // SERVICE WORKER: sw.js
 // PURPOSE: Enables PWA "Add to Home Screen" install prompts + offline shell
+/* global clients */
 // STRATEGY:
 //   - Static assets (JS/CSS/fonts/images): Cache-first (stale-while-revalidate)
 //   - API calls (/api/*): Network-first with cache fallback
