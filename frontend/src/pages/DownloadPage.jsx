@@ -10,7 +10,9 @@ import {
   FaChevronDown,
   FaCheck,
   FaExternalLinkAlt,
+  FaMobileAlt,
 } from 'react-icons/fa';
+import { usePwaInstall } from '../hooks/usePwaInstall.js';
 import MarketingPageLayout from '../components/layout/MarketingPageLayout.jsx';
 import HeroPreview from '../components/landing/HeroPreview.jsx';
 import HeroTiltVisual from '../components/landing/HeroTiltVisual.jsx';
@@ -92,10 +94,26 @@ function DownloadCta({ href, className, releaseStatus, children }) {
   );
 }
 
+const PWA_STEPS_IOS = [
+  { step: 1, title: 'Open in Safari', desc: 'Open rajverse.me in Safari on your iPhone or iPad. (Chrome on iOS does not support this yet.)' },
+  { step: 2, title: 'Tap the Share icon', desc: 'Tap the Share button (rectangle with arrow) in the Safari toolbar.' },
+  { step: 3, title: 'Add to Home Screen', desc: 'Scroll down in the share sheet and tap "Add to Home Screen".' },
+  { step: 4, title: 'Name and Add', desc: 'Edit the name if you like, then tap "Add". Zenith appears on your home screen like a native app.' },
+];
+
+const PWA_STEPS_ANDROID = [
+  { step: 1, title: 'Open in Chrome', desc: 'Visit rajverse.me in Chrome on your Android phone.' },
+  { step: 2, title: 'Tap the menu (⋮)', desc: 'Tap the three-dot menu in the top-right corner of Chrome.' },
+  { step: 3, title: 'Add to Home screen', desc: 'Tap "Add to Home screen" (or "Install app" if Chrome shows an install banner).' },
+  { step: 4, title: 'Confirm', desc: 'Tap "Add" in the prompt. Zenith opens in a dedicated window without browser chrome.' },
+];
+
 export default function DownloadPage() {
   const [manifest, setManifest] = useState(null);
   const [releaseStatus, setReleaseStatus] = useState('loading');
   const [openFaq, setOpenFaq] = useState(null);
+  const [pwaTab, setPwaTab] = useState('android');
+  const { canInstall, triggerInstall } = usePwaInstall();
   const detected = useMemo(() => detectPlatform(), []);
   const [activePlatform, setActivePlatform] = useState(detected === 'unknown' ? 'mac' : detected);
   const [installTab, setInstallTab] = useState(detected === 'unknown' ? 'mac' : detected);
@@ -416,26 +434,90 @@ export default function DownloadPage() {
           </div>
         </section>
 
-        {/* Browser fallback */}
-        <section className="download-browser-band reveal-group">
-          <div className="download-browser-band__inner reveal-item">
-            <FaGlobe className="download-browser-band__icon" aria-hidden />
-            <div className="download-browser-band__text">
-              <h2>Prefer not to install?</h2>
-              <p>
-                Zenith runs in Chrome, Edge, Firefox, and Safari with full feature parity. Add to
-                your home screen for an app-like shortcut — no download required.
-              </p>
+        {/* PWA / Add to Home Screen */}
+        <section className="download-pwa reveal-group">
+          <div className="download-section-head reveal-item">
+            <span className="download-kicker">No App Store required</span>
+            <h2>Add to Home Screen</h2>
+            <p>
+              Get a native-feeling Zenith icon on your phone or tablet — no download, no App Store,
+              no browser bar. Works on any modern iPhone or Android device.
+            </p>
+          </div>
+
+          {/* Feature chips */}
+          <div className="download-pwa__chips reveal-item">
+            {[
+              'Launches like a native app',
+              'Full-screen, no browser bar',
+              'Same secure session',
+              'Works on iOS & Android',
+              'Instant — no download',
+            ].map((chip) => (
+              <span key={chip} className="download-pwa__chip">
+                <FaCheck aria-hidden /> {chip}
+              </span>
+            ))}
+          </div>
+
+          {/* Android install CTA — only shown when browser supports it */}
+          {canInstall && (
+            <div className="download-pwa__android-cta reveal-item">
+              <FaMobileAlt aria-hidden />
+              <span>Your browser supports one-tap install:</span>
+              <button
+                id="pwa-download-page-install-btn"
+                type="button"
+                className="download-cta-primary download-pwa__install-btn"
+                onClick={triggerInstall}
+              >
+                <FaDownload aria-hidden /> Install Zenith Now
+              </button>
             </div>
-            <div className="download-browser-band__actions">
-              <Link to="/" className="download-cta-secondary">
-                Open in browser
-              </Link>
-              <Link to="/register" className="download-cta-ghost">
-                Start free trial
-              </Link>
+          )}
+
+          {/* Step-by-step guide tabs */}
+          <div className="download-install__panel download-pwa__panel reveal-item">
+            <div className="download-install__tabs" role="tablist" aria-label="Platform install guide">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={pwaTab === 'android'}
+                className={`download-install__tab${pwaTab === 'android' ? ' is-active' : ''}`}
+                onClick={() => setPwaTab('android')}
+              >
+                <FaMobileAlt aria-hidden /> Android (Chrome)
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={pwaTab === 'ios'}
+                className={`download-install__tab${pwaTab === 'ios' ? ' is-active' : ''}`}
+                onClick={() => setPwaTab('ios')}
+              >
+                <FaApple aria-hidden /> iPhone / iPad
+              </button>
+            </div>
+
+            <div className="download-pwa__steps" role="tabpanel">
+              {(pwaTab === 'ios' ? PWA_STEPS_IOS : PWA_STEPS_ANDROID).map((item) => (
+                <div key={item.step} className="download-pwa__step">
+                  <span className="download-pwa__step-num">{item.step}</span>
+                  <div>
+                    <p className="download-pwa__step-title">{item.title}</p>
+                    <p className="download-pwa__step-desc">{item.desc}</p>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
+
+          <p className="download-release-note reveal-item">
+            <FaGlobe aria-hidden style={{ marginRight: '0.4em' }} />
+            Or just open{' '}
+            <Link to="/">rajverse.me</Link>{' '}
+            in any browser — Zenith works with full feature parity in Chrome, Edge, Firefox, and Safari.
+          </p>
         </section>
 
         {/* FAQ */}

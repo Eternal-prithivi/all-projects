@@ -889,3 +889,133 @@
     max-width: 100%;
   }
 }
+
+/* ─── PWA / Add to Home Screen section ─── */
+.download-pwa {
+  padding: 2rem 0 4rem;
+  border-top: 1px solid var(--download-border);
+}
+
+/* Feature chips row */
+.download-pwa__chips {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-bottom: 2rem;
+}
+
+.download-pwa__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.4rem 0.9rem;
+  border-radius: 999px;
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.65);
+  background: rgba(99, 102, 241, 0.08);
+  border: 1px solid rgba(99, 102, 241, 0.22);
+}
+
+.download-pwa__chip svg {
+  color: #818cf8;
+  font-size: 0.72rem;
+}
+
+/* One-tap Android CTA banner */
+.download-pwa__android-cta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.85rem;
+  margin: 0 auto 2rem;
+  max-width: 600px;
+  padding: 1rem 1.5rem;
+  border-radius: 16px;
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.12), rgba(139, 92, 246, 0.08));
+  border: 1px solid rgba(99, 102, 241, 0.28);
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.download-pwa__android-cta svg:first-child {
+  color: #818cf8;
+  font-size: 1.25rem;
+  flex-shrink: 0;
+}
+
+.download-pwa__install-btn {
+  background: linear-gradient(135deg, #6366f1, #8b5cf6) !important;
+  color: #fff !important;
+  box-shadow: 0 6px 24px rgba(99, 102, 241, 0.35) !important;
+  padding: 0.65rem 1.35rem !important;
+  font-size: 0.9rem !important;
+}
+
+.download-pwa__install-btn:hover {
+  box-shadow: 0 10px 32px rgba(99, 102, 241, 0.5) !important;
+}
+
+/* Panel (reuses download-install__panel but scoped) */
+.download-pwa__panel {
+  max-width: 640px;
+  margin: 0 auto 1.5rem;
+}
+
+/* Step-by-step cards */
+.download-pwa__steps {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.download-pwa__step {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.download-pwa__step-num {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  color: #fff;
+  font-size: 0.78rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 0.1rem;
+  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.35);
+}
+
+.download-pwa__step-title {
+  margin: 0 0 0.2rem;
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: #f0f0f5;
+}
+
+.download-pwa__step-desc {
+  margin: 0;
+  font-size: 0.85rem;
+  line-height: 1.55;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+/* Responsive */
+@media (max-width: 640px) {
+  .download-pwa__android-cta {
+    flex-direction: column;
+    text-align: center;
+  }
+
+  .download-pwa__install-btn {
+    width: 100%;
+  }
+}
+

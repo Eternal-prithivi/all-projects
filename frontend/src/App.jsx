@@ -4,6 +4,7 @@ import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import CookieConsent from "./components/CookieConsent.jsx";
 import MaintenanceGate from "./components/MaintenanceGate.jsx";
+import PwaInstallBanner from "./components/pwa/PwaInstallBanner.jsx";
 import { startRenderKeepAlive } from "./utils/renderKeepAlive.js";
 
 function App() {
@@ -15,6 +16,8 @@ function App() {
         <Outlet />
       </MaintenanceGate>
       <CookieConsent />
+      {/* PWA "Add to Home Screen" install banner — appears after 8s on eligible browsers */}
+      <PwaInstallBanner />
       <ToastContainer
         position="top-right"
         autoClose={4000}

@@ -218,3 +218,25 @@ ReactDOM.createRoot(document.getElementById("root")).render(
     </ErrorBoundary>
   </React.StrictMode>
 );
+
+// ── Service Worker registration ───────────────────────────────────────────────
+// Register after the page loads so the SW doesn't compete with critical assets.
+// The SW lives at /sw.js (public/sw.js) so Vite copies it as-is to the root.
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker
+      .register('/sw.js', { scope: '/' })
+      .then((reg) => {
+        if (import.meta.env.DEV) {
+          // eslint-disable-next-line no-console
+          console.log('[PWA] Service worker registered:', reg.scope);
+        }
+      })
+      .catch((err) => {
+        if (import.meta.env.DEV) {
+          // eslint-disable-next-line no-console
+          console.warn('[PWA] Service worker registration failed:', err);
+        }
+      });
+  });
+}
