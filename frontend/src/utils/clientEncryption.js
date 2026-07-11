@@ -36,8 +36,8 @@ async function deriveAesKey(password, salt) {
  * @returns {Promise<Blob>}
  */
 export async function encryptFileInBrowser(file, password) {
-  if (!password || password.length < 12) {
-    throw new Error("Password must be at least 12 characters.");
+  if (!password || password.length < 8) {
+    throw new Error("Password must be at least 8 characters.");
   }
   const plainBuffer = await file.arrayBuffer();
   const salt = crypto.getRandomValues(new Uint8Array(SALT_LENGTH));

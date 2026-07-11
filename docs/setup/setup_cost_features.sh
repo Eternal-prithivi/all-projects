@@ -5,11 +5,15 @@
 
 echo "🚀 Setting up Cost Management Features..."
 
-# Install Python dependencies
+# Install Python dependencies (match backend/requirements.txt)
 echo "📦 Installing Python dependencies..."
 cd backend
-source .venv/bin/activate 2>/dev/null || python3 -m venv .venv && source .venv/bin/activate
-pip install scikit-learn==1.7.0 numpy==2.2.6 --quiet
+if [[ ! -x .venv/bin/python ]]; then
+  python3 -m venv .venv
+fi
+# shellcheck source=/dev/null
+source .venv/bin/activate
+pip install -r requirements.txt --quiet
 
 # Check MongoDB
 echo "🔍 Checking MongoDB connection..."

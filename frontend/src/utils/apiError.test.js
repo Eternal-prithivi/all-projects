@@ -38,4 +38,17 @@ describe('getApiErrorMessage', () => {
     };
     expect(getApiErrorMessage(err, 'fallback')).toBe('Connect AWS first Open Settings');
   });
+
+  it('shows remote API host on production network errors', () => {
+    const err = { message: 'Network Error' };
+    const prevMode = import.meta.env.MODE;
+    import.meta.env.MODE = 'production';
+    try {
+      const msg = getApiErrorMessage(err, 'fallback');
+      expect(msg).toContain('zenith-backend-707i.onrender.com');
+      expect(msg).not.toContain('localhost:8000');
+    } finally {
+      import.meta.env.MODE = prevMode;
+    }
+  });
 });

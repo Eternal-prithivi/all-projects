@@ -8,7 +8,7 @@ export function checkPasswordStrength(pwd) {
   }
 
   const checks = {
-    length: pwd.length >= 12,
+    length: pwd.length >= 8,
     uppercase: /[A-Z]/.test(pwd),
     lowercase: /[a-z]/.test(pwd),
     number: /[0-9]/.test(pwd),
@@ -23,7 +23,7 @@ export function checkPasswordStrength(pwd) {
   if (checks.special) strength++;
 
   const missing = [];
-  if (!checks.length) missing.push("12+ characters");
+  if (!checks.length) missing.push("8+ characters");
   if (!checks.uppercase) missing.push("uppercase letter");
   if (!checks.lowercase) missing.push("lowercase letter");
   if (!checks.number) missing.push("number");

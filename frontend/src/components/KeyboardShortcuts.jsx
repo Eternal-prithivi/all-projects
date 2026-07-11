@@ -58,8 +58,14 @@ const KeyboardShortcuts = ({ isOpen, onClose, variant = 'dashboard' }) => {
   if (!isOpen) return null;
 
   return (
-    <div className="keyboard-shortcuts-overlay" onClick={onClose}>
-      <div className="keyboard-shortcuts-modal" onClick={(e) => e.stopPropagation()}>
+    <div className="keyboard-shortcuts-overlay" onClick={onClose} role="presentation">
+      <div
+        className="keyboard-shortcuts-modal"
+        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Keyboard shortcuts"
+      >
         <div className="shortcuts-header">
           <h2>Keyboard shortcuts</h2>
           <button type="button" className="close-btn" onClick={onClose} aria-label="Close">

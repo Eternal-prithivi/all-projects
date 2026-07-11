@@ -63,6 +63,8 @@
   top: calc(100% + 0.5rem);
   right: 0;
   min-width: 280px;
+  max-height: min(85vh, 560px);
+  overflow-y: auto;
   background: var(--bg-elevated);
   border: 1px solid var(--border-default);
   border-radius: 12px;
@@ -130,6 +132,44 @@
   text-overflow: ellipsis;
 }
 
+.profile-menu-username {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-bottom: 0.15rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.profile-menu-plan-badge {
+  display: inline-block;
+  margin-top: 0.4rem;
+  padding: 0.15rem 0.5rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  border-radius: 999px;
+  background: rgba(212, 175, 55, 0.15);
+  color: var(--gold-primary);
+  border: 1px solid rgba(212, 175, 55, 0.35);
+}
+
+.profile-menu-plan-badge--free {
+  background: var(--surface-hover);
+  color: var(--text-muted);
+  border-color: var(--border-default);
+}
+
+.profile-menu-section-label {
+  padding: 0.35rem 1rem 0.15rem;
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+
 .profile-menu-divider {
   height: 1px;
   background: var(--border-default);
@@ -167,4 +207,14 @@
 
 .profile-menu-item.danger:hover {
   background: rgba(239, 68, 68, 0.1);
+}
+
+.profile-menu-item--locked {
+  opacity: 0.85;
+}
+
+.profile-menu-lock {
+  margin-left: auto;
+  font-size: 0.7rem;
+  opacity: 0.6;
 }

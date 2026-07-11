@@ -13,6 +13,8 @@ class UserResponse(BaseModel):
     email: EmailStr
     role: str = "user"
     profile_picture: Optional[str] = None
+    full_name: Optional[str] = None
+    email_verified: bool = True
 
 router = APIRouter(tags=["Users"])
 
@@ -29,4 +31,6 @@ async def read_users_me(
         email=current_user.email,
         role=current_user.role,
         profile_picture=user_doc.get("profile_picture"),
+        full_name=user_doc.get("full_name"),
+        email_verified=bool(user_doc.get("email_verified", True)),
     )

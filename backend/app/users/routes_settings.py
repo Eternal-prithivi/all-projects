@@ -24,12 +24,48 @@ router = APIRouter(prefix="/settings", tags=["Settings"])
 DB = get_database()
 
 
+class NotificationChannelSettings(BaseModel):
+    email: bool = True
+    in_app: bool = True
+
+
 class NotificationSettings(BaseModel):
     email_notifications: bool = True
-    budget_alerts: bool = True
-    security_alerts: bool = True
-    weekly_reports: bool = False
-    maintenance_updates: bool = True
+    budget_alerts: NotificationChannelSettings = Field(default_factory=NotificationChannelSettings)
+    security_alerts: NotificationChannelSettings = Field(default_factory=NotificationChannelSettings)
+    weekly_reports: NotificationChannelSettings = Field(
+        default_factory=lambda: NotificationChannelSettings(email=False, in_app=True)
+    )
+    maintenance_updates: NotificationChannelSettings = Field(default_factory=NotificationChannelSettings)
+
+
+def _coerce_notification_settings(raw: dict) -> NotificationSettings:
+    """Support legacy flat booleans and new per-channel objects."""
+    if not raw:
+        return NotificationSettings()
+
+    def _channel(key: str, default_email: bool = True, default_in_app: bool = True) -> NotificationChannelSettings:
+        val = raw.get(key)
+        if isinstance(val, dict):
+            return NotificationChannelSettings(
+                email=bool(val.get("email", default_email)),
+                in_app=bool(val.get("in_app", default_in_app)),
+            )
+        if isinstance(val, bool):
+            return NotificationChannelSettings(email=val, in_app=val)
+        return NotificationChannelSettings(email=default_email, in_app=default_in_app)
+
+    return NotificationSettings(
+        email_notifications=bool(raw.get("email_notifications", True)),
+        budget_alerts=_channel("budget_alerts"),
+        security_alerts=_channel("security_alerts"),
+        weekly_reports=_channel("weekly_reports", default_email=False, default_in_app=True),
+        maintenance_updates=_channel("maintenance_updates"),
+    )
+
+
+class ApiKeyCreate(BaseModel):
+    name: Optional[str] = Field(default="Unnamed key", max_length=64)
 
 
 class PlatformRegionOption(BaseModel):
@@ -72,6 +108,7 @@ class SettingsResponse(BaseModel):
 class APIKeyResponse(BaseModel):
     key_id: str
     key_preview: str
+    name: str = "Unnamed key"
     created_at: datetime
     last_used: Optional[datetime] = None
 
@@ -128,7 +165,7 @@ async def get_settings(current_user: User = Depends(get_current_user)):
             prefs_raw["platform_region_slug"] = default_platform_slug()
         
         return SettingsResponse(
-            notifications=NotificationSettings(**settings.get("notifications", {})),
+            notifications=_coerce_notification_settings(settings.get("notifications", {})),
             preferences=PreferencesSettings(**prefs_raw),
             billing=BillingSettings(**settings.get("billing", {})),
             platform_multi_region=platform_multi_region,
@@ -251,6 +288,7 @@ async def get_api_keys(current_user: User = Depends(get_current_user)):
         for key in keys:
             full_key = key.get("key", "")
             key["key_preview"] = f"{full_key[:8]}****************************{full_key[-6:]}"
+            key["name"] = key.get("name") or "Unnamed key"
             del key["key"]
         
         return {"success": True, "keys": keys}
@@ -259,12 +297,17 @@ async def get_api_keys(current_user: User = Depends(get_current_user)):
 
 
 @router.post("/api-keys")
-async def generate_api_key(current_user: User = Depends(get_current_user)):
+async def generate_api_key(
+    body: Optional[ApiKeyCreate] = None,
+    current_user: User = Depends(get_current_user),
+):
     """Generate a new API key"""
     from app.payments.plan_entitlements import require_feature
 
     require_feature(current_user.username, "api_access")
     try:
+        payload = body or ApiKeyCreate()
+        name = (payload.name or "Unnamed key").strip()[:64] or "Unnamed key"
         # Generate secure API key
         api_key = f"sk-prod-{secrets.token_urlsafe(32)}"
         key_id = secrets.token_hex(8)
@@ -274,6 +317,7 @@ async def generate_api_key(current_user: User = Depends(get_current_user)):
         key_data = {
             "key_id": key_id,
             "key": api_key,
+            "name": name,
             "username": current_user.username,
             "created_at": datetime.utcnow(),
             "last_used": None,
@@ -288,6 +332,7 @@ async def generate_api_key(current_user: User = Depends(get_current_user)):
             "message": "API key generated successfully",
             "key": api_key,
             "key_id": key_id,
+            "name": name,
             "note": "Save this key securely. You won't be able to see it again."
         }
     except Exception as e:
@@ -371,10 +416,80 @@ async def get_preferences_summary(current_user: User = Depends(get_current_user)
 
         return {
             "username": current_user.username,
-            "notifications": NotificationSettings(**notif_settings).model_dump(),
+            "notifications": _coerce_notification_settings(notif_settings).model_dump(),
         }
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch preferences summary: {str(e)}")
+
+
+WEBHOOK_EVENTS = frozenset({
+    "budget.exceeded",
+    "byoc.connected",
+    "provision.completed",
+})
+
+
+class WebhookCreate(BaseModel):
+    url: str = Field(..., min_length=8, max_length=512)
+    events: List[str] = Field(default_factory=list)
+    name: Optional[str] = Field(default="Webhook", max_length=64)
+
+
+@router.get("/webhooks")
+async def list_webhooks(current_user: User = Depends(get_current_user)):
+    from app.payments.plan_entitlements import require_feature
+
+    require_feature(current_user.username, "api_access")
+    hooks = list(
+        DB["webhooks"].find(
+            {"username": current_user.username, "revoked": {"$ne": True}},
+            {"_id": 0, "secret": 0},
+        )
+    )
+    return {"success": True, "webhooks": hooks}
+
+
+@router.post("/webhooks")
+async def create_webhook(
+    body: WebhookCreate,
+    current_user: User = Depends(get_current_user),
+):
+    from app.payments.plan_entitlements import require_feature
+
+    require_feature(current_user.username, "api_access")
+    events = [e for e in body.events if e in WEBHOOK_EVENTS]
+    if not events:
+        raise HTTPException(status_code=400, detail="Select at least one valid event.")
+    webhook_id = secrets.token_hex(8)
+    secret = secrets.token_urlsafe(24)
+    doc = {
+        "webhook_id": webhook_id,
+        "username": current_user.username,
+        "name": (body.name or "Webhook").strip()[:64],
+        "url": body.url.strip(),
+        "events": events,
+        "secret": secret,
+        "created_at": datetime.utcnow(),
+        "revoked": False,
+    }
+    DB["webhooks"].insert_one(doc)
+    return {
+        "success": True,
+        "webhook_id": webhook_id,
+        "secret": secret,
+        "message": "Webhook created. Save the signing secret — it is shown once.",
+    }
+
+
+@router.delete("/webhooks/{webhook_id}")
+async def revoke_webhook(webhook_id: str, current_user: User = Depends(get_current_user)):
+    result = DB["webhooks"].update_one(
+        {"webhook_id": webhook_id, "username": current_user.username},
+        {"$set": {"revoked": True, "revoked_at": datetime.utcnow()}},
+    )
+    if result.modified_count == 0:
+        raise HTTPException(status_code=404, detail="Webhook not found")
+    return {"success": True, "message": "Webhook removed"}
 

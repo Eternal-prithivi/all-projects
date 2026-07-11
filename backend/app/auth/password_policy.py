@@ -6,7 +6,7 @@ import re
 
 from fastapi import HTTPException
 
-_MIN_LENGTH = 12
+_MIN_LENGTH = 8
 _COMPLEXITY = re.compile(
     r"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).+$"
 )

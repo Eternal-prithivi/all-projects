@@ -617,3 +617,38 @@
     text-align: center;
   }
 }
+
+.email-verification-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 6px;
+  background: rgba(234, 179, 8, 0.12);
+  border: 1px solid rgba(234, 179, 8, 0.35);
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.btn-link-inline {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--gold-primary);
+  font-size: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.btn-link-inline:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.email-verified-hint {
+  color: var(--success, #22c55e);
+  margin-top: 0.35rem;
+}

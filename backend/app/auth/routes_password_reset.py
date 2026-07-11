@@ -25,7 +25,7 @@ class ForgotPasswordRequest(BaseModel):
 
 
 class ResetPasswordRequest(BaseModel):
-    new_password: str = Field(..., min_length=12)
+    new_password: str = Field(..., min_length=8)
     method: str = Field("email", pattern="^(email|sms)$")
     token: str | None = Field(None, description="Token from email link")
     otp: str | None = Field(None, description="6-digit SMS code")

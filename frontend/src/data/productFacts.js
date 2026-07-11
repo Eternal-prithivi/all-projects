@@ -27,7 +27,8 @@ export const NOT_YET_AVAILABLE = {
   vmMigration: 'VM migration between cloud providers is not available in the UI yet.',
   orgBilling:
     'When you join a team, your Zenith plan and seat are managed by the organization owner. Cloud provider costs remain on each member’s connected accounts.',
-  apiKeysPage: 'API key management is planned; use dashboard features via the web UI today.',
+  apiKeysPage:
+    'Manage API keys under Workspace Settings (Pro plan or higher). Generate keys for programmatic access to your resources.',
 };
 
 /** Team page — what works today vs planned (honest UX) */
@@ -215,7 +216,7 @@ export const MARKETING_PRICING = PRODUCT_PLANS.map((p) => ({
 
 export function buildHelpFaqs() {
   const plansSummary = formatPlansSummaryForHelp();
-  const deleteAccountAnswer = `To delete your account, contact us via ${PATHS.contact} or email ${SUPPORT_EMAIL} with your username and reason for deletion. We process requests within 7 business days. Account deletion is permanent — export any data you need first.`;
+  const deleteAccountAnswer = `You can delete your account from ${PATHS.profile} (Danger Zone). Type DELETE to confirm — this permanently removes VMs, files, and settings. For help or if you cannot sign in, contact us via ${PATHS.contact} or email ${SUPPORT_EMAIL}. Export any data you need before deleting.`;
 
   return [
     {

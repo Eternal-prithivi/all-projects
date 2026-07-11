@@ -35,7 +35,7 @@ export const validateUsername = (value) => {
 };
 
 export const validatePassword = (value, options = {}) => {
-  const { minLength = 12 } = options;
+  const { minLength = 8 } = options;
   const trimmedValue = value.trim();
 
   if (!trimmedValue) {

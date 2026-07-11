@@ -168,6 +168,16 @@
     margin-right: -0.25rem;
   }
 
+  .zenith-settings-hub {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 0.35rem;
+    margin-left: -0.25rem;
+    margin-right: -0.25rem;
+    top: 0;
+  }
+
   .zenith-cost-hub a {
     flex-shrink: 0;
     min-height: var(--touch-min);
@@ -437,6 +447,15 @@
   }
 
   .zenith-cost-hub a {
+    font-size: 0.78rem;
+    padding: 0.45rem 0.6rem;
+  }
+
+  .zenith-settings-hub a {
+    flex-shrink: 0;
+    min-height: var(--touch-min);
+    display: inline-flex;
+    align-items: center;
     font-size: 0.78rem;
     padding: 0.45rem 0.6rem;
   }

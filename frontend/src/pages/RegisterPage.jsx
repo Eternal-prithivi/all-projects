@@ -1,8 +1,9 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { registerUser } from '../api';
 import { getValidationErrorMessage, validateRegisterForm } from '../utils/formValidation.js';
 import TurnstileWidget from '../components/auth/TurnstileWidget.jsx';
+import PasswordRequirementsPanel from '../components/auth/PasswordRequirementsPanel.jsx';
 import { turnstileSiteKey } from '../config/turnstile.js';
 import '../styles/auth.css';
 import '../styles/auth-polish.css';
@@ -36,6 +37,10 @@ function RegisterPage() {
   }, []);
 
   const validation = validateRegisterForm({ username, email, password });
+  const passwordHint = useMemo(() => {
+    if (!password) return '';
+    return validation.errors.password || '';
+  }, [password, validation.errors.password]);
   const isSubmitDisabled =
     isLoading || !validation.isValid || (captchaRequired && !captchaToken);
 
@@ -194,7 +199,7 @@ function RegisterPage() {
               <input
                 type="password"
                 id="reg-password"
-                placeholder="Min. 8 characters"
+                placeholder="Create a strong password"
                 value={password}
                 onChange={(e) => {
                   setPassword(e.target.value);
@@ -203,16 +208,16 @@ function RegisterPage() {
                   }
                 }}
                 required
-                minLength="8"
+                minLength={8}
                 aria-required="true"
                 autoComplete="new-password"
-                aria-invalid={Boolean(fieldErrors.password)}
-                aria-describedby={fieldErrors.password ? 'reg-password-error' : 'password-help'}
+                aria-invalid={Boolean(fieldErrors.password || passwordHint)}
+                aria-describedby="password-requirements"
               />
-              <small id="password-help" className="form-help">Minimum 8 characters</small>
-              {fieldErrors.password && (
+              <PasswordRequirementsPanel password={password} id="password-requirements" />
+              {(fieldErrors.password || passwordHint) && (
                 <p className="form-field-error" id="reg-password-error" role="alert">
-                  {fieldErrors.password}
+                  {fieldErrors.password || passwordHint}
                 </p>
               )}
             </div>
@@ -231,6 +236,12 @@ function RegisterPage() {
             >
               {isLoading ? 'Creating account...' : 'Create Account'}
             </button>
+
+            {!isLoading && password && !validation.isValid && validation.errors.password && (
+              <p className="auth-password-hint-blocked" role="status">
+                Complete all password requirements above to create your account.
+              </p>
+            )}
 
             {message && <p className="auth-success" role="status" aria-live="polite">{message}</p>}
             {error && <p className="auth-error" role="alert" aria-live="assertive">{error}</p>}

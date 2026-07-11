@@ -188,6 +188,86 @@
   outline-offset: 2px;
 }
 
+/* Settings page section hub — mirrors cost hub */
+.zenith-settings-hub {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-lg);
+  padding: var(--space-sm);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.zenith-settings-hub a {
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 0.85rem;
+  transition: color var(--duration-fast), background var(--duration-fast);
+  white-space: nowrap;
+}
+
+.zenith-settings-hub a:hover {
+  color: var(--text-primary);
+  background: var(--bg-card-hover);
+}
+
+.zenith-settings-hub a.active,
+.zenith-settings-hub a[aria-current="location"] {
+  color: var(--bg-base);
+  background: var(--gold-primary);
+}
+
+.zenith-settings-hub a:focus-visible {
+  outline: 2px solid var(--gold-primary);
+  outline-offset: 2px;
+}
+
+/* Account hub — Profile / Security / Settings */
+.zenith-account-hub {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-lg);
+  padding: var(--space-sm);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+}
+
+.zenith-account-hub a {
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 0.9rem;
+  transition: color var(--duration-fast), background var(--duration-fast);
+}
+
+.zenith-account-hub a:hover {
+  color: var(--text-primary);
+  background: var(--bg-card-hover);
+}
+
+.zenith-account-hub a.active,
+.zenith-account-hub a[aria-current="page"] {
+  color: var(--bg-base);
+  background: var(--gold-primary);
+}
+
+.zenith-account-hub a:focus-visible {
+  outline: 2px solid var(--gold-primary);
+  outline-offset: 2px;
+}
+
 /* Admin header token alignment */
 .admin-page-header {
   border-color: var(--border-default) !important;

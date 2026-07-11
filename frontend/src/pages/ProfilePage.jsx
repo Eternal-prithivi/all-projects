@@ -31,6 +31,7 @@ import {
 import '../styles/profile.css';
 import PageHeader from '../components/ui/PageHeader.jsx';
 import PageContainer from '../components/ui/PageContainer.jsx';
+import AccountHubNav from '../components/account/AccountHubNav.jsx';
 import { usePageRefresh } from '../hooks/usePageRefresh.js';
 
 const ProfilePage = () => {
@@ -55,7 +56,9 @@ const ProfilePage = () => {
     company: '',
     role: 'Admin',
     profile_picture: null,
+    email_verified: true,
   });
+  const [isResendingVerification, setIsResendingVerification] = useState(false);
   const [showDeleteAccountModal, setShowDeleteAccountModal] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
@@ -102,6 +105,7 @@ const ProfilePage = () => {
         company: profileData.company || '',
         role: profileData.role || 'Admin',
         profile_picture: profileData.profile_picture || null,
+        email_verified: profileData.email_verified !== false,
       });
 
       // Fetch stats
@@ -154,6 +158,36 @@ const ProfilePage = () => {
   const handleCancel = () => {
     fetchProfileData();
     setIsEditing(false);
+  };
+
+  const handleResendVerification = async () => {
+    if (isResendingVerification) return;
+    setIsResendingVerification(true);
+    try {
+      await apiClient.post('/auth/resend-verification');
+      notifications.success('Verification email sent. Check your inbox.');
+    } catch (error) {
+      notifications.error(error.response?.data?.detail || 'Failed to send verification email');
+    } finally {
+      setIsResendingVerification(false);
+    }
+  };
+
+  const handleExportData = async () => {
+    try {
+      const response = await apiClient.get('/profile/export', { responseType: 'blob' });
+      const url = window.URL.createObjectURL(new Blob([response.data], { type: 'application/zip' }));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `zenith-export-${new Date().toISOString().slice(0, 10)}.zip`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      notifications.success('Your data export has been downloaded');
+    } catch (error) {
+      notifications.error(error.response?.data?.detail || 'Failed to export data');
+    }
   };
 
   const handleUploadPicture = async (event) => {
@@ -267,6 +301,8 @@ const ProfilePage = () => {
         refreshing={pageRefreshing || isLoading}
       />
 
+      <AccountHubNav />
+
       <div className="profile-content">
         {/* Profile Picture Section */}
         <div className="profile-card profile-card--avatar">
@@ -364,6 +400,22 @@ const ProfilePage = () => {
                 />
                 {isEditing && profileValidation.errors.email && (
                   <p id="profile-email-error" className="form-field-error">{profileValidation.errors.email}</p>
+                )}
+                {!formData.email_verified && (
+                  <div className="email-verification-banner" role="status">
+                    <span>Email not verified.</span>
+                    <button
+                      type="button"
+                      className="btn-link-inline"
+                      onClick={handleResendVerification}
+                      disabled={isResendingVerification}
+                    >
+                      {isResendingVerification ? 'Sending…' : 'Resend verification email'}
+                    </button>
+                  </div>
+                )}
+                {formData.email_verified && (
+                  <p className="hint-text email-verified-hint">Email verified</p>
                 )}
               </div>
 
@@ -567,6 +619,15 @@ const ProfilePage = () => {
         <div className="profile-card danger-zone">
           <h3>Danger Zone</h3>
           <div className="danger-actions">
+            <div className="danger-item">
+              <div>
+                <h4>Download my data</h4>
+                <p>Export your profile, preferences, and activity log as a ZIP file</p>
+              </div>
+              <button type="button" className="btn-secondary" onClick={handleExportData}>
+                Download data
+              </button>
+            </div>
             <div className="danger-item">
               <div>
                 <h4>Delete Account</h4>

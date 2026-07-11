@@ -1263,3 +1263,38 @@ input:disabled + .toggle-slider {
   text-align: left;
 }
 
+.notification-channel-toggles {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  align-items: flex-end;
+}
+
+.channel-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+}
+
+.setting-item--channels {
+  align-items: flex-start;
+}
+
+.api-key-create-row,
+.webhook-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 1rem;
+  align-items: center;
+}
+
+.api-key-create-row .form-input,
+.webhook-form .form-input,
+.webhook-form .zenith-select {
+  flex: 1 1 200px;
+  min-width: 0;
+}
+

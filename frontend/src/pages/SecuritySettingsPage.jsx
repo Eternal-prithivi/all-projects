@@ -14,6 +14,8 @@ import TwoFADialog from '../components/TwoFADialog.jsx';
 import PageHeader from '../components/ui/PageHeader.jsx';
 import PageContainer from '../components/ui/PageContainer.jsx';
 import { usePageRefresh } from '../hooks/usePageRefresh.js';
+import AccountHubNav from '../components/account/AccountHubNav.jsx';
+import PasswordRequirementsPanel from '../components/auth/PasswordRequirementsPanel.jsx';
 import { useConfirm } from '../context/ConfirmContext.jsx';
 
 const formatRelativeTime = (timestamp) => {
@@ -59,6 +61,8 @@ const SecuritySettingsPage = () => {
     confirmPassword: false,
   });
   const [passwordSubmitAttempted, setPasswordSubmitAttempted] = useState(false);
+  const [linkedAccounts, setLinkedAccounts] = useState({ google_linked: false, password_set: true });
+  const [unlinkPassword, setUnlinkPassword] = useState('');
   const { runPageRefresh, pageRefreshing } = usePageRefresh();
 
   const passwordValidation = React.useMemo(
@@ -80,10 +84,11 @@ const SecuritySettingsPage = () => {
   const fetchSecuritySettings = async () => {
     try {
       setIsLoading(true);
-      const [twoFAResponse, sessionsResponse, summaryResponse] = await Promise.all([
+      const [twoFAResponse, sessionsResponse, summaryResponse, linkedResponse] = await Promise.all([
         apiClient.get('/2fa/status-2fa'),
         apiClient.get('/profile/sessions'),
         apiClient.get('/profile/activity/summary', { params: { period_days: 30 } }),
+        apiClient.get('/auth/linked-accounts'),
       ]);
 
       const enabled = twoFAResponse.data.enabled || false;
@@ -102,6 +107,7 @@ const SecuritySettingsPage = () => {
       }
       setSessions(sessionsResponse.data || []);
       setActivitySummary(summaryResponse.data);
+      setLinkedAccounts(linkedResponse.data || { google_linked: false, password_set: true });
     } catch (error) {
       console.error('Failed to fetch security settings:', error);
       toast.error('Failed to load security settings');
@@ -150,6 +156,65 @@ const SecuritySettingsPage = () => {
       toast.error(error.response?.data?.detail || 'Failed to change password');
     } finally {
       setIsSavingPassword(false);
+    }
+  };
+
+  const handleDownloadActivityCsv = async () => {
+    try {
+      const response = await apiClient.get('/profile/activity/export', {
+        params: { period_days: 30 },
+        responseType: 'blob',
+      });
+      const url = window.URL.createObjectURL(new Blob([response.data], { type: 'text/csv' }));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `zenith-activity-${new Date().toISOString().slice(0, 10)}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      toast.success('Activity log downloaded');
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to download activity log');
+    }
+  };
+
+  const handleRevokeAllOtherSessions = async () => {
+    if (otherSessions.length === 0) return;
+    const ok = await confirm({
+      title: 'Sign out all other devices',
+      message: `Revoke ${otherSessions.length} other sign-in(s)? Those devices will need to log in again.`,
+      confirmLabel: 'Sign out all',
+      variant: 'danger',
+    });
+    if (!ok) return;
+    try {
+      const response = await apiClient.delete('/profile/sessions/others');
+      toast.success(response.data?.message || 'Other sessions revoked');
+      const sessionsResponse = await apiClient.get('/profile/sessions');
+      setSessions(sessionsResponse.data || []);
+      setShowOtherSessions(false);
+      await refreshActivitySummary();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to revoke sessions');
+    }
+  };
+
+  const handleUnlinkGoogle = async () => {
+    if (!unlinkPassword.trim()) {
+      toast.error('Enter your password to unlink Google sign-in');
+      return;
+    }
+    try {
+      await apiClient.post('/auth/linked-accounts/google/unlink', {
+        current_password: unlinkPassword,
+      });
+      toast.success('Google sign-in unlinked');
+      setUnlinkPassword('');
+      setLinkedAccounts((prev) => ({ ...prev, google_linked: false }));
+      await refreshActivitySummary();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to unlink Google');
     }
   };
 
@@ -272,6 +337,8 @@ const SecuritySettingsPage = () => {
         refreshing={pageRefreshing || isLoading}
       />
 
+      <AccountHubNav />
+
       <div className="security-bento">
         <div className="security-card">
           <h3>
@@ -310,13 +377,15 @@ const SecuritySettingsPage = () => {
                 onBlur={() => markPasswordFieldTouched('newPassword')}
                 required
                 minLength={8}
+                placeholder="Create a strong password"
                 className="form-input"
                 aria-invalid={!!showPasswordFieldError('newPassword')}
-                aria-describedby={
-                  showPasswordFieldError('newPassword') ? 'new-password-error' : 'new-password-hint'
-                }
+                aria-describedby="security-new-password-requirements"
               />
-              <small id="new-password-hint" className="hint-text">At least 8 characters</small>
+              <PasswordRequirementsPanel
+                password={passwordData.newPassword}
+                id="security-new-password-requirements"
+              />
               {showPasswordFieldError('newPassword') && (
                 <p id="new-password-error" className="form-field-error">{passwordValidation.errors.newPassword}</p>
               )}
@@ -372,6 +441,44 @@ const SecuritySettingsPage = () => {
       </div>
 
       <div className="security-card security-card--full">
+        <h3>Sign-in methods</h3>
+        <div className="security-item">
+          <div className="security-info">
+            <h4>Password</h4>
+            <p>{linkedAccounts.password_set ? 'Password sign-in enabled' : 'No password set'}</p>
+          </div>
+        </div>
+        <div className="security-item">
+          <div className="security-info">
+            <h4>Google</h4>
+            <p>{linkedAccounts.google_linked ? 'Linked for single sign-on' : 'Not linked'}</p>
+          </div>
+          {linkedAccounts.google_linked && (
+            <div className="linked-account-unlink">
+              <input
+                type="password"
+                className="form-input"
+                placeholder="Current password"
+                value={unlinkPassword}
+                onChange={(e) => setUnlinkPassword(e.target.value)}
+                autoComplete="current-password"
+              />
+              <button type="button" className="btn-danger-outline" onClick={handleUnlinkGoogle}>
+                Unlink Google
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="security-card security-card--full">
+        <h3>Passkeys</h3>
+        <p className="security-card-subtitle">
+          Passwordless sign-in with Face ID, Touch ID, or a security key — coming in a future update.
+        </p>
+      </div>
+
+      <div className="security-card security-card--full">
         <h3>
           <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
             <path d="M0 1.5A.5.5 0 0 1 .5 1H2a.5.5 0 0 1 .485.379L2.89 3H14.5a.5.5 0 0 1 .491.592l-1.5 8A.5.5 0 0 1 13 12H4a.5.5 0 0 1-.491-.408L2.01 3.607 1.61 2H.5a.5.5 0 0 1-.5-.5z" />
@@ -400,6 +507,13 @@ const SecuritySettingsPage = () => {
 
         {otherSessions.length > 0 && (
           <>
+            <button
+              type="button"
+              className="btn-danger-outline sign-out-others-btn"
+              onClick={handleRevokeAllOtherSessions}
+            >
+              Sign out all other devices ({otherSessions.length})
+            </button>
             <button
               type="button"
               className="other-sessions-toggle"
@@ -476,6 +590,13 @@ const SecuritySettingsPage = () => {
               onClick={() => setShowAuditPanel(true)}
             >
               View full activity history
+            </button>
+            <button
+              type="button"
+              className="btn-secondary-outline audit-view-all-btn"
+              onClick={handleDownloadActivityCsv}
+            >
+              Download activity log (CSV)
             </button>
           </div>
         )}

@@ -36,7 +36,7 @@ export default function WizardPasswordFields({
         </p>
         <div className="password-requirements">
           <small className={strength.checks?.length ? "met" : "unmet"}>
-            {strength.checks?.length ? "✓" : "○"} 12+ characters
+            {strength.checks?.length ? "✓" : "○"} 8+ characters
           </small>
           <small className={strength.checks?.uppercase ? "met" : "unmet"}>
             {strength.checks?.uppercase ? "✓" : "○"} Uppercase (A–Z)

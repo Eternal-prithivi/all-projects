@@ -34,6 +34,7 @@ cleanup() {
   echo -e "${YELLOW}Stopping Frontend...${NC}"
   zenith_stop_pid "$FRONTEND_PID"
   zenith_stop_port "$FRONTEND_PORT"
+  zenith_stop_port "$BACKEND_PORT"
   echo -e "${GREEN}✅ All services stopped${NC}"
   exit "$status"
 }

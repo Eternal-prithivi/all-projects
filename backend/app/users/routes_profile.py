@@ -16,6 +16,8 @@
 import base64
 import csv
 import io
+import json
+import zipfile
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from fastapi.responses import Response
@@ -87,6 +89,8 @@ class ProfileResponse(BaseModel):
     role: str
     profile_picture: Optional[str] = None
     created_at: Optional[datetime] = None
+    email_verified: bool = True
+    email_verified_at: Optional[datetime] = None
 
 
 class AccountStats(BaseModel):
@@ -204,7 +208,9 @@ async def get_profile(current_user: User = Depends(get_current_user)):
             company=user.get("company", ""),
             role=user.get("role", "Admin"),
             profile_picture=user.get("profile_picture"),
-            created_at=user.get("created_at")
+            created_at=user.get("created_at"),
+            email_verified=bool(user.get("email_verified", True)),
+            email_verified_at=user.get("email_verified_at"),
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch profile: {str(e)}")
@@ -514,6 +520,43 @@ async def terminate_session(
         raise HTTPException(status_code=500, detail=f"Failed to terminate session: {str(e)}")
 
 
+@router.delete("/sessions/others")
+async def terminate_other_sessions(current_user: User = Depends(get_current_user)):
+    """Revoke all sessions except the current one."""
+    try:
+        sessions_collection = DB["sessions"]
+        current = sessions_collection.find_one(
+            {"username": current_user.username, "is_current": True}
+        )
+        if not current:
+            result = sessions_collection.delete_many(
+                {"username": current_user.username, "is_current": {"$ne": True}}
+            )
+        else:
+            result = sessions_collection.delete_many(
+                {
+                    "username": current_user.username,
+                    "_id": {"$ne": current["_id"]},
+                }
+            )
+
+        activity_collection = DB["activity_log"]
+        activity_collection.insert_one({
+            "username": current_user.username,
+            "action": "Sessions Revoked",
+            "description": f"Signed out {result.deleted_count} other device(s)",
+            "timestamp": datetime.utcnow(),
+        })
+
+        return {
+            "success": True,
+            "message": f"Signed out {result.deleted_count} other device(s)",
+            "revoked_count": result.deleted_count,
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to revoke sessions: {str(e)}")
+
+
 def _map_activity_doc(activity: dict) -> ActivityLogResponse:
     action = activity.get("action", "Unknown Action")
     return ActivityLogResponse(
@@ -660,3 +703,66 @@ async def export_activity_log_csv(
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to export activity log: {str(e)}")
+
+
+@router.get("/export")
+async def export_user_data_zip(current_user: User = Depends(get_current_user)):
+    """Export profile, preferences, and activity log as a ZIP (GDPR data portability)."""
+    from app.utils.audit_log import build_activity_query, dedupe_audit_entries
+
+    try:
+        users_collection = DB["users"]
+        user = users_collection.find_one({"username": current_user.username})
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        safe_profile = {
+            k: v for k, v in user.items()
+            if k not in ("hashed_password", "password", "email_verify_token", "_id")
+        }
+        for key, val in list(safe_profile.items()):
+            if isinstance(val, datetime):
+                safe_profile[key] = val.isoformat()
+
+        activity_collection = DB["activity_log"]
+        query = build_activity_query(current_user.username, days=90)
+        raw = list(activity_collection.find(query).sort("timestamp", -1).limit(2000))
+        activities = dedupe_audit_entries(raw, window_minutes=30)
+
+        csv_buffer = io.StringIO()
+        writer = csv.DictWriter(
+            csv_buffer,
+            fieldnames=["timestamp", "action", "description", "category", "ip"],
+        )
+        writer.writeheader()
+        for doc in activities:
+            action = doc.get("action", "")
+            writer.writerow({
+                "timestamp": (
+                    doc.get("timestamp").isoformat()
+                    if isinstance(doc.get("timestamp"), datetime)
+                    else str(doc.get("timestamp", ""))
+                ),
+                "action": action,
+                "description": doc.get("description", ""),
+                "category": categorize_audit_action(action),
+                "ip": doc.get("ip", ""),
+            })
+
+        zip_buffer = io.BytesIO()
+        with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
+            zf.writestr("profile.json", json.dumps(safe_profile, indent=2, default=str))
+            prefs = user.get("settings", {}).get("preferences", {})
+            zf.writestr("preferences.json", json.dumps(prefs, indent=2, default=str))
+            zf.writestr("activity_log.csv", csv_buffer.getvalue())
+
+        filename = f"zenith_export_{current_user.username}_{datetime.utcnow().strftime('%Y%m%d')}.zip"
+        return Response(
+            content=zip_buffer.getvalue(),
+            media_type="application/zip",
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to export user data: {str(e)}")

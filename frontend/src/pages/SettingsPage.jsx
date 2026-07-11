@@ -46,7 +46,8 @@ import KpiStrip, { KpiTile } from '../components/ui/KpiStrip.jsx';
 import StatusBadge from '../components/ui/StatusBadge.jsx';
 import { usePageRefresh } from '../hooks/usePageRefresh.js';
 import PlatformRegionPills from '../components/PlatformRegionPills.jsx';
-import CloudProviderLogo from '../components/cloud/CloudProviderLogo.jsx';
+import SettingsSectionNav from '../components/settings/SettingsSectionNav.jsx';
+import AccountHubNav from '../components/account/AccountHubNav.jsx';
 
 const SettingsPage = () => {
   const navigate = useNavigate();
@@ -67,11 +68,14 @@ const SettingsPage = () => {
   const [apiKeys, setApiKeys] = useState([]);
   const [notificationSettings, setNotificationSettings] = useState({
     emailNotifications: true,
-    budgetAlerts: true,
-    securityAlerts: true,
-    weeklyReports: false,
-    maintenanceUpdates: true,
+    budgetAlerts: { email: true, inApp: true },
+    securityAlerts: { email: true, inApp: true },
+    weeklyReports: { email: false, inApp: true },
+    maintenanceUpdates: { email: true, inApp: true },
   });
+  const [apiKeyName, setApiKeyName] = useState('');
+  const [webhooks, setWebhooks] = useState([]);
+  const [webhookForm, setWebhookForm] = useState({ name: '', url: '', events: ['budget.exceeded'] });
 
   const [preferences, setPreferences] = useState({
     theme: theme,
@@ -219,6 +223,7 @@ const SettingsPage = () => {
   useEffect(() => {
     fetchSettings();
     fetchApiKeys();
+    fetchWebhooks();
     fetchByocStatus();
     fetchSubscription();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- initial load on mount
@@ -278,12 +283,25 @@ const SettingsPage = () => {
       const response = await apiClient.get('/settings/');
       const data = response.data;
       
+      const mapChannel = (val, defaults = { email: true, inApp: true }) => {
+        if (val && typeof val === 'object') {
+          return {
+            email: val.email ?? defaults.email,
+            inApp: val.in_app ?? val.inApp ?? defaults.inApp,
+          };
+        }
+        if (typeof val === 'boolean') {
+          return { email: val, inApp: val };
+        }
+        return defaults;
+      };
+
       setNotificationSettings({
         emailNotifications: data.notifications.email_notifications,
-        budgetAlerts: data.notifications.budget_alerts,
-        securityAlerts: data.notifications.security_alerts,
-        weeklyReports: data.notifications.weekly_reports,
-        maintenanceUpdates: data.notifications.maintenance_updates,
+        budgetAlerts: mapChannel(data.notifications.budget_alerts),
+        securityAlerts: mapChannel(data.notifications.security_alerts),
+        weeklyReports: mapChannel(data.notifications.weekly_reports, { email: false, inApp: true }),
+        maintenanceUpdates: mapChannel(data.notifications.maintenance_updates),
       });
       
       const serverTheme = data.preferences?.theme;
@@ -324,6 +342,15 @@ const SettingsPage = () => {
       console.error('Failed to fetch settings:', error);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const fetchWebhooks = async () => {
+    try {
+      const response = await apiClient.get('/settings/webhooks');
+      setWebhooks(response.data.webhooks || []);
+    } catch {
+      setWebhooks([]);
     }
   };
 
@@ -764,29 +791,108 @@ const SettingsPage = () => {
     );
   };
 
-  const handleNotificationChange = async (key) => {
-    // Don't allow toggling "Coming Soon" features
-    if (key === 'weeklyReports') return;
+  const persistNotifications = async (nextSettings) => {
+    await apiClient.put('/settings/notifications', {
+      email_notifications: nextSettings.emailNotifications,
+      budget_alerts: {
+        email: nextSettings.budgetAlerts.email,
+        in_app: nextSettings.budgetAlerts.inApp,
+      },
+      security_alerts: {
+        email: nextSettings.securityAlerts.email,
+        in_app: nextSettings.securityAlerts.inApp,
+      },
+      weekly_reports: {
+        email: nextSettings.weeklyReports.email,
+        in_app: nextSettings.weeklyReports.inApp,
+      },
+      maintenance_updates: {
+        email: nextSettings.maintenanceUpdates.email,
+        in_app: nextSettings.maintenanceUpdates.inApp,
+      },
+    });
+  };
 
+  const handleNotificationChange = async (key) => {
     const newNotificationSettings = {
       ...notificationSettings,
-      [key]: !notificationSettings[key]
+      [key]: !notificationSettings[key],
     };
     setNotificationSettings(newNotificationSettings);
-    
+
     try {
-      await apiClient.put('/settings/notifications', {
-        email_notifications: newNotificationSettings.emailNotifications,
-        budget_alerts: newNotificationSettings.budgetAlerts,
-        security_alerts: newNotificationSettings.securityAlerts,
-        weekly_reports: newNotificationSettings.weeklyReports,
-        maintenance_updates: newNotificationSettings.maintenanceUpdates,
-      });
+      await persistNotifications(newNotificationSettings);
       notifications.success('Notification settings updated');
     } catch {
       notifications.error('Failed to update notifications');
-      // Revert change
       setNotificationSettings(notificationSettings);
+    }
+  };
+
+  const handleNotificationChannelChange = async (key, channel) => {
+    const current = notificationSettings[key];
+    if (!current || typeof current !== 'object') return;
+
+    const newNotificationSettings = {
+      ...notificationSettings,
+      [key]: { ...current, [channel]: !current[channel] },
+    };
+    setNotificationSettings(newNotificationSettings);
+
+    try {
+      await persistNotifications(newNotificationSettings);
+      notifications.success('Notification settings updated');
+    } catch {
+      notifications.error('Failed to update notifications');
+      setNotificationSettings(notificationSettings);
+    }
+  };
+
+  const formatLastUsed = (value) => {
+    if (!value) return 'Never';
+    return new Date(value).toLocaleString();
+  };
+
+  const handleCreateWebhook = async () => {
+    if (!webhookForm.url.trim()) {
+      notifications.error('Webhook URL is required');
+      return;
+    }
+    try {
+      const response = await apiClient.post('/settings/webhooks', {
+        name: webhookForm.name || 'Webhook',
+        url: webhookForm.url.trim(),
+        events: webhookForm.events,
+      });
+      notifications.success(
+        <div>
+          <strong>Webhook created</strong><br/>
+          <code style={{ fontSize: '0.85rem' }}>{response.data.secret}</code><br/>
+          <small>{response.data.message}</small>
+        </div>,
+        { autoClose: false }
+      );
+      setWebhookForm({ name: '', url: '', events: ['budget.exceeded'] });
+      fetchWebhooks();
+    } catch (error) {
+      notifications.error(error.response?.data?.detail || 'Failed to create webhook');
+    }
+  };
+
+  const handleRevokeWebhook = async (webhookId) => {
+    const ok = await confirm({
+      title: 'Remove webhook',
+      message: 'Remove this webhook endpoint?',
+      confirmLabel: 'Remove',
+      variant: 'danger',
+    });
+    if (!ok) return;
+    try {
+      await apiClient.delete(`/settings/webhooks/${webhookId}`);
+      notifications.success('Webhook removed');
+      fetchWebhooks();
+    } catch (error) {
+      notifications.error(error.response?.data?.detail || 'Failed to remove webhook');
     }
   };
 
@@ -897,18 +1003,20 @@ const SettingsPage = () => {
   };
 
   const handleGenerateApiKey = async () => {
+    const name = apiKeyName.trim() || 'Unnamed key';
     const loadingToastId = showLoading('Generating API key…');
     try {
-      const response = await apiClient.post('/settings/api-keys');
+      const response = await apiClient.post('/settings/api-keys', { name });
       updateSuccess(loadingToastId, 'API key generated — copy it now; it will not be shown again.');
       notifications.success(
         <div>
-          <strong>API Key Generated!</strong><br/>
+          <strong>{response.data.name || name}</strong><br/>
           <code style={{fontSize: '0.85rem'}}>{response.data.key}</code><br/>
           <small>{response.data.note}</small>
         </div>,
         { autoClose: false }
       );
+      setApiKeyName('');
       fetchApiKeys();
     } catch {
       updateError(loadingToastId, 'Failed to generate API key');
@@ -943,22 +1051,22 @@ const SettingsPage = () => {
     budgetAlerts: {
       label: 'Budget Alerts',
       description: 'Get notified when spending approaches budget limits',
-      comingSoon: false,
+      channels: true,
     },
     securityAlerts: {
       label: 'Security Alerts',
       description: 'Receive alerts about security events and threats',
-      comingSoon: false,
+      channels: true,
     },
     weeklyReports: {
       label: 'Weekly Reports',
-      description: 'Receive weekly cloud usage and cost summaries',
-      comingSoon: true,
+      description: 'Receive weekly cloud usage and cost summaries (email delivery when enabled)',
+      channels: true,
     },
     maintenanceUpdates: {
       label: 'Maintenance Updates',
       description: 'Get notified about scheduled maintenance windows',
-      comingSoon: false,
+      channels: true,
     },
   };
 
@@ -1680,6 +1788,9 @@ const SettingsPage = () => {
         refreshing={pageRefreshing}
       />
 
+      <AccountHubNav />
+      <SettingsSectionNav />
+
       <KpiStrip className="settings-summary-strip">
         <KpiTile label="Plan" value={planName || byocCurrentPlan || 'Free'} />
         <KpiTile label="Connected clouds" value={connectedCloudCount} hint="BYOC accounts linked" />
@@ -1700,28 +1811,50 @@ const SettingsPage = () => {
         {renderByocSection()}
 
         {/* Notifications Settings */}
-        <Panel title="Notifications" className="settings-card">
+        <Panel title="Notifications" className="settings-card" id="notifications">
           <div className="settings-group">
-            {Object.entries(notificationSettings).map(([key, value]) => {
+            <div className="setting-item">
+              <div className="setting-info">
+                <h4>{notificationConfig.emailNotifications.label}</h4>
+                <p>{notificationConfig.emailNotifications.description}</p>
+              </div>
+              <label className="toggle-switch">
+                <input
+                  type="checkbox"
+                  checked={notificationSettings.emailNotifications}
+                  onChange={() => handleNotificationChange('emailNotifications')}
+                />
+                <span className="toggle-slider"></span>
+              </label>
+            </div>
+
+            {['budgetAlerts', 'securityAlerts', 'weeklyReports', 'maintenanceUpdates'].map((key) => {
               const config = notificationConfig[key];
+              const channels = notificationSettings[key];
               return (
-                <div key={key} className={`setting-item ${config?.comingSoon ? 'setting-item-disabled' : ''}`}>
+                <div key={key} className="setting-item setting-item--channels">
                   <div className="setting-info">
-                    <h4>
-                      {config?.label || key.replace(/([A-Z])/g, ' $1').trim()}
-                      {config?.comingSoon && <span className="coming-soon-badge">Coming Soon</span>}
-                    </h4>
-                    <p>{config?.description || `Receive ${key.replace(/([A-Z])/g, ' $1').toLowerCase()} notifications`}</p>
+                    <h4>{config.label}</h4>
+                    <p>{config.description}</p>
                   </div>
-                  <label className="toggle-switch">
-                    <input
-                      type="checkbox"
-                      checked={value}
-                      onChange={() => handleNotificationChange(key)}
-                      disabled={config?.comingSoon}
-                    />
-                    <span className="toggle-slider"></span>
-                  </label>
+                  <div className="notification-channel-toggles">
+                    <label className="channel-toggle">
+                      <input
+                        type="checkbox"
+                        checked={channels.email}
+                        onChange={() => handleNotificationChannelChange(key, 'email')}
+                      />
+                      Email
+                    </label>
+                    <label className="channel-toggle">
+                      <input
+                        type="checkbox"
+                        checked={channels.inApp}
+                        onChange={() => handleNotificationChannelChange(key, 'inApp')}
+                      />
+                      In-app
+                    </label>
+                  </div>
                 </div>
               );
             })}
@@ -1729,7 +1862,7 @@ const SettingsPage = () => {
         </Panel>
 
         {/* Secure vault defaults */}
-        <div className="settings-card">
+        <div className="settings-card" id="vault-defaults">
           <h3>
             <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor">
               <path d="M8 1a2 2 0 0 1 2 2v4.5A1.5 1.5 0 0 0 11.5 9h1A1.5 1.5 0 0 1 14 10.5V13a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-2.5A1.5 1.5 0 0 1 3.5 9h1A1.5 1.5 0 0 0 6 7.5V3a2 2 0 0 1 2-2z"/>
@@ -1831,7 +1964,7 @@ const SettingsPage = () => {
         </div>
 
         {/* Storage lifecycle defaults */}
-        <div className="settings-card">
+        <div className="settings-card" id="lifecycle">
           <h3>
             <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor">
               <path d="M8 1a2 2 0 0 1 2 2v1h1.5A1.5 1.5 0 0 1 13 5.5v8A1.5 1.5 0 0 1 11.5 15h-7A1.5 1.5 0 0 1 3 13.5v-8A1.5 1.5 0 0 1 4.5 4H6V3a2 2 0 0 1 2-2zm0 1a1 1 0 0 0-1 1v1h2V3a1 1 0 0 0-1-1zM4.5 5a.5.5 0 0 0-.5.5v8a.5.5 0 0 0 .5.5h7a.5.5 0 0 0 .5-.5v-8a.5.5 0 0 0-.5-.5h-7z"/>
@@ -1875,7 +2008,7 @@ const SettingsPage = () => {
         </div>
 
         {/* Infrastructure provisioning engine */}
-        <div className="settings-card">
+        <div className="settings-card" id="provisioning">
           <h3>
             <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor">
               <path d="M1 2.5A1.5 1.5 0 0 1 2.5 1h3A1.5 1.5 0 0 1 7 2.5v3A1.5 1.5 0 0 1 5.5 7h-3A1.5 1.5 0 0 1 1 5.5v-3zM2.5 2a.5.5 0 0 0-.5.5v3a.5.5 0 0 0 .5.5h3a.5.5 0 0 0 .5-.5v-3a.5.5 0 0 0-.5-.5h-3zm6.5.5A1.5 1.5 0 0 1 10.5 1h3A1.5 1.5 0 0 1 15 2.5v3A1.5 1.5 0 0 1 13.5 7h-3A1.5 1.5 0 0 1 9 5.5v-3zm1.5-.5a.5.5 0 0 0-.5.5v3a.5.5 0 0 0 .5.5h3a.5.5 0 0 0 .5-.5v-3a.5.5 0 0 0-.5-.5h-3zM1 10.5A1.5 1.5 0 0 1 2.5 9h3A1.5 1.5 0 0 1 7 10.5v3A1.5 1.5 0 0 1 5.5 15h-3A1.5 1.5 0 0 1 1 13.5v-3zm1.5-.5a.5.5 0 0 0-.5.5v3a.5.5 0 0 0 .5.5h3a.5.5 0 0 0 .5-.5v-3a.5.5 0 0 0-.5-.5h-3zm6.5.5A1.5 1.5 0 0 1 10.5 9h3a1.5 1.5 0 0 1 1.5 1.5v3a1.5 1.5 0 0 1-1.5 1.5h-3A1.5 1.5 0 0 1 9 13.5v-3zm1.5-.5a.5.5 0 0 0-.5.5v3a.5.5 0 0 0 .5.5h3a.5.5 0 0 0 .5-.5v-3a.5.5 0 0 0-.5-.5h-3z"/>
@@ -1903,7 +2036,7 @@ const SettingsPage = () => {
         </div>
 
         {/* Preferences */}
-        <div className="settings-card">
+        <div className="settings-card" id="preferences">
           <h3>
             <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor">
               <path d="M8 4.754a3.246 3.246 0 1 0 0 6.492 3.246 3.246 0 0 0 0-6.492zM5.754 8a2.246 2.246 0 1 1 4.492 0 2.246 2.246 0 0 1-4.492 0z"/>
@@ -2008,7 +2141,7 @@ const SettingsPage = () => {
         </div>
 
         {/* Plan & Billing — loaded from /payments/my-subscription (same DB as Billing page) */}
-        <div className="settings-card">
+        <div className="settings-card" id="billing">
           <h3>
             <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor">
               <path d="M0 4a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V4zm2-1a1 1 0 0 0-1 1v1h14V4a1 1 0 0 0-1-1H2zm13 4H1v5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V7z"/>
@@ -2056,7 +2189,7 @@ const SettingsPage = () => {
         </div>
 
         {/* API Keys */}
-        <div className="settings-card">
+        <div className="settings-card" id="api-keys">
           <h3>
             <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor">
               <path d="M0 8a4 4 0 0 1 7.465-2H14a.5.5 0 0 1 .354.146l1.5 1.5a.5.5 0 0 1 0 .708l-1.5 1.5a.5.5 0 0 1-.708 0L13 9.207l-.646.647a.5.5 0 0 1-.708 0L11 9.207l-.646.647a.5.5 0 0 1-.708 0L9 9.207l-.646.647A.5.5 0 0 1 8 10h-.535A4 4 0 0 1 0 8zm4-3a3 3 0 1 0 2.712 4.285A.5.5 0 0 1 7.163 9h.63l.853-.854a.5.5 0 0 1 .708 0l.646.647.646-.647a.5.5 0 0 1 .708 0l.646.647.646-.647a.5.5 0 0 1 .708 0l.646.647.793-.793-1-1h-6.63a.5.5 0 0 1-.451-.285A3 3 0 0 0 4 5z"/>
@@ -2078,9 +2211,12 @@ const SettingsPage = () => {
               {apiKeys.map((key) => (
                 <div key={key.key_id} className="api-key-item">
                   <div className="api-key-info">
-                    <h4>Production API Key</h4>
+                    <h4>{key.name || 'Unnamed key'}</h4>
                     <code>{key.key_preview}</code>
-                    <p className="key-created">Created: {new Date(key.created_at).toLocaleDateString()}</p>
+                    <p className="key-created">
+                      Created: {new Date(key.created_at).toLocaleDateString()}
+                      {' · '}Last used: {formatLastUsed(key.last_used)}
+                    </p>
                   </div>
                   <button className="btn-danger-outline" onClick={() => handleRevokeApiKey(key.key_id)}>Revoke</button>
                 </div>
@@ -2088,7 +2224,80 @@ const SettingsPage = () => {
               {apiKeys.length === 0 && (
                 <p className="info-text">No API keys generated yet</p>
               )}
-              <button className="btn-secondary" onClick={handleGenerateApiKey}>Generate New API Key</button>
+              <div className="api-key-create-row">
+                <input
+                  type="text"
+                  className="form-input"
+                  placeholder="Key name (e.g. CI pipeline)"
+                  value={apiKeyName}
+                  onChange={(e) => setApiKeyName(e.target.value)}
+                  maxLength={64}
+                />
+                <button className="btn-secondary" type="button" onClick={handleGenerateApiKey}>
+                  Generate API key
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="settings-card" id="webhooks">
+          <h3>Webhooks</h3>
+          {!isFeatureEnabled('api_access') ? (
+            <PlanUpgradeGate
+              featureLabel="Webhooks"
+              currentPlan={planName}
+              requiredPlan={MIN_PLAN_LABELS[getNavMeta('api_access')?.min_plan] || 'Pro'}
+              requiredPlanId={getNavMeta('api_access')?.min_plan || 'pro'}
+              compact
+            />
+          ) : (
+            <div className="settings-group">
+              <p className="info-text">Receive HTTP callbacks when events occur in your workspace.</p>
+              {webhooks.map((hook) => (
+                <div key={hook.webhook_id} className="api-key-item">
+                  <div className="api-key-info">
+                    <h4>{hook.name || 'Webhook'}</h4>
+                    <code>{hook.url}</code>
+                    <p className="key-created">Events: {(hook.events || []).join(', ')}</p>
+                  </div>
+                  <button
+                    type="button"
+                    className="btn-danger-outline"
+                    onClick={() => handleRevokeWebhook(hook.webhook_id)}
+                  >
+                    Remove
+                  </button>
+                </div>
+              ))}
+              <div className="webhook-form">
+                <input
+                  type="text"
+                  className="form-input"
+                  placeholder="Webhook name"
+                  value={webhookForm.name}
+                  onChange={(e) => setWebhookForm((p) => ({ ...p, name: e.target.value }))}
+                />
+                <input
+                  type="url"
+                  className="form-input"
+                  placeholder="https://example.com/webhooks/zenith"
+                  value={webhookForm.url}
+                  onChange={(e) => setWebhookForm((p) => ({ ...p, url: e.target.value }))}
+                />
+                <select
+                  className="zenith-select settings-select"
+                  value={webhookForm.events[0] || 'budget.exceeded'}
+                  onChange={(e) => setWebhookForm((p) => ({ ...p, events: [e.target.value] }))}
+                >
+                  <option value="budget.exceeded">budget.exceeded</option>
+                  <option value="byoc.connected">byoc.connected</option>
+                  <option value="provision.completed">provision.completed</option>
+                </select>
+                <button type="button" className="btn-secondary" onClick={handleCreateWebhook}>
+                  Add webhook
+                </button>
+              </div>
             </div>
           )}
         </div>

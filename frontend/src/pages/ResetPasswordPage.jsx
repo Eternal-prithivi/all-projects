@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { resetPasswordWithToken } from '../api';
 import { getValidationErrorMessage, validateResetPasswordForm } from '../utils/formValidation.js';
+import PasswordRequirementsPanel from '../components/auth/PasswordRequirementsPanel.jsx';
 import '../styles/auth.css';
 import '../styles/auth-polish.css';
 import ZenithLogo from '../components/brand/ZenithLogo.jsx';
@@ -180,9 +181,11 @@ function ResetPasswordPage() {
                 required
                 minLength={8}
                 autoComplete="new-password"
+                placeholder="Create a strong password"
                 aria-invalid={Boolean(fieldErrors.newPassword)}
-                aria-describedby={fieldErrors.newPassword ? 'reset-new-password-error' : undefined}
+                aria-describedby="reset-password-requirements"
               />
+              <PasswordRequirementsPanel password={newPassword} id="reset-password-requirements" />
               {fieldErrors.newPassword && (
                 <p className="form-field-error" id="reset-new-password-error" role="alert">
                   {fieldErrors.newPassword}
