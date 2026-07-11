@@ -43,6 +43,8 @@ export const bearerHeaders = (token) =>
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,
   withCredentials: true,
+  // Render free-tier cold starts can exceed 60s; avoid hanging forever in dev.
+  timeout: import.meta.env.MODE === "production" ? 120_000 : 0,
 });
 
 let refreshInFlight = null;
@@ -149,6 +151,16 @@ export const getApiErrorMessage = (error, fallback = "Something went wrong.") =>
 
   if (error.message && !error.message.includes("Network Error")) return error.message;
   if (!error.response) {
+    const apiRoot = getApiBaseUrl().replace(/\/api\/?$/, "");
+    const isProd = import.meta.env.MODE === "production";
+    const isRemoteApi = apiRoot && !/localhost|127\.0\.0\.1/i.test(apiRoot);
+    if (isProd && isRemoteApi) {
+      return (
+        `Cannot reach the API at ${apiRoot}. ` +
+        "If you use an ad blocker or privacy extension, allow rajverse.me and zenith-backend-707i.onrender.com, then try again. " +
+        "Otherwise the server may be waking up (free tier can take 1–2 minutes)."
+      );
+    }
     return "Cannot reach the server. Start the backend (http://localhost:8000) and try again.";
   }
   return fallback;

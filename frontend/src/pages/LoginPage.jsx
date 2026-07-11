@@ -8,7 +8,6 @@ import { getDeviceFingerprint } from '../utils/deviceFingerprint.js';
 import '../styles/auth.css';
 import '../styles/auth-polish.css';
 import { getApiRoot } from '../config/apiBase.js';
-import { wakeRenderBackend } from '../utils/renderKeepAlive.js';
 import { FaBolt, FaChartBar, FaLock } from 'react-icons/fa';
 import ZenithLogo from '../components/brand/ZenithLogo.jsx';
 import TurnstileWidget from '../components/auth/TurnstileWidget.jsx';
@@ -78,24 +77,6 @@ function LoginPage() {
       .catch(() => setSsoProviders([]));
   }, [apiRoot]);
 
-  // Render free tier can sleep ~15 min; wake before login so first sign-in is faster
-  useEffect(() => {
-    let cancelled = false;
-    const slowTimer = window.setTimeout(() => {
-      if (!cancelled) setBackendWaking(true);
-    }, 2500);
-
-    wakeRenderBackend().finally(() => {
-      if (!cancelled) setBackendWaking(false);
-      window.clearTimeout(slowTimer);
-    });
-
-    return () => {
-      cancelled = true;
-      window.clearTimeout(slowTimer);
-    };
-  }, []);
-
   const startSso = (providerId) => {
     window.location.href = `${apiRoot}/api/auth/sso/${providerId}/login`;
   };
@@ -118,12 +99,6 @@ function LoginPage() {
     setIsLoading(true);
     setBackendWaking(true);
     try {
-      const warm = await wakeRenderBackend();
-      // Do not block sign-in — login itself wakes Render; ready probe can fail during cold start.
-      if (!warm) {
-        console.warn(`API warm-up at ${apiRoot} did not finish; attempting sign-in anyway.`);
-      }
-
       const credentials = { username: username.trim(), password: password.trim() };
       if (captchaToken) {
         credentials.captcha_token = captchaToken;

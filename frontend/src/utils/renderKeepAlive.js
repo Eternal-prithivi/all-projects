@@ -1,7 +1,6 @@
 /**
- * While the Zenith tab is open in production, ping Render /health/ready periodically so the
- * free-tier backend stays warm (MongoDB + deps), not just the lightweight /health probe.
- * GitHub Actions handles idle periods when no tab is open.
+ * While the Zenith tab is open in production, ping Render /health periodically.
+ * Uses /health (not /health/ready) — ad blockers often block "ready" probe URLs.
  */
 import { getApiRoot } from '../config/apiBase.js';
 
@@ -83,6 +82,7 @@ export async function wakeRenderBackend() {
       await sleep(WAKE_RETRY_DELAY_MS);
     }
   }
+  // Ad blockers return ERR_BLOCKED_BY_CLIENT — do not treat as hard failure for callers.
   return false;
 }
 
@@ -92,7 +92,7 @@ export function startRenderKeepAlive() {
   }
 
   const ping = () => {
-    wakeRenderBackend().catch(() => {});
+    pingHealthOnce(getApiRoot().replace(/\/$/, '')).catch(() => {});
   };
 
   ping();
