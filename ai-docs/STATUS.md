@@ -94,5 +94,6 @@
 | Guide | When |
 |-------|------|
 | **`ai-docs/CLOUD_ACCOUNT_MIGRATION_GUIDE.md`** | Switching AWS / GCP / Azure platform accounts or BYOC — plain-English checklist |
+| **`ai-docs/SERVICES_REFERENCE.md`** | Every external service (Razorpay, Twilio, MongoDB, Render, etc.) — structured + layman |
 | `docs/setup/CREDENTIAL_ROTATION.md` | Rotate keys on the **same** account |
 | `docs/setup/CLOUD_CREDENTIAL_SETUP_GUIDE.md` | First-time cloud setup from scratch |

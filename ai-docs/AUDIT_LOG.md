@@ -23,6 +23,16 @@ Notes: [one line optional]
 ## Session Log (recent only)
 
 ---
+SESSION_ID: 20260711-services-reference
+Date: 2026-07-11
+Agent: Cursor Composer
+Task: Add plain-English catalog of all Zenith external services
+Changes:
+- Added ai-docs/SERVICES_REFERENCE.md (Razorpay, Twilio, Render, MongoDB, clouds, etc.)
+- Linked from STATUS, AI_MASTER index, SCRATCHPAD
+Outcome: Done
+Notes: Companion to CLOUD_ACCOUNT_MIGRATION_GUIDE.md
+---
 SESSION_ID: 20260711-cloud-migration-guide
 Date: 2026-07-11
 Agent: Cursor Composer

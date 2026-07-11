@@ -1007,3 +1007,11 @@ Reference: 97-page project report (Chapter 4–6). Last cross-check: 2026-05-24.
 
 **Linked from:** `STATUS.md`, `AI_MASTER.md` index, `SCRATCHPAD.md`.
 
+---
+
+## 2026-07-11 — Services reference (ai-docs)
+
+**Added:** `ai-docs/SERVICES_REFERENCE.md` — structured catalog of all external services (Render, Vercel, MongoDB, CloudAMQP, AWS/GCP/Azure, Razorpay, Gmail, Twilio, Sentry, Turnstile, OAuth, GitHub, desktop) with layman explanations and troubleshooting table.
+
+**Linked from:** `STATUS.md`, `AI_MASTER.md` index, `SCRATCHPAD.md`.
+

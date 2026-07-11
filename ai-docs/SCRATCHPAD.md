@@ -8,7 +8,7 @@
 
 **Next (Stage 2 — when user asks):** Desktop code signing; Redis app cache; dashboard BFF endpoint.
 
-**Ops:** Cloud account migration → `CLOUD_ACCOUNT_MIGRATION_GUIDE.md`
+**Ops:** Cloud account migration → `CLOUD_ACCOUNT_MIGRATION_GUIDE.md` · All services → `SERVICES_REFERENCE.md`
 
 ---
 
