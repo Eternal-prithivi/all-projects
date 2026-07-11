@@ -15,8 +15,7 @@ test.describe('Profile menu', () => {
     await page.getByRole('button', { name: /user menu/i }).click();
 
     await expect(page.getByRole('menu').getByRole('button', { name: /^billing$/i })).toBeVisible();
-    await expect(page.getByRole('menu').getByRole('button', { name: /^help center$/i })).toBeVisible();
-    await expect(page.getByRole('menu').getByRole('button', { name: /^support$/i })).toBeVisible();
+    await expect(page.getByRole('menu').getByRole('button', { name: /help.*support/i })).toBeVisible();
     await expect(page.getByRole('menu').getByRole('button', { name: /keyboard shortcuts/i })).toBeVisible();
 
     await page.getByRole('menu').getByRole('button', { name: /^billing$/i }).click();

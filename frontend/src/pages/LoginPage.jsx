@@ -282,7 +282,6 @@ function LoginPage() {
               type="submit" 
               className="auth-submit-btn" 
               disabled={isSubmitDisabled}
-              aria-label="Submit login form"
             >
               {isLoading ? 'Signing in...' : 'Sign In'}
             </button>

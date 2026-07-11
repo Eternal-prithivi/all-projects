@@ -211,23 +211,25 @@ export default function DownloadPage() {
               )}
 
               <div className="download-platform-tabs" role="tablist" aria-label="Choose platform">
-                {platforms.map((p) => {
-                  const Icon = PLATFORM_ICONS[p.key];
-                  const isActive = p.key === activePlatform;
+                {(['mac', 'win', 'linux']).map((key) => {
+                  const p = platforms.find((pl) => pl.key === key);
+                  const Icon = PLATFORM_ICONS[key];
+                  const isActive = key === activePlatform;
                   return (
                     <button
-                      key={p.key}
+                      key={key}
                       type="button"
                       role="tab"
                       aria-selected={isActive}
+                      aria-label={PLATFORM_LABELS[key] || key}
                       className={`download-platform-tab${isActive ? ' is-active' : ''}${
-                        p.key === detected ? ' is-detected' : ''
+                        key === detected ? ' is-detected' : ''
                       }`}
-                      onClick={() => setActivePlatform(p.key)}
+                      onClick={() => setActivePlatform(key)}
                     >
                       <Icon aria-hidden />
-                      <span>{p.label}</span>
-                      {p.key === detected && (
+                      <span>{p?.label || PLATFORM_LABELS[key] || key}</span>
+                      {key === detected && (
                         <span className="download-platform-tab__pill">Your device</span>
                       )}
                     </button>
