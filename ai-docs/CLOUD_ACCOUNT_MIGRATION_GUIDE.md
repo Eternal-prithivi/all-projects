@@ -1,51 +1,262 @@
 # Cloud account migration guide (plain English)
 
-> **Who this is for:** You run Zenith and might switch your **AWS**, **Google Cloud (GCP)**, or **Microsoft Azure** accounts later. This guide tells you **exactly what to update** so the app keeps working the way it does today.
+> **Who this is for:** You run Zenith. This guide answers: *“I deleted my AWS, GCP, and Azure accounts and made new ones — what do I change so the app works the same?”*
 >
-> **Last updated:** 2026-07-11  
+> **Last updated:** 2026-07-11 (tailored to this repo’s deployment)  
 > **Technical deep dive:** `docs/setup/CLOUD_CREDENTIAL_SETUP_GUIDE.md` · `docs/cloud/CREDENTIAL_CONTRACT.md`
 
 ---
 
-## The big picture (30-second version)
+## Your question, answered simply
 
-Zenith talks to three clouds. Credentials live in **four places**:
+**Yes — new accounts mean new credentials.** You create new access keys / service accounts in the new clouds, then paste them into the places Zenith reads them.
 
-1. **Your computer** — `backend/.env` (local dev)
-2. **Render** — production backend environment variables + secret files
-3. **The Zenith app UI** — Settings → BYOC (per-user “bring your own cloud”)
-4. **MongoDB** — encrypted copies of BYOC credentials + file records pointing at old buckets
+**For you (platform owner):** update **`backend/.env`** (laptop) and **Render** (production). That is almost everything.
 
-If you change a cloud account, you update the keys in (1) and (2). If users connected their **own** cloud in Settings, they update (3). Old uploaded files in (4) may still point at **old bucket names** until you migrate data or reconnect.
+**For advanced BYOC users:** they update **their own** credentials in **Settings → BYOC**. You do **not** do that for them. Their change is separate from your platform account change.
 
-**The frontend website does not store cloud passwords or keys.** Only the backend does.
+**You do not change:** MongoDB connection, `SECRET_KEY`, Razorpay, Twilio, Gmail, frontend/Vercel (no cloud keys there), or app code — **unless** your new AWS account has a **different account ID** (see [Code change](#step-7-code-change-only-if-aws-account-id-changes)).
 
 ---
 
-## Two types of cloud access (read this first)
+## Your deployment profile (checked from this project)
+
+These facts were read from your repo config — **no secrets listed here**.
+
+| Setting | Your project today |
+|---------|-------------------|
+| **Multi-region storage** | **Yes** — 4 region pills (Asia, US, Europe, Africa) via `platform_storage_catalog.json` |
+| **Google Sign-In** | **Off** — `GOOGLE_OAUTH_*` not set (email/password login only) |
+| **Local dev cost mode** | `DEMO_MODE=true` (mock billing on laptop) |
+| **Production cost mode** | `DEMO_MODE=false` in `zenith-backend.env` (live billing APIs when creds work) |
+| **GCP project** | `zenith-dev-498414` |
+| **Platform owner login** | `tanjiro` (enterprise via `PLATFORM_OWNER_USERNAMES`) |
+| **BYOC** | Feature for Pro/Enterprise users in Settings — **not** where your platform keys live |
+
+### Bucket / container names you must recreate (same names = app behaves the same)
+
+Use these exact names in the **new** accounts so you only change credentials, not code.
+
+**AWS (S3)**
+
+| Purpose | Bucket name | Region |
+|---------|-------------|--------|
+| Main / Asia catalog | `zeneith-storage-bucket` | `ap-south-1` |
+| US region | `zeneith-storage-us` | `us-east-1` |
+| Europe region | `zeneith-storage-europe` | `eu-west-1` |
+| Africa region | `zeneith-storage-africa` | `af-south-1` |
+| Secure vault | `zenith-secure-files` | (primary region) |
+| Secure replica | `zenith-secure-files-replica` or `zenith-secure-files-secondary2` | `us-east-1` |
+
+**GCP (Cloud Storage)**
+
+| Purpose | Bucket name |
+|---------|-------------|
+| US / default | `zenith-main-bucket` |
+| Asia | `zeneith-main-asia` |
+| Europe | `zeneith-main-europe` |
+| Africa | `zeneith-main-africa` |
+| Secure vault | `zenith-secure-gcp` |
+| Secure replica | `zenith-secure-gcp-replica` |
+
+**Azure (Blob)**
+
+| Purpose | Storage account | Container |
+|---------|-----------------|-----------|
+| US / default | `zenithprithivi` | `zenith-main-bucket` |
+| Asia | `zenithpriasia` | `zenith-storage` |
+| Europe | `zenithprieu` | `zenith-storage` |
+| Africa | `zenithpriafrica` | `zenith-storage` |
+| Secure vault | (same accounts or dedicated) | `zenith-secure` |
+| Secure replica | | `zenith-secure-replica` |
+
+**Easiest way to create all of this:** run `backend/scripts/provision_platform_storage.py` after putting **new** platform keys in `.env` — it creates buckets and writes `platform_storage_catalog.json`.
+
+---
+
+## Main playbook: deleted all 3 platform accounts → new accounts
+
+Follow these steps in order. This is the complete list for **your** setup.
+
+### Step 1 — Create new cloud accounts and resources
+
+In each new AWS / GCP / Azure account:
+
+1. Create IAM user (AWS) / service account (GCP) / app registration + storage (Azure) with permissions for S3, GCS, Blob, EC2, etc. (same as before).
+2. Create buckets and containers using the **names in the table above** (or run the provision script in Step 3).
+3. Download **GCP service account JSON** → save as `backend/gcp-platform-key.json` (gitignored).
+
+### Step 2 — Update `backend/.env` on your laptop
+
+Open `backend/.env` and replace **only** the cloud blocks. Keep Mongo, `SECRET_KEY`, Celery, Razorpay, Twilio, Gmail as they are.
+
+**AWS — update these lines:**
+
+```
+AWS_ACCESS_KEY_ID=          ← new key
+AWS_SECRET_ACCESS_KEY=      ← new secret
+S3_BUCKET_NAME=zeneith-storage-bucket
+REGULAR_S3_BUCKET_NAME=zeneith-storage-bucket
+PRIMARY_S3_REGION=ap-south-1
+SECURE_S3_BUCKET_NAME=zenith-secure-files
+REPLICA_S3_BUCKET_NAME=zenith-secure-files-replica
+REPLICA_S3_REGION=us-east-1
+```
+
+**GCP — update these lines:**
+
+```
+GCP_PROJECT_ID=             ← new project ID
+GCP_SERVICE_ACCOUNT_JSON_PATH=backend/gcp-platform-key.json
+GCP_ZONE=us-central1-a
+GCP_BUCKET_NAME=zenith-main-bucket
+GCP_SECURE_BUCKET_NAME=zenith-secure-gcp
+GCP_SECURE_REPLICA_BUCKET_NAME=zenith-secure-gcp-replica
+```
+
+**Azure — update these lines:**
+
+```
+AZURE_STORAGE_ACCOUNT_NAME=zenithprithivi
+AZURE_STORAGE_ACCOUNT_KEY=  ← new key
+AZURE_CONTAINER_NAME=zenith-main-bucket
+AZURE_SECURE_CONTAINER_NAME=zenith-secure
+AZURE_SECURE_REPLICA_CONTAINER_NAME=zenith-secure-replica
+AZURE_SUBSCRIPTION_ID=      ← new subscription
+AZURE_TENANT_ID=            ← new tenant
+AZURE_CLIENT_ID=            ← new app registration
+AZURE_CLIENT_SECRET=        ← new secret
+AZURE_RESOURCE_GROUP=zenith-rg
+AZURE_LOCATION=eastus
+```
+
+**Multi-region catalog — keep these lines:**
+
+```
+PLATFORM_STORAGE_CATALOG_JSON=config/platform_storage_catalog.json
+PLATFORM_STORAGE_DEFAULT_SLUG=asia
+```
+
+### Step 3 — Regenerate the storage catalog (recommended)
+
+From `backend/`:
+
+```bash
+# After .env has NEW credentials:
+python scripts/provision_platform_storage.py
+```
+
+This creates regional buckets and rewrites `backend/config/platform_storage_catalog.json` with new Azure keys embedded per region.
+
+**Manual alternative:** edit `platform_storage_catalog.json` yourself — update each region’s `account_key` for Azure (file is gitignored; never commit it).
+
+### Step 4 — Test locally
+
+```bash
+cd backend && .venv/bin/python -m pytest -q
+# Start API + frontend, then:
+```
+
+- [ ] Upload a small file on Storage (try AWS, GCP, Azure)
+- [ ] Switch region pill (e.g. Asia → US) and upload again
+- [ ] Secure vault upload (if 2FA on)
+- [ ] Login still works (you did **not** change `SECRET_KEY`)
+
+### Step 5 — Update Render (production)
+
+For **zenith-api**, **zenith-celery**, and **zenith-provision**:
+
+1. **Environment variables** — paste the same cloud variables as `.env` (use Render dashboard, not Git).
+2. **GCP JSON** — upload new file as **Secret File**; set `GCP_SERVICE_ACCOUNT_JSON_PATH` to mount path (e.g. `/etc/secrets/gcp-key.json`).
+3. **Catalog JSON** — upload new `platform_storage_catalog.json` as secret file; set `PLATFORM_STORAGE_CATALOG_JSON` to its path.
+4. **Redeploy** all three services.
+
+Helper: `python backend/scripts/export_render_env.py` builds a paste file from your local `.env` (output is gitignored).
+
+**`render.yaml` secure names** — already set to `zenith-secure-gcp`, `zenith-secure`, etc. No change needed if you reused those bucket/container names.
+
+### Step 6 — Verify production (rajverse.me)
+
+- [ ] `https://rajverse.me` — login as `tanjiro`
+- [ ] Storage upload on each cloud
+- [ ] Region pills work
+- [ ] Cost page loads (production uses `DEMO_MODE=false`)
+
+### Step 7 — Code change (only if AWS account ID changes)
+
+If your **new** AWS account is not `412628362844`, update two files and push:
+
+| File | Change |
+|------|--------|
+| `backend/app/byoc/routes_byoc.py` | `ZENITH_AWS_ACCOUNT_ID = "YOUR_NEW_12_DIGIT_ID"` |
+| `backend/terraform/backend.tf` | S3 state bucket name (create new state bucket in new account) |
+
+This matters only for **BYOC users who connect via IAM role** — they must update their role trust policy to trust your new Zenith AWS account ID.
+
+### Step 8 — Old data (expectations)
+
+Deleting old cloud accounts **deletes old files**. MongoDB still has records pointing at old buckets — uploads/downloads for those old files will fail.
+
+| Your choice | What to do |
+|-------------|------------|
+| **Start fresh** (typical after account deletion) | Nothing extra — new uploads work; old file rows in app may show errors until you delete them in the UI |
+| **Keep old files** | You must copy objects to new buckets **before** deleting old accounts (`aws s3 sync`, `gsutil rsync`, AzCopy) — not automatic |
+
+### What you do **not** need to change
+
+| Item | Why |
+|------|-----|
+| MongoDB (`MONGO_*`) | Not a cloud provider account |
+| `SECRET_KEY` | Changing it logs everyone out and breaks encrypted BYOC |
+| Vercel / frontend | No cloud keys — only `VITE_API_URL` |
+| Razorpay, Twilio, Gmail | Unrelated to AWS/GCP/Azure |
+| BYOC users’ Settings | They manage their own cloud; separate from your platform keys |
+| `GOOGLE_OAUTH_*` | Not configured in your project |
+
+---
+
+## BYOC users (advanced) — separate from your platform change
+
+| Who | What they do when **their** cloud changes |
+|-----|-------------------------------------------|
+| Pro/Enterprise user | Settings → disconnect old BYOC → connect new credentials → Test connection |
+| You (platform owner) | You use **platform** `.env` / Render — not BYOC — unless you personally connected BYOC in Settings too |
+
+Your platform credential swap does **not** automatically update anyone’s BYOC. Each BYOC user fixes their own Settings.
+
+---
+
+## The big picture (reference)
+
+Zenith platform credentials live in **two places you control**:
+
+1. **Your computer** — `backend/.env` + `gcp-platform-key.json` + `platform_storage_catalog.json`
+2. **Render** — same variables + secret file uploads
+
+BYOC credentials live in **MongoDB** (per user, via Settings UI).
+
+**The frontend website does not store cloud passwords or keys.**
+
+---
+
+## Two types of cloud access (reference)
 
 | Type | Plain English | Where it lives | Who it affects |
 |------|---------------|----------------|----------------|
-| **Platform cloud** | Zenith’s shared cloud keys — powers Free/Basic users and fills gaps when BYOC isn’t connected | `backend/.env` + Render env | Everyone using platform storage, VMs, cost, provision without BYOC |
-| **BYOC** (“Bring Your Own Cloud”) | A Pro/Enterprise user connects **their** AWS/GCP/Azure in **Settings** | Encrypted in MongoDB `byoc_credentials` | That user only |
-
-**Hybrid example:** You connect AWS BYOC but use Zenith’s platform keys for GCP and Azure. AWS uses your BYOC; GCP/Azure use platform `.env`.
+| **Platform cloud** | Zenith’s shared keys — default for Free/Basic and platform storage | `backend/.env` + Render | All non-BYOC usage |
+| **BYOC** | User connects their own cloud in Settings | MongoDB `byoc_credentials` | That user only |
 
 ---
 
-## Which situation are you in?
-
-Answer one row, then jump to that section.
+## Other scenarios (reference)
 
 | I want to… | Go to section |
 |------------|---------------|
-| Replace Zenith’s **AWS** platform account (new IAM user, new buckets) | [AWS platform checklist](#aws-platform-checklist) |
-| Replace Zenith’s **GCP** platform project / service account | [GCP platform checklist](#gcp-platform-checklist) |
-| Replace Zenith’s **Azure** platform storage / subscription | [Azure platform checklist](#azure-platform-checklist) |
-| Replace **all three** platform clouds | Do all three checklists + [Recommended order](#recommended-order-all-platform-clouds) |
-| Change **my own** cloud I connected in Settings (BYOC) | [BYOC user checklist](#byoc-user-checklist-settings-ui) |
-| Only **rotate keys** (same account, new password/key) | [Key rotation only](#key-rotation-only-same-account) |
-| I use **multi-region storage** (Asia / US / Europe / Africa pills) | Also read [Multi-region catalog](#multi-region-storage-catalog-extra-steps) |
+| Replace Zenith’s **AWS** platform account only | [AWS platform checklist](#aws-platform-checklist) |
+| Replace Zenith’s **GCP** platform project only | [GCP platform checklist](#gcp-platform-checklist) |
+| Replace Zenith’s **Azure** platform only | [Azure platform checklist](#azure-platform-checklist) |
+| Change **my own** BYOC in Settings | [BYOC user checklist](#byoc-user-checklist-settings-ui) |
+| Only **rotate keys** (same account) | [Key rotation only](#key-rotation-only-same-account) |
 
 ---
 
@@ -515,28 +726,27 @@ cd backend && .venv/bin/python -m pytest -q
 ## One-page cheat sheet (print this)
 
 ```
-PLATFORM CLOUD CHANGE
-─────────────────────
-□ Create buckets/containers in NEW account
-□ Update backend/.env (AWS_*, GCP_*, AZURE_*)
-□ Update Render env (all 3 services)
-□ Upload new GCP JSON to Render secret file
-□ Update platform_storage_catalog.json if multi-region
-□ Update render.yaml if secure vault NAMES changed
-□ Redeploy backend
-□ Test upload + sync on rajverse.me
-
-BYOC CHANGE (Settings UI)
-─────────────────────────
-□ Settings → Disconnect old cloud
-□ Connect new credentials → Test connection
-□ Re-enter bucket names if changed
-□ Re-upload or migrate old files in cloud console
-
-NEVER DURING CLOUD MIGRATION (unless intentional)
+DELETED PLATFORM ACCOUNTS → NEW ACCOUNTS (your case)
 ──────────────────────────────────────────────────
-□ Change SECRET_KEY (breaks encrypted BYOC)
-□ Commit .env or key JSON to Git
+□ Create new AWS/GCP/Azure accounts
+□ Create buckets/containers (same names as guide table)
+   OR run: python backend/scripts/provision_platform_storage.py
+□ Put new keys in backend/.env (AWS_*, GCP_*, AZURE_*)
+□ Replace backend/gcp-platform-key.json
+□ Regenerate platform_storage_catalog.json
+□ Test locally (upload + region pills)
+□ Update Render env on all 3 services + upload GCP JSON + catalog JSON
+□ Redeploy backend
+□ If new AWS account ID → update routes_byoc.py + terraform/backend.tf
+□ Test rajverse.me
+
+DO NOT CHANGE
+─────────────
+□ SECRET_KEY, MONGO_*, Razorpay, Twilio, Gmail, Vercel
+
+BYOC USERS (not you)
+────────────────────
+□ They update Settings themselves when THEIR cloud changes
 ```
 
 ---

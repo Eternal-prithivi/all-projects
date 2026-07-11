@@ -999,9 +999,11 @@ Reference: 97-page project report (Chapter 4–6). Last cross-check: 2026-05-24.
 
 ---
 
-## 2026-07-11 — Cloud account migration guide (ai-docs)
+## 2026-07-11 — Cloud account migration guide (ai-docs) — v2
 
-**Added:** `ai-docs/CLOUD_ACCOUNT_MIGRATION_GUIDE.md` — plain-English owner checklist for switching AWS/GCP/Azure platform accounts or BYOC; covers `.env`, Render, catalog JSON, `render.yaml`, MongoDB expectations, verification steps.
+**Refined for owner question:** deleted all platform AWS/GCP/Azure accounts → new accounts. Added deployment profile from repo inspection (multi-region catalog, demo/local vs prod billing, OAuth off, bucket name inventory, 8-step playbook, BYOC separation).
+
+**Added:** `ai-docs/CLOUD_ACCOUNT_MIGRATION_GUIDE.md` — plain-English owner checklist.
 
 **Linked from:** `STATUS.md`, `AI_MASTER.md` index, `SCRATCHPAD.md`.
 
