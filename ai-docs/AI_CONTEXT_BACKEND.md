@@ -1,7 +1,7 @@
 # AI_CONTEXT_BACKEND.md — Backend Architecture & Source Map
 
 > Read this for any backend, API, database, Celery, or ML task.
-> **Last Updated: 2026-06-09** — Phase 19 platform multi-region storage catalog + sync scoping.
+> **Last Updated: 2026-07-11** — Password policy min 8 chars; post–Stage 1 polish.
 
 ---
 
@@ -20,7 +20,7 @@ For frontend context → read `AI_CONTEXT_FRONTEND.md`
 
 | Module | Route File(s) | Key Files | Notes |
 |--------|--------------|-----------|-------|
-| **auth** | `routes_auth.py`, `routes_password_reset.py` | `auth_service.py`, `auth_utils.py`, `password_reset_service.py` | JWT login, register, forgot/reset password (email link + SMS OTP), recovery contacts |
+| **auth** | `routes_auth.py`, `routes_password_reset.py` | `auth_service.py`, `auth_utils.py`, `password_reset_service.py`, `password_policy.py` | JWT login, register, forgot/reset password (email link + SMS OTP), recovery contacts; **min password length 8** with strength rules |
 | **users** | `routes_users.py`, `routes_profile.py`, `routes_settings.py` | `user_model.py` | Profile edit, recovery contacts, settings preferences, BYOC, theme, currency, audit log |
 | **security** | `routes_security.py`, `routes_2fa.py` | `secure_vault.py`, `encryption_handler.py`, `security_intelligence.py`, `security_policy.py`, `security_service.py`, `security_scan_ml.py`, `sensitive_file_detector.py` | Tri-cloud secure vault; vault health/cost preview; rules+ML hybrid scan; stale-file Celery job |
 | **storage** | `routes_storage.py` | `cloud_credentials.py`, `optimizer.py`, `uploader.py`, `manager.py`, `tasks.py`, `tiering_tasks.py`, `models_storage.py`, `file_queries.py` | ML ensemble analysis, multi-cloud upload/download/delete/sync, nightly lifecycle tiering; **BYOC** via `credential_resolver`; platform catalog via `platform_storage_catalog.py` |

@@ -2,26 +2,26 @@
 
 ## 🔄 Current Resume State
 
-**Status:** COMPLETE (2026-06-15)
+**Status:** COMPLETE (2026-07-11)
 
-**Stage 1 — Production Beta:** CI, onboarding, cache, performance, desktop branded icons — all delivered and pushed to `stage`.
+**Post–Stage 1 polish:** password UX (8-char min), toast notifications, unified help/support, settings crash fix, desktop v0.1.4 release, ESLint green — all delivered and pushed to `stage`.
 
-**Next (Stage 2 — when user asks):** Desktop code signing; tag `desktop-v0.1.2` with rebuilt branded installers; Redis app cache; dashboard BFF endpoint.
+**Next (Stage 2 — when user asks):** Desktop code signing; Redis app cache; dashboard BFF endpoint.
 
 ---
 
 ## ✅ Last Known Good State
 
-**Stage 1 closeout** (2026-06-15)
+**Post–Stage 1 polish** (2026-07-11)
 
-- CI: Playwright green; desktop-release workflow fixed
-- Onboarding: `OnboardingTour.jsx`, `GettingStartedCard`, `ONBOARDING_GUIDE.md`
-- Cache: billing/cost/availability fixes; `CACHING_GUIDE.md`, `ADR_001_CACHING_STRATEGY.md`
-- Performance: `DashboardPage.jsx` deferred loads; `billing_status.py` cache; `routes_dashboard.py` Mongo aggregation
-- Desktop: `generate-brand-assets.mjs` → icns/ico; `desktop/package.json` prebuild + platform icons
-- Docs: `STATUS.md`, `PROGRESS.md`, `PROGRESS_HISTORY.md` updated
+- Password: `PasswordRequirementsPanel`; backend `password_policy.py` min 8; register/reset/security-settings
+- Notifications: `utils/notifications.js` toasts + bell; `useNotifications` hook; public `ToastContainer` in `App.jsx`
+- Help: `/help` tabs (articles | tickets); `SupportTicketsSection`; `PATHS.support` → `/help?tab=tickets`
+- Desktop: `desktop-v0.1.4` on GitHub Releases; `releases.json` checksums committed by CI
+- CI: frontend `package-lock.json` synced for desktop-release `npm ci`; lint 0 warnings
+- Production: `SettingsPage` CloudProviderLogo import; profile dropdown CSS compact
 
-**Git:** `stage` @ latest push — verify CI + Vercel + Render after push
+**Git:** `stage` @ `97171c0`
 
 **Verify locally:**
 ```bash

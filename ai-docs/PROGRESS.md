@@ -1,12 +1,24 @@
 # PROGRESS.md — Task Tracker
 
-> **Last Updated:** 2026-06-15
+> **Last Updated:** 2026-07-11
 
 ---
 
 ## 🔴 Active Task
 
-**None** — **Stage 1 (Production Beta) COMPLETE** (2026-06-15)
+**None** — **Stage 1 (Production Beta) COMPLETE** (2026-06-15); post–Stage 1 polish **COMPLETE** (2026-07-11)
+
+---
+
+## Post–Stage 1 polish ✅ (2026-06-27 — 2026-07-11)
+
+- [x] **Password UX** — `PasswordRequirementsPanel`; 8-char minimum (frontend `passwordPolicy.js` + backend `password_policy.py`)
+- [x] **Notifications** — visible toasts + bell via `notifications.js`; migrated security, team, support, admin, file upload flows
+- [x] **Help & support** — unified `/help` with tickets tab; `SupportTicketsSection`; profile dropdown + nav links updated
+- [x] **Production fixes** — Settings `CloudProviderLogo` import; API proxy / cold-start login; admin portal gate
+- [x] **Desktop v0.1.4** — version bump, `releases.json`, GitHub Release (DMG/EXE/AppImage/deb), lockfile CI fix
+- [x] **Launch scripts** — bash audit (`start_all.sh`, `start-celery.sh`, `setup_cost_features.sh`)
+- [x] **Lint** — `SecuritySettingsPage` hook deps; `AdminOverviewPage` unused import removed
 
 ---
 

@@ -1,6 +1,6 @@
 # STATUS.md — Live Project Snapshot
 
-**Last Updated:** 2026-06-15 (Stage 1 — production beta **COMPLETE**)
+**Last Updated:** 2026-07-11 (Post–Stage 1 polish + desktop v0.1.4)
 
 ---
 
@@ -9,13 +9,13 @@
 | Milestone | **Stage 1 — Production Beta** · **COMPLETE** |
 |-----------|-----------------------------------------------|
 | Phases | 25–30 Mobile + Desktop · COMPLETE |
-| Stage 1 closeout | CI green · onboarding · cache · performance · branded desktop icons |
+| Post–Stage 1 | UX polish, notifications, help unification, desktop v0.1.4 · **COMPLETE** |
 
 ---
 
 ## Active Task
 
-**None** — Stage 1 fully delivered; ready for Stage 2 (signing, Redis cache, BFF) when prioritized
+**None** — ready for Stage 2 (signing, Redis cache, BFF) when prioritized
 
 ---
 
@@ -23,13 +23,27 @@
 
 | Check | Status |
 |-------|--------|
-| CI (`stage`) | green — lint, pytest, Playwright, security-audit, docker-scan |
+| CI (`stage`) | green — lint (`--max-warnings 0`), pytest, Playwright, security-audit, docker-scan |
 | Deploy Stage | auto on CI pass → Vercel (frontend) + Render (backend) |
-| Desktop CI | `desktop-v0.1.1` + icon.icns/ico pipeline in `brand:assets` |
-| Frontend lint | `eslint . --max-warnings 0` |
+| Desktop CI | `desktop-v0.1.4` — DMG, EXE, AppImage, deb on GitHub Releases |
+| Frontend lint | `eslint . --max-warnings 0` — green @ `97171c0` |
 | Frontend build | `vite build` with vendor chunk split |
 | Render keep-alive | scheduled ping every 5 min |
 | Signing | unsigned beta — see `docs/desktop/SIGNING.md` |
+
+---
+
+## Recent deliverables (2026-06-27 — 2026-07-11)
+
+| Area | Done |
+|------|------|
+| **Password UX** | `PasswordRequirementsPanel`; min length **8** (frontend + backend policy); register, reset, security-settings aligned |
+| **Notifications** | `notifications.js` — visible top-right toasts + bell; `ToastContainer` on public shell; migrated security, team, support, admin, file actions |
+| **Help & support** | Unified `/help` (articles + `?tab=tickets`); `SupportTicketsSection`; `/dashboard/support` → redirect; profile dropdown compact (no scroll bleed) |
+| **Production fixes** | `SettingsPage` `CloudProviderLogo` import; rajverse.me API proxy + cold-start login; admin portal gate for platform owner |
+| **Desktop v0.1.4** | `desktop/package.json` + `releases.json`; tag `desktop-v0.1.4`; CI lockfile sync (`npm ci` in desktop-release) |
+| **Launch scripts** | `start_all.sh`, `start-celery.sh`, `setup_cost_features.sh` — bash audit fixes |
+| **Lint** | `SecuritySettingsPage` `useCallback` deps; removed unused `notifyAdminSuccess` in `AdminOverviewPage` |
 
 ---
 
@@ -48,9 +62,9 @@
 
 ## Desktop downloads
 
-- **Tag:** `desktop-v0.1.1` (rebuild with branded icons via CI or `desktop-v0.1.2` when re-tagged)
-- **Page:** `/download` on rajverse.me
-- **Assets:** `Zenith-0.1.1.dmg`, `Zenith.Setup.0.1.1.exe`, `Zenith-0.1.1.AppImage`, `zenith-desktop_0.1.1_amd64.deb`
+- **Tag:** `desktop-v0.1.4` (published 2026-07-11)
+- **Page:** `/download` on rajverse.me — reads `frontend/public/releases.json`
+- **Assets:** `Zenith-0.1.4.dmg`, `Zenith.Setup.0.1.4.exe`, `Zenith-0.1.4.AppImage`, `zenith-desktop_0.1.4_amd64.deb`
 - macOS build is **arm64** (Apple Silicon)
 
 ---

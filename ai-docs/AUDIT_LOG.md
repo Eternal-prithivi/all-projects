@@ -23,6 +23,18 @@ Notes: [one line optional]
 ## Session Log (recent only)
 
 ---
+SESSION_ID: 20260711-post-stage1-polish
+Date: 2026-07-11
+Agent: Cursor Composer
+Task: Post–Stage 1 polish — password UX, notifications, help unification, desktop v0.1.4, lint
+Changes:
+- Password 8-char min + PasswordRequirementsPanel; toast notifications across key flows
+- Unified /help (articles + tickets); Settings CloudProviderLogo crash fix
+- desktop-v0.1.4 release + package-lock CI fix; ESLint 0 warnings
+- ai-docs STATUS/SCRATCHPAD/PROGRESS/PROGRESS_HISTORY/AI_CONTEXT_FRONTEND updated
+Outcome: Done
+Notes: stage @ 97171c0; verify /download shows v0.1.4 after Vercel deploy
+---
 SESSION_ID: 20260615-stage1-production-beta
 Date: 2026-06-15
 Agent: Cursor Composer

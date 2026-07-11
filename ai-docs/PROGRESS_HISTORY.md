@@ -960,3 +960,40 @@ Reference: 97-page project report (Chapter 4–6). Last cross-check: 2026-05-24.
 
 **Git:** six commits on `stage` (Phases 25–30).
 
+---
+
+## 2026-07-11 — Post–Stage 1 polish: UX, notifications, help, desktop v0.1.4
+
+**Password UX (8-char minimum):**
+- Added `PasswordRequirementsPanel.jsx` + `password-requirements.css` — live checklist on register, reset, security-settings
+- Frontend: `formValidation.js`, `passwordPolicy.js`, `clientEncryption.js` aligned to min 8
+- Backend: `password_policy.py`, `user_model.py`, `routes_password_reset.py` — min 8 with strength rules
+
+**Action feedback (notifications):**
+- Rewrote `utils/notifications.js` — top-right React Toastify banners + notification bell entries
+- `ToastContainer` in `App.jsx` for public pages; `useNotifications` hook for dashboard pages
+- Migrated: `SecuritySettingsPage`, `TeamPage`, `SupportPage`, admin pages, `FileList`, `SecureFileList`, `EncryptionChoiceModal`, `ContactPage`, `SupportTicketPage`
+
+**Help & support unification:**
+- `HelpCenterPage.jsx` — tabs: Help articles | My tickets (`?tab=tickets`)
+- New `SupportTicketsSection.jsx`; `SupportPage.jsx` redirects to `/help?tab=tickets`
+- `PATHS.help` → `/help`, `PATHS.support` → `/help?tab=tickets`
+- `ProfileDropdown.jsx` — single “Help & support” item; compact CSS (no scroll bleed-through)
+- `dashboardNavConfig.jsx` — sidebar “Help & Support” → `/help`
+
+**Production fixes:**
+- `SettingsPage.jsx` — missing `CloudProviderLogo` import (rajverse.me crash)
+- API proxy through rajverse.me; cold-start login warm-up; admin portal gate for platform owner
+
+**Desktop v0.1.4:**
+- Bumped `desktop/package.json` to 0.1.4; pre-updated `frontend/public/releases.json`
+- Tag `desktop-v0.1.4` → CI built DMG, EXE, AppImage, deb; CI committed checksums to `releases.json`
+- Fixed `frontend/package-lock.json` out-of-sync (desktop-release `npm ci` failure on first attempt)
+
+**Lint / scripts:**
+- `SecuritySettingsPage` — `fetchSecuritySettings` wrapped in `useCallback`
+- `AdminOverviewPage` — removed unused `notifyAdminSuccess` import
+- Bash launch scripts: `start_all.sh`, `backend/scripts/start-celery.sh`, `docs/setup/setup_cost_features.sh`
+
+**Git:** `stage` @ `97171c0` (commits `47e20fb` … `97171c0`)
+

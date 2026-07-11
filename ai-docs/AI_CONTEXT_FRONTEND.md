@@ -1,7 +1,7 @@
 # AI_CONTEXT_FRONTEND.md — Frontend Architecture & Source Map
 
 > Read this for any frontend, UI, CSS, component, or routing task.
-> **Last Updated: 2026-06-11** — Phase 22 SaaS pages polish + Phase 21 provision wizard.
+> **Last Updated: 2026-07-11** — Post–Stage 1 polish (notifications, help, password UX, desktop v0.1.4).
 
 ---
 
@@ -38,7 +38,7 @@ For backend context → read `AI_CONTEXT_BACKEND.md`
 | `/support/ticket` | `SupportTicketPage.jsx` — guest OTP lookup + thread |
 | `/about` | `AboutPage.jsx` |
 | `/features` | `FeaturesPage.jsx` |
-| `/help` | `HelpCenterPage.jsx` — FAQs from `data/productFacts.js`; `?topic=` / `?q=` deep links |
+| `/help` | `HelpCenterPage.jsx` — FAQs from `data/productFacts.js`; tabs: **articles** \| **My tickets** (`?tab=tickets`); `?topic=` / `?q=` deep links |
 | `/legal/terms` | `TermsOfServicePage.jsx` |
 | `/legal/privacy` | `PrivacyPolicyPage.jsx` |
 | `/legal/cookies` | `CookiePolicyPage.jsx` |
@@ -47,7 +47,7 @@ For backend context → read `AI_CONTEXT_BACKEND.md`
 | `/status` | `StatusPage.jsx` — polls `GET /api/platform/status` |
 | `/verify-email` | `VerifyEmailPage.jsx` — `POST /api/auth/verify-email?token=` |
 | `/pricing` | `PublicPricingPage.jsx` — re-exports `data/marketingPricing.js` → `productFacts.js` |
-| `/download` | `DownloadPage.jsx` — desktop installers; reads `public/releases.json` |
+| `/download` | `DownloadPage.jsx` — desktop installers; reads `public/releases.json` (current: **v0.1.4**, tag `desktop-v0.1.4`) |
 | `/docs` | `DocsHubPage.jsx` — links to Swagger + Help |
 | `/session-expired` | `SessionExpiredPage.jsx` |
 | `/billing/success`, `/billing/cancel` | `BillingSuccessPage.jsx`, `BillingCancelPage.jsx` |
@@ -72,12 +72,12 @@ For backend context → read `AI_CONTEXT_BACKEND.md`
 | `/dashboard/vmcluster` | `VMClusterPage.jsx` | Org resource labels; admin resource toggle (`useOrgContext`, `OrgResourceMeta`) |
 | `/dashboard/provision` | `ProvisionPage.jsx` | Infrastructure — Manage tab shows org labels via `ProvisionManagePanel` |
 | `/dashboard/security` | `SecurityPage.jsx` | 2FA vault; tri-cloud sync; BYOC secure pickers (AWS/GCP/Azure via `SecurityVaultDestinationSummary`); trust docs: `docs/security/TRUST_AND_ENCRYPTION.md` |
-| `/dashboard/security-settings` | `SecuritySettingsPage.jsx` | |
+| `/dashboard/security-settings` | `SecuritySettingsPage.jsx` | Password change + 2FA + sessions; `PasswordRequirementsPanel`; `useNotifications` toasts |
 | `/dashboard/profile` | `ProfilePage.jsx` | |
 | `/dashboard/settings` | `SettingsPage.jsx` | Infrastructure provisioning engine (Boto3/Terraform); Preferences + Restart Tour |
 | `/dashboard/notifications` | `NotificationsPage.jsx` | Paginated history; All/Unread tabs; type filters |
 | `/dashboard/team` | `TeamPage.jsx` | Org roster, seats card, org resources, cloud health metrics, member spend (admin), org budget, team actions, approvals, migrate-personal |
-| `/dashboard/support` | `SupportPage.jsx` | New ticket form + list + thread (10s poll + WS) |
+| `/dashboard/support` | `SupportPage.jsx` | Redirects to `/help?tab=tickets` (unified help hub) |
 | `/invite/:token` | `AcceptInvitePage.jsx` | Accept team invite |
 | `/auth/sso/callback` | `SsoCallbackPage.jsx` | OAuth redirect handler |
 
@@ -110,7 +110,9 @@ For backend context → read `AI_CONTEXT_BACKEND.md`
 | `OnboardingTour.jsx` | 7-step guided tour (react-joyride v3) — shows once per user |
 | `admin/AdminLayout.jsx` | Admin panel layout — AdminHeader + AdminSidebar + `<Outlet>` |
 | `support/SupportThreadPanel.jsx` | Shared chat-style ticket thread (bubbles, composer, optimistic send) |
+| `support/SupportTicketsSection.jsx` | Embedded ticket list + thread on `/help?tab=tickets` |
 | `support/SupportWsBridge.jsx` | Single WS per layout; dispatches support events to event bus |
+| `auth/PasswordRequirementsPanel.jsx` | Live password rule checklist (register, reset, change password) |
 | `ProtectedRoute.jsx` | Auth guard — redirects to `/login` if not authenticated |
 | `ErrorBoundary.jsx` | React error boundary |
 | `GlobalSearch.jsx` | Cmd+K search modal |
@@ -141,6 +143,7 @@ For backend context → read `AI_CONTEXT_BACKEND.md`
 | File | Purpose |
 |------|---------|
 | `usePageRefresh.js` | `runPageRefresh()` — loading toast + success/error for page-level refresh |
+| `useNotifications.js` | Thin wrapper over `utils/notifications.js` for dashboard pages |
 | `useAwsBuckets.js` | AWS bucket discovery; `reloadToken` triggers reload with gold bar |
 | `useGcpBuckets.js` | GCS bucket discovery (static catalog in platform mode) |
 | `useAzureContainers.js` | Azure container discovery (static catalog in platform mode) |
@@ -183,7 +186,7 @@ For backend context → read `AI_CONTEXT_BACKEND.md`
 | Routing | React Router DOM v6 (`createBrowserRouter`) |
 | HTTP | Axios via `frontend/src/api.js` (interceptors + auth header) |
 | HTTP exception | `SecurityPage.jsx` only — uses raw `fetch()`, intentional |
-| Notifications | React Toastify + custom WS via `NotificationContext` |
+| Notifications | React Toastify (`showBannerToast`) + bell via `NotificationContext`; `utils/notifications.js` central API; public pages use root `ToastContainer` in `App.jsx` |
 | Charts | Recharts (sparklines, area charts) |
 | Icons | React Icons (`react-icons/fa`) + custom SVG `Icons.jsx` |
 | State | React Context only (4 contexts) — no Redux/Zustand |
@@ -199,9 +202,10 @@ All routes defined in `frontend/src/main.jsx` via `createBrowserRouter`:
 ```
 Public routes → no wrapper
   /login, /register, /forgot-password, /reset-password
-  /, /contact, /about, /features, /help, /support
+  /, /contact, /about, /features, /help
   /legal/terms, /legal/privacy
   /access-denied, /500, /503, *
+  /dashboard/support → redirects to /help?tab=tickets
 
 Dashboard routes → <ProtectedRoute> → <DashboardLayout>
   /dashboard → DashboardPage
@@ -216,6 +220,9 @@ Admin routes → <ProtectedRoute> → <AdminLayout> (role-guarded)
 ---
 
 ## 🔑 Key Frontend Patterns
+
+### Product paths (`data/productFacts.js`)
+`PATHS` object — single source for help copy and nav links: `help` → `/help`, `support` → `/help?tab=tickets`, plus dashboard, billing, security, etc.
 
 ### Page → api.js → AuthContext (standard pattern)
 ```jsx
@@ -252,4 +259,4 @@ Do not refactor to a shared CSS file unless the user explicitly requests it.
 | `settings.css` partially upgraded | `styles/settings.css` | Rest needs audit |
 | `billing.css` not audited | `styles/billing.css` | May have old hardcoded colors |
 | `costanalysis.css` partially upgraded | `styles/costanalysis.css` | Deeper table/report styling needs work |
-| Lint warnings (28) | Various | All pre-existing, not caused by recent changes |
+| Lint | `eslint . --max-warnings 0` | Green @ 2026-07-11 (`97171c0`) |
