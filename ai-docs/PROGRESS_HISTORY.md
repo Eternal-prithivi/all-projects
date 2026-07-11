@@ -997,3 +997,11 @@ Reference: 97-page project report (Chapter 4–6). Last cross-check: 2026-05-24.
 
 **Git:** `stage` @ `97171c0` (commits `47e20fb` … `97171c0`)
 
+---
+
+## 2026-07-11 — Cloud account migration guide (ai-docs)
+
+**Added:** `ai-docs/CLOUD_ACCOUNT_MIGRATION_GUIDE.md` — plain-English owner checklist for switching AWS/GCP/Azure platform accounts or BYOC; covers `.env`, Render, catalog JSON, `render.yaml`, MongoDB expectations, verification steps.
+
+**Linked from:** `STATUS.md`, `AI_MASTER.md` index, `SCRATCHPAD.md`.
+

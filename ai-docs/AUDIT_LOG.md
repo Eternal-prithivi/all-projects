@@ -23,6 +23,16 @@ Notes: [one line optional]
 ## Session Log (recent only)
 
 ---
+SESSION_ID: 20260711-cloud-migration-guide
+Date: 2026-07-11
+Agent: Cursor Composer
+Task: Write plain-English cloud account migration guide for AWS/GCP/Azure
+Changes:
+- Added ai-docs/CLOUD_ACCOUNT_MIGRATION_GUIDE.md (platform + BYOC checklists)
+- Linked from STATUS, AI_MASTER index, SCRATCHPAD
+Outcome: Done
+Notes: Owner-facing; technical detail in docs/setup/CLOUD_CREDENTIAL_SETUP_GUIDE.md
+---
 SESSION_ID: 20260711-post-stage1-polish
 Date: 2026-07-11
 Agent: Cursor Composer

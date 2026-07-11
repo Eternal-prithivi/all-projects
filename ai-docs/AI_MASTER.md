@@ -258,6 +258,7 @@ Scope: [...] | Do NOT touch: [...] | Done when: [...]
 | `AI_RULES.md` | Constraints, conflicts, zero-cost |
 | `DECISIONS.md` | Before structural changes |
 | `AI_CONTEXT_*.md` | Module maps when editing that stack |
+| `CLOUD_ACCOUNT_MIGRATION_GUIDE.md` | Switching AWS/GCP/Azure accounts — owner checklist (plain English) |
 | `AUDIT_LOG.md` | **Append only** — never read at startup |
 
 PDFs (project root): full report + Phase 12 security paper — use when spec is unclear.
