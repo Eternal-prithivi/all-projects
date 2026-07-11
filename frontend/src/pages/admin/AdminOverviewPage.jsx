@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../../api';
-import { toast } from 'react-toastify';
+import { notifyAdminSuccess, notifyAdminError } from '../../utils/notifications.js';
 import '../../styles/admin-pages.css';
 import '../../styles/dashboard-enhanced.css';
 import StatCard from '../../components/dashboard/StatCard.jsx';
@@ -52,7 +52,7 @@ const AdminOverviewPage = () => {
         setStats(null);
         setActivities([]);
       } else {
-        toast.error(error.response?.data?.detail?.message || error.response?.data?.detail || 'Failed to load admin dashboard');
+        notifyAdminError(error.response?.data?.detail?.message || error.response?.data?.detail || 'Failed to load admin dashboard');
       }
     } finally {
       setLoading(false);

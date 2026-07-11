@@ -564,3 +564,68 @@
     padding: 0.55rem 0.65rem 0.55rem 0.55rem;
   }
 }
+
+/* Unified help hub tabs */
+.help-hub-tabs {
+  display: flex;
+  justify-content: center;
+  gap: 0.5rem;
+  max-width: 520px;
+  margin: 0 auto var(--space-lg);
+  padding: 0 var(--space-md);
+}
+
+.help-hub-tab {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  padding: 0.65rem 1rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-default);
+  background: var(--surface-hover);
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.2s ease, background 0.2s ease, color 0.2s ease;
+}
+
+.help-hub-tab:hover {
+  border-color: rgba(212, 175, 55, 0.35);
+  color: var(--text-primary);
+}
+
+.help-hub-tab.is-active {
+  background: linear-gradient(135deg, rgba(212, 175, 55, 0.18), rgba(212, 175, 55, 0.06));
+  border-color: rgba(212, 175, 55, 0.45);
+  color: var(--gold-primary);
+  box-shadow: 0 0 0 1px rgba(212, 175, 55, 0.12);
+}
+
+.help-hub-panel {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 0 var(--space-md) var(--space-2xl);
+}
+
+.help-footer-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  justify-content: center;
+  margin-top: 0.5rem;
+}
+
+.contact-button--secondary {
+  background: transparent;
+  border: 1px solid var(--border-strong);
+  color: var(--text-primary);
+  box-shadow: none;
+}
+
+.contact-button--secondary:hover {
+  border-color: rgba(212, 175, 55, 0.45);
+  color: var(--gold-primary);
+}

@@ -1,6 +1,6 @@
 import React, { useCallback, useState, useEffect } from 'react';
 import api from '../../api';
-import { toast } from 'react-toastify';
+import { notifyAdminSuccess, notifyAdminError } from '../../utils/notifications.js';
 import '../../styles/admin-pages.css';
 import { FaServer, FaDatabase, FaCheckCircle, FaExclamationTriangle } from 'react-icons/fa';
 import PageHeader from '../../components/ui/PageHeader.jsx';
@@ -17,7 +17,7 @@ const AdminSystemPage = () => {
       const res = await api.get('/admin/system-health');
       setSystemHealth(res.data);
     } catch {
-      toast.error('Failed to load system health');
+      notifyAdminError('Failed to load system health');
     } finally {
       setLoading(false);
     }
@@ -45,9 +45,9 @@ const AdminSystemPage = () => {
       link.click();
       link.remove();
       window.URL.revokeObjectURL(url);
-      toast.success('Audit log exported');
+      notifyAdminSuccess('Audit log exported');
     } catch {
-      toast.error('Failed to export audit log');
+      notifyAdminError('Failed to export audit log');
     }
   };
 

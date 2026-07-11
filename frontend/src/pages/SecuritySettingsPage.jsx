@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { toast } from 'react-toastify';
 import { apiClient } from '../api';
 import LoadingSpinner from '../components/LoadingSpinner';
 import { SettingsPageSkeleton } from '../components/Skeletons.jsx';
@@ -17,6 +16,7 @@ import { usePageRefresh } from '../hooks/usePageRefresh.js';
 import AccountHubNav from '../components/account/AccountHubNav.jsx';
 import PasswordRequirementsPanel from '../components/auth/PasswordRequirementsPanel.jsx';
 import { useConfirm } from '../context/ConfirmContext.jsx';
+import { useNotifications } from '../hooks/useNotifications.js';
 
 const formatRelativeTime = (timestamp) => {
   const date = new Date(timestamp);
@@ -41,6 +41,7 @@ const getAuditIcon = (category) => {
 const SecuritySettingsPage = () => {
   const navigate = useNavigate();
   const { confirm } = useConfirm();
+  const notifications = useNotifications();
   const [isLoading, setIsLoading] = useState(true);
   const [isSavingPassword, setIsSavingPassword] = useState(false);
   const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
@@ -110,7 +111,7 @@ const SecuritySettingsPage = () => {
       setLinkedAccounts(linkedResponse.data || { google_linked: false, password_set: true });
     } catch (error) {
       console.error('Failed to fetch security settings:', error);
-      toast.error('Failed to load security settings');
+      notifications.error('Failed to load security settings');
     } finally {
       setIsLoading(false);
     }
@@ -132,7 +133,7 @@ const SecuritySettingsPage = () => {
     setPasswordSubmitAttempted(true);
 
     if (!passwordValidation.isValid) {
-      toast.error(getValidationErrorMessage(passwordValidation.errors));
+      notifications.error(getValidationErrorMessage(passwordValidation.errors));
       return;
     }
 
@@ -143,7 +144,7 @@ const SecuritySettingsPage = () => {
         new_password: passwordData.newPassword,
       });
 
-      toast.success('Password changed successfully');
+      notifications.success('Password changed successfully');
       setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
       setPasswordTouched({
         currentPassword: false,
@@ -153,7 +154,7 @@ const SecuritySettingsPage = () => {
       setPasswordSubmitAttempted(false);
       await refreshActivitySummary();
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Failed to change password');
+      notifications.error(error.response?.data?.detail || 'Failed to change password');
     } finally {
       setIsSavingPassword(false);
     }
@@ -173,9 +174,9 @@ const SecuritySettingsPage = () => {
       link.click();
       link.remove();
       window.URL.revokeObjectURL(url);
-      toast.success('Activity log downloaded');
+      notifications.success('Activity log downloaded');
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Failed to download activity log');
+      notifications.error(error.response?.data?.detail || 'Failed to download activity log');
     }
   };
 
@@ -190,31 +191,31 @@ const SecuritySettingsPage = () => {
     if (!ok) return;
     try {
       const response = await apiClient.delete('/profile/sessions/others');
-      toast.success(response.data?.message || 'Other sessions revoked');
+      notifications.success(response.data?.message || 'Other sessions revoked');
       const sessionsResponse = await apiClient.get('/profile/sessions');
       setSessions(sessionsResponse.data || []);
       setShowOtherSessions(false);
       await refreshActivitySummary();
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Failed to revoke sessions');
+      notifications.error(error.response?.data?.detail || 'Failed to revoke sessions');
     }
   };
 
   const handleUnlinkGoogle = async () => {
     if (!unlinkPassword.trim()) {
-      toast.error('Enter your password to unlink Google sign-in');
+      notifications.error('Enter your password to unlink Google sign-in');
       return;
     }
     try {
       await apiClient.post('/auth/linked-accounts/google/unlink', {
         current_password: unlinkPassword,
       });
-      toast.success('Google sign-in unlinked');
+      notifications.success('Google sign-in unlinked');
       setUnlinkPassword('');
       setLinkedAccounts((prev) => ({ ...prev, google_linked: false }));
       await refreshActivitySummary();
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Failed to unlink Google');
+      notifications.error(error.response?.data?.detail || 'Failed to unlink Google');
     }
   };
 
@@ -225,13 +226,13 @@ const SecuritySettingsPage = () => {
       return;
     }
     navigate('/dashboard/security');
-    toast.info('Complete 2FA setup on the Security vault page');
+    notifications.info('Complete 2FA setup on the Security vault page');
   };
 
   const handleConfirmDisable2FA = async () => {
     const code = disable2FACode.trim();
     if (code.length < 6) {
-      toast.error('Enter the 6-digit code from your authenticator app.');
+      notifications.error('Enter the 6-digit code from your authenticator app.');
       return;
     }
     try {
@@ -239,10 +240,10 @@ const SecuritySettingsPage = () => {
       setTwoFactorEnabled(false);
       setShowDisable2FA(false);
       setDisable2FACode('');
-      toast.success('Two-factor authentication disabled');
+      notifications.success('Two-factor authentication disabled');
       await refreshActivitySummary();
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Failed to update 2FA settings');
+      notifications.error(error.response?.data?.detail || 'Failed to update 2FA settings');
     }
   };
 
@@ -266,11 +267,11 @@ const SecuritySettingsPage = () => {
 
     try {
       await apiClient.delete(`/profile/sessions/${sessionId}`);
-      toast.success('Sign-in revoked');
+      notifications.success('Sign-in revoked');
       setSessions((prev) => prev.filter((s) => s.id !== sessionId));
       await refreshActivitySummary();
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Failed to revoke sign-in');
+      notifications.error(error.response?.data?.detail || 'Failed to revoke sign-in');
     }
   };
 

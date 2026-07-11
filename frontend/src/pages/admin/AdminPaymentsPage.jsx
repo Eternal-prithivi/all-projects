@@ -1,6 +1,6 @@
 import React, { useCallback, useState, useEffect } from 'react';
 import api from '../../api';
-import { toast } from 'react-toastify';
+import { notifyAdminSuccess, notifyAdminError } from '../../utils/notifications.js';
 import '../../styles/admin-pages.css';
 import { FaDollarSign, FaFilter, FaCheckCircle, FaTimesCircle, FaClock, FaFileDownload, FaFilePdf } from 'react-icons/fa';
 import { exportToCSV, preparePaymentsForExport, exportPaymentsToPDF } from '../../utils/exportUtils';
@@ -30,7 +30,7 @@ const AdminPaymentsPage = () => {
       });
     } catch (error) {
       console.error('Failed to fetch payments:', error);
-      toast.error('Failed to load payments');
+      notifyAdminError('Failed to load payments');
     } finally {
       setLoading(false);
     }
@@ -44,13 +44,13 @@ const AdminPaymentsPage = () => {
     const exportData = preparePaymentsForExport(payments);
     const filename = `payments_export_${new Date().toISOString().split('T')[0]}.csv`;
     exportToCSV(exportData, filename);
-    toast.success('Payments exported to CSV successfully!');
+    notifyAdminSuccess('Payments exported to CSV successfully!');
   };
 
   const handleExportPDF = () => {
     const filename = `payments_report_${new Date().toISOString().split('T')[0]}.pdf`;
     exportPaymentsToPDF(payments, stats, filename);
-    toast.success('Payment report generated successfully!');
+    notifyAdminSuccess('Payment report generated successfully!');
   };
 
   const getStatusIcon = (status) => {

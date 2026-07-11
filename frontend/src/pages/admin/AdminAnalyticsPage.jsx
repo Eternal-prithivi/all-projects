@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../../api';
-import { toast } from 'react-toastify';
+import { notifyAdminSuccess, notifyAdminError } from '../../utils/notifications.js';
 import '../../styles/admin-pages.css';
 import { FaChartLine, FaUsers, FaServer, FaDollarSign, FaFileDownload, FaFilePdf } from 'react-icons/fa';
 import { exportToCSV, prepareAnalyticsForExport, exportAnalyticsToPDF } from '../../utils/exportUtils';
@@ -31,7 +31,7 @@ const AdminAnalyticsPage = () => {
         setAnalytics(null);
       } else {
         console.error('Failed to fetch analytics:', error);
-        toast.error('Failed to load analytics data');
+        notifyAdminError('Failed to load analytics data');
       }
     } finally {
       setLoading(false);
@@ -43,14 +43,14 @@ const AdminAnalyticsPage = () => {
     const exportData = prepareAnalyticsForExport(analytics);
     const filename = `analytics_export_${new Date().toISOString().split('T')[0]}.csv`;
     exportToCSV(exportData, filename);
-    toast.success('Analytics exported to CSV successfully!');
+    notifyAdminSuccess('Analytics exported to CSV successfully!');
   };
 
   const handleExportPDF = () => {
     if (!analytics) return;
     const filename = `analytics_report_${new Date().toISOString().split('T')[0]}.pdf`;
     exportAnalyticsToPDF(analytics, filename);
-    toast.success('Analytics report generated successfully!');
+    notifyAdminSuccess('Analytics report generated successfully!');
   };
 
   if (loading) {

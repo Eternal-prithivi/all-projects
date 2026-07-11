@@ -227,7 +227,7 @@ const ProfileDropdown = () => {
           <SectionLabel>Help</SectionLabel>
 
           <MenuItem
-            onClick={() => navigateTo('/help')}
+            onClick={() => navigateTo(PATHS.help)}
             icon={(
               <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden>
                 <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z" />
@@ -235,19 +235,7 @@ const ProfileDropdown = () => {
               </svg>
             )}
           >
-            Help center
-          </MenuItem>
-
-          <MenuItem
-            onClick={() => navigateTo(PATHS.support)}
-            icon={(
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden>
-                <path d="M0 2a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H9.5a.5.5 0 0 0 0 1H14a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1H2a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h1.5a.5.5 0 0 0 0-1H2V2z" />
-                <path d="M3 3.5a.5.5 0 0 1 .5-.5h9a.5.5 0 0 1 0 1h-9a.5.5 0 0 1-.5-.5zm0 2a.5.5 0 0 1 .5-.5h5a.5.5 0 0 1 0 1h-5a.5.5 0 0 1-.5-.5zm0 2a.5.5 0 0 1 .5-.5h3a.5.5 0 0 1 0 1h-3a.5.5 0 0 1-.5-.5z" />
-              </svg>
-            )}
-          >
-            Support
+            Help &amp; support
           </MenuItem>
 
           <MenuItem

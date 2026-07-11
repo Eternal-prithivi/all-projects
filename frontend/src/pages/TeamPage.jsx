@@ -20,6 +20,7 @@ import { useAuth } from '../context/AuthContext.jsx';
 import { NOT_YET_AVAILABLE, PATHS, TEAM_CAPABILITIES } from '../data/productFacts.js';
 import { usePlanEntitlementsContext } from '../context/PlanEntitlementsContext.jsx';
 import { useConfirm } from '../context/ConfirmContext.jsx';
+import { useNotifications } from '../hooks/useNotifications.js';
 import PlanUpgradeGate from '../components/billing/PlanUpgradeGate.jsx';
 import { NAV_ID_LABELS, MIN_PLAN_LABELS } from '../config/planNavConfig.js';
 import '../styles/settings.css';
@@ -31,6 +32,7 @@ const ONBOARDING_KEY = 'zenith_team_onboarding_dismissed';
 export default function TeamPage() {
   const { user } = useAuth();
   const { confirm } = useConfirm();
+  const notifications = useNotifications();
   const { isFeatureEnabled, planName, getNavMeta } = usePlanEntitlementsContext();
   const [data, setData] = useState(null);
   const [summary, setSummary] = useState(null);
@@ -129,17 +131,27 @@ export default function TeamPage() {
     setShowOnboarding(false);
   };
 
+  const notifySuccess = (text) => {
+    setMessage(text);
+    notifications.success(text);
+  };
+
+  const notifyError = (text) => {
+    setError(text);
+    notifications.error(text);
+  };
+
   const createOrg = async (e) => {
     e.preventDefault();
     setError('');
     setMessage('');
     try {
       await apiClient.post('/organizations', { name: orgName });
-      setMessage('Organization created');
+      notifySuccess('Organization created');
       setOrgName('');
       load();
     } catch (err) {
-      setError(err.response?.data?.detail || 'Could not create organization');
+      notifyError(err.response?.data?.detail || 'Could not create organization');
     }
   };
 
@@ -154,7 +166,7 @@ export default function TeamPage() {
       });
       const link = `${window.location.origin}${res.data.invite_link}`;
       setLastInviteLink(link);
-      setMessage(
+      notifySuccess(
         res.data.email_sent
           ? 'Invite created and emailed. You can also copy the link below.'
           : 'Invite created. Copy the link below to share (email not configured).'
@@ -162,7 +174,7 @@ export default function TeamPage() {
       setInviteEmail('');
       load();
     } catch (err) {
-      setError(err.response?.data?.detail || 'Could not send invite');
+      notifyError(err.response?.data?.detail || 'Could not send invite');
     }
   };
 
@@ -177,9 +189,10 @@ export default function TeamPage() {
     setMessage('');
     try {
       await apiClient.delete(`/organizations/members/${username}`);
+      notifySuccess(`${username} removed from the organization`);
       load();
     } catch (err) {
-      setError(err.response?.data?.detail || 'Could not remove member');
+      notifyError(err.response?.data?.detail || 'Could not remove member');
     }
   };
 
@@ -187,9 +200,9 @@ export default function TeamPage() {
     if (!lastInviteLink) return;
     try {
       await navigator.clipboard.writeText(lastInviteLink);
-      setMessage('Invite link copied to clipboard');
+      notifySuccess('Invite link copied to clipboard');
     } catch {
-      setError('Could not copy link — select and copy manually');
+      notifyError('Could not copy link — select and copy manually');
     }
   };
 
@@ -204,10 +217,10 @@ export default function TeamPage() {
     setMessage('');
     try {
       await apiClient.delete(`/organizations/invites/${encodeURIComponent(email)}`);
-      setMessage(`Revoked invite for ${email}`);
+      notifySuccess(`Revoked invite for ${email}`);
       load();
     } catch (err) {
-      setError(err.response?.data?.detail || 'Could not revoke invite');
+      notifyError(err.response?.data?.detail || 'Could not revoke invite');
     }
   };
 
@@ -222,9 +235,10 @@ export default function TeamPage() {
     setMessage('');
     try {
       await apiClient.post('/organizations/leave');
+      notifySuccess('You left the organization');
       load();
     } catch (err) {
-      setError(err.response?.data?.detail || 'Could not leave organization');
+      notifyError(err.response?.data?.detail || 'Could not leave organization');
     }
   };
 
@@ -232,10 +246,10 @@ export default function TeamPage() {
     setMessage('');
     try {
       await apiClient.patch(`/organizations/members/${username}/role`, { role });
-      setMessage(`Updated role for ${username}`);
+      notifySuccess(`Updated role for ${username}`);
       load();
     } catch (err) {
-      setError(err.response?.data?.detail || 'Could not update role');
+      notifyError(err.response?.data?.detail || 'Could not update role');
     }
   };
 
@@ -250,10 +264,10 @@ export default function TeamPage() {
     setMessage('');
     try {
       await apiClient.post('/organizations/billing/migrate-personal');
-      setMessage('Personal subscription moved to organization');
+      notifySuccess('Personal subscription moved to organization');
       load();
     } catch (err) {
-      setError(err.response?.data?.detail || 'Could not migrate subscription');
+      notifyError(err.response?.data?.detail || 'Could not migrate subscription');
     }
   };
 
@@ -270,10 +284,10 @@ export default function TeamPage() {
       await apiClient.post('/organizations/transfer-ownership', {
         new_owner_username: username,
       });
-      setMessage(`Ownership transferred to ${username}`);
+      notifySuccess(`Ownership transferred to ${username}`);
       load();
     } catch (err) {
-      setError(err.response?.data?.detail || 'Could not transfer ownership');
+      notifyError(err.response?.data?.detail || 'Could not transfer ownership');
     }
   };
 
@@ -287,10 +301,10 @@ export default function TeamPage() {
         payload.approval_threshold_usd = parseFloat(approvalThreshold) || 0;
       }
       await apiClient.patch('/organizations/settings', payload);
-      setMessage('Organization settings saved');
+      notifySuccess('Organization settings saved');
       load();
     } catch (err) {
-      setError(err.response?.data?.detail || 'Could not save settings');
+      notifyError(err.response?.data?.detail || 'Could not save settings');
     }
   };
 
@@ -298,10 +312,10 @@ export default function TeamPage() {
     setMessage('');
     try {
       await apiClient.patch(`/organizations/approvals/${id}`, { status });
-      setMessage(`Request ${status}`);
+      notifySuccess(`Request ${status}`);
       load();
     } catch (err) {
-      setError(err.response?.data?.detail || 'Could not review approval');
+      notifyError(err.response?.data?.detail || 'Could not review approval');
     }
   };
 

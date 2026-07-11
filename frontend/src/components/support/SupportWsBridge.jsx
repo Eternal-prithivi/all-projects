@@ -43,7 +43,7 @@ export default function SupportWsBridge({ notifyOnAgentReply = false }) {
             title: 'Support replied',
             message: `New reply on ${data.reference_code}`,
             type: 'info',
-            link: `/dashboard/support?ref=${encodeURIComponent(data.reference_code)}`,
+            link: `/help?tab=tickets&ref=${encodeURIComponent(data.reference_code)}`,
             persist: true,
           });
         }

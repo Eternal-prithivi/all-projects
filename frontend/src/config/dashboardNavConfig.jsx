@@ -1,5 +1,6 @@
 import React from 'react';
 import { IconDashboard, IconBarChart, IconHardDrive, IconServer, IconShield } from '../components/dashboard/Icons.jsx';
+import { PATHS } from '../data/productFacts.js';
 
 export const infrastructureIcon = (
   <svg className="rail-icon" width="20" height="20" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
@@ -66,7 +67,7 @@ export const DASHBOARD_NAV_ITEMS = [
     lockNavBlock: false,
   },
   { to: '/dashboard/billing', icon: billingIcon, label: 'Billing', navId: 'billing' },
-  { to: '/dashboard/support', icon: supportIcon, label: 'Support', navId: 'support' },
+  { to: PATHS.help, icon: supportIcon, label: 'Help & Support', navId: 'support', isHelp: true },
 ];
 
 /** Cost hub sub-routes (Pro+ tools). */
@@ -94,8 +95,7 @@ export function getDashboardMobileMoreItems(user) {
     { to: '/dashboard/optimization', label: 'Cost optimization', navId: 'cost_optimization', lockNavBlock: true },
     DASHBOARD_NAV_ITEMS[6],
     DASHBOARD_NAV_ITEMS[7],
-    DASHBOARD_NAV_ITEMS[8],
-    { to: '/help', label: 'Help Center', external: false, isHelp: true },
+    { to: PATHS.help, label: 'Help & Support', external: false, isHelp: true },
     { to: '/dashboard/settings', label: 'Settings', isSettings: true },
   ];
   if (user?.role === 'admin') {

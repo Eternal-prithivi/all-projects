@@ -48,6 +48,7 @@ import { usePageRefresh } from '../hooks/usePageRefresh.js';
 import PlatformRegionPills from '../components/PlatformRegionPills.jsx';
 import SettingsSectionNav from '../components/settings/SettingsSectionNav.jsx';
 import AccountHubNav from '../components/account/AccountHubNav.jsx';
+import CloudProviderLogo from '../components/cloud/CloudProviderLogo.jsx';
 
 const SettingsPage = () => {
   const navigate = useNavigate();
@@ -1014,7 +1015,7 @@ const SettingsPage = () => {
           <code style={{fontSize: '0.85rem'}}>{response.data.key}</code><br/>
           <small>{response.data.note}</small>
         </div>,
-        { autoClose: false }
+        { title: 'API key generated', banner: false }
       );
       setApiKeyName('');
       fetchApiKeys();

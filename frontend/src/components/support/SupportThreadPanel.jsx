@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { toast } from 'react-toastify';
+import { showBannerToast } from '../../utils/notifications.js';
 import SupportMessageBubble from './SupportMessageBubble.jsx';
 import { canReplyToTicket, statusLabel } from '../../utils/supportFormat.js';
 
@@ -73,7 +73,7 @@ export default function SupportThreadPanel({
     } catch (err) {
       setPending(null);
       setDraft(body);
-      toast.error(err?.message || 'Could not send message');
+      showBannerToast('error', err?.message || 'Could not send message');
     } finally {
       setSending(false);
     }

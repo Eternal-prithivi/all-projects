@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { toast } from 'react-toastify';
+import { useNotifications } from '../hooks/useNotifications.js';
 import '../styles/encryption-modal.css';
 
 const EncryptionChoiceModal = ({ file, onClose, onChoose }) => {
+  const notifications = useNotifications();
   const [selectedMethod, setSelectedMethod] = useState(null);
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -72,36 +73,36 @@ const EncryptionChoiceModal = ({ file, onClose, onChoose }) => {
     setFormError('');
     if (!selectedMethod) {
       setFormError('Please select an encryption method.');
-      toast.error('Please select an encryption method.');
+      notifications.error('Please select an encryption method.');
       return;
     }
 
     if (selectedMethod === 'none' && !skipAcknowledged) {
       setFormError('Confirm you accept storing this file without Zenith encryption.');
-      toast.error('Confirm you accept storing this file without Zenith encryption.');
+      notifications.error('Confirm you accept storing this file without Zenith encryption.');
       return;
     }
 
     if (selectedMethod === 'client-side') {
       if (!password) {
         setFormError('Please enter a password.');
-        toast.error('Please enter a password.');
+        notifications.error('Please enter a password.');
         return;
       }
       if (password.length < 12) {
         setFormError('Password must be at least 12 characters for strong encryption.');
-        toast.error('Password must be at least 12 characters for strong encryption.');
+        notifications.error('Password must be at least 12 characters for strong encryption.');
         return;
       }
       if (!passwordStrength.checks.uppercase || !passwordStrength.checks.number || !passwordStrength.checks.special) {
         const msg = 'Password must include an uppercase letter, a number, and a special character.';
         setFormError(msg);
-        toast.error(msg);
+        notifications.error(msg);
         return;
       }
       if (password !== confirmPassword) {
         setFormError('Passwords do not match.');
-        toast.error('Passwords do not match.');
+        notifications.error('Passwords do not match.');
         return;
       }
     }

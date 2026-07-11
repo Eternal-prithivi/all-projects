@@ -1,5 +1,5 @@
 import React from 'react';
-import { toast } from 'react-toastify';
+import { useNotifications } from '../../hooks/useNotifications.js';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useConfirm } from '../../context/ConfirmContext.jsx';
 import { getDownloadUrl, deleteFile } from '../../api.js';
@@ -19,13 +19,14 @@ function formatBytes(bytes, decimals = 2) {
 function FileList({ files, onFileDeleted }) {
   const { token } = useAuth();
   const { confirm } = useConfirm();
+  const notifications = useNotifications();
 
   const handleDownload = async (filename) => {
     try {
       const data = await getDownloadUrl(filename, token);
       window.open(data.download_url, '_blank');
     } catch {
-      toast.error('Could not get download link.');
+      notifications.error('Could not get download link.');
     }
   };
 
@@ -41,9 +42,9 @@ function FileList({ files, onFileDeleted }) {
     try {
       await deleteFile(filename, token);
       onFileDeleted();
-      toast.success('File deleted.');
+      notifications.success('File deleted.');
     } catch {
-      toast.error('Could not delete file.');
+      notifications.error('Could not delete file.');
     }
   };
 

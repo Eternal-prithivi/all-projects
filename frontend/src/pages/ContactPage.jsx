@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { toast } from 'react-toastify';
 import MarketingPageLayout from '../components/layout/MarketingPageLayout.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { getValidationErrorMessage, validateContactForm } from '../utils/formValidation.js';
+import { showBannerToast } from '../utils/notifications.js';
 import '../styles/contact.css';
 import '../styles/support-tickets.css';
 import { apiUrl } from '../config/apiBase.js';
+import { PATHS } from '../data/productFacts.js';
 
 function ContactPage() {
   const navigate = useNavigate();
@@ -37,7 +38,7 @@ function ContactPage() {
     setFieldErrors(validation.errors);
 
     if (!validation.isValid) {
-      toast.error(getValidationErrorMessage(validation.errors) || 'Please fix the highlighted fields.');
+      showBannerToast('error', getValidationErrorMessage(validation.errors) || 'Please fix the highlighted fields.');
       return;
     }
 
@@ -58,10 +59,11 @@ function ContactPage() {
         const data = await response.json();
         const ref = data.reference_code;
         setSubmittedRef(ref || '');
-        toast.success(
+        showBannerToast(
+          'success',
           ref
             ? `Message sent! Your reference is ${ref} — check your email for follow-up instructions.`
-            : 'Message sent successfully! We\'ll get back to you soon.'
+            : "Message sent successfully! We'll get back to you soon."
         );
         setFormData({ name: '', email: '', subject: 'general', message: '' });
         if (!ref) {
@@ -71,7 +73,7 @@ function ContactPage() {
         throw new Error('Failed to send message');
       }
     } catch (error) {
-      toast.error('Failed to send message. Please try again.');
+      showBannerToast('error', 'Failed to send message. Please try again.');
       console.error('Contact form error:', error);
     } finally {
       setLoading(false);
@@ -106,7 +108,7 @@ function ContactPage() {
               {token && (
                 <p style={{ marginTop: '0.75rem', fontSize: '0.85rem' }}>
                   Or view in{' '}
-                  <Link to="/dashboard/support">Dashboard → Support</Link>
+                  <Link to={PATHS.support}>Help → My tickets</Link>
                 </p>
               )}
             </div>

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { toast } from 'react-toastify';
+import { notifyAdminSuccess, notifyAdminError } from '../../utils/notifications.js';
 import { FaSearch } from 'react-icons/fa';
 import api from '../../api';
 import PageHeader from '../../components/ui/PageHeader.jsx';
@@ -41,7 +41,7 @@ function AdminSupportPage() {
       setTickets(res.data.tickets || []);
       setTotal(res.data.total || 0);
     } catch {
-      toast.error('Failed to load support inbox');
+      notifyAdminError('Failed to load support inbox');
     } finally {
       setLoading(false);
     }
@@ -58,7 +58,7 @@ function AdminSupportPage() {
       setDetail(res.data);
     } catch {
       if (!silent) {
-        toast.error('Failed to load ticket');
+        notifyAdminError('Failed to load ticket');
         setDetail(null);
       }
     } finally {
@@ -102,7 +102,7 @@ function AdminSupportPage() {
       body,
     });
     setDetail(res.data);
-    toast.success('Reply sent to customer');
+    notifyAdminSuccess('Reply sent to customer');
     fetchTickets();
   };
 
@@ -110,11 +110,11 @@ function AdminSupportPage() {
     if (!selectedId) return;
     try {
       await api.patch(`/admin/support/tickets/${selectedId}`, { status: newStatus });
-      toast.success(`Ticket marked ${statusLabel(newStatus)}`);
+      notifyAdminSuccess(`Ticket marked ${statusLabel(newStatus)}`);
       fetchDetail(selectedId, { silent: true });
       fetchTickets();
     } catch (err) {
-      toast.error(err.response?.data?.detail || 'Failed to update status');
+      notifyAdminError(err.response?.data?.detail || 'Failed to update status');
     }
   };
 

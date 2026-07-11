@@ -1,6 +1,6 @@
 import React, { useCallback, useState, useEffect } from 'react';
 import api from '../../api';
-import { toast } from 'react-toastify';
+import { notifyAdminSuccess, notifyAdminError } from '../../utils/notifications.js';
 import '../../styles/admin-pages.css';
 import { 
   FaSearch, FaCheck, FaBan, FaClock, FaUserPlus, FaFileDownload, FaFilePdf
@@ -25,7 +25,7 @@ const AdminUsersPage = () => {
       setUsers(res.data.users);
       setPagination(prev => ({ ...prev, total: res.data.total }));
     } catch {
-      toast.error('Failed to load users');
+      notifyAdminError('Failed to load users');
     } finally {
       setLoading(false);
     }
@@ -50,10 +50,10 @@ const AdminUsersPage = () => {
 
     try {
       await api.put(`/admin/users/${username}/status?status=${newStatus}`);
-      toast.success(`User ${username} ${newStatus}d successfully`);
+      notifyAdminSuccess(`User ${username} ${newStatus}d successfully`);
       fetchUsers();
     } catch (_error) {
-      toast.error(`Failed to update user status: ${_error.response?.data?.detail || 'Unknown error'}`);
+      notifyAdminError(`Failed to update user status: ${_error.response?.data?.detail || 'Unknown error'}`);
     }
   };
 
@@ -79,13 +79,13 @@ const AdminUsersPage = () => {
     const exportData = prepareUsersForExport(users);
     const filename = `users_export_${new Date().toISOString().split('T')[0]}.csv`;
     exportToCSV(exportData, filename);
-    toast.success('Users exported to CSV successfully!');
+    notifyAdminSuccess('Users exported to CSV successfully!');
   };
 
   const handleExportPDF = () => {
     const filename = `users_report_${new Date().toISOString().split('T')[0]}.pdf`;
     exportUsersToPDF(users, filename);
-    toast.success('Users report generated successfully!');
+    notifyAdminSuccess('Users report generated successfully!');
   };
 
   return (

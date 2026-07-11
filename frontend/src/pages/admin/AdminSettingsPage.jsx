@@ -1,6 +1,6 @@
 import React, { useCallback, useState, useEffect } from 'react';
 import api from '../../api';
-import { toast } from 'react-toastify';
+import { notifyAdminSuccess, notifyAdminError } from '../../utils/notifications.js';
 import '../../styles/admin-pages.css';
 import { 
   FaCog, FaToggleOn, FaToggleOff, FaServer, 
@@ -24,7 +24,7 @@ const AdminSettingsPage = () => {
       setStatistics(response.data.statistics);
     } catch (error) {
       console.error('Failed to fetch settings:', error);
-      toast.error('Failed to load settings');
+      notifyAdminError('Failed to load settings');
     } finally {
       setLoading(false);
     }
@@ -46,10 +46,10 @@ const AdminSettingsPage = () => {
     setSaving(true);
     try {
       await api.put('/admin/settings', settings);
-      toast.success('Settings saved successfully!');
+      notifyAdminSuccess('Settings saved successfully!');
     } catch (error) {
       console.error('Failed to save settings:', error);
-      toast.error('Failed to save settings');
+      notifyAdminError('Failed to save settings');
     } finally {
       setSaving(false);
     }

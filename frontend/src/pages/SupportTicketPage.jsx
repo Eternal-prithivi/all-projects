@@ -1,10 +1,10 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { toast } from 'react-toastify';
 import MarketingPageLayout from '../components/layout/MarketingPageLayout.jsx';
 import SupportThreadPanel from '../components/support/SupportThreadPanel.jsx';
 import { useSupportThreadPoll } from '../hooks/useSupportThreadPoll.js';
 import { apiUrl } from '../config/apiBase.js';
+import { showBannerToast } from '../utils/notifications.js';
 import '../styles/support-tickets.css';
 
 const GUEST_TOKEN_KEY = 'zenith_guest_ticket_token';
@@ -86,10 +86,10 @@ function SupportTicketPage() {
         const err = await res.json().catch(() => ({}));
         throw new Error(err.detail || 'Request failed');
       }
-      toast.success('Verification code sent — check your email.');
+      showBannerToast('success', 'Verification code sent — check your email.');
       setStep('otp');
     } catch (err) {
-      toast.error(err.message || 'Could not send code');
+      showBannerToast('error', err.message || 'Could not send code');
     } finally {
       setLoading(false);
     }
@@ -117,9 +117,9 @@ function SupportTicketPage() {
       setGuestToken(data.guest_token);
       setThread(data);
       setStep('thread');
-      toast.success('Verified — you can view your ticket.');
+      showBannerToast('success', 'Verified — you can view your ticket.');
     } catch (err) {
-      toast.error(err.message || 'Verification failed');
+      showBannerToast('error', err.message || 'Verification failed');
     } finally {
       setLoading(false);
     }

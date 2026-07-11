@@ -1,19 +1,19 @@
 .profile-dropdown {
   position: relative;
-  z-index: 1000;
+  z-index: 10001;
 }
 
 .profile-trigger {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  padding: 0.5rem 1rem;
+  gap: 0.65rem;
+  padding: 0.45rem 0.85rem;
   background: var(--surface-hover);
   border: 1px solid var(--border-default);
   border-radius: 8px;
   color: var(--text-primary);
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: all 0.2s ease;
 }
 
 .profile-trigger:hover {
@@ -30,7 +30,7 @@
   align-items: center;
   justify-content: center;
   font-weight: 600;
-  font-size: 0.875rem;
+  font-size: 0.8rem;
   color: #000;
   overflow: hidden;
   flex-shrink: 0;
@@ -45,13 +45,18 @@
 }
 
 .profile-name {
-  font-size: 0.95rem;
+  font-size: 0.9rem;
   font-weight: 500;
+  max-width: 9rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .dropdown-arrow {
-  transition: transform 0.3s ease;
+  transition: transform 0.2s ease;
   color: var(--text-muted);
+  flex-shrink: 0;
 }
 
 .dropdown-arrow.open {
@@ -60,23 +65,24 @@
 
 .profile-menu {
   position: absolute;
-  top: calc(100% + 0.5rem);
+  top: calc(100% + 0.45rem);
   right: 0;
-  min-width: 280px;
-  max-height: min(85vh, 560px);
-  overflow-y: auto;
+  width: 272px;
+  overflow: hidden;
   background: var(--bg-elevated);
-  border: 1px solid var(--border-default);
+  border: 1px solid var(--border-strong);
   border-radius: 12px;
-  box-shadow: var(--shadow-elevated);
-  padding: 0.5rem;
-  animation: slideDown 0.2s ease;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(255, 255, 255, 0.04);
+  padding: 0.35rem;
+  animation: slideDown 0.18s ease;
+  isolation: isolate;
+  contain: paint;
 }
 
 @keyframes slideDown {
   from {
     opacity: 0;
-    transform: translateY(-10px);
+    transform: translateY(-8px);
   }
   to {
     opacity: 1;
@@ -85,74 +91,77 @@
 }
 
 .profile-menu-header {
-  display: flex;
+  display: grid;
+  grid-template-columns: 40px 1fr;
   align-items: center;
-  gap: 1rem;
-  padding: 1rem;
-  background: var(--surface-hover);
+  gap: 0.65rem;
+  padding: 0.6rem 0.65rem;
+  background: linear-gradient(145deg, rgba(212, 175, 55, 0.1), rgba(255, 255, 255, 0.03));
+  border: 1px solid rgba(212, 175, 55, 0.14);
   border-radius: 8px;
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.3rem;
 }
 
 .profile-menu-avatar {
-  width: 48px;
-  height: 48px;
+  width: 40px;
+  height: 40px;
   border-radius: 50%;
   background: linear-gradient(135deg, var(--gold-primary), var(--gold-light));
   display: flex;
   align-items: center;
   justify-content: center;
   font-weight: 700;
-  font-size: 1.25rem;
+  font-size: 0.95rem;
   color: #000;
   flex-shrink: 0;
   overflow: hidden;
+  box-shadow: 0 0 0 2px rgba(212, 175, 55, 0.25);
 }
 
 .profile-menu-info {
-  flex: 1;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
 }
 
 .profile-menu-name {
   font-weight: 600;
   color: var(--text-primary);
-  font-size: 1rem;
-  margin-bottom: 0.25rem;
+  font-size: 0.875rem;
+  line-height: 1.2;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .profile-menu-email {
-  font-size: 0.8rem;
+  font-size: 0.72rem;
   color: var(--text-muted);
+  line-height: 1.2;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .profile-menu-username {
-  font-size: 0.75rem;
-  color: var(--text-muted);
-  margin-bottom: 0.15rem;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  display: none;
 }
 
 .profile-menu-plan-badge {
-  display: inline-block;
-  margin-top: 0.4rem;
-  padding: 0.15rem 0.5rem;
-  font-size: 0.7rem;
-  font-weight: 600;
+  display: inline-flex;
+  align-self: flex-start;
+  margin-top: 0.15rem;
+  padding: 0.12rem 0.45rem;
+  font-size: 0.6rem;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.04em;
   border-radius: 999px;
-  background: rgba(212, 175, 55, 0.15);
+  background: rgba(212, 175, 55, 0.14);
   color: var(--gold-primary);
-  border: 1px solid rgba(212, 175, 55, 0.35);
+  border: 1px solid rgba(212, 175, 55, 0.32);
+  line-height: 1.2;
 }
 
 .profile-menu-plan-badge--free {
@@ -162,34 +171,34 @@
 }
 
 .profile-menu-section-label {
-  padding: 0.35rem 1rem 0.15rem;
-  font-size: 0.68rem;
-  font-weight: 600;
+  padding: 0.28rem 0.65rem 0.08rem;
+  font-size: 0.62rem;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.07em;
   color: var(--text-muted);
 }
 
 .profile-menu-divider {
   height: 1px;
   background: var(--border-default);
-  margin: 0.5rem 0;
+  margin: 0.28rem 0.4rem;
 }
 
 .profile-menu-item {
   width: 100%;
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  padding: 0.75rem 1rem;
+  gap: 0.55rem;
+  padding: 0.42rem 0.65rem;
   background: transparent;
   border: none;
   border-radius: 6px;
   color: var(--text-primary);
-  font-size: 0.9rem;
+  font-size: 0.84rem;
   text-align: left;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: background 0.15s ease, color 0.15s ease;
 }
 
 .profile-menu-item:hover {
@@ -198,7 +207,9 @@
 
 .profile-menu-item svg {
   flex-shrink: 0;
-  opacity: 0.7;
+  width: 15px;
+  height: 15px;
+  opacity: 0.75;
 }
 
 .profile-menu-item.danger {
@@ -215,6 +226,16 @@
 
 .profile-menu-lock {
   margin-left: auto;
-  font-size: 0.7rem;
+  font-size: 0.68rem;
   opacity: 0.6;
+}
+
+@media (max-width: 640px) {
+  .profile-name {
+    display: none;
+  }
+
+  .profile-menu {
+    width: min(272px, calc(100vw - 1rem));
+  }
 }
