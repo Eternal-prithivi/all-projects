@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { adminCredentials, apiRoot, isBackendAvailable, loginOnPage } from '../helpers';
+import { adminCredentials, apiRoot, isBackendAvailable, loginAdminOnPage } from '../helpers';
 
 /**
  * Admin smoke tests — two layers:
@@ -55,7 +55,7 @@ test.describe('Admin smoke', () => {
     const admin = adminCredentials();
     if (!admin) test.skip(true, 'Admin credentials not configured');
 
-    await loginOnPage(page, admin, request);
+    await loginAdminOnPage(page, request, admin);
 
     await expect
       .poll(

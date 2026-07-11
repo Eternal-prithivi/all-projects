@@ -40,7 +40,7 @@ export async function registerTestUser(
   return { username, password, email };
 }
 
-/** Obtain session via API cookies (httpOnly auth). */
+/** Obtain session via API cookies + bearer tokens (cross-origin CI). */
 export async function loginViaApi(
   page: import('@playwright/test').Page,
   request: import('@playwright/test').APIRequestContext,
@@ -58,7 +58,15 @@ export async function loginViaApi(
     throw new Error(`Login API failed (${res.status()}): ${await res.text()}`);
   }
 
+  const tokens = (await res.json()) as { access_token?: string; refresh_token?: string };
+
   await syncApiCookiesToPage(page, request);
+  await page.goto('/login');
+  await page.evaluate((tok) => {
+    if (tok.access_token) sessionStorage.setItem('authToken', tok.access_token);
+    if (tok.refresh_token) sessionStorage.setItem('refreshToken', tok.refresh_token);
+  }, tokens);
+
   await page.goto('/dashboard');
   await page.waitForURL(/\/dashboard/, { timeout: 30_000, waitUntil: 'commit' });
   await waitForSessionUser(page);
@@ -106,7 +114,11 @@ export async function loginAdminOnPage(
     throw new Error(`Admin login API failed (${res.status()}): ${await res.text()}`);
   }
 
-  const meRes = await request.get(`${apiRoot()}/api/users/me`);
+  const tokens = (await res.json()) as { access_token?: string; refresh_token?: string };
+  const meHeaders = tokens.access_token
+    ? { Authorization: `Bearer ${tokens.access_token}` }
+    : undefined;
+  const meRes = await request.get(`${apiRoot()}/api/users/me`, { headers: meHeaders });
   if (!meRes.ok()) {
     throw new Error(`Admin /users/me failed (${meRes.status()}): ${await meRes.text()}`);
   }
@@ -117,9 +129,19 @@ export async function loginAdminOnPage(
 
   await syncApiCookiesToPage(page, request);
   await page.goto('/login');
-  await page.evaluate((cached) => {
-    sessionStorage.setItem('cachedUser', JSON.stringify(cached));
-  }, userData);
+  await page.evaluate(
+    (payload) => {
+      const { tok, cached } = payload;
+      if (tok.access_token) sessionStorage.setItem('authToken', tok.access_token);
+      if (tok.refresh_token) sessionStorage.setItem('refreshToken', tok.refresh_token);
+      sessionStorage.setItem('cachedUser', JSON.stringify(cached));
+    },
+    { tok: tokens, cached: userData },
+  );
+
+  await page.goto('/dashboard');
+  await page.waitForURL(/\/dashboard/, { timeout: 30_000, waitUntil: 'commit' });
+  await waitForSessionUser(page);
 }
 
 export function adminCredentials(): { username: string; password: string } | null {
@@ -159,5 +181,18 @@ export async function mockProEntitlements(page: import('@playwright/test').Page)
 export async function waitForSessionUser(page: import('@playwright/test').Page): Promise<void> {
   await page
     .waitForResponse((r) => r.url().includes('/api/users/me') && r.ok(), { timeout: 30_000 })
+    .catch(() => undefined);
+  await page
+    .waitForFunction(
+      () => {
+        try {
+          const raw = sessionStorage.getItem('cachedUser');
+          return Boolean(raw && JSON.parse(raw)?.username);
+        } catch {
+          return false;
+        }
+      },
+      { timeout: 30_000 },
+    )
     .catch(() => undefined);
 }
