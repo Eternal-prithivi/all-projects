@@ -44,6 +44,7 @@ import {
   securityVaultAction,
   apiClient,
 } from "../api";
+import { getWsRoot } from "../config/apiBase.js";
 import SecurityIntelligenceBar from "../components/security/SecurityIntelligenceBar.jsx";
 import SecurityFileInsight from "../components/security/SecurityFileInsight.jsx";
 import "../styles/security-page.css";
@@ -232,9 +233,9 @@ function SecurityPage() {
     const wsRef = { current: null };
     if (user && token && canAccessSecureArea && !loading) {
       fetchSecureFiles();
-      const wsUrl = import.meta.env.DEV 
+      const wsUrl = import.meta.env.DEV
         ? `ws://localhost:8000/ws/status?token=${token}`
-        : `wss://zenith-backend-707i.onrender.com/ws/status?token=${token}`;
+        : `${getWsRoot()}/ws/status?token=${token}`;
       const ws = new WebSocket(wsUrl);
       wsRef.current = ws;
       ws.onmessage = (event) => {

@@ -1,12 +1,13 @@
 /**
  * Normalized API URLs for fetch() and axios.
  *
- * Vercel production (after api.rajverse.me DNS is live):
- *   VITE_API_URL=https://api.rajverse.me
- * Until then, the app defaults to the Render API hostname.
+ * rajverse.me (production): same-origin /api via Vercel rewrite → Render backend.
+ * Avoids ad blockers that block zenith-backend-707i.onrender.com (ERR_BLOCKED_BY_CLIENT).
+ *
+ * Custom API subdomain (optional): VITE_API_URL=https://api.rajverse.me
  */
 
-/** Live Render API — used until api.rajverse.me DNS + TLS are configured (see docs/setup/API_SUBDOMAIN.md). */
+/** Direct Render host — fallback when not on rajverse.me and no VITE_API_URL. */
 const PRODUCTION_API_ROOT = 'https://zenith-backend-707i.onrender.com';
 const DEV_API_ROOT = 'http://localhost:8000';
 
@@ -19,23 +20,31 @@ function isUnconfiguredCustomApiHost(url) {
   return /^https:\/\/api\.rajverse\.me\/?$/i.test(String(url || '').replace(/\/$/, ''));
 }
 
+/** True when the SPA runs on rajverse.me and should use Vercel /api proxy (same origin). */
+export function usesSameOriginApiProxy() {
+  if (typeof window === 'undefined') return false;
+  const host = window.location.hostname;
+  return host === 'rajverse.me' || host.endsWith('.rajverse.me');
+}
+
 /** Backend origin only (no /api suffix). */
 export function getApiRoot() {
+  if (usesSameOriginApiProxy()) {
+    return window.location.origin;
+  }
+
   const isProd = import.meta.env.MODE === 'production';
   const fromEnv = import.meta.env.VITE_API_URL
     ? String(import.meta.env.VITE_API_URL).replace(/\/api\/?$/i, '').replace(/\/$/, '')
     : '';
 
   if (isProd) {
-    // Never call localhost from rajverse.me — common mis-set Vercel env
     if (fromEnv && !isLocalhostUrl(fromEnv) && !isUnconfiguredCustomApiHost(fromEnv)) {
-      // Old Render hostname without the trailing "i" returns 404
       if (/zenith-backend-707\.onrender\.com/i.test(fromEnv) && !/707i/i.test(fromEnv)) {
         return PRODUCTION_API_ROOT;
       }
       return fromEnv;
     }
-    // Default to Render until api.rajverse.me resolves (NXDOMAIN breaks login otherwise).
     return PRODUCTION_API_ROOT;
   }
 
@@ -52,4 +61,10 @@ export function apiUrl(apiPath) {
   const path = apiPath.startsWith('/') ? apiPath : `/${apiPath}`;
   const relative = path.startsWith('/api/') ? path.slice(4) : path;
   return `${getApiBaseUrl()}${relative.startsWith('/') ? relative : `/${relative}`}`;
+}
+
+/** WebSocket origin (ws/wss) aligned with getApiRoot(). */
+export function getWsRoot() {
+  const root = getApiRoot().replace(/\/$/, '');
+  return root.replace(/^http/i, 'ws');
 }

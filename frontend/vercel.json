@@ -4,6 +4,30 @@
   "framework": "vite",
   "rewrites": [
     {
+      "source": "/api/:path*",
+      "destination": "https://zenith-backend-707i.onrender.com/api/:path*"
+    },
+    {
+      "source": "/health/ready",
+      "destination": "https://zenith-backend-707i.onrender.com/health/ready"
+    },
+    {
+      "source": "/health",
+      "destination": "https://zenith-backend-707i.onrender.com/health"
+    },
+    {
+      "source": "/ws/:path*",
+      "destination": "https://zenith-backend-707i.onrender.com/ws/:path*"
+    },
+    {
+      "source": "/docs",
+      "destination": "https://zenith-backend-707i.onrender.com/docs"
+    },
+    {
+      "source": "/docs/:path*",
+      "destination": "https://zenith-backend-707i.onrender.com/docs/:path*"
+    },
+    {
       "source": "/((?!assets/).*)",
       "destination": "/index.html"
     }

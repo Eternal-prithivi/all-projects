@@ -17,7 +17,7 @@
 //   - Import apiClient in VMClusterPage — it uses its own fetch() pattern
 // =============================================================================
 import axios from "axios";
-import { getApiBaseUrl } from "./config/apiBase.js";
+import { getApiBaseUrl, usesSameOriginApiProxy } from "./config/apiBase.js";
 import {
   clearAuthTokens,
   clearStaleSessionArtifacts,
@@ -155,10 +155,16 @@ export const getApiErrorMessage = (error, fallback = "Something went wrong.") =>
     const isProd = import.meta.env.MODE === "production";
     const isRemoteApi = apiRoot && !/localhost|127\.0\.0\.1/i.test(apiRoot);
     if (isProd && isRemoteApi) {
+      if (usesSameOriginApiProxy()) {
+        return (
+          `Cannot reach the API at ${apiRoot}. ` +
+          'The server may be waking up (free tier can take 1–2 minutes). Wait, then try again.'
+        );
+      }
       return (
         `Cannot reach the API at ${apiRoot}. ` +
-        "If you use an ad blocker or privacy extension, allow rajverse.me and zenith-backend-707i.onrender.com, then try again. " +
-        "Otherwise the server may be waking up (free tier can take 1–2 minutes)."
+        'If you use an ad blocker, allow this site and zenith-backend-707i.onrender.com, then try again. ' +
+        'Otherwise the server may be waking up (free tier can take 1–2 minutes).'
       );
     }
     return "Cannot reach the server. Start the backend (http://localhost:8000) and try again.";

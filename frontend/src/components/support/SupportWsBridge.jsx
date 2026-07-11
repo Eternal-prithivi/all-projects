@@ -3,10 +3,13 @@ import { useAuth } from '../../context/AuthContext.jsx';
 import { useNotificationCenter } from '../../context/NotificationContext.jsx';
 import { dispatchSupportWsEvent } from '../../utils/supportEventBus.js';
 
+import { getWsRoot } from '../../config/apiBase.js';
+
 function wsUrlForToken(token) {
-  return import.meta.env.DEV
-    ? `ws://localhost:8000/ws/status?token=${token}`
-    : `wss://zenith-backend-707i.onrender.com/ws/status?token=${token}`;
+  if (import.meta.env.DEV) {
+    return `ws://localhost:8000/ws/status?token=${token}`;
+  }
+  return `${getWsRoot()}/ws/status?token=${token}`;
 }
 
 /**
