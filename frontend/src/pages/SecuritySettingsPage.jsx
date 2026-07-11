@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiClient } from '../api';
 import LoadingSpinner from '../components/LoadingSpinner';
@@ -78,11 +78,7 @@ const SecuritySettingsPage = () => {
     setPasswordTouched((prev) => ({ ...prev, [field]: true }));
   };
 
-  useEffect(() => {
-    fetchSecuritySettings();
-  }, []);
-
-  const fetchSecuritySettings = async () => {
+  const fetchSecuritySettings = useCallback(async () => {
     try {
       setIsLoading(true);
       const [twoFAResponse, sessionsResponse, summaryResponse, linkedResponse] = await Promise.all([
@@ -115,7 +111,11 @@ const SecuritySettingsPage = () => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [notifications]);
+
+  useEffect(() => {
+    fetchSecuritySettings();
+  }, [fetchSecuritySettings]);
 
   const refreshActivitySummary = async () => {
     try {

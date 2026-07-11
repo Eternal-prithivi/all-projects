@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../../api';
-import { notifyAdminSuccess, notifyAdminError } from '../../utils/notifications.js';
+import { notifyAdminError } from '../../utils/notifications.js';
 import '../../styles/admin-pages.css';
 import '../../styles/dashboard-enhanced.css';
 import StatCard from '../../components/dashboard/StatCard.jsx';
