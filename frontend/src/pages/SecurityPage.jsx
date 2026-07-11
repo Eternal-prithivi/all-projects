@@ -1272,7 +1272,7 @@ function SecurityPage() {
             />
           ) : (
           <div className="table-responsive-scroll">
-          <table className="file-table">
+          <table className="file-table data-card-table">
             <thead>
               <tr>
                 <th>Filename</th>
@@ -1290,7 +1290,7 @@ function SecurityPage() {
                     || vaultActionBusy === secureFileRowKey(f, "restore");
                   return (
                     <tr key={`${f.csp || "AWS"}-${f.filename}`} className={isArchived ? "security-file-row--archived" : ""}>
-                      <td>
+                      <td data-label="Filename">
                         <div className="security-file-name-cell">
                           <span className="security-file-name">{f.filename}</span>
                           <span className="security-file-badges">
@@ -1310,14 +1310,14 @@ function SecurityPage() {
                           </span>
                         </div>
                       </td>
-                      <td>{(f.size_bytes / 1024).toFixed(2)}</td>
-                      <td className="date-col">
+                      <td data-label="Size (KB)">{(f.size_bytes / 1024).toFixed(2)}</td>
+                      <td className="date-col" data-label="Upload Date">
                         {f.upload_date ? new Date(f.upload_date).toLocaleDateString() : 'N/A'}
                       </td>
-                      <td>
+                      <td data-label="Insight">
                         <SecurityFileInsight insight={f.insight} file={f} />
                       </td>
-                      <td>
+                      <td className="actions-cell" data-label="Actions">
                         {isDeleting === secureFileRowKey(f) ? (
                           <span className="deleting-indicator">Deleting...</span>
                         ) : rowBusy ? (

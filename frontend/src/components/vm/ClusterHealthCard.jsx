@@ -35,7 +35,7 @@ export default function ClusterHealthCard({ health, clusterLabel, getCPUColor })
       </div>
 
       <div className="vm-health-table-wrap">
-        <table className="vm-health-table">
+        <table className="vm-health-table data-card-table">
           <thead>
             <tr>
               <th scope="col">Instance</th>
@@ -47,14 +47,14 @@ export default function ClusterHealthCard({ health, clusterLabel, getCPUColor })
           <tbody>
             {(health.vms || []).map((vm) => (
               <tr key={vm.vm_name}>
-                <td className="vm-health-table__name">{vm.vm_name}</td>
-                <td>
+                <td className="vm-health-table__name" data-label="Instance">{vm.vm_name}</td>
+                <td data-label="Status">
                   <span className={`vm-status-pill ${(vm.status || "").toLowerCase()}`}>
                     {vm.status}
                   </span>
                 </td>
-                <td>{vm.cpu_usage.toFixed(1)}%</td>
-                <td>{vm.active_users}</td>
+                <td data-label="CPU">{vm.cpu_usage.toFixed(1)}%</td>
+                <td data-label="Users">{vm.active_users}</td>
               </tr>
             ))}
           </tbody>

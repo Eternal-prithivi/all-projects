@@ -23,6 +23,7 @@ export default function ByocSetupHelpPage() {
             Tier 2 is recommended for additional dashboard areas and can be completed anytime in{' '}
             <Link to="/dashboard/settings">Settings</Link>.
           </p>
+          <div className="table-responsive-scroll">
           <table className="byoc-help-matrix-table">
             <thead>
               <tr>
@@ -41,6 +42,7 @@ export default function ByocSetupHelpPage() {
               ))}
             </tbody>
           </table>
+          </div>
         </Panel>
 
         <Panel title="Google Cloud — billing export" className="settings-card">

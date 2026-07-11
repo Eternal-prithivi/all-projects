@@ -260,6 +260,7 @@ Scope: [...] | Do NOT touch: [...] | Done when: [...]
 | `AI_CONTEXT_*.md` | Module maps when editing that stack |
 | `CLOUD_ACCOUNT_MIGRATION_GUIDE.md` | Switching AWS/GCP/Azure accounts — owner checklist (plain English) |
 | `SERVICES_REFERENCE.md` | All external services (Razorpay, Twilio, Render, etc.) — what each does |
+| `MOBILE_UX_CHECKLIST.md` | Feature-by-feature mobile readiness (≤768px) |
 | `AUDIT_LOG.md` | **Append only** — never read at startup |
 
 PDFs (project root): full report + Phase 12 security paper — use when spec is unclear.

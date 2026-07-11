@@ -32,6 +32,25 @@ test.describe('Mobile shell', () => {
     await expect(page.getByLabel('Choose platform').getByRole('tab', { name: /macOS/i })).toBeVisible();
   });
 
+  test('login page is usable on mobile', async ({ page }) => {
+    await page.goto('/login');
+    await expect(page.getByRole('heading', { name: /sign in/i })).toBeVisible();
+    await expect(page.locator('#login-username')).toBeVisible();
+    await expect(page.locator('#login-password')).toBeVisible();
+    await expect(page.getByRole('button', { name: /sign in/i })).toBeVisible();
+  });
+
+  test('register page is usable on mobile', async ({ page }) => {
+    await page.goto('/register');
+    await expect(page.getByRole('heading', { name: /create your account/i })).toBeVisible();
+    await expect(page.locator('#reg-username')).toBeVisible();
+  });
+
+  test('help page shows hub tabs on mobile', async ({ page }) => {
+    await page.goto('/help');
+    await expect(page.getByRole('button', { name: /help articles/i })).toBeVisible();
+  });
+
   test('dashboard shows bottom navigation when logged in', async ({ page, request }) => {
     test.skip(!(await isBackendAvailable(request)), 'Backend not available');
 

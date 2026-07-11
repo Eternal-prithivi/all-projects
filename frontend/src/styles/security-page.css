@@ -697,11 +697,22 @@ html.theme-light .security-2fa-badge--off {
     margin: 0.15rem 0;
   }
 
-  .security-page .file-table td:last-child {
+  .security-page .file-table:not(.data-card-table) td:last-child {
     display: flex;
     flex-wrap: wrap;
     gap: 0.35rem;
     justify-content: flex-end;
+  }
+
+  .security-page .file-table.data-card-table .security-file-actions {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 0.35rem;
+    width: 100%;
+  }
+
+  .security-page .file-table.data-card-table .action-btn {
+    min-height: var(--touch-min, 44px);
   }
 }
 

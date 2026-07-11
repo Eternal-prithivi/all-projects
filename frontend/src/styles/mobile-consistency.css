@@ -433,6 +433,71 @@
     flex: 1 1 auto;
     min-height: var(--touch-min);
   }
+
+  /* Help hub tabs */
+  .help-hub-tabs {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    flex-wrap: nowrap;
+    padding-bottom: 0.25rem;
+  }
+
+  .help-hub-tab {
+    flex-shrink: 0;
+    min-height: var(--touch-min);
+  }
+
+  /* Billing — touch-friendly checkout */
+  .billing-tab,
+  .billing-plan-card button,
+  .billing-checkout-btn,
+  .org-billing-panel button {
+    min-height: var(--touch-min);
+  }
+
+  .billing-metrics {
+    grid-template-columns: 1fr;
+  }
+
+  .billing-org-seats {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  /* Storage / security file actions */
+  .file-table.data-card-table .action-btn,
+  .storage-page .action-btn,
+  .security-page .action-btn {
+    min-height: var(--touch-min);
+  }
+
+  /* Account hub nav */
+  .account-hub-nav {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    flex-wrap: nowrap;
+  }
+
+  .account-hub-nav a {
+    flex-shrink: 0;
+    min-height: var(--touch-min);
+  }
+
+  /* Password requirements panel */
+  .password-requirements-panel {
+    font-size: 0.85rem;
+  }
+
+  /* BYOC matrix */
+  .byoc-help-matrix-table {
+    min-width: 480px;
+  }
+
+  /* Cost preview cross-cloud tables */
+  .storage-cost-cross-table,
+  .security-cost-cross-table {
+    min-width: 320px;
+  }
 }
 
 @media (max-width: 480px) {

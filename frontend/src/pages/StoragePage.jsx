@@ -1025,7 +1025,7 @@ function StoragePage() {
           />
         ) : (
           <div className="table-responsive-scroll">
-          <table className="file-table">
+          <table className="file-table data-card-table">
             <thead>
               <tr>
                 <th>File Name</th>
@@ -1039,7 +1039,7 @@ function StoragePage() {
             <tbody>
               {displayedFiles.map((file) => (
                   <tr key={`${file.csp || ""}-${file.cloud_bucket || ""}-${file.region || ""}-${file.filename}`}>
-                    <td>
+                    <td data-label="File Name">
                       <div>{file.filename}</div>
                       <OrgResourceMeta
                         orgName={file.org_id ? orgName : null}
@@ -1047,11 +1047,11 @@ function StoragePage() {
                         currentUsername={user?.username}
                       />
                     </td>
-                    <td>{(file.size_bytes / 1024).toFixed(2)}</td>
-                    <td className="date-col">
+                    <td data-label="Size (KB)">{(file.size_bytes / 1024).toFixed(2)}</td>
+                    <td className="date-col" data-label="Upload Date">
                       {new Date(file.upload_date).toLocaleString()}
                     </td>
-                    <td>
+                    <td data-label="Location">
                       <div className="csp-location-cell">
                         <CspIcon csp={file.csp} />
                         <span>
@@ -1069,10 +1069,10 @@ function StoragePage() {
                         </span>
                       </div>
                     </td>
-                    <td className="insight-col">
+                    <td className="insight-col" data-label="Zenith insight">
                       <StorageFileInsight insight={file.insight} />
                     </td>
-                    <td>
+                    <td className="actions-cell" data-label="Actions">
                       <button
                         onClick={() => handleDownload(file)}
                         className="action-btn download-btn"
