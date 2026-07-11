@@ -119,14 +119,12 @@ function LoginPage() {
     setBackendWaking(true);
     try {
       const warm = await wakeRenderBackend();
+      // Do not block sign-in — login itself wakes Render; ready probe can fail during cold start.
       if (!warm) {
-        setError(
-          `Cannot reach the API at ${apiRoot}. The server may be starting up — wait a minute and try again.`,
-        );
-        return;
+        console.warn(`API warm-up at ${apiRoot} did not finish; attempting sign-in anyway.`);
       }
 
-      const credentials = { username: username.trim(), password };
+      const credentials = { username: username.trim(), password: password.trim() };
       if (captchaToken) {
         credentials.captcha_token = captchaToken;
       }
@@ -243,7 +241,7 @@ function LoginPage() {
 
           <form onSubmit={handleSubmit} aria-label="Login form">
             <div className="auth-input-group">
-              <label htmlFor="login-username">Username</label>
+              <label htmlFor="login-username">Username or email</label>
               <input
                 type="text"
                 id="login-username"

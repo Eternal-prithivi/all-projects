@@ -17,6 +17,7 @@ import secrets
 from fastapi import APIRouter, Depends, HTTPException, status, Request, Query, Form
 from fastapi.security import OAuth2PasswordRequestForm
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel
 from pymongo.collection import Collection
 from datetime import datetime, timedelta, timezone
 from typing import Optional
@@ -29,7 +30,7 @@ from app.users.user_model import Token, UserCreate, UserInDB
 from app.database.mongo_client import get_users_collection
 # --- MODIFIED LINE ---
 # Import the new function to reset 2FA status on login
-from app.auth.auth_utils import get_password_hash, verify_password, mark_2fa_unverified, get_current_user_optional
+from app.auth.auth_utils import get_password_hash, verify_password, mark_2fa_unverified, get_current_user_optional, get_current_user
 from app.utils.config import settings
 from app.utils.logger import setup_logger
 from app.utils.responses import StandardResponse, ErrorResponses
@@ -153,6 +154,8 @@ def login_for_access_token_route(
     logger.info("Login attempt for username: %r", username)
 
     user_dict = db.find_one({"username": username})
+    if not user_dict and "@" in username:
+        user_dict = db.find_one({"email": username.lower()})
     if not user_dict or not verify_password(form_data.password, user_dict["hashed_password"]):
         logger.warning("Failed login attempt for username: %r", username)
         raise ErrorResponses.unauthorized("Incorrect username or password")
@@ -282,3 +285,98 @@ def verify_email_route(
     )
     logger.info("Email verified for user '%s'", user.get("username"))
     return StandardResponse.success(message="Email verified successfully. You can sign in now.")
+
+
+@router.post("/resend-verification")
+@limiter.limit("1/minute")
+def resend_verification_email(
+    request: Request,
+    current_user: UserInDB = Depends(get_current_user),
+    db: Collection = Depends(get_users_collection),
+):
+    """Resend email verification link for the authenticated user."""
+    user = db.find_one({"username": current_user.username})
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    if user.get("email_verified", True):
+        return StandardResponse.success(message="Your email is already verified.")
+
+    if not email_verification_required():
+        return StandardResponse.success(message="Email verification is not required on this platform.")
+
+    last_sent = user.get("email_verify_sent_at")
+    if last_sent:
+        if isinstance(last_sent, datetime) and last_sent.tzinfo is None:
+            last_sent = last_sent.replace(tzinfo=timezone.utc)
+        elapsed = datetime.now(timezone.utc) - last_sent
+        if elapsed < timedelta(minutes=5):
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail="Please wait a few minutes before requesting another verification email.",
+            )
+
+    token = secrets.token_urlsafe(32)
+    verify_link = f"{settings.FRONTEND_URL.rstrip('/')}/verify-email?token={token}"
+    db.update_one(
+        {"username": current_user.username},
+        {
+            "$set": {
+                "email_verify_token": token,
+                "email_verify_sent_at": datetime.utcnow(),
+            }
+        },
+    )
+
+    from app.trust.signup_guards import is_test_signup_email
+
+    if not is_test_signup_email(user.get("email", "")):
+        EmailService().send_verification_email(
+            to_email=user.get("email", ""),
+            username=user.get("username", ""),
+            verify_link=verify_link,
+        )
+
+    return StandardResponse.success(message="Verification email sent. Check your inbox.")
+
+
+class LinkedAccountsResponse(BaseModel):
+    google_linked: bool = False
+    password_set: bool = False
+
+
+class UnlinkGoogleBody(BaseModel):
+    current_password: str
+
+
+@router.get("/linked-accounts", response_model=LinkedAccountsResponse)
+def get_linked_accounts(
+    current_user: UserInDB = Depends(get_current_user),
+    db: Collection = Depends(get_users_collection),
+):
+    user = db.find_one({"username": current_user.username}) or {}
+    return LinkedAccountsResponse(
+        google_linked=bool(user.get("google_id")),
+        password_set=bool(user.get("hashed_password") or user.get("password")),
+    )
+
+
+@router.post("/linked-accounts/google/unlink")
+def unlink_google_account(
+    body: UnlinkGoogleBody,
+    current_user: UserInDB = Depends(get_current_user),
+    db: Collection = Depends(get_users_collection),
+):
+    user = db.find_one({"username": current_user.username})
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    if not user.get("google_id"):
+        return StandardResponse.success(message="Google account is not linked.")
+    stored_hash = user.get("hashed_password") or user.get("password")
+    if not stored_hash or not verify_password(body.current_password, stored_hash):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Current password is incorrect")
+    db.update_one(
+        {"username": current_user.username},
+        {"$unset": {"google_id": ""}, "$set": {"updated_at": datetime.utcnow()}},
+    )
+    return StandardResponse.success(message="Google sign-in unlinked.")

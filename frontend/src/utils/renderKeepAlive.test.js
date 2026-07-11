@@ -46,6 +46,15 @@ describe('renderKeepAlive', () => {
     vi.unstubAllEnvs();
   });
 
+  it('wakeRenderBackend falls back to /health when ready is not mongo-ready', async () => {
+    vi.stubEnv('MODE', 'production');
+    fetch
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ mongo_connected: false }) })
+      .mockResolvedValueOnce({ ok: true });
+    await expect(wakeRenderBackend()).resolves.toBe(true);
+    vi.unstubAllEnvs();
+  });
+
   it('skips ping when API root is localhost', () => {
     vi.stubEnv('MODE', 'production');
     getApiRoot.mockReturnValueOnce('http://localhost:8000');

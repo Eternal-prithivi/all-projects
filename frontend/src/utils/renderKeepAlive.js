@@ -23,6 +23,25 @@ function sleep(ms) {
   return new Promise((resolve) => window.setTimeout(resolve, ms));
 }
 
+async function pingHealthOnce(root) {
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), PING_TIMEOUT_MS);
+
+  try {
+    const res = await fetch(`${root}/health`, {
+      method: 'GET',
+      cache: 'no-store',
+      credentials: 'omit',
+      signal: controller.signal,
+    });
+    return res.ok;
+  } catch {
+    return false;
+  } finally {
+    window.clearTimeout(timeoutId);
+  }
+}
+
 async function pingReadyOnce(root) {
   const controller = new AbortController();
   const timeoutId = window.setTimeout(() => controller.abort(), PING_TIMEOUT_MS);
@@ -56,8 +75,10 @@ export async function wakeRenderBackend() {
   const root = getApiRoot().replace(/\/$/, '');
 
   for (let attempt = 1; attempt <= WAKE_MAX_ATTEMPTS; attempt += 1) {
-    const ok = await pingReadyOnce(root);
-    if (ok) return true;
+    const ready = await pingReadyOnce(root);
+    if (ready) return true;
+    const alive = await pingHealthOnce(root);
+    if (alive) return true;
     if (attempt < WAKE_MAX_ATTEMPTS) {
       await sleep(WAKE_RETRY_DELAY_MS);
     }

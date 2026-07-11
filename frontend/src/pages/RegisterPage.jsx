@@ -53,7 +53,11 @@ function RegisterPage() {
 
     setIsLoading(true);
     try {
-      const userData = { username, email, password };
+      const userData = {
+        username: username.trim(),
+        email: email.trim(),
+        password: password.trim(),
+      };
       if (captchaToken) {
         userData.captcha_token = captchaToken;
       }
