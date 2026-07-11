@@ -31,7 +31,7 @@
 }
 
 .about-title {
-  font-size: 3.5rem;
+  font-size: clamp(1.85rem, 7vw, 3.5rem);
   font-weight: 900;
   background: linear-gradient(135deg, var(--gold-primary) 0%, var(--gold-light) 100%);
   -webkit-background-clip: text;
@@ -186,7 +186,7 @@
 }
 
 .stat-number {
-  font-size: 3rem;
+  font-size: clamp(2rem, 7vw, 3rem);
   font-weight: 900;
   background: linear-gradient(135deg, var(--gold-primary) 0%, var(--gold-light) 100%);
   -webkit-background-clip: text;

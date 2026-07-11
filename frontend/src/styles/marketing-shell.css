@@ -307,6 +307,12 @@
     padding: 0.85rem 1rem;
   }
 
+  /* Explicitly hide desktop nav — don't rely on landing.css cascade */
+  .marketing-page .nav-links--desktop,
+  .landing-page .nav-links--desktop {
+    display: none !important;
+  }
+
   .marketing-page .btn-nav-login,
   .marketing-page .btn-nav-signup {
     padding: 0.5rem 0.85rem;

@@ -170,8 +170,8 @@
   color: var(--text-secondary);
   font-size: 1.25rem;
   line-height: 1;
-  width: 32px;
-  height: 32px;
+  width: 44px;
+  height: 44px;
   border-radius: var(--radius-sm);
   cursor: pointer;
   display: inline-flex;
@@ -217,6 +217,7 @@
   align-items: center;
   gap: var(--space-sm);
   padding: 0.65rem 1.25rem;
+  min-height: var(--touch-min, 44px); /* WCAG 2.5.5 touch target */
   background: rgba(14, 14, 18, 0.75);
   border: 1px solid var(--border-default);
   border-radius: var(--radius-md);

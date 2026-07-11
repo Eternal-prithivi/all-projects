@@ -5,7 +5,7 @@
    ======================================== */
 .nav-rail {
   width: 56px;
-  height: 100vh;
+  height: 100dvh; /* dvh accounts for iOS Safari dynamic toolbar */
   background: linear-gradient(180deg, var(--bg-elevated) 0%, var(--bg-base) 100%);
   border-right: 1px solid var(--border-subtle);
   display: flex;
@@ -192,3 +192,9 @@
 }
 
 /* Mobile: desktop rail hidden; see mobile-nav.css + MobileBottomNav.jsx */
+/* CSS safety guard — ensures rail never shows on mobile even if JSX conditional fails */
+@media (max-width: 768px) {
+  .nav-rail {
+    display: none !important;
+  }
+}

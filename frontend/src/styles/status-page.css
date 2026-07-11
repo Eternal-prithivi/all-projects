@@ -322,6 +322,24 @@
   text-decoration: underline;
 }
 
+@media (max-width: 768px) {
+  /* Banner: stack icon + text vertically on tablet */
+  .status-banner {
+    flex-direction: column;
+    gap: var(--space-sm);
+  }
+
+  /* Long service names: allow wrapping */
+  .status-services li {
+    flex-wrap: wrap;
+  }
+
+  .status-services__name {
+    flex: 1 1 100%;
+    word-break: break-word;
+  }
+}
+
 @media (max-width: 480px) {
   .status-page {
     padding-top: var(--space-lg);
@@ -333,3 +351,4 @@
     align-items: flex-start;
   }
 }
+

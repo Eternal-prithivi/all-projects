@@ -473,3 +473,22 @@
     justify-content: center;
   }
 }
+
+@media (max-width: 480px) {
+  /* Feature blocks inside each card: 2-col is too tight on small phones */
+  .plan-feature-blocks {
+    grid-template-columns: 1fr;
+  }
+
+  /* Toggle buttons: tighter padding on small screens */
+  .toggle-btn {
+    padding: 10px 16px;
+    font-size: 0.9rem;
+  }
+
+  /* Featured ribbon: scale down positioning */
+  .featured-badge {
+    font-size: 11px;
+    padding: 6px 32px;
+  }
+}
