@@ -28,6 +28,11 @@ from app.provision.sdk_modules.common import (
     is_azure_vm_architecture_error,
 )
 from app.provision.sdk_modules.context import SdkDeployContext
+from app.vm.azure_cleanup import (
+    cleanup_vm_attached_resources,
+    collect_managed_disk_ids,
+    os_disk_profile,
+)
 from app.vm.ssh_manager import generate_ssh_keypair
 
 VNET_NAME = "zenith-vnet"
@@ -155,11 +160,7 @@ def apply_azure_vm(
                 "hardware_profile": {"vm_size": vm_size},
                 "storage_profile": {
                     "image_reference": image_ref,
-                    "os_disk": {
-                        "create_option": "FromImage",
-                        "disk_size_gb": disk,
-                        "managed_disk": {"storage_account_type": "Standard_LRS"},
-                    },
+                    "os_disk": os_disk_profile(disk, "Standard_LRS", name),
                 },
                 "os_profile": os_profile,
                 "network_profile": {
@@ -194,6 +195,13 @@ def apply_azure_vm(
                         continue
                     raise
             else:
+                cleanup_vm_attached_resources(
+                    compute_client,
+                    network_client,
+                    rg,
+                    name,
+                    delete_vm_if_present=True,
+                )
                 return {
                     "success": False,
                     "steps": steps,
@@ -252,6 +260,13 @@ def apply_azure_vm(
             steps[-1] = steps[-1] + ip_note
         return {"success": True, "steps": steps, "error": None}
     except Exception as exc:
+        cleanup_vm_attached_resources(
+            compute_client,
+            network_client,
+            rg,
+            name,
+            delete_vm_if_present=True,
+        )
         return {"success": False, "steps": steps, "error": str(exc)}
 
 
@@ -264,22 +279,36 @@ def destroy_azure_vm(
     network_client, _, _ = azure_network_client(cloud_env)
     steps: list[str] = []
     try:
+        vm = None
+        disk_ids: list[str] = []
         try:
-            compute_client.virtual_machines.begin_delete(rg, name).result()
-            steps.append(f"✓ Deleted VM '{name}'")
+            vm = compute_client.virtual_machines.get(rg, name)
+            disk_ids = collect_managed_disk_ids(vm)
         except ResourceNotFoundError:
             pass
-        for res_name in (ctx.nic_name, ctx.public_ip_name):
-            if not res_name:
-                continue
-            try:
-                if "nic" in res_name:
-                    network_client.network_interfaces.begin_delete(rg, res_name).result()
-                else:
-                    network_client.public_ip_addresses.begin_delete(rg, res_name).result()
-                steps.append(f"✓ Deleted '{res_name}'")
-            except ResourceNotFoundError:
-                pass
+
+        if vm:
+            compute_client.virtual_machines.begin_delete(
+                rg,
+                name,
+                force_deletion=True,
+            ).result()
+            steps.append(f"✓ Deleted VM '{name}'")
+
+        cleanup = cleanup_vm_attached_resources(
+            compute_client,
+            network_client,
+            rg,
+            name,
+            extra_disk_ids=disk_ids,
+        )
+        if cleanup.get("nic_deleted"):
+            steps.append(f"✓ Deleted NIC '{name}-nic'")
+        if cleanup.get("pip_deleted"):
+            steps.append(f"✓ Deleted public IP '{name}-pip'")
+        if cleanup.get("disks_deleted"):
+            steps.append(f"✓ Deleted managed disk(s) for '{name}'")
+
         return {"success": True, "steps": steps or ["Azure VM: nothing to delete"], "error": None}
     except Exception as exc:
         return {"success": False, "steps": steps, "error": str(exc)}

@@ -104,6 +104,9 @@ resource "azurerm_linux_virtual_machine" "main" {
     public_key = tls_private_key.vm[0].public_key_openssh
   }
 
+  delete_os_disk_on_termination    = true
+  delete_data_disks_on_termination = true
+
   os_disk {
     caching              = "ReadWrite"
     storage_account_type = "Standard_LRS"

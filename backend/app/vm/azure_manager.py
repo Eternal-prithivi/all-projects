@@ -22,6 +22,11 @@ from app.vm.cluster_catalog import (
 )
 from app.vm.models import ClusterType
 from app.vm.ssh_manager import generate_ssh_keypair
+from app.vm.azure_cleanup import (
+    cleanup_vm_attached_resources,
+    collect_managed_disk_ids,
+    os_disk_profile,
+)
 
 logger = setup_logger(__name__)
 
@@ -335,11 +340,7 @@ def create_vm(
         "tags": tags,
         "storage_profile": {
             "image_reference": image_ref,
-            "os_disk": {
-                "create_option": "FromImage",
-                "disk_size_gb": os_disk_gb,
-                "managed_disk": {"storage_account_type": storage_type},
-            },
+            "os_disk": os_disk_profile(os_disk_gb, storage_type, name),
         },
         "os_profile": {
             "computer_name": computer_name,
@@ -388,22 +389,43 @@ def create_vm(
                     name,
                 )
                 continue
-            _cleanup_nic_resources(network_client, rg, name)
+            _rollback_vm_resources(compute_client, network_client, rg, name)
             raise _azure_error("create VM", exc) from exc
 
-    _cleanup_nic_resources(network_client, rg, name)
+    _rollback_vm_resources(compute_client, network_client, rg, name)
     raise _azure_error("create VM", last_exc or RuntimeError("No VM size available"))
 
 
-def _cleanup_nic_resources(network_client, rg: str, prefix: str) -> None:
-    for suffix, deleter in (
-        ("-nic", network_client.network_interfaces.begin_delete),
-        ("-pip", network_client.public_ip_addresses.begin_delete),
-    ):
-        try:
-            deleter(rg, f"{prefix}{suffix}").result()
-        except Exception:
-            pass
+def _rollback_vm_resources(compute_client, network_client, rg: str, vm_name: str) -> None:
+    cleanup_vm_attached_resources(
+        compute_client,
+        network_client,
+        rg,
+        vm_name,
+        delete_vm_if_present=True,
+    )
+
+
+def delete_vm(name: str) -> Dict[str, Any]:
+    compute_client, network_client = _clients()
+    rg = azure_resource_group()
+    vm = _vm_by_name(compute_client, rg, name)
+    disk_ids = collect_managed_disk_ids(vm)
+    if vm:
+        logger.info("Deleting Azure VM '%s' in resource group %s", name, rg)
+        compute_client.virtual_machines.begin_delete(
+            rg,
+            name,
+            force_deletion=True,
+        ).result()
+    cleanup_vm_attached_resources(
+        compute_client,
+        network_client,
+        rg,
+        name,
+        extra_disk_ids=disk_ids,
+    )
+    return {"name": name, "status": "DELETED"}
 
 
 def _azure_error(action: str, exc: Exception) -> ValueError:
@@ -451,24 +473,6 @@ def stop_vm(name: str) -> Dict[str, Any]:
         compute_client.virtual_machines.begin_deallocate(rg, name).result()
     details = get_vm_details(name, azure_location())
     return {"name": name, "status": "TERMINATED", "details": details}
-
-
-def delete_vm(name: str) -> Dict[str, Any]:
-    compute_client, network_client = _clients()
-    rg = azure_resource_group()
-    vm = _vm_by_name(compute_client, rg, name)
-    if not vm:
-        _cleanup_nic_resources(network_client, rg, name)
-        return {"name": name, "status": "DELETED"}
-    logger.info("Deleting Azure VM '%s' in resource group %s", name, rg)
-    poller = compute_client.virtual_machines.begin_delete(
-        rg,
-        name,
-        force_deletion=True,
-    )
-    poller.result()
-    _cleanup_nic_resources(network_client, rg, name)
-    return {"name": name, "status": "DELETED"}
 
 
 def cluster_machine_type(cluster_type: ClusterType, slot_id: Optional[str] = None) -> str:
