@@ -110,6 +110,16 @@ def _rebind_route_databases(db: Database) -> None:
         ("app.billing.routes_billing", ("DB",)),
         ("app.admin.routes_admin", ("DB",)),
         ("app.contact.routes_contact", ("DB",)),
+        ("app.organizations.service", ("DB",)),
+        ("app.organizations.routes_organizations", ("DB",)),
+        ("app.organizations.billing", ("DB",)),
+        ("app.organizations.recommendations", ("DB",)),
+        ("app.organizations.approvals", ("DB",)),
+        ("app.organizations.limits", ("DB",)),
+        ("app.payments.routes_payments", ("DB",)),
+        ("app.payments.quota_service", ("DB",)),
+        ("app.payments.checkout", ("DB",)),
+        ("app.budgets.routes_budgets", ("DB",)),
     ]
     for module_path, attrs in modules:
         try:
@@ -201,13 +211,17 @@ def clean_database(request: pytest.FixtureRequest) -> Generator[None, None, None
         yield
         return
     test_database: Database = request.getfixturevalue("test_database")
-    yield
     db_name = test_database.name
     if db_name in _PROTECTED_MONGO_DB_NAMES:
         raise RuntimeError(
             f"Refusing to wipe protected database {db_name!r} during tests. "
             "Use MONGO_DB_NAME=zenith_test (default) or PYTEST_MONGO_DB_NAME for an isolated test DB."
         )
+    for name in test_database.list_collection_names():
+        if name.startswith("system."):
+            continue
+        test_database[name].delete_many({})
+    yield
     for name in test_database.list_collection_names():
         if name.startswith("system."):
             continue
@@ -270,6 +284,7 @@ def auth_headers(client: TestClient, user_factory):
                 two_fa_enabled=two_fa_enabled,
                 two_fa_verified=two_fa_verified,
             )
+        client.cookies.clear()
         response = client.post(
             "/api/auth/token",
             data={

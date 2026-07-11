@@ -269,7 +269,6 @@ function DashboardPage() {
       apiClient.get('/budgets/status'),
       apiClient.get('/cost/billing-status'),
       apiClient.get('/organizations/me'),
-      apiClient.get('/organizations/summary'),
       apiClient.get('/cost/anomalies/summary'),
       apiClient.get('/support/tickets'),
     ]);
@@ -280,21 +279,28 @@ function DashboardPage() {
     if (parallel[1].status === 'fulfilled') {
       setBillingStatus(parallel[1].value.data);
     }
+    let orgMe = null;
     if (parallel[2].status === 'fulfilled') {
-      setTeamOrg(parallel[2].value.data);
+      orgMe = parallel[2].value.data;
+      setTeamOrg(orgMe);
     }
-    if (parallel[3].status === 'fulfilled') {
-      setTeamSummary(parallel[3].value.data);
+    if (orgMe?.organization) {
+      try {
+        const summaryRes = await apiClient.get('/organizations/summary');
+        setTeamSummary(summaryRes.data?.organization ? summaryRes.data : null);
+      } catch {
+        setTeamSummary(null);
+      }
     } else {
       setTeamSummary(null);
     }
     const anomalyCount =
-      parallel[4].status === 'fulfilled'
-        ? parallel[4].value.data?.total_unacknowledged || 0
+      parallel[3].status === 'fulfilled'
+        ? parallel[3].value.data?.total_unacknowledged || 0
         : 0;
     const ticketCount =
-      parallel[5].status === 'fulfilled'
-        ? (parallel[5].value.data?.tickets || []).filter((t) => t.status === 'open').length
+      parallel[4].status === 'fulfilled'
+        ? (parallel[4].value.data?.tickets || []).filter((t) => t.status === 'open').length
         : 0;
     setAttention({
       anomalies: anomalyCount,

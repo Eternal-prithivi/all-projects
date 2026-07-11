@@ -250,7 +250,7 @@ def filter_summary_for_role(
 def get_org_summary(username: str, *, use_cache: bool = True) -> Dict[str, Any]:
     m = get_membership(username)
     if not m:
-        raise HTTPException(status_code=404, detail="You are not in an organization")
+        return {"organization": None}
 
     org_id = m["org_id"]
     now = time.time()

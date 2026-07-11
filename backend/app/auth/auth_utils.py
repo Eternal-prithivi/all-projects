@@ -40,11 +40,12 @@ def _resolve_bearer_token(
 ) -> str:
     from app.auth.cookie_auth import get_access_token_from_request
 
+    # Explicit Bearer wins when both are present (API clients, integration tests).
+    if bearer_token:
+        return bearer_token
     cookie_token = get_access_token_from_request(request)
     if cookie_token:
         return cookie_token
-    if bearer_token:
-        return bearer_token
     raise HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
@@ -98,7 +99,7 @@ def get_current_user_optional(
     """Return user when authenticated; None when no/invalid credentials (no 401)."""
     from app.auth.cookie_auth import get_access_token_from_request
 
-    token = get_access_token_from_request(request) or bearer_token
+    token = bearer_token or get_access_token_from_request(request)
     if not token:
         return None
     try:

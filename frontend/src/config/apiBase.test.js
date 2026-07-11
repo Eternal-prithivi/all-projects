@@ -9,7 +9,6 @@ describe('apiBase', () => {
   afterEach(() => {
     vi.unstubAllEnvs();
     vi.resetModules();
-    // eslint-disable-next-line no-undef
     delete global.window;
   });
 
