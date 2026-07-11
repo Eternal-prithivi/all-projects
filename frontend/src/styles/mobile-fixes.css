@@ -1,0 +1,537 @@
+/* =============================================================================
+   mobile-fixes.css
+   PURPOSE: Comprehensive mobile responsiveness layer that patches gaps across
+   all pages/components. This file is the SINGLE source of truth for fixes —
+   it complements existing mobile CSS without duplicating what already works.
+
+   Breakpoints used:
+     480px  — small phones (iPhone SE, Galaxy A)
+     640px  — mid phones
+     768px  — tablet / large phone (primary mobile breakpoint)
+     1024px — small desktop / large tablet
+
+   SECTION INDEX
+   ─────────────────────────────────────────────────────────────────────────────
+   1. Global box-sizing + viewport safety
+   2. Download page — grid fixes
+   3. Features page — padding + grid fixes
+   4. About page — fine-grained scaling
+   5. Contact page — marketing-shell top-pad + layout
+   6. Footer — container padding tightening
+   7. Dashboard — greeting card + bottom row
+   8. Landing premium — steps grid mobile
+   9. Legal / trust pages — padding
+  10. Status page — mobile tweaks
+  11. Billing page — cards + tabs
+  12. Profile / Settings — mobile forms
+  13. Marketing nav — tablet breakpoint fill
+  14. PWA banner z-index / safe area (supports our new sw banner)
+  15. Touch targets audit — minimum 44px on all interactive elements
+  ============================================================================= */
+
+/* ─── 1. Global box-sizing + viewport safety ────────────────────────────────── */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+/* Prevent any child from creating horizontal scroll */
+body {
+  overflow-x: hidden;
+  -webkit-text-size-adjust: 100%; /* Prevent iOS font size bump on rotation */
+}
+
+img,
+video,
+iframe,
+svg {
+  max-width: 100%;
+}
+
+/* ─── 2. Download page — grid fixes ────────────────────────────────────────── */
+
+/* 4-column value props → 2-col on tablet, 1-col on phone */
+@media (max-width: 900px) {
+  .download-value__grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 560px) {
+  .download-value__grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* 3-column OS cards → 1-col on phone */
+@media (max-width: 768px) {
+  .download-all-platforms__grid {
+    grid-template-columns: 1fr;
+    max-width: 420px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  /* 3-column specs → 1-col */
+  .download-specs__grid {
+    grid-template-columns: 1fr;
+  }
+
+  /* Hero section padding */
+  .download-page {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+
+  .download-hero__grid {
+    grid-template-columns: 1fr;
+  }
+
+  .download-hero__visual {
+    display: none; /* hide tilt visual on mobile — saves space */
+  }
+
+  .download-hero {
+    padding: 1rem 0 2.5rem;
+  }
+
+  /* Platform tab row wraps on phone */
+  .download-platform-tabs {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.4rem;
+  }
+
+  .download-platform-tab {
+    justify-content: center;
+    padding: 0.55rem 0.5rem;
+    font-size: 0.82rem;
+  }
+
+  .download-hero__chips {
+    justify-content: center;
+  }
+
+  .download-section-head {
+    padding: 0 0.5rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .download-platform-tabs {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .download-platform-tab span {
+    display: none; /* Show icon only on tiny phones */
+  }
+
+  .download-all-platforms__grid {
+    max-width: 100%;
+  }
+
+  /* Full-width download CTAs */
+  .download-cta-primary,
+  .download-cta-secondary,
+  .download-cta-ghost {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .download-hero__cta-block {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    align-items: stretch;
+  }
+
+  .download-bottom-cta__actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
+/* ─── 3. Features page — padding + grid fixes ───────────────────────────────── */
+@media (max-width: 768px) {
+  .features-grid-section,
+  .features-steps,
+  .features-integrations,
+  .features-cta,
+  .features-metrics {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+
+  .features-hero {
+    padding-left: 1rem;
+    padding-right: 1rem;
+    box-sizing: border-box;
+  }
+
+  /* Metrics row → 2-col */
+  .features-metrics {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 480px) {
+  .features-metrics {
+    grid-template-columns: 1fr;
+  }
+
+  .features-glow-value {
+    font-size: 1.8rem;
+  }
+
+  .features-cta-inner {
+    flex-direction: column;
+    align-items: stretch;
+    text-align: center;
+    padding: 1.5rem 1rem;
+    margin: 0;
+  }
+
+  .features-hero-content h1 {
+    font-size: clamp(1.85rem, 8vw, 2.5rem);
+  }
+
+  .section-heading h2 {
+    font-size: clamp(1.5rem, 7vw, 2rem);
+  }
+}
+
+/* ─── 4. About page — fine-grained scaling ──────────────────────────────────── */
+@media (max-width: 480px) {
+  .about-container {
+    padding: 1.5rem 1rem 3rem;
+  }
+
+  .about-hero {
+    padding: 1.5rem 0 2rem;
+  }
+
+  .about-title {
+    font-size: 1.85rem;
+  }
+
+  .about-subtitle {
+    font-size: 1.05rem;
+  }
+
+  .section-content h2 {
+    font-size: 1.65rem;
+  }
+
+  .about-cta h2 {
+    font-size: 1.55rem;
+  }
+
+  .about-cta {
+    padding: 2rem 1rem;
+    margin-top: 2rem;
+  }
+}
+
+/* ─── 5. Contact page ────────────────────────────────────────────────────────── */
+/* Contact page sits inside .marketing-page which has 5.5rem top padding — but the
+   contact-page itself adds another 4rem, causing double-padding on mobile.
+   The marketing-shell overrides contact-page padding to 0, so we restore safe padding. */
+@media (max-width: 768px) {
+  .marketing-page .contact-page {
+    padding: 0 0 2rem;
+  }
+
+  .marketing-page .contact-container {
+    padding: 1.5rem 1rem 3rem;
+  }
+
+  .contact-header {
+    margin-bottom: 2rem;
+  }
+
+  .contact-header h1 {
+    font-size: 1.85rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .marketing-page .contact-container {
+    padding: 1rem 0.75rem 2.5rem;
+  }
+
+  .contact-header h1 {
+    font-size: 1.6rem;
+  }
+
+  .contact-form-wrapper {
+    border-radius: 12px;
+  }
+}
+
+/* ─── 6. Footer — container padding tightening ───────────────────────────────── */
+@media (max-width: 480px) {
+  .footer-container {
+    padding: 0 1rem;
+  }
+
+  .footer-brand-section h3 {
+    font-size: 1.2rem;
+  }
+}
+
+/* ─── 7. Dashboard — greeting card + bottom row ─────────────────────────────── */
+@media (max-width: 768px) {
+  .mc-greeting {
+    flex-direction: column;
+    gap: 0.75rem;
+    padding: 1.25rem;
+  }
+
+  .mc-greeting > :last-child {
+    /* hide any trailing action button if it exists */
+    display: none;
+  }
+
+  .mc-greeting h2 {
+    font-size: 1.35rem;
+  }
+
+  /* Quick actions grid — 2 col on phones is fine, keep it */
+  .quick-actions-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  /* Budget items */
+  .dashboard-budget-item {
+    flex-wrap: wrap;
+    gap: 0.25rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .mc-greeting {
+    padding: 1rem;
+  }
+
+  .mc-greeting h2 {
+    font-size: 1.15rem;
+  }
+
+  /* Getting started card */
+  .gs-card {
+    padding: 1rem;
+  }
+
+  .gs-header {
+    gap: 0.65rem;
+  }
+}
+
+/* ─── 8. Landing premium — steps + testimonials ─────────────────────────────── */
+@media (max-width: 768px) {
+  .landing-steps,
+  .landing-testimonials {
+    padding: 3rem 1rem;
+  }
+
+  .landing-steps__grid {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
+  .landing-steps__grid .landing-step:not(:last-child)::after {
+    display: none;
+  }
+
+  .landing-step {
+    padding: 1.5rem 1.25rem;
+  }
+}
+
+/* ─── 9. Legal / trust pages ────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .legal-page {
+    padding-bottom: 2rem;
+  }
+
+  .legal-content {
+    padding: 0 1rem 2rem !important;
+  }
+
+  .trust-center-page,
+  .marketing-page .trust-center-page {
+    padding-left: 1rem;
+    padding-right: 1rem;
+    box-sizing: border-box;
+  }
+}
+
+@media (max-width: 480px) {
+  .legal-header-content h1,
+  .marketing-page .legal-page h1 {
+    font-size: clamp(1.65rem, 7vw, 2.25rem);
+  }
+}
+
+/* ─── 10. Status page ────────────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .status-page {
+    padding-left: 1rem;
+    padding-right: 1rem;
+    box-sizing: border-box;
+  }
+
+  .status-cloud-cards {
+    grid-template-columns: 1fr;
+  }
+
+  .status-banner {
+    flex-direction: column;
+    gap: 0.75rem;
+    padding: 1.25rem 1rem;
+    text-align: center;
+  }
+}
+
+/* ─── 11. Billing page — cards + tabs ───────────────────────────────────────── */
+@media (max-width: 640px) {
+  .billing-plan-cards,
+  .billing-plans-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .billing-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
+  }
+
+  .billing-tabs {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    flex-wrap: nowrap;
+    padding-bottom: 0.25rem;
+  }
+
+  .billing-tab {
+    flex-shrink: 0;
+  }
+}
+
+/* ─── 12. Profile / Settings — mobile forms ──────────────────────────────────── */
+@media (max-width: 768px) {
+  /* Settings hub is already handled by mobile-consistency.css zenith-settings-hub */
+
+  /* Profile page — two-column form fields → single column */
+  .profile-form-row,
+  .settings-form-row {
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .profile-form-row > *,
+  .settings-form-row > * {
+    width: 100%;
+    min-width: 0;
+  }
+}
+
+/* ─── 13. Marketing nav — tablet (769–1024) breakpoint fill ─────────────────── */
+/* Already handled by mobile-marketing-nav.css at ≤768. This fills the gap between
+   769px and ~900px where nav links can wrap awkwardly */
+@media (min-width: 769px) and (max-width: 900px) {
+  .marketing-page .nav-links {
+    gap: 0.85rem;
+    font-size: 0.82rem;
+  }
+
+  .marketing-page .nav-container {
+    padding: 0.85rem 1.25rem;
+  }
+}
+
+/* ─── 14. PWA banner safe area ───────────────────────────────────────────────── */
+/* Already handled in PwaInstallBanner.css — this is a cross-check */
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+  .pwa-banner {
+    bottom: calc(1.25rem + env(safe-area-inset-bottom));
+  }
+}
+
+/* ─── 15. Touch targets — minimum 44px on all interactive elements ───────────── */
+@media (max-width: 768px) {
+  /* Any button or anchor that might be too small */
+  button:not([aria-hidden="true"]):not(.pwa-banner__dismiss),
+  a[role="button"],
+  [role="tab"],
+  [role="menuitem"],
+  .category-button,
+  .download-platform-tab,
+  .help-hub-tab,
+  .download-install__tab,
+  .download-faq__question {
+    min-height: var(--touch-min, 44px);
+  }
+
+  /* Form inputs — prevent iOS zoom (font-size must be ≥16px) */
+  input:not([type="range"]),
+  select,
+  textarea {
+    font-size: max(16px, 1em);
+  }
+
+  /* Prevent tap highlight flicker */
+  button,
+  a,
+  [role="button"] {
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+  }
+
+  /* Download page CTA buttons */
+  .download-cta-primary,
+  .download-cta-secondary,
+  .download-cta-ghost,
+  .download-os-card__btn {
+    min-height: 48px;
+  }
+}
+
+/* ─── 16. Horizontal scroll protection ───────────────────────────────────────── */
+/* Any section that might cause horizontal scroll */
+@media (max-width: 768px) {
+  .landing-page,
+  .marketing-page,
+  .auth-page,
+  .download-page {
+    overflow-x: hidden;
+  }
+
+  /* Tables with fixed min-width need scroll containers */
+  .table-container,
+  .admin-table-wrapper,
+  .cost-table-wrapper {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    max-width: 100%;
+  }
+
+  /* Charts — don't clip on small screens */
+  .recharts-wrapper,
+  .recharts-responsive-container {
+    max-width: 100% !important;
+    overflow: visible;
+  }
+}
+
+/* ─── 17. Download page — the new PWA section on mobile ─────────────────────── */
+@media (max-width: 768px) {
+  .download-pwa {
+    padding: 2rem 0 3rem;
+  }
+
+  .download-pwa__panel {
+    max-width: 100%;
+  }
+}

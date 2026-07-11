@@ -6,6 +6,8 @@
 @import './styles/zenith-experience.css';
 @import './styles/enterprise.css';
 @import './styles/mobile-consistency.css';
+@import './styles/mobile-fixes.css'; /* Comprehensive mobile gap fixes — loaded last to override */
+
 
 /* ========================================
    DESIGN TOKENS
