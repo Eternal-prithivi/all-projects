@@ -14,8 +14,18 @@ import TurnstileWidget from '../components/auth/TurnstileWidget.jsx';
 import { turnstileSiteKey } from '../config/turnstile.js';
 
 function LoginPage() {
-  const [username, setUsername] = useState('');
+  const { login, isAuthenticated } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [searchParams] = useSearchParams();
+
+  // Detect if user just registered and pre-fill username
+  const justRegistered = location.state?.registered === true;
+  const registeredUsername = location.state?.registeredUsername || '';
+
+  const [username, setUsername] = useState(registeredUsername);
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [needsEmailVerification, setNeedsEmailVerification] = useState(false);
   const [fieldErrors, setFieldErrors] = useState({});
@@ -24,7 +34,6 @@ function LoginPage() {
   const [backendWaking, setBackendWaking] = useState(false);
   const [captchaToken, setCaptchaToken] = useState('');
   const [turnstileResetKey, setTurnstileResetKey] = useState(0);
-  const { login, isAuthenticated } = useAuth();
 
   const captchaRequired = Boolean(turnstileSiteKey());
 
@@ -42,9 +51,6 @@ function LoginPage() {
   }, []);
 
   const apiRoot = useMemo(() => getApiRoot(), []);
-  const navigate = useNavigate();
-  const location = useLocation();
-  const [searchParams] = useSearchParams();
 
   const sessionExpiredBanner = searchParams.get('session') === 'expired';
 
@@ -199,6 +205,26 @@ function LoginPage() {
               Your session has ended. Please sign in again to continue.
             </div>
           )}
+          {justRegistered && (
+            <div
+              className="auth-success"
+              role="status"
+              style={{
+                marginBottom: '1rem',
+                padding: '12px 14px',
+                borderRadius: '8px',
+                background: 'rgba(34, 197, 94, 0.12)',
+                border: '1px solid rgba(34, 197, 94, 0.35)',
+                color: 'var(--text-primary, #f5f5f5)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+              }}
+            >
+              <span style={{ fontSize: '1.15em' }}>✅</span>
+              Account created successfully! Sign in to get started.
+            </div>
+          )}
           <div className="auth-form-header">
             <h2>Sign in</h2>
             {backendWaking && (
@@ -248,23 +274,34 @@ function LoginPage() {
                   Forgot password?
                 </Link>
               </div>
-              <input
-                type="password"
-                id="login-password"
-                placeholder="Enter your password"
-                value={password}
-                onChange={(e) => {
-                  setPassword(e.target.value);
-                  if (fieldErrors.password) {
-                    setFieldErrors((current) => ({ ...current, password: '' }));
-                  }
-                }}
-                required
-                aria-required="true"
-                autoComplete="current-password"
-                aria-invalid={Boolean(fieldErrors.password)}
-                aria-describedby={fieldErrors.password ? 'login-password-error' : error ? 'login-error' : undefined}
-              />
+              <div className="auth-password-wrapper">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  id="login-password"
+                  placeholder="Enter your password"
+                  value={password}
+                  onChange={(e) => {
+                    setPassword(e.target.value);
+                    if (fieldErrors.password) {
+                      setFieldErrors((current) => ({ ...current, password: '' }));
+                    }
+                  }}
+                  required
+                  aria-required="true"
+                  autoComplete="current-password"
+                  aria-invalid={Boolean(fieldErrors.password)}
+                  aria-describedby={fieldErrors.password ? 'login-password-error' : error ? 'login-error' : undefined}
+                />
+                <button
+                  type="button"
+                  className="auth-password-toggle"
+                  onClick={() => setShowPassword((v) => !v)}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  tabIndex={-1}
+                >
+                  {showPassword ? '🙈' : '👁️'}
+                </button>
+              </div>
               {fieldErrors.password && (
                 <p className="form-field-error" id="login-password-error" role="alert">
                   {fieldErrors.password}

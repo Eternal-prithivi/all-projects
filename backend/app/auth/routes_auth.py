@@ -84,6 +84,15 @@ def register_user_route(request: Request, user: UserCreate, db: Collection = Dep
     if db.find_one({"username": user.username}):
         logger.warning(f"Registration failed: Username '{user.username}' already exists")
         raise ErrorResponses.conflict(f"Username '{user.username}' is already taken")
+
+    # Normalize email to lowercase for consistent lookups
+    normalized_email = str(user.email).lower().strip()
+
+    # NOTE: For production, ensure a unique index on the 'email' field in MongoDB:
+    #   db.users.create_index("email", unique=True, sparse=True)
+    if db.find_one({"email": normalized_email}):
+        logger.warning(f"Registration failed: Email '{normalized_email}' already in use")
+        raise ErrorResponses.conflict("An account with that email already exists")
     
     try:
         hashed_password = get_password_hash(user.password)
@@ -92,6 +101,8 @@ def register_user_route(request: Request, user: UserCreate, db: Collection = Dep
             hashed_password=hashed_password,
         )
         doc = user_in_db.model_dump()
+        # Store normalized email
+        doc["email"] = normalized_email
         require_verify = email_verification_required()
         if require_verify:
             token = secrets.token_urlsafe(32)

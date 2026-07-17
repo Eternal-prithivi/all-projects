@@ -83,7 +83,7 @@ export const validateLoginForm = ({ username, password }) => {
   return buildResult(errors);
 };
 
-export const validateRegisterForm = ({ username, email, password }) => {
+export const validateRegisterForm = ({ username, email, password, confirmPassword }) => {
   const errors = {};
   const usernameError = validateUsername(username);
   const emailValue = trimValue(email);
@@ -101,6 +101,16 @@ export const validateRegisterForm = ({ username, email, password }) => {
 
   if (passwordError) {
     errors.password = passwordError;
+  }
+
+  // Confirm password validation (only when the field is provided)
+  if (typeof confirmPassword === 'string') {
+    const confirmValue = confirmPassword.trim();
+    if (!confirmValue) {
+      errors.confirmPassword = 'Please confirm your password.';
+    } else if (password !== confirmPassword) {
+      errors.confirmPassword = 'Passwords do not match.';
+    }
   }
 
   return buildResult(errors);
