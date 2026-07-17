@@ -16,10 +16,6 @@
       "destination": "https://zenith-backend-707i.onrender.com/health"
     },
     {
-      "source": "/ws/:path*",
-      "destination": "https://zenith-backend-707i.onrender.com/ws/:path*"
-    },
-    {
       "source": "/docs",
       "destination": "https://zenith-backend-707i.onrender.com/docs"
     },
