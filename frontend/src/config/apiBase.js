@@ -63,8 +63,21 @@ export function apiUrl(apiPath) {
   return `${getApiBaseUrl()}${relative.startsWith('/') ? relative : `/${relative}`}`;
 }
 
-/** WebSocket origin (ws/wss) aligned with getApiRoot(). */
+/** WebSocket origin — always connects directly to the backend, NOT through
+ *  Vercel's same-origin /api proxy. Vercel does not support WebSocket
+ *  upgrade requests through its edge rewrites, so wss://rajverse.me would
+ *  return a non-101 HTTP response ("bad response from server"). */
 export function getWsRoot() {
-  const root = getApiRoot().replace(/\/$/, '');
-  return root.replace(/^http/i, 'ws');
+  // Use MODE check (not DEV) so vi.stubEnv('MODE', 'production') works in tests.
+  if (import.meta.env.MODE !== 'production') {
+    return 'ws://localhost:8000';
+  }
+  // In production, always go directly to the Render host (bypasses Vercel).
+  const fromEnv = import.meta.env.VITE_API_URL
+    ? String(import.meta.env.VITE_API_URL).replace(/\/api\/?$/i, '').replace(/\/$/, '')
+    : '';
+  const directRoot = (fromEnv && !isLocalhostUrl(fromEnv) && !isUnconfiguredCustomApiHost(fromEnv))
+    ? fromEnv
+    : PRODUCTION_API_ROOT;
+  return directRoot.replace(/^http/i, 'ws');
 }

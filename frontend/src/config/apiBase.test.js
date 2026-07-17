@@ -12,7 +12,7 @@ describe('apiBase', () => {
     delete global.window;
   });
 
-  it('uses same origin on rajverse.me to avoid ad-blocked Render host', async () => {
+  it('uses same origin on rajverse.me to avoid ad-blocked Render host (HTTP only)', async () => {
     global.window = {
       location: {
         origin: 'https://rajverse.me',
@@ -22,7 +22,8 @@ describe('apiBase', () => {
     const { getApiRoot, getApiBaseUrl, getWsRoot } = await import('./apiBase.js');
     expect(getApiRoot()).toBe('https://rajverse.me');
     expect(getApiBaseUrl()).toBe('https://rajverse.me/api');
-    expect(getWsRoot()).toBe('wss://rajverse.me');
+    // WebSockets must bypass Vercel (no WS proxy support) — go directly to Render.
+    expect(getWsRoot()).toBe('wss://zenith-backend-707i.onrender.com');
   });
 
   it('falls back to Render when not on rajverse.me', async () => {

@@ -216,8 +216,9 @@ const ProfileDropdown = () => {
             onClick={handleTeamClick}
           >
             <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden>
-              <path d="M7 14s-1 0-1-1 1-4 5-4 5 3 5 4 1 1 1 1-1-1-4-5-4-5-3-5-4-1-1-1-1 1 1 4 5 4 5 3 5 4 1 1 1 1-1z" />
-              <path d="M4 4a2 2 0 1 1 4 0 2 2 0 0 1-4 0zm7 0a2 2 0 1 1 4 0 2 2 0 0 1-4 0z" transform="translate(-1 0)" />
+              {/* Two-person "team" icon — valid SVG paths */}
+              <path d="M5 3a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm0 5c-2.2 0-4 1.12-4 2.5V11h8v-.5C9 9.12 7.2 8 5 8z" />
+              <path d="M11 3a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm1 5c-.37 0-.73.05-1.07.14C11.57 8.7 12 9.55 12 10.5V11h4v-.5C16 9.12 14.2 8 12 8z" opacity=".6" />
             </svg>
             Team
             {teamLocked && <FaLock className="profile-menu-lock" aria-hidden />}
