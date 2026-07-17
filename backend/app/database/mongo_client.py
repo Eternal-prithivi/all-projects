@@ -84,6 +84,7 @@ class MongoDB:
             self._create_index_if_missing("sessions", [("username", 1), ("last_active", -1)])
             self._create_index_if_missing("activity_log", [("username", 1), ("timestamp", -1)])
             self._ensure_users_unique_index()
+            self._ensure_users_email_unique_index()
             self._create_index_if_missing(
                 "byoc_credentials",
                 [("username", 1), ("csp", 1), ("is_active", 1)],
@@ -215,6 +216,54 @@ class MongoDB:
             collection.drop_index(name)
             break
         collection.create_index(keys, unique=True)
+
+    def _ensure_users_email_unique_index(self) -> None:
+        """
+        Ensure a sparse unique index on users.email.
+
+        sparse=True means documents with no 'email' field (e.g. SSO-only
+        accounts) are excluded from the uniqueness constraint, so they never
+        block each other.
+
+        Before creating/upgrading the index we check for existing duplicates so
+        we never crash on a DB that already has dirty data — matching the same
+        safety pattern used for users.username above.
+        """
+        if self.db is None:
+            return
+        collection = self.db["users"]
+        keys = [("email", 1)]
+
+        for name, info in list(collection.index_information().items()):
+            if info.get("key") != keys:
+                continue
+            if info.get("unique") and info.get("sparse"):
+                # Index already correct — nothing to do.
+                return
+            # Index exists but is missing unique/sparse — check for duplicates
+            # before dropping and recreating it.
+            dupes = list(
+                collection.aggregate(
+                    [
+                        {"$match": {"email": {"$exists": True, "$ne": None}}},
+                        {"$group": {"_id": "$email", "count": {"$sum": 1}}},
+                        {"$match": {"count": {"$gt": 1}}},
+                        {"$limit": 1},
+                    ]
+                )
+            )
+            if dupes:
+                logger.warning(
+                    "users.email index cannot be made unique: duplicate emails exist. "
+                    "Resolve duplicates in the database before re-deploying."
+                )
+                return
+            logger.info("Replacing non-unique users.email index %s with sparse unique index", name)
+            collection.drop_index(name)
+            break
+
+        collection.create_index(keys, unique=True, sparse=True, name="users_email_unique")
+        logger.info("✅ users.email unique sparse index ensured.")
 
     def _create_index_if_missing(self, collection_name: str, keys, **kwargs) -> None:
         collection = self.db[collection_name]
