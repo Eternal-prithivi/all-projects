@@ -85,23 +85,16 @@ function RegisterPage() {
 
     setIsLoading(true);
     setBackendWaking(true);
+    try {
+      const userData = {
+        username: username.trim(),
+        email: email.trim(),
+        password: password.trim(),
+      };
+      if (captchaToken) {
+        userData.captcha_token = captchaToken;
+      }
 
-    const userData = {
-      username: username.trim(),
-      email: email.trim(),
-      password: password.trim(),
-    };
-    if (captchaToken) {
-      userData.captcha_token = captchaToken;
-    }
-
-    const isColdStartError = (err) => {
-      const status = err?.response?.status ?? err?.status;
-      // No response at all (network unreachable) or 502 Bad Gateway = Render waking up
-      return !err?.response || status === 502 || status === 503;
-    };
-
-    const attemptRegister = async () => {
       const response = await registerUser(userData);
       const emailVerificationRequired = response?.data?.email_verification_required ?? false;
 
@@ -119,26 +112,9 @@ function RegisterPage() {
           navigate('/login', { replace: true, state: { registered: true, registeredUsername: username.trim() } });
         }, 2000);
       }
-    };
-
-    try {
-      await attemptRegister();
-    } catch (firstErr) {
-      if (isColdStartError(firstErr)) {
-        // Server is waking up — wait 15s and retry once automatically
-        setMessage('Server is waking up, retrying in a moment…');
-        await new Promise((resolve) => setTimeout(resolve, 15000));
-        setMessage('');
-        try {
-          await attemptRegister();
-        } catch (retryErr) {
-          resetCaptcha();
-          setError(getApiErrorMessage(retryErr, 'An error occurred during registration. Please try again.'));
-        }
-      } else {
-        resetCaptcha();
-        setError(getApiErrorMessage(firstErr, 'An error occurred during registration. Please try again.'));
-      }
+    } catch (err) {
+      resetCaptcha();
+      setError(getApiErrorMessage(err, 'An error occurred during registration. Please try again.'));
     } finally {
       setIsLoading(false);
       setBackendWaking(false);

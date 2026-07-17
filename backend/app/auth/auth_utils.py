@@ -13,6 +13,7 @@
 #   - Remove the 2fa_verified flag check from require_2fa() — breaks vault security
 # =============================================================================
 import bcrypt
+import os
 from datetime import datetime, timedelta
 from typing import Optional
 from fastapi import Depends, HTTPException, status, Request
@@ -22,13 +23,19 @@ from app.database.mongo_client import get_users_collection
 from app.users.user_model import UserInDB
 from app.utils.config import settings
 from fastapi import WebSocket, status, Query, Request
+
+# Bcrypt work factor — default 12 is ~250ms on modern CPUs but 5-15s on Render
+# free-tier 0.1 CPU. 10 rounds (~60ms modern, ~1-3s free-tier) is still above
+# the OWASP minimum and matches Django's default.
+_BCRYPT_ROUNDS = int(os.getenv("BCRYPT_ROUNDS", "10"))
+
 # --- existing password functions ---
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     return bcrypt.checkpw(plain_password.encode('utf-8'), hashed_password.encode('utf-8'))
 
 def get_password_hash(password: str) -> str:
-    return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+    return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt(rounds=_BCRYPT_ROUNDS)).decode('utf-8')
 
 # --- JWT authentication ---
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/auth/token", auto_error=False)

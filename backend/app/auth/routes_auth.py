@@ -113,22 +113,34 @@ def register_user_route(request: Request, user: UserCreate, db: Collection = Dep
         doc["created_at"] = datetime.utcnow()
         db.insert_one(doc)
 
+        # ── Fire-and-forget emails in background threads ────────────────
+        # Each SMTP call (Gmail STARTTLS + AUTH + SEND) takes 10-30s on
+        # Render free tier.  The user document is already persisted above,
+        # so there is zero data-loss risk if an email fails later.
+        import threading
+
         if require_verify:
             verify_link = f"{settings.FRONTEND_URL.rstrip('/')}/verify-email?token={token}"
             from app.trust.signup_guards import is_test_signup_email
 
             if not is_test_signup_email(user.email):
-                EmailService().send_verification_email(
-                    to_email=user.email,
-                    username=user.username,
-                    verify_link=verify_link,
-                )
+                threading.Thread(
+                    target=lambda: EmailService().send_verification_email(
+                        to_email=user.email,
+                        username=user.username,
+                        verify_link=verify_link,
+                    ),
+                    daemon=True,
+                ).start()
 
-        notify_new_user_signup(
-            username=user.username,
-            email=user.email,
-            source="register",
-        )
+        threading.Thread(
+            target=lambda: notify_new_user_signup(
+                username=user.username,
+                email=user.email,
+                source="register",
+            ),
+            daemon=True,
+        ).start()
 
         logger.info(f"User '{user.username}' registered successfully")
         return StandardResponse.success(
