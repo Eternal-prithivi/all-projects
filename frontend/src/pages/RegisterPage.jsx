@@ -30,6 +30,7 @@ function RegisterPage() {
 
   // Ref to track redirect timeout so we can cancel on unmount
   const redirectTimerRef = useRef(null);
+  const errorRef = useRef(null);
 
   const captchaRequired = Boolean(turnstileSiteKey());
 
@@ -114,7 +115,12 @@ function RegisterPage() {
       }
     } catch (err) {
       resetCaptcha();
-      setError(getApiErrorMessage(err, 'An error occurred during registration. Please try again.'));
+      const errorMsg = getApiErrorMessage(err, 'An error occurred during registration. Please try again.');
+      setError(errorMsg);
+      // Scroll the error message into view so the user always sees it
+      setTimeout(() => {
+        errorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 100);
     } finally {
       setIsLoading(false);
       setBackendWaking(false);
@@ -322,6 +328,9 @@ function RegisterPage() {
                 resetKey={turnstileResetKey}
               />
 
+              {message && <p className="auth-success" role="status" aria-live="polite">{message}</p>}
+              {error && <p className="auth-error" ref={errorRef} role="alert" aria-live="assertive">{error}</p>}
+
               <button 
                 type="submit" 
                 className="auth-submit-btn" 
@@ -337,9 +346,6 @@ function RegisterPage() {
                 Complete all password requirements above to create your account.
               </p>
             )}
-
-            {message && <p className="auth-success" role="status" aria-live="polite">{message}</p>}
-            {error && <p className="auth-error" role="alert" aria-live="assertive">{error}</p>}
           </form>
 
           <div className="auth-footer-link">

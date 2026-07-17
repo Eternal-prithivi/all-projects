@@ -83,7 +83,10 @@ def register_user_route(request: Request, user: UserCreate, db: Collection = Dep
     
     if db.find_one({"username": user.username}):
         logger.warning(f"Registration failed: Username '{user.username}' already exists")
-        raise ErrorResponses.conflict(f"Username '{user.username}' is already taken")
+        raise ErrorResponses.conflict(
+            f"Username '{user.username}' is already taken. "
+            f"Try signing in instead, or choose a different username."
+        )
 
     # Normalize email to lowercase for consistent lookups
     normalized_email = str(user.email).lower().strip()
@@ -92,7 +95,10 @@ def register_user_route(request: Request, user: UserCreate, db: Collection = Dep
     #   db.users.create_index("email", unique=True, sparse=True)
     if db.find_one({"email": normalized_email}):
         logger.warning(f"Registration failed: Email '{normalized_email}' already in use")
-        raise ErrorResponses.conflict("An account with that email already exists")
+        raise ErrorResponses.conflict(
+            "An account with that email already exists. "
+            "Try signing in instead, or use 'Forgot password' to recover your account."
+        )
     
     try:
         hashed_password = get_password_hash(user.password)
