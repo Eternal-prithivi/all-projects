@@ -23,6 +23,7 @@ function RegisterPage() {
   const [error, setError] = useState('');
   const [fieldErrors, setFieldErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
+  const [backendWaking, setBackendWaking] = useState(false);
   const [registrationComplete, setRegistrationComplete] = useState(false);
   const [captchaToken, setCaptchaToken] = useState('');
   const [turnstileResetKey, setTurnstileResetKey] = useState(0);
@@ -83,15 +84,24 @@ function RegisterPage() {
     }
 
     setIsLoading(true);
-    try {
-      const userData = {
-        username: username.trim(),
-        email: email.trim(),
-        password: password.trim(),
-      };
-      if (captchaToken) {
-        userData.captcha_token = captchaToken;
-      }
+    setBackendWaking(true);
+
+    const userData = {
+      username: username.trim(),
+      email: email.trim(),
+      password: password.trim(),
+    };
+    if (captchaToken) {
+      userData.captcha_token = captchaToken;
+    }
+
+    const isColdStartError = (err) => {
+      const status = err?.response?.status ?? err?.status;
+      // No response at all (network unreachable) or 502 Bad Gateway = Render waking up
+      return !err?.response || status === 502 || status === 503;
+    };
+
+    const attemptRegister = async () => {
       const response = await registerUser(userData);
       const emailVerificationRequired = response?.data?.email_verification_required ?? false;
 
@@ -109,11 +119,29 @@ function RegisterPage() {
           navigate('/login', { replace: true, state: { registered: true, registeredUsername: username.trim() } });
         }, 2000);
       }
-    } catch (err) {
-      resetCaptcha();
-      setError(getApiErrorMessage(err, 'An error occurred during registration. Please try again.'));
+    };
+
+    try {
+      await attemptRegister();
+    } catch (firstErr) {
+      if (isColdStartError(firstErr)) {
+        // Server is waking up — wait 15s and retry once automatically
+        setMessage('Server is waking up, retrying in a moment…');
+        await new Promise((resolve) => setTimeout(resolve, 15000));
+        setMessage('');
+        try {
+          await attemptRegister();
+        } catch (retryErr) {
+          resetCaptcha();
+          setError(getApiErrorMessage(retryErr, 'An error occurred during registration. Please try again.'));
+        }
+      } else {
+        resetCaptcha();
+        setError(getApiErrorMessage(firstErr, 'An error occurred during registration. Please try again.'));
+      }
     } finally {
       setIsLoading(false);
+      setBackendWaking(false);
     }
   };
 
@@ -170,6 +198,11 @@ function RegisterPage() {
         <div className="auth-form-wrapper">
           <div className="auth-form-header">
             <h2>Create your account</h2>
+            {backendWaking && (
+              <p className="auth-hint" role="status">
+                Waking the cloud API — first visit after idle can take up to a minute on free hosting…
+              </p>
+            )}
             <p>Already have an account? <Link to="/login">Sign in</Link></p>
           </div>
 
